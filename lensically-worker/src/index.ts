@@ -97,6 +97,8 @@ import {
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
 import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
+import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
+
 import {
   buildOperatorMcpRuntimeHeaders,
   operatorTransportFailureResponse,
@@ -11644,391 +11646,129 @@ async function persistManifestAutonomousPost(
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  if (brand.brand_key !== "manifest_mental") return { success: false, error: "manifest_only" };
-  const profile = await getOperatorAutonomyProfile(env, brand.brand_key);
-  if (String(profile?.mode ?? "") !== MANIFEST_AUTONOMY_MODE) {
-    return { success: false, error: "autonomous_operator_mode_required", current_mode: profile?.mode ?? null };
-  }
-  const operationId = normalizeOperatorText(payload.operation_id, 240, true);
-  if (!operationId) return { success: false, error: "stable_operation_id_required" };
-  const cycleId = normalizeOperatorText(payload.cycle_id, 120);
-  if (!cycleId) return { success: false, error: "autonomous_cycle_id_required" };
-    const cycle = await readManifestAutonomousCycle(env, brand.brand_key, cycleId);
-  if (!cycle) return { success: false, error: "autonomous_cycle_not_found" };
-  const rejectPersist = async (
-    error: string,
-    details: Record<string, unknown> = {},
-    slotKey: string | null = null,
-  ): Promise<Record<string, unknown>> => {
-    await appendManifestCycleEvent(env.DB, {
-      cycleId,
-      brandKey: brand.brand_key,
-      eventKey: `rejected:${operationId}`,
-      eventType: "candidate_rejected",
-      slotKey,
-      payload: { operation_id: operationId, error, ...details },
-    });
-        return { success: false, error, ...details };
-  };
-  const requestedCycleStrategyId = normalizeOperatorText(payload.cycle_strategy_id, 160);
-  const requestedCyclePlanItemId = normalizeOperatorText(payload.cycle_plan_item_id, 160);
-  const cycleStrategy = await getManifestCycleStrategy(env.DB, cycleId, brand.brand_key);
-  if (!cycleStrategy) return rejectPersist("manifest_cycle_strategy_required_before_persist");
-  if (!requestedCycleStrategyId || String(cycleStrategy.id ?? "") !== requestedCycleStrategyId) {
-    return rejectPersist("manifest_cycle_strategy_mismatch", {
-      expected_cycle_strategy_id: cycleStrategy.id ?? null,
-      received_cycle_strategy_id: requestedCycleStrategyId ?? null,
-    });
-  }
-  const evidenceConsumption = await getManifestEvidenceConsumptionState(env.DB, cycleId, brand.brand_key);
-  if (evidenceConsumption.complete !== true) {
-    return rejectPersist("manifest_analysis_pages_not_fully_consumed", evidenceConsumption);
-  }
-  if (!requestedCyclePlanItemId) return rejectPersist("manifest_cycle_plan_item_required");
-    const post = payload.post && typeof payload.post === "object" && !Array.isArray(payload.post)
-    ? payload.post as Record<string, unknown>
-    : {};
-  const rawPostStrategy = post.strategy && typeof post.strategy === "object" && !Array.isArray(post.strategy)
-    ? post.strategy as Record<string, unknown>
-    : {};
-  const {
-    hypothesis: embeddedHypothesis,
-    source_context: embeddedSourceContext,
-    ...postStrategy
-  } = rawPostStrategy;
-  const modelEvaluation = payload.model_evaluation && typeof payload.model_evaluation === "object" && !Array.isArray(payload.model_evaluation)
-    ? payload.model_evaluation as Record<string, unknown>
-    : {};
-  const hypothesisValidation = validateManifestPostHypothesis(post.hypothesis ?? embeddedHypothesis);
-  if (!hypothesisValidation.ok) {
-    return rejectPersist("post_hypothesis_invalid", { details: hypothesisValidation.errors });
-  }
-  const sourceContextValidation = normalizeManifestSourceContext(post.source_context ?? embeddedSourceContext);
-    if (!sourceContextValidation.ok) {
-    return rejectPersist("source_context_invalid", { details: sourceContextValidation.errors });
-  }
-  if (["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)
-    && !sourceContextValidation.value.source_card_id
-    && !sourceContextValidation.value.source_selection_id) {
-        return rejectPersist("existing_source_card_lineage_required");
-  }
-  const candidateTrace = Array.isArray(modelEvaluation.candidate_trace)
-    ? modelEvaluation.candidate_trace.filter((item) => item && typeof item === "object" && !Array.isArray(item)).slice(0, 12) as Record<string, unknown>[]
-    : [];
-    if (modelEvaluation.generation_passed !== true || modelEvaluation.scheduling_passed !== true) {
-    return rejectPersist("model_evaluation_not_passed");
-  }
-    const noveltyAssessment = normalizeOperatorText(modelEvaluation.novelty_assessment, 4000);
-  const winnerPreservationAssessment = normalizeOperatorText(modelEvaluation.winner_preservation_assessment, 4000);
-  const slotPlacementAssessment = normalizeOperatorText(modelEvaluation.slot_placement_assessment, 4000);
-    const recentExposureAssessment = normalizeOperatorText(modelEvaluation.recent_exposure_assessment, 4000);
-  const intelligenceApplicationAssessment = normalizeOperatorText(modelEvaluation.intelligence_application_assessment, 4000, true);
-  if (!noveltyAssessment || !winnerPreservationAssessment || !slotPlacementAssessment || !recentExposureAssessment) {
-        return rejectPersist("model_evaluation_incomplete", {
-      required_fields: [
-        "novelty_assessment",
-        "winner_preservation_assessment",
-        "slot_placement_assessment",
-        "recent_exposure_assessment",
-      ],
-    });
-  }
-      const effectiveStrategicThesis = cycleStrategy;
-  const cycleStrategicThesisReused = true;
-  const outputStrategyVersion = { id: String(cycleStrategy.id ?? requestedCycleStrategyId) };
-  const followerBoundary = validateManifestFollowerAttributionBoundary({
-    cycle_strategy: cycleStrategy,
-    post_strategy: postStrategy,
-    model_evaluation: modelEvaluation,
-  });
-    if (!followerBoundary.ok) {
-    return rejectPersist("follower_attribution_forbidden", { details: followerBoundary.errors });
-  }
-  const date = normalizeOperatorText(post.date, 20);
-  const time = normalizeOperatorText(post.time, 20);
-  const text = normalizeOperatorText(post.text, 20000);
-  const generationMode = normalizeOperatorMachineKey(post.generation_mode, "");
-  const familyKey = normalizeOperatorMachineKey(post.family_key, "");
-  const sourceMechanism = normalizeOperatorText(post.source_mechanism, 4000);
-  const audienceReward = normalizeOperatorText(post.audience_reward, 4000);
-  const strategicPurpose = normalizeOperatorText(post.strategic_purpose, 4000);
-  const slotKey = date && time ? `${date}T${time}` : "";
-        const allowedSourceBackedGenerationModes = new Set([
-    "franchise_deployment",
-    "controlled_variation",
-    "mechanism_expansion",
-    "adjacent_experiment",
-  ]);
-  if (!date || !time || !text || !familyKey || !sourceMechanism || !audienceReward || !strategicPurpose
-    || !allowedSourceBackedGenerationModes.has(generationMode)) {
-    return rejectPersist("invalid_source_backed_autonomous_post", {
-      allowed_generation_modes: Array.from(allowedSourceBackedGenerationModes),
-    }, slotKey || null);
-  }
-  if (!["saved_pattern", "source_card"].includes(sourceContextValidation.value.kind)
-    || !sourceContextValidation.value.source_card_id) {
-    return rejectPersist("canonical_source_card_required", {
-      received_source_kind: sourceContextValidation.value.kind,
-      corrective_action: "Create or recover a locked canonical source card from a qualified Saved Pattern or proven prior winner before generation.",
-    }, slotKey || null);
-  }
-
-  const targetSlots = Array.isArray(cycle.target_slots)
-    ? cycle.target_slots as Array<{ key: string; date: string; time: string }>
-    : [];
-                  const targetSlot = targetSlots.find((slot) => slot.key === slotKey);
-  if (!targetSlot) return rejectPersist("slot_outside_prepared_cycle", { slot_key: slotKey }, slotKey);
-  const cyclePlanItem = await getManifestCyclePlanItem(env.DB, cycleId, brand.brand_key, slotKey);
-  if (!cyclePlanItem || String(cyclePlanItem.id ?? "") !== requestedCyclePlanItemId) {
-    return rejectPersist("manifest_cycle_plan_item_mismatch", {
-      slot_key: slotKey,
-      expected_cycle_plan_item_id: cyclePlanItem?.id ?? null,
-      received_cycle_plan_item_id: requestedCyclePlanItemId,
-    }, slotKey);
-  }
-  if (String(cyclePlanItem.strategy_id ?? "") !== requestedCycleStrategyId
-    || String(cyclePlanItem.source_card_id ?? "") !== String(sourceContextValidation.value.source_card_id ?? "")
-    || normalizeOperatorMachineKey(cyclePlanItem.family_key, "") !== familyKey
-    || normalizeOperatorMachineKey(cyclePlanItem.generation_mode, "") !== generationMode) {
-    return rejectPersist("candidate_does_not_match_locked_cycle_plan", {
-      slot_key: slotKey,
-      planned_family_key: cyclePlanItem.family_key ?? null,
-      planned_generation_mode: cyclePlanItem.generation_mode ?? null,
-      planned_source_card_id: cyclePlanItem.source_card_id ?? null,
-    }, slotKey);
-  }
-  let postHypothesis = await recordManifestPostHypothesis(env.DB, {
-    cycleId,
+  const admission = await admitOperatorManifestPersistence({
     brandKey: brand.brand_key,
-    slotKey,
-    strategyVersionId: normalizeOperatorText(outputStrategyVersion.id, 160, true),
-    source: sourceContextValidation.value,
-    hypothesis: hypothesisValidation.value,
-    candidateTrace,
-    modelEvaluation,
-  });
-  await appendManifestCycleEvent(env.DB, {
-    cycleId,
-    brandKey: brand.brand_key,
-    eventKey: `candidate:${operationId}`,
-    eventType: "candidate_evaluated",
-    slotKey,
-    payload: {
-      operation_id: operationId,
-      text,
-      generation_mode: generationMode,
-      family_key: familyKey,
-      source_context: sourceContextValidation.value,
-      hypothesis_id: postHypothesis.id ?? null,
-      candidate_trace: candidateTrace,
-      model_evaluation: modelEvaluation,
-    },
-  });
-  const timezone = String(cycle.timezone ?? WORKSPACE_DEFAULT_TIMEZONE);
-  const cycleAccountPosition = cycle.account_position && typeof cycle.account_position === "object" && !Array.isArray(cycle.account_position)
-    ? cycle.account_position as Record<string, unknown>
-    : {};
-  const cycleClock = cycleAccountPosition.clock && typeof cycleAccountPosition.clock === "object" && !Array.isArray(cycleAccountPosition.clock)
-    ? cycleAccountPosition.clock as Record<string, unknown>
-    : {};
-  const preparedClockMs = parseOperatorTimestampMs(cycleClock.effective_now_iso);
-  const reconciliationNowMs = Math.max(Date.now(), preparedClockMs ?? 0);
-  const reconcileNonfatalSlot = async (
-    outcome: "slot_already_covered" | "slot_elapsed",
-    evidence: Record<string, unknown> | null,
-  ): Promise<Record<string, unknown>> => {
-    const liveCoverage = await buildManifestAutonomousCoverageLedger(
+    accountId: brand.account_id,
+    threadsUserId: brand.profile.threads_user_id,
+    payload,
+  }, {
+    autonomyMode: MANIFEST_AUTONOMY_MODE,
+    workspaceDefaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    allowedGenerationModes: [
+      "franchise_deployment",
+      "controlled_variation",
+      "mechanism_expansion",
+      "adjacent_experiment",
+    ],
+    getAutonomyProfile: (brandKey) => getOperatorAutonomyProfile(env, brandKey),
+    normalizeText: normalizeOperatorText,
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    readCycle: (brandKey, cycleId) => readManifestAutonomousCycle(env, brandKey, cycleId) as Promise<Record<string, unknown> | null>,
+    appendCycleEvent: (input) => appendManifestCycleEvent(env.DB, input as Parameters<typeof appendManifestCycleEvent>[1]),
+    getCycleStrategy: (cycleId, brandKey) => getManifestCycleStrategy(env.DB, cycleId, brandKey) as Promise<Record<string, unknown> | null>,
+    getEvidenceConsumption: (cycleId, brandKey) => getManifestEvidenceConsumptionState(env.DB, cycleId, brandKey),
+    validateHypothesis: validateManifestPostHypothesis,
+    normalizeSourceContext: normalizeManifestSourceContext,
+    validateFollowerBoundary: validateManifestFollowerAttributionBoundary,
+    getCyclePlanItem: (cycleId, brandKey, slotKey) => getManifestCyclePlanItem(env.DB, cycleId, brandKey, slotKey),
+    recordHypothesis: (input) => recordManifestPostHypothesis(env.DB, input as Parameters<typeof recordManifestPostHypothesis>[1]),
+    parseTimestampMs: parseOperatorTimestampMs,
+    nowMs: () => Date.now(),
+    buildCoverage: (targetSlots, timezone, effectiveNowMs) => buildManifestAutonomousCoverageLedger(
       env,
       brand,
       targetSlots,
       timezone,
-      reconciliationNowMs,
-    );
-    const liveMissing = targetSlots.filter((slot) => {
-      const slotUtc = convertLocalDateTimeToUtcIso(slot.date, slot.time, timezone);
-      const slotMs = parseOperatorTimestampMs(slotUtc);
-      return slotMs !== null && slotMs > reconciliationNowMs && !liveCoverage.occupied.has(slot.key);
-    });
-    await env.DB.prepare(
+      effectiveNowMs,
+    ),
+    convertLocalDateTimeToUtcIso,
+    updateCycleCoverage: (input) => env.DB.prepare(
       `UPDATE operator_autonomous_growth_cycles
        SET status = ?, missing_slots_json = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND brand_key = ?`,
     ).bind(
-      liveMissing.length > 0 ? "partially_committed" : "completed",
-      normalizeOperatorJson(liveMissing, []),
-      cycleId,
-      brand.brand_key,
-    ).run();
-    return {
-      success: true,
-      persisted: false,
-      outcome,
-      slot_key: slotKey,
-      preserved_existing: outcome === "slot_already_covered",
-      occupied_evidence: evidence,
-      collision_reconciled: true,
-      candidate_requires_reslot: liveMissing.length > 0,
-      next_missing_slot: liveMissing[0] ?? null,
-      authoritative_missing_slots: liveMissing.slice(0, 12),
-      remaining_missing_count: liveMissing.length,
-      next_action: liveMissing.length > 0
-        ? "Re-evaluate the candidate for the returned next_missing_slot, use that slot's deterministic operation id, and continue without stopping."
-        : "The prepared horizon is covered; verify lineage, scheduler health, and delivery incidents.",
-    };
-  };
-  const existingLineup = await env.DB.prepare(
-        `SELECT source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
-     FROM operator_autonomous_lineup_items
-     WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
-     ORDER BY datetime(updated_at) DESC LIMIT 1`,
-  ).bind(cycleId, brand.brand_key, slotKey).first<Record<string, unknown>>();
-      const existingLineupScheduledPostId = existingLineup?.scheduled_post_id
-    ? Number(existingLineup.scheduled_post_id)
-    : null;
-  const existingScheduledPost = existingLineupScheduledPostId
-    ? await env.DB.prepare(
-        `SELECT id, scheduled_time FROM scheduled_posts
-         WHERE id = ? AND threads_user_id = ? LIMIT 1`,
-      ).bind(existingLineupScheduledPostId, brand.profile.threads_user_id)
-        .first<{ id: number | string; scheduled_time: string }>()
-    : null;
-  const existingScheduledPostId = existingScheduledPost
-    ? Number(existingScheduledPost.id)
-    : null;
-  if (existingLineupScheduledPostId && !existingScheduledPost) {
-    await env.DB.prepare(
+      input.status,
+      normalizeOperatorJson(input.missingSlots, []),
+      input.cycleId,
+      input.brandKey,
+    ).run(),
+    readExistingLineup: (cycleId, brandKey, slotKey) => env.DB.prepare(
+      `SELECT source_card_id, source_selection_id, hypothesis_id, generation_run_id, draft_id, scheduled_post_id, status
+       FROM operator_autonomous_lineup_items
+       WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?
+       ORDER BY datetime(updated_at) DESC LIMIT 1`,
+    ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>(),
+    readScheduledPost: (scheduledPostId, threadsUserId) => env.DB.prepare(
+      `SELECT id, scheduled_time FROM scheduled_posts
+       WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+    ).bind(scheduledPostId, threadsUserId).first<Record<string, unknown>>(),
+    markLineupStale: (input) => env.DB.prepare(
       `UPDATE operator_autonomous_lineup_items
        SET scheduled_post_id = NULL, status = 'stale', updated_at = CURRENT_TIMESTAMP
        WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND scheduled_post_id = ?`,
-    ).bind(cycleId, brand.brand_key, slotKey, existingLineupScheduledPostId).run();
-  }
-  if (existingScheduledPostId && String(existingLineup?.status ?? "") === "scheduled") {
-    const existingLineage = await getScheduledPostPublishLineageStatus(
+    ).bind(input.cycleId, input.brandKey, input.slotKey, input.scheduledPostId).run(),
+    getPublishLineage: (scheduledPostId, threadsUserId) => getScheduledPostPublishLineageStatus(
       env,
-      existingScheduledPostId,
-      brand.profile.threads_user_id,
-    );
-                if (existingLineage.complete === true) {
-      const priorPersistEvent = await env.DB.prepare(
-        `SELECT event_type, payload_json
-         FROM operator_manifest_cycle_receipt_events
-         WHERE cycle_id = ? AND event_key = ? LIMIT 1`,
-      ).bind(cycleId, `persist:${operationId}`).first<Record<string, unknown>>();
-      const priorPersistPayload = priorPersistEvent?.payload_json
-        ? safeParseJsonString(String(priorPersistEvent.payload_json))
-        : null;
-      const priorPersistPayloadRecord = priorPersistPayload && typeof priorPersistPayload === "object" && !Array.isArray(priorPersistPayload)
-        ? priorPersistPayload as Record<string, unknown>
-        : {};
-      const priorScheduledPostId = Number(priorPersistPayloadRecord.scheduled_post_id ?? 0);
-      if (["post_persisted", "post_reused"].includes(String(priorPersistEvent?.event_type ?? ""))
-        && priorScheduledPostId === existingScheduledPostId) {
-        return {
-          success: true,
-          reused: true,
-          replayed_persist_event: true,
-          slot_key: slotKey,
-          scheduled_post_id: existingScheduledPostId,
-          lineage: existingLineage.lineage ?? {
-            source_card_id: existingLineup?.source_card_id ?? null,
-            source_selection_id: existingLineup?.source_selection_id ?? null,
-            generation_run_id: existingLineup?.generation_run_id ?? null,
-            draft_id: existingLineup?.draft_id ?? null,
-          },
-          publish_lineage_complete: true,
-          hypothesis_id: priorPersistPayloadRecord.hypothesis_id ?? postHypothesis.id ?? null,
-          strategy_version_id: priorPersistPayloadRecord.strategy_version_id ?? outputStrategyVersion.id ?? null,
-          experiment_assignment: priorPersistPayloadRecord.experiment_assignment ?? null,
-          decision_influence: priorPersistPayloadRecord.decision_influence ?? null,
-          coverage_reconciliation_required: true,
-        };
-      }
-      await linkManifestHypothesisResult(env.DB, {
-        cycleId,
-        slotKey,
-        scheduledPostId: existingScheduledPostId,
-        status: "reused",
-        hypothesisId: normalizeOperatorText(postHypothesis.id, 160, true),
-        sourceSelectionId: normalizeOperatorText(existingLineup?.source_selection_id, 160, true)
-          ?? sourceContextValidation.value.source_selection_id,
-      });
-            await upsertManifestSemanticSignature(env.DB, {
-        brand_key: brand.brand_key,
-        content_type: "scheduled",
-        content_id: String(existingScheduledPostId),
-        text,
-        metadata: {
-                    ...postStrategy,
-          family_key: familyKey,
-          source_mechanism: sourceMechanism,
-          audience_reward: audienceReward,
-          strategic_purpose: strategicPurpose,
-        },
-        scheduled_post_id: existingScheduledPostId,
-        observed_at: existingScheduledPost?.scheduled_time ?? null,
-      });
-            const reusedExperimentAssignment = await registerManifestExperimentAssignment(env.DB, {
-        brand_key: brand.brand_key,
-        cycle_id: cycleId,
-        slot_key: slotKey,
-        family_key: familyKey,
-        hypothesis_id: String(postHypothesis.id ?? ""),
-        scheduled_post_id: existingScheduledPostId,
-        experiment: hypothesisValidation.value.experiment,
-      });
-      const reusedDecisionInfluence = await recordManifestDecisionInfluence(env.DB, {
-        brand_key: brand.brand_key,
-        cycle_id: cycleId,
-        slot_key: slotKey,
-        scheduled_post_id: existingScheduledPostId,
-        hypothesis_id: String(postHypothesis.id ?? ""),
-        input_strategy_version_id: normalizeOperatorText(cycle.strategy_version_id, 160, true),
-        output_strategy_version_id: normalizeOperatorText(outputStrategyVersion.id, 160, true),
-        family_key: familyKey,
-        generation_mode: generationMode,
-        source_context: sourceContextValidation.value as unknown as Record<string, unknown>,
-                strategic_thesis: effectiveStrategicThesis,
-        model_evaluation: { ...modelEvaluation, intelligence_application_assessment: intelligenceApplicationAssessment },
-        semantic_repetition: {},
-        experiment_assignment: reusedExperimentAssignment,
-      });
-      await appendManifestCycleEvent(env.DB, {
-        cycleId,
-        brandKey: brand.brand_key,
-        eventKey: `persist:${operationId}`,
-        eventType: "post_reused",
-        slotKey,
-        payload: {
-          scheduled_post_id: existingScheduledPostId,
-                    publish_lineage_complete: true,
-          experiment_assignment: reusedExperimentAssignment,
-          decision_influence: reusedDecisionInfluence,
-        },
-      });
-      return {
-        success: true,
-        reused: true,
-        slot_key: slotKey,
-        scheduled_post_id: existingScheduledPostId,
-        lineage: existingLineage.lineage ?? {
-          source_card_id: existingLineup?.source_card_id ?? null,
-          generation_run_id: existingLineup?.generation_run_id ?? null,
-          draft_id: existingLineup?.draft_id ?? null,
-        },
-                publish_lineage_complete: true,
-        hypothesis_id: postHypothesis.id ?? null,
-                strategy_version_id: outputStrategyVersion.id ?? null,
-                experiment_assignment: reusedExperimentAssignment,
-        decision_influence: reusedDecisionInfluence,
-        coverage_reconciliation_required: true,
-      };
-    }
-  }
-    const scheduledUtc = convertLocalDateTimeToUtcIso(date, time, timezone);
-    if (!scheduledUtc) return rejectPersist("invalid_date_time", { slot_key: slotKey }, slotKey);
-  if ((parseOperatorTimestampMs(scheduledUtc) ?? 0) <= reconciliationNowMs && !existingScheduledPostId) {
-    return reconcileNonfatalSlot("slot_elapsed", null);
-  }
+      scheduledPostId,
+      threadsUserId,
+    ),
+    readPersistEvent: (cycleId, operationId) => env.DB.prepare(
+      `SELECT event_type, payload_json
+       FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ? AND event_key = ? LIMIT 1`,
+    ).bind(cycleId, `persist:${operationId}`).first<Record<string, unknown>>(),
+    parseJson: safeParseJsonString,
+    linkHypothesisResult: (input) => linkManifestHypothesisResult(env.DB, input as Parameters<typeof linkManifestHypothesisResult>[1]),
+    upsertSemanticSignature: (input) => upsertManifestSemanticSignature(env.DB, input as Parameters<typeof upsertManifestSemanticSignature>[1]),
+    registerExperimentAssignment: (input) => registerManifestExperimentAssignment(env.DB, input as Parameters<typeof registerManifestExperimentAssignment>[1]),
+    recordDecisionInfluence: (input) => recordManifestDecisionInfluence(env.DB, input as Parameters<typeof recordManifestDecisionInfluence>[1]),
+  });
+  if (admission.handled) return admission.response;
+  const {
+    cycle,
+    operationId,
+    cycleId,
+    requestedCycleStrategyId,
+    requestedCyclePlanItemId,
+    post,
+    postStrategy,
+    modelEvaluation,
+    hypothesis,
+    sourceContext,
+    candidateTrace,
+    noveltyAssessment,
+    winnerPreservationAssessment,
+    slotPlacementAssessment,
+    recentExposureAssessment,
+    intelligenceApplicationAssessment,
+    effectiveStrategicThesis,
+    cycleStrategicThesisReused,
+    outputStrategyVersion,
+    date,
+    time,
+    text,
+    generationMode,
+    familyKey,
+    sourceMechanism,
+    audienceReward,
+    strategicPurpose,
+    slotKey,
+    targetSlots,
+    postHypothesis: admittedPostHypothesis,
+    timezone,
+    reconciliationNowMs,
+    existingLineup,
+    existingScheduledPostId,
+    scheduledUtc,
+    rejectPersist,
+    reconcileNonfatalSlot,
+  } = admission.context;
+  const hypothesisValidation = { ok: true as const, value: hypothesis };
+  const sourceContextValidation = { ok: true as const, value: sourceContext };
+  let postHypothesis = admittedPostHypothesis;
+
+  
+  
   await ensureScheduledPostsTable(env);
   const scheduleIdempotencyKey = await buildScheduledPostIdempotencyKey(
     WORKSPACE_APP_USER_ID,
