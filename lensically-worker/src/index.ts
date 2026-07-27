@@ -98,6 +98,8 @@ import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageSer
 import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
+import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
+
 
 import {
   buildOperatorMcpRuntimeHeaders,
