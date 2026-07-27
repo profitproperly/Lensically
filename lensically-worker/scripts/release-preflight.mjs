@@ -47,6 +47,8 @@ const operatorManifestCycleService = read("src/operatorManifestCycleService.ts")
 const operatorManifestCycleServiceTests = read("test/operatorManifestCycleService.spec.ts");
 const operatorHourlyCoverageService = read("src/operatorHourlyCoverageService.ts");
 const operatorHourlyCoverageServiceTests = read("test/operatorHourlyCoverageService.spec.ts");
+const operatorManifestPrepareCheckpointService = read("src/operatorManifestPrepareCheckpointService.ts");
+const operatorManifestPrepareCheckpointServiceTests = read("test/operatorManifestPrepareCheckpointService.spec.ts");
 
 
 
@@ -147,6 +149,9 @@ if (!workflow.includes("test/operatorManifestCycleService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorHourlyCoverageService.spec.ts")) {
   errors.push("operator_hourly_coverage_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorManifestPrepareCheckpointService.spec.ts")) {
+  errors.push("operator_manifest_prepare_checkpoint_service_workflow_gate_missing");
 }
 
 
@@ -645,6 +650,34 @@ if (!operatorHourlyCoverageServiceTests.includes("preserves generic bounded hour
     || !operatorHourlyCoverageServiceTests.includes("repairs authoritative Manifest ledger drift and selects the next locked plan item")
     || !operatorHourlyCoverageServiceTests.includes("finalizes complete coverage while ignoring elapsed unfilled slots")) {
   lifecycleErrors.push("operator_hourly_coverage_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorManifestPrepareCheckpointService"')
+    || !source.includes("handleOperatorManifestPrepareCheckpoint({")
+    || !source.includes("if (checkpointResult.handled) return checkpointResult.response;")) {
+  lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_import_or_binding_missing");
+}
+if (source.includes('error: "manifest_live_collection_checkpoint_missing"')
+    || source.includes('stage_completed: "manifest_intelligence_semantic"')
+    || source.includes('stage_completed: "manifest_intelligence_learning_batch"')
+    || source.includes('next_stage: "manifest_measurement_audit"')) {
+  lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_returned_to_index");
+}
+if (!operatorManifestPrepareCheckpointService.includes("export async function handleOperatorManifestPrepareCheckpoint")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.getAutonomyProfile")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.readCheckpoint")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshThreadsSnapshot")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshIntelligenceEngine")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshMeasurementAudit")
+    || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshContentFocus")
+    || !operatorManifestPrepareCheckpointService.includes('phase: "learning_observations"')
+    || !operatorManifestPrepareCheckpointService.includes('phase: "cycle_construction"')) {
+  lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_module_incomplete");
+}
+if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission and idempotency mismatch blocking")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("checkpoints bounded live collection before evaluator recomputation")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("persists bounded learning continuation offsets")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
+  lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");
 }
 
 
