@@ -9,7 +9,7 @@ type JsonRecord = Record<string, unknown>;
 
 type CompiledProfileResult =
   | (JsonRecord & { ok: true; profile_id: string; request: JsonRecord })
-  | (JsonRecord & { ok: false; error?: unknown; profile_id?: string });
+    | (JsonRecord & { ok: false; error?: unknown; profile_id?: string | null });
 
 type PreparedGatewayResult =
   | (JsonRecord & {
