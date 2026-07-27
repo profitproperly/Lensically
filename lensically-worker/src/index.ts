@@ -12063,7 +12063,150 @@ async function persistManifestAutonomousPost(
       source_context_errors: sourceContextValidation.ok ? [] : sourceContextValidation.errors,
     }, slotKey);
   }
+    return persistOperatorManifestCandidate({
+    brandKey: brand.brand_key,
+    accountId: brand.account_id,
+    threadsUserId: brand.profile.threads_user_id,
+    context: admission.context,
+  }, {
+    growthEngineVersion: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION,
+    normalizeText: normalizeOperatorText,
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    normalizeJson: normalizeOperatorJson,
+    ensureScheduledPosts: () => ensureScheduledPostsTable(env),
+    buildScheduleIdempotencyKey: ({ threadsUserId, scheduledUtc, text }) => buildScheduledPostIdempotencyKey(
+      WORKSPACE_APP_USER_ID,
+      threadsUserId,
+      scheduledUtc,
+      text,
+      buildSpoilerFingerprint(false, []),
+    ),
+    readExactScheduledByKey: (idempotencyKey) => env.DB.prepare(
+      `SELECT id, scheduled_time FROM scheduled_posts WHERE idempotency_key = ? LIMIT 1`,
+    ).bind(idempotencyKey).first<{ id: number | string; scheduled_time: string }>(),
+    readScheduledById: (scheduledPostId, threadsUserId) => env.DB.prepare(
+      `SELECT id, scheduled_time FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
+    ).bind(scheduledPostId, threadsUserId).first<{ id: number | string; scheduled_time: string }>(),
+    buildCoverage: (targetSlots, timezone, effectiveNowMs) => buildManifestAutonomousCoverageLedger(
+      env,
+      brand,
+      targetSlots,
+      timezone,
+      effectiveNowMs,
+    ),
+    findExactDuplicate: ({ threadsUserId, text, idempotencyKey, excludedScheduledPostId }) => env.DB.prepare(
+      `SELECT id, status, scheduled_time FROM scheduled_posts
+       WHERE threads_user_id = ? AND lower(trim(post_text)) = lower(trim(?))
+         AND COALESCE(idempotency_key, '') <> ? AND id <> ?
+       ORDER BY id DESC LIMIT 1`,
+    ).bind(threadsUserId, text, idempotencyKey, excludedScheduledPostId).first<Record<string, unknown>>(),
+    analyzeRepetition: (input) => analyzeManifestCandidateRepetition(
+      env.DB,
+      input as Parameters<typeof analyzeManifestCandidateRepetition>[1],
+    ),
+    ensureSourceCard: (cycleId, post) => ensureManifestAutonomousSourceCard(env, brand, cycleId, post),
+    linkHypothesisResult: (input) => linkManifestHypothesisResult(
+      env.DB,
+      input as Parameters<typeof linkManifestHypothesisResult>[1],
+    ),
+    extractOpeningPhrase,
+    listHardBans: (brandKey) => listManifestHardBans(env.DB, brandKey),
+    runGateSuite: (input) => runOperatorGates(env, {
+      brand,
+      sourceCardId: normalizeOperatorText(input.sourceCardId, 160, true),
+      draftText: normalizeOperatorText(input.draftText, 20000, true) ?? "",
+      stageScope: String(input.stageScope ?? "gate_evaluation"),
+      laneKey: normalizeOperatorText(input.laneKey, 160, true),
+      contentType: normalizeOperatorText(input.contentType, 160, true),
+      draftAnalysis: input.draftAnalysis as Parameters<typeof runOperatorGates>[1]["draftAnalysis"],
+      modelGateResults: Array.isArray(input.modelGateResults)
+        ? input.modelGateResults as Record<string, unknown>[]
+        : [],
+    }),
+    recordGateReceipt: (input) => recordManifestCandidateGateReceipt(
+      env.DB,
+      input as Parameters<typeof recordManifestCandidateGateReceipt>[1],
+    ),
+    recordHypothesis: (input) => recordManifestPostHypothesis(
+      env.DB,
+      input as Parameters<typeof recordManifestPostHypothesis>[1],
+    ),
+    sha256: sha256OperatorText,
+    createScheduledPost: ({ text, date, time, timezone }) => createScheduledPostForAppUser(
+      env,
+      WORKSPACE_APP_USER_ID,
+      brand.profile.threads_user_id,
+      text,
+      date,
+      time,
+      timezone,
+    ),
+    ensurePersistenceSchemas: async () => {
+      await ensureGptPostStrategyTagsTable(env);
+      await ensureOperatorWorkflowTables(env);
+    },
+    normalizeStrategy: (value) => normalizeGptPostStrategyInput(value) as unknown as Record<string, unknown> | null,
+    inferRealmEntranceKey,
+    persistLineageRecords: (input) => persistManifestAutonomousLineageRecords(env, input),
+    upsertSemanticSignature: (input) => upsertManifestSemanticSignature(
+      env.DB,
+      input as Parameters<typeof upsertManifestSemanticSignature>[1],
+    ),
+    readLineageStatus: (input) => readManifestAutonomousLineageStatus(env, input as unknown as Record<string, unknown>),
+    markLineageFailure: ({ scheduledPostId, threadsUserId, errorMessage }) => env.DB.prepare(
+      `UPDATE scheduled_posts SET publish_error_message = ? WHERE id = ? AND threads_user_id = ?`,
+    ).bind(errorMessage, scheduledPostId, threadsUserId).run(),
+    registerExperimentAssignment: (input) => registerManifestExperimentAssignment(
+      env.DB,
+      input as Parameters<typeof registerManifestExperimentAssignment>[1],
+    ),
+    recordDecisionInfluence: (input) => recordManifestDecisionInfluence(
+      env.DB,
+      input as Parameters<typeof recordManifestDecisionInfluence>[1],
+    ),
+    appendCycleEvent: (input) => appendManifestCycleEvent(
+      env.DB,
+      input as Parameters<typeof appendManifestCycleEvent>[1],
+    ),
+    readCurrentCycle: (_brandKey, cycleId) => readManifestAutonomousCycle(
+      env,
+      brand.brand_key,
+      cycleId,
+    ) as Promise<Record<string, unknown> | null>,
+    occupiedSlots: (targetSlots, timezone) => manifestAutonomousOccupiedSlots(
+      env,
+      brand,
+      targetSlots,
+      timezone,
+    ),
+    localDateTimeParts: operatorLocalDateTimeParts,
+    hourlySlot: operatorHourlySlot,
+    reconcileCoverageState: reconcileManifestAutonomousCoverageState,
+    updateCycleAfterPersist: (input) => env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
+           scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(
+      input.status,
+      normalizeOperatorJson(input.strategicThesis, {}),
+      normalizeOperatorJson(input.remainingMissing, []),
+      normalizeOperatorJson(input.scheduledPostIds, []),
+      input.cycleId,
+      input.brandKey,
+    ).run(),
+    finalizeCycleReceipt: (input) => finalizeManifestCycleReceipt(
+      env.DB,
+      input as Parameters<typeof finalizeManifestCycleReceipt>[1],
+    ),
+    setCycleStatus: (cycleId, brandKey, status) => env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
+    ).bind(status, cycleId, brandKey).run(),
+    now: () => new Date(),
+  });
+
   let postHypothesis = admittedPostHypothesis;
+
 
 
   
