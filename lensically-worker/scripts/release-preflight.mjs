@@ -25,6 +25,8 @@ const operatorMcpAccountFoundationRegistry = read("src/operatorMcpAccountFoundat
 const operatorMcpAccountFoundationRegistryTests = read("test/operatorMcpAccountFoundationRegistry.spec.ts");
 const operatorMcpSourceDraftRegistry = read("src/operatorMcpSourceDraftRegistry.ts");
 const operatorMcpSourceDraftRegistryTests = read("test/operatorMcpSourceDraftRegistry.spec.ts");
+const operatorMcpStrategyScheduleRegistry = read("src/operatorMcpStrategyScheduleRegistry.ts");
+const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyScheduleRegistry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
@@ -86,6 +88,9 @@ if (!workflow.includes("test/operatorMcpAccountFoundationRegistry.spec.ts")) {
 if (!workflow.includes("test/operatorMcpSourceDraftRegistry.spec.ts")) {
   errors.push("operator_mcp_source_draft_registry_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorMcpStrategyScheduleRegistry.spec.ts")) {
+  errors.push("operator_mcp_strategy_schedule_registry_workflow_gate_missing");
+}
 const lifecycleErrors = [];
 const lifecycleRequiredFields = capabilityLifecycle?.declaration_schema?.required_fields ?? [];
 const lifecycleDeclarations = Array.isArray(capabilityLifecycle?.declarations) ? capabilityLifecycle.declarations : [];
@@ -94,7 +99,7 @@ const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.dir
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
 const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
@@ -258,6 +263,29 @@ if (!operatorMcpSourceDraftRegistryTests.includes("preserves the exact ordered 1
     || !operatorMcpSourceDraftRegistryTests.includes("preserves showable draft lifecycle and rejection evidence requirements")
     || !operatorMcpSourceDraftRegistryTests.includes("preserves gate discovery, mutation, and memory-promotion schemas")) {
   lifecycleErrors.push("operator_mcp_source_draft_registry_tests_incomplete");
+}
+if (!source.includes('from "./operatorMcpStrategyScheduleRegistry"')) {
+  lifecycleErrors.push("operator_mcp_strategy_schedule_registry_import_missing");
+}
+if (source.includes('{ name: "list_strategy_memory"')
+    || source.includes('{ name: "delete_scheduled_post"')
+    || source.includes('{ name: "schedule_owner_approved_batch"')
+    || source.includes("const GPT_STRATEGY_MEMORY_KINDS =")) {
+  lifecycleErrors.push("operator_mcp_strategy_schedule_registry_returned_to_index");
+}
+if (!operatorMcpStrategyScheduleRegistry.includes("export const OPERATOR_MCP_STRATEGY_SCHEDULE_TOOL_NAMES")
+    || !operatorMcpStrategyScheduleRegistry.includes("export type OperatorMcpStrategyScheduleToolName")
+    || !operatorMcpStrategyScheduleRegistry.includes("export const OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS")) {
+  lifecycleErrors.push("operator_mcp_strategy_schedule_registry_module_incomplete");
+}
+if (!operatorMcpConstants.includes("export const GPT_STRATEGY_MEMORY_KINDS")) {
+  lifecycleErrors.push("operator_mcp_strategy_memory_kinds_missing");
+}
+if (!operatorMcpStrategyScheduleRegistryTests.includes("preserves the exact ordered seven-tool strategy-scheduling registry")
+    || !operatorMcpStrategyScheduleRegistryTests.includes("preserves shared strategy-memory kind authority")
+    || !operatorMcpStrategyScheduleRegistryTests.includes("preserves protected scheduled-post deletion and retry restrictions")
+    || !operatorMcpStrategyScheduleRegistryTests.includes("preserves owner batch limits and Manifest lineage protections")) {
+  lifecycleErrors.push("operator_mcp_strategy_schedule_registry_tests_incomplete");
 }
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
