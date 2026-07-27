@@ -156,3 +156,32 @@ export function classifyOperatorMcpHandler(
   if (isOperatorMcpAdminToolName(toolName)) return "admin";
   return "account";
 }
+
+export function createOperatorMcpRoutingPolicy(dependencies: {
+  normalizeBrandKey: OperatorMcpBrandNormalizer;
+  normalizeText: OperatorMcpTextNormalizer;
+}) {
+  return {
+    canonicalScopedToolName: canonicalScopedOperatorMcpToolName,
+    scopeCall: scopeOperatorMcpToolCall,
+    requestedBrandKey: (toolName: string, args: Record<string, unknown>) => requestedMcpBrandKey(
+      toolName,
+      args,
+      dependencies.normalizeBrandKey,
+    ),
+    callRequiresProceed: (toolName: string, args: Record<string, unknown>) => operatorMcpCallRequiresProceed(
+      toolName,
+      args,
+      dependencies.normalizeBrandKey,
+    ),
+    proceedConfirmed: operatorMcpProceedConfirmed,
+    canonicalAutonomyToolName,
+    canonicalExecutionArgs: (toolName: string, args: Record<string, unknown>) => canonicalOperatorExecutionArgs(
+      toolName,
+      args,
+      dependencies.normalizeText,
+    ),
+    classifyHandler: classifyOperatorMcpHandler,
+  } as const;
+}
+
