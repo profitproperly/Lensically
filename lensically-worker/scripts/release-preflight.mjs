@@ -239,7 +239,7 @@ if (!operatorMcpAdminRegistryTests.includes("preserves the intentional 25-name c
     || !operatorMcpAdminRegistryTests.includes("preserves workflow and gate compatibility schemas")) {
   lifecycleErrors.push("operator_mcp_admin_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpAccountFoundationRegistry"')
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAccountFoundationRegistry"')
     || !source.includes('from "./operatorMcpConstants"')) {
   lifecycleErrors.push("operator_mcp_account_foundation_registry_import_missing");
 }
@@ -262,7 +262,7 @@ if (!operatorMcpAccountFoundationRegistryTests.includes("preserves the exact ord
     || !operatorMcpAccountFoundationRegistryTests.includes("preserves source deletion, lineage recovery, and bounded backfill contracts")) {
   lifecycleErrors.push("operator_mcp_account_foundation_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpSourceDraftRegistry"')) {
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpSourceDraftRegistry"')) {
   lifecycleErrors.push("operator_mcp_source_draft_registry_import_missing");
 }
 if (source.includes('{ name: "create_source_card"')
@@ -286,7 +286,7 @@ if (!operatorMcpSourceDraftRegistryTests.includes("preserves the exact ordered 1
     || !operatorMcpSourceDraftRegistryTests.includes("preserves gate discovery, mutation, and memory-promotion schemas")) {
   lifecycleErrors.push("operator_mcp_source_draft_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpStrategyScheduleRegistry"')) {
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpStrategyScheduleRegistry"')) {
   lifecycleErrors.push("operator_mcp_strategy_schedule_registry_import_missing");
 }
 if (source.includes('{ name: "list_strategy_memory"')
@@ -309,7 +309,7 @@ if (!operatorMcpStrategyScheduleRegistryTests.includes("preserves the exact orde
     || !operatorMcpStrategyScheduleRegistryTests.includes("preserves owner batch limits and Manifest lineage protections")) {
   lifecycleErrors.push("operator_mcp_strategy_schedule_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpManifestCycleRegistry"')) {
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpManifestCycleRegistry"')) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_import_missing");
 }
 if (source.includes('{ name: "get_manifest_intelligence_foundation"')
@@ -330,7 +330,7 @@ if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered
     || !operatorMcpManifestCycleRegistryTests.includes("preserves complete analysis consumption and source-backed strategy locking")) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpAutonomousExecutionRegistry"')) {
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAutonomousExecutionRegistry"')) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_import_missing");
 }
 if (source.includes('{ name: "prepare_manifest_autonomous_cycle"')
@@ -350,7 +350,7 @@ if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact o
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves optional owner review and slot-preserving replacement")) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_tests_incomplete");
 }
-if (!source.includes('from "./operatorMcpAccountAnalyticsRegistry"')) {
+if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAccountAnalyticsRegistry"')) {
   lifecycleErrors.push("operator_mcp_account_analytics_registry_import_missing");
 }
 if (source.includes("const OPERATOR_MCP_TOOLS:")
