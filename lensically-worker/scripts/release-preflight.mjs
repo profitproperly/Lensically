@@ -41,6 +41,8 @@ const operatorMcpTransport = read("src/operatorMcpTransport.ts");
 const operatorMcpTransportTests = read("test/operatorMcpTransport.spec.ts");
 const operatorMcpDispatcher = read("src/operatorMcpDispatcher.ts");
 const operatorMcpDispatcherTests = read("test/operatorMcpDispatcher.spec.ts");
+const operatorMcpToolCallDispatcher = read("src/operatorMcpToolCallDispatcher.ts");
+const operatorMcpToolCallDispatcherTests = read("test/operatorMcpToolCallDispatcher.spec.ts");
 
 
 
@@ -132,6 +134,9 @@ if (!workflow.includes("test/operatorMcpTransport.spec.ts")) {
 }
 if (!workflow.includes("test/operatorMcpDispatcher.spec.ts")) {
   errors.push("operator_mcp_dispatcher_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorMcpToolCallDispatcher.spec.ts")) {
+  errors.push("operator_mcp_tool_call_dispatcher_workflow_gate_missing");
 }
 
 
@@ -449,7 +454,7 @@ if (source.includes("function requestedMcpBrandKey(")
 if (!source.includes("OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload)")
     || !source.includes("OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)")
     || !source.includes("OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args)")
-    || !source.includes("OPERATOR_MCP_ROUTING_POLICY.classifyHandler(toolName)")) {
+    || !operatorMcpToolCallDispatcher.includes("dependencies.classifyHandler(toolName)")) {
   lifecycleErrors.push("operator_mcp_routing_policy_runtime_cutover_incomplete");
 }
 if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorMcpToolName")
@@ -480,8 +485,8 @@ if (source.includes("function mcpJsonResponse(")
 }
 if (!source.includes("return buildOperatorMcpRuntimeHeaders({")
     || !source.includes("return operatorTransportFailureResponse({")
-    || !source.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")
-    || !source.includes("mcpToolResultResponse(")) {
+    || !operatorMcpToolCallDispatcher.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")
+    || !operatorMcpToolCallDispatcher.includes("mcpToolResultResponse(")) {
   lifecycleErrors.push("operator_mcp_transport_runtime_cutover_incomplete");
 }
 if (!operatorMcpTransport.includes("export function mcpJsonResponse")
@@ -541,6 +546,36 @@ if (!operatorMcpDispatcherTests.includes("preserves POST-only admission and auth
     || !operatorMcpDispatcherTests.includes("preserves unsupported-method and bounded internal-error shaping")) {
   lifecycleErrors.push("operator_mcp_dispatcher_tests_incomplete");
 }
+if (!source.includes('from "./operatorMcpToolCallDispatcher"')
+    || !source.includes("return dispatchOperatorMcpToolCall({ request, id, params }, {")) {
+  lifecycleErrors.push("operator_mcp_tool_call_dispatcher_import_or_binding_missing");
+}
+if (source.includes("const directPublicEntry")
+    || source.includes("const sourceDefinedStaticRoute")
+    || source.includes("const idempotencyKey = sourceDefinedDirectEngineering")
+    || source.includes("const autonomyAuthorization = sourceDefinedDirectEngineering")
+    || source.includes("resultPayload.operator_action_closure")) {
+  lifecycleErrors.push("operator_mcp_tool_call_state_machine_returned_to_index");
+}
+if (!operatorMcpToolCallDispatcher.includes("export async function dispatchOperatorMcpToolCall")
+    || !operatorMcpToolCallDispatcher.includes("const directPublicEntry = dependencies.isPublicDirectToolName")
+    || !operatorMcpToolCallDispatcher.includes("const sourceDefinedStaticRoute = directPublicEntry")
+    || !operatorMcpToolCallDispatcher.includes("const idempotencyKey = sourceDefinedDirectEngineering")
+    || !operatorMcpToolCallDispatcher.includes("const autonomyAuthorization: OperatorMcpAutonomyAuthorization")
+    || !operatorMcpToolCallDispatcher.includes("dependencies.classifyHandler(toolName)")
+    || !operatorMcpToolCallDispatcher.includes("resultPayload.operator_action_closure")
+    || !operatorMcpToolCallDispatcher.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")) {
+  lifecycleErrors.push("operator_mcp_tool_call_dispatcher_module_incomplete");
+}
+if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admission and rejects hidden routes")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves registered gateway compilation failures")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves proven pre-call redirects before execution")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves completed idempotency replay without re-execution")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves autonomy blocking before handler execution")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves handler completion, hardening intake, and action closure")) {
+  lifecycleErrors.push("operator_mcp_tool_call_dispatcher_tests_incomplete");
+}
+
 
 
 
