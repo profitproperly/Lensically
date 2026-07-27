@@ -29,7 +29,11 @@ function createHarness() {
       occupied: new Map<string, JsonRecord>(),
       scheduled_records: [] as JsonRecord[],
     })),
-    reconcileDelivery: vi.fn(async () => ({ repaired: 0 })),
+        reconcileDelivery: vi.fn(async () => ({
+      repaired: 0,
+      unresolved_incidents: [],
+      required_recovery_actions: [],
+    })),
     ensureRequiredSchemas: vi.fn(async () => undefined),
     readSavedPatternStates: vi.fn(async () => ({
       qualified: { total: 2, latest_updated_at: "2026-07-27T18:00:00Z" },

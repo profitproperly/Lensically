@@ -11,6 +11,12 @@ export type OperatorManifestConstructionCoverage = {
   scheduled_records: JsonRecord[];
 };
 
+export type OperatorManifestDeliveryReconciliation = {
+  unresolved_incidents: JsonRecord[];
+  required_recovery_actions: JsonRecord[];
+  [key: string]: unknown;
+};
+
 export interface OperatorManifestCycleConstructionDependencies {
   growthEngineVersion: string;
   sourceSelectionEngineVersion: string;
@@ -41,7 +47,10 @@ export interface OperatorManifestCycleConstructionDependencies {
     timezone: string,
     effectiveNowMs: number,
   ): Promise<OperatorManifestConstructionCoverage>;
-  reconcileDelivery(timezone: string, effectiveNowMs: number): Promise<unknown>;
+    reconcileDelivery(
+    timezone: string,
+    effectiveNowMs: number,
+  ): Promise<OperatorManifestDeliveryReconciliation>;
   ensureRequiredSchemas(): Promise<unknown>;
   readSavedPatternStates(accountId: string, brandKey: string): Promise<{
     qualified: JsonRecord | null;
@@ -54,7 +63,7 @@ export interface OperatorManifestCycleConstructionDependencies {
     coverage: OperatorManifestConstructionCoverage;
     clock: JsonRecord;
     threadsSnapshot: JsonRecord;
-    deliveryReconciliation: unknown;
+        deliveryReconciliation: OperatorManifestDeliveryReconciliation;
   }): Promise<JsonRecord>;
   readExistingCycle(operationId: string, brandKey: string): Promise<{ id: string } | null>;
   createId(): string;
