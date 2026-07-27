@@ -898,8 +898,9 @@ if (!source.includes('from "./operatorLensicallyUiSurfaceService"')
   lifecycleErrors.push("operator_lensically_ui_surface_service_import_or_binding_missing");
 }
 if (source.includes("unsupported_lensically_ui_surface")
-    || source.includes("start_of_day_followers: startOfDayFollowers")
-    || source.includes("cursor_depth: cursorDepth")) {
+    || source.includes('if (surface === "dashboard")')
+    || source.includes('if (surface === "saved_patterns")')) {
+
   lifecycleErrors.push("operator_lensically_ui_surface_service_returned_to_index");
 }
 if (!operatorLensicallyUiSurfaceService.includes("export async function readOperatorLensicallyUiSurface")
