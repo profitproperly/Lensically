@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 9fbc7cd971b655d86ad61a5ddae3ac305f191aa6
-production_sha: 9fbc7cd971b655d86ad61a5ddae3ac305f191aa6
+repository_base_sha: b754ff8cd14c4d5c886e44f969d6f94310bc8a8c
+production_sha: b754ff8cd14c4d5c886e44f969d6f94310bc8a8c
 
 This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
 
@@ -617,20 +617,32 @@ Completed checkpoint — Stage 6D2 autonomous post gated persistence and complet
 - Exact-SHA release passed in run `30301341906`.
 - Live production independently confirmed exact SHA `9fbc7cd971b655d86ad61a5ddae3ac305f191aa6` with 75/75 public tools.
 
-Current sub-action — Stage 6E scheduled Manifest post review service extraction:
+Completed checkpoint — Stage 6E scheduled Manifest post review service extraction:
 
-Extract `reviewManifestScheduledPost` from `src/index.ts` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestScheduledReviewService.ts` as the dependency-injected authority for Manifest-only review admission, action/feedback/replacement validation, approved-unpublished reviewability, linked draft and source-card context, replacement generation and scheduling gates, timezone-safe existing-slot reconstruction, same-slot scheduled-post updates, lineup feedback status, exact lesson-scope memory mapping, durable strategy-memory metadata, and final response wording.
+- Reduced `reviewManifestScheduledPost` in `src/index.ts` to explicit gate, timezone, scheduled-post update, lineup SQL, and strategy-memory adapters while preserving no deletion, no new slot creation, no direct publication, and exact runway coverage.
+- Added `test/operatorManifestScheduledReviewService.spec.ts` covering review admission, unpublished status, replacement gate failure, successful same-slot rewrite, and permanent-rule memory mapping without production mutation.
+- Added permanent push and release ownership gates preventing scheduled-review business logic from returning to `src/index.ts`.
+- Push validation passed in run `30302451821`.
+- All eight Operator shards passed in run `30302677597`.
+- Exact-SHA release passed in run `30302737583`.
+- The first independent check briefly observed the prior deployment during propagation; the immediate recheck confirmed live production exact SHA `b754ff8cd14c4d5c886e44f969d6f94310bc8a8c` with 75/75 public tools.
 
-- Manifest-only admission, action/feedback/replacement validation, selected-account scheduled-post lookup, and approved-unpublished reviewability
-- linked-draft and canonical source-card context, replacement generation gates, timezone-safe existing-slot reconstruction, replacement scheduling gates, and same-slot scheduled-post update
-- keep/rewrite/reject-replace lineup status, owner feedback persistence, exact lesson-scope to strategy-memory-kind mapping, durable memory metadata, and final response wording
-- no deletion, no new slot creation, no direct publication, and exact existing runway preservation
+Current sub-action — Stage 6F Manifest cycle-result observation service extraction:
 
-Keep low-level gate execution, scheduled-post update, SQL, timezone primitives, strategy-memory persistence, JSON normalization, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `manifestCycleFailureIsDefect`, `manifestCycleToolScope`, and `observeManifestCycleToolResult` from `src/index.ts` into a focused dependency-injected service while preserving:
+
+- exact expected/non-defect failure classification and exported test compatibility
+- tool-to-seven-stage scope mapping, slot-key derivation, evaluator-phase recognition, and preparation/persistence/coverage phase identity
+- automatic scoped defect resolution after successful retry or reconciliation, compact verification evidence, and unchanged successful results when no defects resolve
+- unexpected failure normalization, impact-state classification, retryability, blocking defect recording, reconciliation metadata, durable defect receipts, and exact response augmentation
+- Manifest-only observation and no mutation for other brands, missing cycle IDs, unscoped tools, or expected operational outcomes
+
+Keep database defect primitives, text normalization, shared transport, and tool invocation wrappers as explicit `index.ts` adapters. Preserve the existing exported `manifestCycleFailureIsDefect` API through the new module. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6E, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6F, then continue Stage 6 product-service extraction in bounded domain clusters.
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
 - Stage 9 final comparison, cleanup, validation, and production release.
