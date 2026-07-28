@@ -1,20 +1,20 @@
 type JsonRecord = Record<string, unknown>;
 
-type OperatorActiveGateReadDependencies = {
-  normalizeStage: (value: unknown) => string;
+type OperatorActiveGateReadDependencies<TStage extends string> = {
+  normalizeStage: (value: unknown) => TStage;
   normalizeMachineKey: (value: unknown, fallback: string) => string;
   listGates: (input: {
     brandKey: string;
-    stageScope: string | null;
+        stageScope: TStage | null;
     laneKey: string | null;
     contentType: string | null;
   }) => Promise<unknown[]>;
 };
 
-export async function readOperatorActiveGates(input: {
+export async function readOperatorActiveGates<TStage extends string>(input: {
   brandKey: string;
   payload: JsonRecord;
-}, dependencies: OperatorActiveGateReadDependencies): Promise<JsonRecord> {
+}, dependencies: OperatorActiveGateReadDependencies<TStage>): Promise<JsonRecord> {
   const stageScope = input.payload.stage_scope
     ? dependencies.normalizeStage(input.payload.stage_scope)
     : null;

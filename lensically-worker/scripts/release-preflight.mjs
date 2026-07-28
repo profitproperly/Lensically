@@ -1919,7 +1919,9 @@ if (source.includes(`if (toolName === "list_active_gates") {
     || source.includes("payload.stage_scope ? normalizeOperatorStage(payload.stage_scope) : null")) {
   lifecycleErrors.push("operator_active_gate_read_service_returned_to_index");
 }
-if (!operatorActiveGateReadService.includes("export async function readOperatorActiveGates")
+if (!operatorActiveGateReadService.includes("export async function readOperatorActiveGates<TStage extends string>")
+    || !operatorActiveGateReadService.includes("OperatorActiveGateReadDependencies<TStage extends string>")
+    || !operatorActiveGateReadService.includes("stageScope: TStage | null")
     || !operatorActiveGateReadService.includes("dependencies.normalizeStage")
     || !operatorActiveGateReadService.includes("dependencies.normalizeMachineKey")
     || !operatorActiveGateReadService.includes("dependencies.listGates")
