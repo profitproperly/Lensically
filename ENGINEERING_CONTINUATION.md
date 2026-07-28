@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6v-manifest-source-card-backfill-preparation-service
-repository_base_sha: d8fea027b6f003421677ac4a662768eea7cf14a7
-production_sha: d8fea027b6f003421677ac4a662768eea7cf14a7
+active_checkpoint: stage-6w-source-candidate-batch-read-service
+repository_base_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
+production_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6V Manifest source-card backfill preparation read service extraction.
+- Current checkpoint: Stage 6W source-candidate batch read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -848,27 +848,37 @@ Completed checkpoint — Stage 6U Manifest source-card backfill orchestration se
 - Exact-SHA release passed in run `30377766628`.
 - Live production independently confirmed exact SHA `d8fea027b6f003421677ac4a662768eea7cf14a7` with 75/75 public tools.
 
-Current sub-action — Stage 6V Manifest source-card backfill preparation read service extraction:
+Completed checkpoint — Stage 6V Manifest source-card backfill preparation read service extraction:
 
-Extract `prepare_manifest_source_card_backfill` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
+- Added `src/operatorManifestSourceCardBackfillPreparationService.ts` as the dependency-injected authority for Manifest admission, bounded limits, source-identity precedence, numeric metric serialization, complete/ready state, counts, batch metadata, and exact completion/interruption rules.
+- Reduced `prepare_manifest_source_card_backfill` in `src/index.ts` to workflow-table readiness, account-scoped SQL, canonical URL/post-ID helpers, row retrieval, brand identity, and transport adapters.
+- Added `test/operatorManifestSourceCardBackfillPreparationService.spec.ts` and handler-specific push/release ownership gates.
+- Focused validation passed in run `30378484076`.
+- Push validation passed in run `30378469154`.
+- All eight Operator shards passed in run `30378774554`.
+- Exact-SHA release passed in run `30378860110`.
+- Live production independently confirmed exact SHA `98ee4aa16b3b907f72c00a049242a41f8979ce24` with 75/75 public tools.
 
-- Manifest-only admission
-- workflow-table readiness before reading
-- bounded `limit` normalization with exact default and maximum
-- account-scoped Saved Pattern total, already-carded count, and ordered uncarded-row retrieval
-- canonical Threads URL and post-ID fallback behavior
-- deterministic source identity precedence across Threads post ID, canonical URL, and Saved Pattern ID
-- stable numeric metric serialization and engagement-total calculation
-- exact complete/ready status, counts, batch metadata, patterns, completion rule, and interruption rule
-- no product mutation
+Current sub-action — Stage 6W source-candidate batch read service extraction:
 
-Keep table readiness, all SQL, account identifiers, canonical URL/post-ID helpers, row retrieval, brand identity, and transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `get_source_candidate_batch` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
+
+- required normalized `source_batch_id` admission
+- account-scoped batch lookup and exact not-found behavior
+- ordered joined selection retrieval
+- stable batch metadata JSON parsing
+- stable selection serialization for source snapshots, metrics snapshots, canonical-family/card identity, card version/status, disposition state, workflow sequence, and selection timestamp
+- numeric conversion and null behavior for canonical card version and workflow sequence
+- exact pending disposition default and no product mutation
+
+Keep text normalization, all SQL, account and brand identifiers, shared JSON parsing, row retrieval, and HTTP transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6V, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Complete Stage 6W, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
 - Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
 - After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
@@ -897,7 +907,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6V
+6. Product-service extraction — ACTIVE at Stage 6W
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
