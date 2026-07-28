@@ -5,8 +5,9 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: a7ad935e17e7617d7bb4959791648605414b5b5b
-production_sha: a7ad935e17e7617d7bb4959791648605414b5b5b
+repository_base_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
+production_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
+
 
 
 
@@ -774,24 +775,35 @@ Completed checkpoint — Stage 6R saved-pattern source exclusion service extract
 - Exact-SHA release passed in run `30321485440`.
 - Live production independently confirmed exact SHA `a7ad935e17e7617d7bb4959791648605414b5b5b` with 75/75 public tools.
 
-Current sub-action — Stage 6S Manifest source-draw batch service extraction:
+Completed checkpoint — Stage 6S Manifest source-draw batch service extraction:
 
-Extract `draw_source_candidate_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorManifestSourceDrawService.ts` as the dependency-injected authority for Manifest-only admission, normalized active-session admission, existing-batch idempotency, source-type normalization, qualified-pool sufficiency, uniform random selection without replacement, selection snapshots, persistence orchestration, workflow-stage advancement, and exact responses.
+- Reduced `draw_source_candidate_batch` in `src/index.ts` to explicit active-session/batch/selection SQL, qualified-pool construction, shuffling, UUID/time, JSON serialization, atomic D1 persistence, workflow-stage update, constants, brand identity, and transport adapters.
+- Added `test/operatorManifestSourceDrawService.spec.ts` with five deterministic tests covering every no-mutation exit, existing-batch reuse, source-type normalization, insufficient-pool behavior, atomic persistence, draw order, metadata, metrics snapshots, and stage advancement.
+- Added permanent push/release ownership gates preventing source-draw business logic from returning to `src/index.ts`.
+- Push validation passed in run `30323166717`.
+- All eight Operator shards passed in run `30323362299`.
+- Exact-SHA release passed in run `30323430663`.
+- Live production independently confirmed exact SHA `3778d498c5b0de62c830e1d9f3fe80c0200a0aba` with 75/75 public tools.
 
-- Manifest-only admission and exact unsupported-brand response
-- required normalized workflow-session identity and active-session admission
-- idempotent reuse of the latest existing batch and exact selection serialization
-- source-type normalization, qualified-pool construction, and exact insufficient-pool response
-- uniform random selection without replacement with the fixed daily draw size
-- batch/selection identities, draw order, metrics snapshots, metadata flags, and exact response keys
-- atomic batch and selection persistence followed by workflow-stage advancement
-- no mutation for unsupported brand, missing/inactive session, existing-batch reuse, or insufficient pool
+Current sub-action — Stage 6T published-post lineage audit service extraction:
 
-Keep active-session/batch/selection SQL, qualified-pool construction, shuffling, UUID/time creation, JSON serialization, atomic D1 persistence, workflow-stage update, brand identity, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `audit_published_post_lineage` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
+
+- archive, workflow, and metric-snapshot table readiness before reading
+- bounded `minimum_likes`, `days`, and `limit` normalization with exact defaults and limits
+- account-scoped winner ordering and joined source, source-card, generation-run, draft, scheduled-post, and metric lineage
+- deterministic missing-stage classification for source, source card, generation run, draft, scheduled post, and metrics
+- stable metrics and lineage serialization, including numeric saved-pattern and scheduled-post identifiers
+- exact complete/incomplete counts, criteria, brand identity, and response keys
+- no product mutation
+
+Keep table readiness, winner/join SQL, brand/account identifiers, row retrieval, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6S, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6T, then continue Stage 6 product-service extraction in bounded domain clusters.
+
 
 
 
