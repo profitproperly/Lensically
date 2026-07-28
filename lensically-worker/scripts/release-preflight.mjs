@@ -81,6 +81,8 @@ const operatorProductionBoardService = read("src/operatorProductionBoardService.
 const operatorProductionBoardServiceTests = read("test/operatorProductionBoardService.spec.ts");
 const operatorSourceCandidateListService = read("src/operatorSourceCandidateListService.ts");
 const operatorSourceCandidateListServiceTests = read("test/operatorSourceCandidateListService.spec.ts");
+const operatorSavedPatternSourceExclusionService = read("src/operatorSavedPatternSourceExclusionService.ts");
+const operatorSavedPatternSourceExclusionServiceTests = read("test/operatorSavedPatternSourceExclusionService.spec.ts");
 
 
 
@@ -239,6 +241,9 @@ if (!workflow.includes("test/operatorProductionBoardService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorSourceCandidateListService.spec.ts")) {
   errors.push("operator_source_candidate_list_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSavedPatternSourceExclusionService.spec.ts")) {
+  errors.push("operator_saved_pattern_source_exclusion_service_workflow_gate_missing");
 }
 
 
@@ -1213,6 +1218,39 @@ if (!operatorSourceCandidateListServiceTests.includes("uses empty source filters
     || !operatorSourceCandidateListServiceTests.includes("reports complete pagination when the returned window reaches the total")
     || !operatorSourceCandidateListServiceTests.includes("returns Manifest eligibility metadata and null for other brands")) {
   lifecycleErrors.push("operator_source_candidate_list_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorSavedPatternSourceExclusionService"')
+    || !source.includes("excludeOperatorSavedPatternSource({")
+    || !source.includes("upsertExclusion: async")
+    || !source.includes("skipActiveSelections: async")
+    || !source.includes("markActiveClaimsDeleted: async")) {
+  lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "delete_saved_pattern_source") {
+    const patternId = Math.trunc(Number(payload.pattern_id ?? 0));`)
+    || source.includes("const ownerApproval = normalizeOperatorText(payload.owner_approval, 500, true)")
+    || source.includes("skipped_active_selection_count: Number(skipped.meta.changes ?? 0)")) {
+  lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_returned_to_index");
+}
+if (!source.includes("Legacy destructive deletion path intentionally retired")
+    || !source.includes("Historical pattern,")
+    || !source.includes("card, generation, and analytics data must remain intact.")) {
+  lifecycleErrors.push("operator_saved_pattern_source_destructive_retirement_documentation_missing");
+}
+if (!operatorSavedPatternSourceExclusionService.includes("export async function excludeOperatorSavedPatternSource")
+    || !operatorSavedPatternSourceExclusionService.includes("dependencies.getPattern")
+    || !operatorSavedPatternSourceExclusionService.includes("dependencies.upsertExclusion")
+    || !operatorSavedPatternSourceExclusionService.includes("dependencies.skipActiveSelections")
+    || !operatorSavedPatternSourceExclusionService.includes("dependencies.markActiveClaimsDeleted")
+    || !operatorSavedPatternSourceExclusionService.includes("preserved_historical_data: true")) {
+  lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_module_incomplete");
+}
+if (!operatorSavedPatternSourceExclusionServiceTests.includes("rejects missing explicit delete approval before reads or mutation")
+    || !operatorSavedPatternSourceExclusionServiceTests.includes("returns the exact not-found preservation response without mutation")
+    || !operatorSavedPatternSourceExclusionServiceTests.includes("prefers the stored Threads post ID for durable source identity")
+    || !operatorSavedPatternSourceExclusionServiceTests.includes("falls back from canonical URL identity to saved-pattern identity")
+    || !operatorSavedPatternSourceExclusionServiceTests.includes("retires active work in order while preserving all historical data")) {
+  lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_tests_incomplete");
 }
 
 
