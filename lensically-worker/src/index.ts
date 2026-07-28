@@ -59,6 +59,7 @@ import {
 
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
 import {
+  OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
@@ -16167,9 +16168,10 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     size: continuationFile.size,
     precedence_rule: "Read Authority and Precedence, Unified Job Queue, and Current Action. No chat, D1 work state, Growth Mission, action-closure receipt, or other document may override this ledger.",
   };
-  return {
+    return {
     ok: true,
-    bootstrap_version: "operator-startup-v4",
+    startup_authority: OPERATOR_GOVERNING_STANDARDS,
+    bootstrap_version: "operator-startup-v5",
     operating_contract: {
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
@@ -20545,8 +20547,9 @@ async function handleOperatorMcpEngineeringTool(
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
       ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
       : undefined;
-    return {
+        return {
       ok: true,
+      startup_authority: OPERATOR_GOVERNING_STANDARDS,
       status_kind: "compact_engineering_precheck",
       runtime: operatorRuntimeMetadata(env),
       access: { github_token_status: config.token ? "exists" : "missing", repo: `${config.owner}/${config.repo}`, branch: config.branch },

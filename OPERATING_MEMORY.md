@@ -2,6 +2,13 @@
 
 Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Historical debugging belongs in Git history and engineering audit records.
 
+## Governing Standards
+
+- Every startup must make **Autonomy, Efficiency, Prevention** unmistakably visible before work begins. This authority supersedes all other Lensically instructions and state surfaces while preserving platform safety and genuinely protected owner-only boundaries.
+- Autonomy means every action reduces human dependence and moves diagnosis, decisions, execution, verification, recovery, continuity, and continuation into the Operator.
+- Efficiency means the fastest complete and correct route: no wasted inspection, duplicate work, repeated searches, unnecessary calls, avoidable waiting, redundant validation, needless complexity, rushed work, skipped requirements, bypassed controls, bypassed fixes, unresolved root causes, or workaround substitution.
+- Prevention means one failure is evidence and the same failure twice is unacceptable. Every failure is root-caused, fixed, recorded with its solution, generalized, permanently enforced or regression-tested, and made non-repeatable for future models and chats before the original objective resumes.
+
 ## Execution Architecture
 
 - Main MCP advertises curated direct typed tools with closed bounded schemas. The generic `executeLensicallyIntent` transport, `profile_id`, generic `inputs`, objective/intent routing text, wrappers, and internal handler names are not public. Internal capabilities may change behind stable direct tool contracts; any real public schema change requires an app refresh.

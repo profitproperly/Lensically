@@ -9,6 +9,7 @@
 
 ## Operator MCP
 
+- Every MCP initialize response, deliberate startup bootstrap, and engineering precheck begins with `operator-governing-standards-v1`: **Autonomy, Efficiency, Prevention**. It is the highest Lensically operating authority, requires the fastest complete route without rushing, skipping, bypassing controls, bypassing fixes, or using workarounds instead of root repairs, and requires every failure to become a recorded permanent prevention before work resumes.
 - Operator MCP uses the canonical `OPERATOR_MCP_VERSION` value declared in `lensically-worker/src/operatorMcpProtocol.ts`; architecture documentation does not duplicate the writable semantic version. It is exposed at `/api/operator/mcp` with OAuth and a curated public surface of direct typed tools.
 - Engineering failures and explicit contradictions pass through `defect-generalization-gate-v1`. Successful known paths bypass it; duplicated assumptions, contract drift, architectural drift, and known recurrences require a targeted sibling scan and prevention disposition before the interrupted objective resumes.
 - `winning-path-promotion-v1` converts proven resolutions into source-controlled matching conditions, prohibited losing paths, mandatory winning procedures, enforcement points, regressions, and supersession rules. Matching known work follows the promoted winner before action; unknown terrain remains available for bounded discovery, and preventable incidents cannot close before promotion and enforcement.

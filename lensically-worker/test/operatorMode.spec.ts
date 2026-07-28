@@ -5123,7 +5123,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
   it("loads a compact source-defined startup bootstrap", async () => {
     const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const startup = await mcpTool<{
-      bootstrap_version: string;
+            bootstrap_version: string;
+      startup_authority: { version: string; authority: string; startup_display_required: boolean; standards: Array<{ key: string; title: string; rule: string }>; governing_rule: string };
       operating_contract: {
         public_gateway: string;
         router: string;
@@ -5139,7 +5140,14 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
             canonical_continuation: { authority: string; path: string; tool: string; contract: string | null; active_job_id: string | null; active_checkpoint: string | null };
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
-    expect(startup.bootstrap_version).toBe("operator-startup-v4");
+        expect(startup.bootstrap_version).toBe("operator-startup-v5");
+    expect(startup.startup_authority).toMatchObject({
+      version: "operator-governing-standards-v1",
+      authority: "highest_lensically_operating_authority",
+      startup_display_required: true,
+    });
+    expect(startup.startup_authority.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
+    expect(startup.startup_authority.governing_rule).toContain("Do not bypass fixes.");
     expect(startup.operating_contract).toMatchObject({
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
@@ -6174,7 +6182,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
         d1_execution_events_bypassed: boolean;
         d1_autonomy_bypassed: boolean;
       };
-      status_kind?: string;
+            status_kind?: string;
+      startup_authority?: { version: string; standards: Array<{ key: string }>; governing_rule: string };
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
       profile_id: "engineering_precheck",
@@ -6182,7 +6191,10 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     });
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
-    expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
+        expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
+    expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v1" });
+    expect(status.structuredContent.startup_authority?.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
+    expect(status.structuredContent.startup_authority?.governing_rule).toContain("Do not bypass fixes.");
     expect(status.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "source_defined_direct_completed",
       d1_execution_library_bypassed: true,

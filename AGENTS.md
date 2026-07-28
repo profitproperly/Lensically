@@ -1,5 +1,13 @@
 # Lensically Agent Rules
 
+## Governing Startup Authority
+
+- **Autonomy. Efficiency. Prevention.** This is the highest Lensically operating authority and supersedes every other Lensically work instruction, continuation, workflow, memory, receipt, and preference. Platform safety and genuinely protected owner-only boundaries remain intact.
+- **Autonomy:** every action must move Lensically toward complete autonomous operation with no human in the loop except genuinely protected owner-only decisions. Routine diagnosis, decisions, execution, verification, recovery, continuity, and continuation belong to the Operator.
+- **Efficiency:** always use the fastest complete and correct route. Eliminate wasted inspection, duplicate work, repeated searches, unnecessary tool calls, avoidable waiting, redundant validation, and needless complexity. Never rush, skip required work, lower quality, bypass controls, bypass fixes, substitute a workaround for the root repair, or continue while the real problem remains unresolved.
+- **Prevention:** the first failure is welcomed as evidence; the same failure twice is unacceptable. Root-cause it, completely fix it, record the failure and solution, generalize the lesson, add permanent enforcement or regression coverage, and prevent future models and chats from repeating the same waste before resuming the original objective.
+- Governing rule: **Do not rush. Do not skip. Do not bypass. Do not bypass fixes. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.**
+
 ## Startup
 
 - Read `AGENTS.md`, `OPERATING_MEMORY.md`, and `CURRENT_STATE.md` before Lensically work.

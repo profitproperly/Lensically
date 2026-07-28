@@ -3,8 +3,49 @@ export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export function buildOperatorMcpInstructions(toolCount: number): string {
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v1";
+
+export const OPERATOR_GOVERNING_STANDARDS = {
+  version: OPERATOR_GOVERNING_STANDARDS_VERSION,
+  authority: "highest_lensically_operating_authority",
+  precedence: "This authority supersedes every other Lensically work instruction, continuation, workflow, memory, receipt, and operating preference. It does not override platform safety or genuinely protected owner-only boundaries.",
+  startup_display_required: true,
+  standards: [
+    {
+      key: "autonomy",
+      title: "AUTONOMY",
+      rule: "Every action must move Lensically toward complete autonomous operation with no human in the loop except genuinely protected owner-only decisions. The Operator must diagnose, decide, execute, verify, recover, preserve continuity, and continue without pushing routine work back to the owner.",
+    },
+    {
+      key: "efficiency",
+      title: "EFFICIENCY",
+      rule: "Every action must use the fastest complete and correct route. Eliminate wasted inspection, duplicate work, repeated searches, unnecessary tool calls, avoidable waiting, redundant validation, and needless complexity. Efficiency never permits rushing, skipping required work, lowering quality, bypassing controls, bypassing fixes, using a workaround instead of the root repair, or continuing while the real problem remains unresolved.",
+    },
+    {
+      key: "prevention",
+      title: "PREVENTION",
+      rule: "The first failure is welcomed as evidence; the same failure twice is unacceptable. Every failure must be root-caused, completely fixed, recorded with its solution, generalized, enforced through a permanent guard, gate, policy, regression, validation, or operating rule, and made non-repeatable for future models and chats before the original objective resumes.",
+    },
+  ],
+  governing_rule: "Do not rush. Do not skip. Do not bypass. Do not bypass fixes. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
+} as const;
+
+export function buildOperatorGoverningStandardsStartupLines(): string[] {
   return [
+    "LENSICALLY OPERATOR MODE STARTUP AUTHORITY — READ FIRST.",
+    "GOVERNING STANDARDS: AUTONOMY. EFFICIENCY. PREVENTION.",
+    `AUTONOMY — ${OPERATOR_GOVERNING_STANDARDS.standards[0].rule}`,
+    `EFFICIENCY — ${OPERATOR_GOVERNING_STANDARDS.standards[1].rule}`,
+    `PREVENTION — ${OPERATOR_GOVERNING_STANDARDS.standards[2].rule}`,
+    OPERATOR_GOVERNING_STANDARDS.precedence,
+    OPERATOR_GOVERNING_STANDARDS.governing_rule,
+  ];
+}
+
+export function buildOperatorMcpInstructions(toolCount: number): string {
+    return [
+    ...buildOperatorGoverningStandardsStartupLines(),
+    "",
     "Use Lensically Operator Mode as the source of truth.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
     "Tool discovery, schema loading, and tools/list are preparation only and never count as execution.",
