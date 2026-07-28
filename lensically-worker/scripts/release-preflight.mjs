@@ -85,6 +85,9 @@ const operatorSavedPatternSourceExclusionService = read("src/operatorSavedPatter
 const operatorSavedPatternSourceExclusionServiceTests = read("test/operatorSavedPatternSourceExclusionService.spec.ts");
 const operatorManifestSourceDrawService = read("src/operatorManifestSourceDrawService.ts");
 const operatorManifestSourceDrawServiceTests = read("test/operatorManifestSourceDrawService.spec.ts");
+const operatorPublishedPostLineageAuditService = read("src/operatorPublishedPostLineageAuditService.ts");
+const operatorPublishedPostLineageAuditServiceTests = read("test/operatorPublishedPostLineageAuditService.spec.ts");
+
 
 
 
@@ -251,6 +254,10 @@ if (!workflow.includes("test/operatorSavedPatternSourceExclusionService.spec.ts"
 if (!workflow.includes("test/operatorManifestSourceDrawService.spec.ts")) {
   errors.push("operator_manifest_source_draw_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorPublishedPostLineageAuditService.spec.ts")) {
+  errors.push("operator_published_post_lineage_audit_service_workflow_gate_missing");
+}
+
 
 
 
@@ -1287,6 +1294,32 @@ if (!operatorManifestSourceDrawServiceTests.includes("rejects unsupported brands
     || !operatorManifestSourceDrawServiceTests.includes("persists one uniform random batch and advances the workflow stage")) {
   lifecycleErrors.push("operator_manifest_source_draw_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorPublishedPostLineageAuditService"')
+    || !source.includes("auditOperatorPublishedPostLineage({")
+    || !source.includes("listRows: async ({ minimumLikes, days, limit })")) {
+  lifecycleErrors.push("operator_published_post_lineage_audit_service_import_or_binding_missing");
+}
+if (source.includes("const minimumLikes = Math.max(1, Math.trunc(Number(payload.minimum_likes ?? 1000)))")
+    || source.includes("const posts = (rows.results ?? []).map((row) =>")
+    || source.includes("if (!row.source_selection_id || !row.source_batch_id) missingStages.push(\"source\")")) {
+  lifecycleErrors.push("operator_published_post_lineage_audit_service_returned_to_index");
+}
+if (!operatorPublishedPostLineageAuditService.includes("export async function auditOperatorPublishedPostLineage")
+    || !operatorPublishedPostLineageAuditService.includes("dependencies.listRows")
+    || !operatorPublishedPostLineageAuditService.includes('missingStages.push("source")')
+    || !operatorPublishedPostLineageAuditService.includes('missingStages.push("metrics")')
+    || !operatorPublishedPostLineageAuditService.includes("saved_pattern_id")
+    || !operatorPublishedPostLineageAuditService.includes("complete_count")
+    || !operatorPublishedPostLineageAuditService.includes("incomplete_count")) {
+  lifecycleErrors.push("operator_published_post_lineage_audit_service_module_incomplete");
+}
+if (!operatorPublishedPostLineageAuditServiceTests.includes("applies exact defaults and bounded criteria before row retrieval")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("serializes complete lineage with stable metrics and numeric identifiers")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("classifies every missing lineage stage in deterministic order")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("counts mixed results and omits saved-pattern identity for other source types")) {
+  lifecycleErrors.push("operator_published_post_lineage_audit_service_tests_incomplete");
+}
+
 
 
 
