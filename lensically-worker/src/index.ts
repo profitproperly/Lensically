@@ -113,6 +113,7 @@ import { resolveOperatorManifestReviewSource } from "./operatorManifestReviewSou
 import { scheduleOperatorManifestReviewBatch } from "./operatorManifestReviewBatchSchedulingService";
 import { startOperatorWorkflowSession } from "./operatorWorkflowSessionStartService";
 import { admitOperatorContext } from "./operatorContextAdmissionService";
+import { readOperatorProductionBoard } from "./operatorProductionBoardService";
 
 
 
@@ -13250,31 +13251,30 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(admissionResult);
   }
 
-  if (toolName === "get_production_board") {
-    const rows = await env.DB.prepare(
-      `SELECT *
-       FROM operator_production_board_items
-       WHERE brand_key = ?
-         AND status = 'active'
-         AND (? IS NULL OR workflow_session_id = ?)
-       ORDER BY COALESCE(priority, 1000) ASC, datetime(updated_at) DESC`,
-    ).bind(brand.brand_key, normalizeOperatorText(payload.workflow_session_id, 120, true), normalizeOperatorText(payload.workflow_session_id, 120, true)).all<Record<string, unknown>>();
-    return operatorJsonResponse({
-      brand_key: brand.brand_key,
-      items: (rows.results ?? []).map((row) => ({
-        id: row.id,
-        item_type: row.item_type,
-        lane_key: row.lane_key ?? null,
-        title: row.title,
-        body: row.body,
-        priority: row.priority === null || row.priority === undefined ? null : Number(row.priority),
-        evidence: safeParseJsonString(String(row.evidence_json ?? "[]")) ?? [],
-        created_from: row.created_from ?? null,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      })),
-      warnings: [],
+    if (toolName === "get_production_board") {
+    const boardResult = await readOperatorProductionBoard({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      listActiveItems: async (input) => {
+        const rows = await env.DB.prepare(
+          `SELECT *
+           FROM operator_production_board_items
+           WHERE brand_key = ?
+             AND status = 'active'
+             AND (? IS NULL OR workflow_session_id = ?)
+           ORDER BY COALESCE(priority, 1000) ASC, datetime(updated_at) DESC`,
+        ).bind(
+          input.brandKey,
+          input.workflowSessionId,
+          input.workflowSessionId,
+        ).all<Record<string, unknown>>();
+        return rows.results ?? [];
+      },
+      parseJsonString: safeParseJsonString,
     });
+    return operatorJsonResponse(boardResult);
   }
 
         if (toolName === "list_source_candidates") {
