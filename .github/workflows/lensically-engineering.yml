@@ -223,7 +223,8 @@ jobs:
                     npm run test -- --run test/operatorSourceCardLockService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardReadService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/wranglerDeployRetry.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
 
@@ -531,7 +532,8 @@ jobs:
                     npm run test -- --run test/operatorSourceCardLockService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardReadService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/wranglerDeployRetry.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
 
@@ -559,7 +561,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+                run: node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
 
 
             

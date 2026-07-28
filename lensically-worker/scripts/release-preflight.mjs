@@ -107,6 +107,9 @@ const operatorGenerationRunAdmissionService = read("src/operatorGenerationRunAdm
 const operatorGenerationRunAdmissionServiceTests = read("test/operatorGenerationRunAdmissionService.spec.ts");
 const operatorGenerationRunPersistencePlanningService = read("src/operatorGenerationRunPersistencePlanningService.ts");
 const operatorGenerationRunPersistencePlanningServiceTests = read("test/operatorGenerationRunPersistencePlanningService.spec.ts");
+const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
+const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
+
 
 
 
@@ -319,6 +322,9 @@ if (!workflow.includes("test/operatorGenerationRunAdmissionService.spec.ts")) {
 if (!workflow.includes("test/operatorGenerationRunPersistencePlanningService.spec.ts")) {
   errors.push("operator_generation_run_persistence_planning_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
+  errors.push("wrangler_deploy_retry_workflow_gate_missing");
+}
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
 }
@@ -355,6 +361,22 @@ if (!workflow.includes("for attempt in $(seq 1 45); do")
     || !workflow.includes("sleep 2")) {
   errors.push("release_runtime_propagation_guard_incomplete");
 }
+if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"')
+    || workflow.includes('run: npx wrangler deploy --config wrangler.jsonc')
+    || !wranglerDeployRetry.includes("export function isTransientWranglerDeployFailure")
+    || !wranglerDeployRetry.includes("export function getDeployRetryDelayMs")
+    || !wranglerDeployRetry.includes("export async function runWranglerDeployWithRetry")
+    || !wranglerDeployRetry.includes("maxAttempts = 4")
+    || !wranglerDeployRetry.includes("[code:\\s*10013]")
+    || !wranglerDeployRetry.includes("deterministic failure; not retrying")
+    || !wranglerDeployRetry.includes("transient retry budget exhausted")
+    || !wranglerDeployRetryTests.includes("classifies Cloudflare assets-upload code 10013 as transient")
+    || !wranglerDeployRetryTests.includes("recovers after one classified transient failure")
+    || !wranglerDeployRetryTests.includes("fails immediately for a deterministic deployment error")
+    || !wranglerDeployRetryTests.includes("stops after the bounded transient retry budget")) {
+  errors.push("wrangler_deploy_retry_contract_incomplete");
+}
+
 
 
 
