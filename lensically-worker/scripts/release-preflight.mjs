@@ -77,6 +77,8 @@ const operatorWorkflowSessionStartService = read("src/operatorWorkflowSessionSta
 const operatorWorkflowSessionStartServiceTests = read("test/operatorWorkflowSessionStartService.spec.ts");
 const operatorContextAdmissionService = read("src/operatorContextAdmissionService.ts");
 const operatorContextAdmissionServiceTests = read("test/operatorContextAdmissionService.spec.ts");
+const operatorProductionBoardService = read("src/operatorProductionBoardService.ts");
+const operatorProductionBoardServiceTests = read("test/operatorProductionBoardService.spec.ts");
 
 
 
@@ -229,6 +231,9 @@ if (!workflow.includes("test/operatorWorkflowSessionStartService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorContextAdmissionService.spec.ts")) {
   errors.push("operator_context_admission_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorProductionBoardService.spec.ts")) {
+  errors.push("operator_production_board_service_workflow_gate_missing");
 }
 
 
@@ -1149,6 +1154,31 @@ if (!operatorContextAdmissionServiceTests.includes("persists an empty complete a
     || !operatorContextAdmissionServiceTests.includes("infers partial coverage from remaining pagination and emits the exact warning")
     || !operatorContextAdmissionServiceTests.includes("normalizes admission metadata and honors explicit partial status")) {
   lifecycleErrors.push("operator_context_admission_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorProductionBoardService"')
+    || !source.includes("readOperatorProductionBoard({")
+    || !source.includes("listActiveItems: async")
+    || !source.includes("parseJsonString: safeParseJsonString")) {
+  lifecycleErrors.push("operator_production_board_service_import_or_binding_missing");
+}
+if (source.includes("items: (rows.results ?? []).map")
+    || source.includes("priority: row.priority === null")
+    || source.includes("evidence: safeParseJsonString")) {
+  lifecycleErrors.push("operator_production_board_service_returned_to_index");
+}
+if (!operatorProductionBoardService.includes("export async function readOperatorProductionBoard")
+    || !operatorProductionBoardService.includes("dependencies.listActiveItems")
+    || !operatorProductionBoardService.includes("dependencies.parseJsonString")
+    || !operatorProductionBoardService.includes("priority: row.priority")
+    || !operatorProductionBoardService.includes("warnings: []")) {
+  lifecycleErrors.push("operator_production_board_service_module_incomplete");
+}
+if (!operatorProductionBoardServiceTests.includes("returns an empty board with exact brand identity and warnings")
+    || !operatorProductionBoardServiceTests.includes("normalizes the optional workflow-session filter before querying")
+    || !operatorProductionBoardServiceTests.includes("serializes stable item fields and preserves nullable values")
+    || !operatorProductionBoardServiceTests.includes("converts numeric priorities and decodes evidence payloads")
+    || !operatorProductionBoardServiceTests.includes("falls back to an empty evidence array when parsing returns null")) {
+  lifecycleErrors.push("operator_production_board_service_tests_incomplete");
 }
 
 
