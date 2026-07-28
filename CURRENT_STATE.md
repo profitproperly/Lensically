@@ -106,7 +106,7 @@
 ## Engineering and Release
 
 - GitHub `main` is the repository source of truth.
-- `ENGINEERING_CONTINUATION.md` is the single root-level authority for active implementation state. The fixed-path `getEngineeringContinuation` tool exposes it directly to fresh chats; it is rewritten after each checkpoint and explicitly reports idle when no implementation is active.
+- `ENGINEERING_CONTINUATION.md` is the sole root-level continuation authority for all Lensically work, not only engineering. It contains every accepted incomplete job, deterministic precedence, exactly one active job, and exactly one current action. `getEngineeringContinuation` exposes it directly; D1 work-state tables and action-closure receipts are telemetry and may never override it.
 - Stage 4 database authority is enforced by `lensically-worker/database/schema-authority.json` and `scripts/validate-database-authority.mjs`. Release preflight now inventories runtime DDL owners, blocks undeclared sources or duplicate owners, and freezes retired-table recreation debt until migration extraction removes it.
 
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.

@@ -21,9 +21,10 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 ## Autonomous Business Operator
 
 - The runtime role is the **Lensically Autonomous Business Operator** under `agent-native-operating-contract-v1`. It restores durable state, reconciles, diagnoses, selects one priority, executes, verifies, records, declares one next action, and checkpoints. Chat is an optional interface, not the business engine.
-- `operator_work_state` stores one frozen active outcome. `operator_work_ledger` stores every proposed, queued, deferred, interrupting, merged, rejected, and completed work item with priority, reason, dependencies, completion condition, order, and evidence.
-- `single-active-outcome-v1` permits interruption only for P0/P1 incidents, required prerequisites, or material irreversible rework. All other ideas are durably deferred without changing the active outcome.
-- Every operational result must contain an action-closure receipt with current live state, target agent-native state, active outcome, one selected next action, priority reason, completion evidence, and owner-action requirement. A temporary dependency is invalid without an explicit retirement condition.
+- Root `ENGINEERING_CONTINUATION.md` is the sole continuation ledger for all Lensically jobs. It owns accepted-job visibility, precedence, the one active job, and the one current action.
+- `operator_work_state` and `operator_work_ledger` remain non-authoritative execution telemetry and historical intake evidence. They cannot create, activate, reorder, or resume work that is absent from the canonical continuation ledger.
+- `single-active-outcome-v1` permits interruption only for verified P0/P1 incidents recorded in the canonical ledger. All other ideas remain visible as queued or captured work without changing the active job.
+- Every operational result must contain an action-closure receipt, but that receipt points back to `getEngineeringContinuation` and may not independently define continuation. A temporary dependency is invalid without an explicit retirement condition.
 - Do not ask the owner what happens next when mission and durable evidence are sufficient. Owner approval is authorization only; the Operator arrives with the recommendation, prepared action, verification plan, and follow-on checkpoint.
 
 ## Engineering Speed

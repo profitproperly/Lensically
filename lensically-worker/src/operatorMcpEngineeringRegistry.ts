@@ -64,7 +64,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "getEngineeringContinuation",
     title: "Get engineering continuation",
-    description: "Read the canonical root ENGINEERING_CONTINUATION.md handoff before starting or resuming engineering. The fixed path prevents fresh chats from hunting through repository files or stale memories.",
+    description: "Read the sole canonical root ENGINEERING_CONTINUATION.md ledger before deciding what Lensically work to resume. It contains every accepted incomplete job, explicit precedence, exactly one active job, and exactly one current action; chat, D1 work state, and action-closure receipts cannot override it.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
@@ -166,14 +166,14 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "getOperatorWorkState",
     title: "Get operator work state",
-    description: "Read the frozen active outcome, interrupt state, queued prerequisites, and deferred-work ledger.",
+    description: "Read the legacy D1 work-state telemetry and historical intake ledger. This surface is non-authoritative and cannot establish, reorder, or resume work; call getEngineeringContinuation for canonical precedence and the current action.",
     inputSchema: { type: "object", properties: { status: { type: "string", enum: ["queued", "deferred", "interrupting", "completed", "merged", "rejected"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "intakeOperatorWork",
     title: "Intake operator work",
-    description: "Classify one proposed work item against the single-active-outcome guard and persist the resulting activate, defer, merge, or reject decision.",
+    description: "Persist one proposed work item into the non-authoritative D1 intake mirror. This does not accept, activate, or order canonical work; update ENGINEERING_CONTINUATION.md before execution.",
     inputSchema: {
       type: "object",
       properties: {
@@ -197,7 +197,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "advanceOperatorWork",
     title: "Advance operator work",
-    description: "Update one persisted work item, clear a completed interrupt, checkpoint the next action, or close the active outcome with evidence.",
+    description: "Update the non-authoritative D1 work telemetry mirror. This cannot change canonical precedence or continuation; ENGINEERING_CONTINUATION.md remains the sole authority.",
     inputSchema: {
       type: "object",
       properties: {

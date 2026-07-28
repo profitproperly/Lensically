@@ -16133,26 +16133,27 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
     ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
     : undefined;
-  const docFiles = await Promise.all([
-    getGithubFile(env, "AGENTS.md"),
-    getGithubFile(env, "CURRENT_STATE.md"),
-    getGithubFile(env, "OPERATING_MEMORY.md"),
-  ]);
-  const sourceDocuments = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"].map((path, index) => compactStartupDocument(path, docFiles[index]));
-    const operatorWorkState = await getOperatorWorkState(env, { limit: 30 });
-  const rawWorkState = operatorWorkState.work_state && typeof operatorWorkState.work_state === "object" && !Array.isArray(operatorWorkState.work_state)
-    ? operatorWorkState.work_state as Record<string, unknown>
-    : null;
-  const operatorWorkSummary = {
-    ok: operatorWorkState.ok === true,
-    status: rawWorkState?.status ?? null,
-    active_outcome_key: rawWorkState?.active_outcome_key ?? null,
-    active_outcome_title: rawWorkState?.active_outcome_title ?? null,
-    next_action: rawWorkState?.next_action ?? null,
-    updated_at: rawWorkState?.updated_at ?? null,
-    queued_required_count: operatorWorkState.queued_required_count ?? 0,
-    deferred_count: operatorWorkState.deferred_count ?? 0,
-    detail: "Durable work items remain server-side and are omitted from startup payloads.",
+    const continuationPath = "ENGINEERING_CONTINUATION.md";
+  const sourcePaths = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", continuationPath];
+  const docFiles = await Promise.all(sourcePaths.map((path) => getGithubFile(env, path)));
+  const sourceDocuments = sourcePaths.map((path, index) => compactStartupDocument(path, docFiles[index]));
+  const continuationFile = docFiles[3];
+  const continuationStatus = continuationFile.content?.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown";
+  const continuationContract = continuationFile.content?.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+  const activeJobId = continuationFile.content?.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+  const activeCheckpoint = continuationFile.content?.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+  const canonicalContinuation = {
+    ok: continuationFile.ok && continuationFile.content !== null,
+    authority: "sole_canonical_repository_ledger",
+    path: continuationPath,
+    tool: "getEngineeringContinuation",
+    status: continuationStatus,
+    contract: continuationContract,
+    active_job_id: activeJobId,
+    active_checkpoint: activeCheckpoint,
+    file_sha: continuationFile.sha,
+    size: continuationFile.size,
+    precedence_rule: "Read Authority and Precedence, Unified Job Queue, and Current Action. No chat, D1 work state, Growth Mission, action-closure receipt, or other document may override this ledger.",
   };
   return {
     ok: true,
@@ -16186,7 +16187,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       ],
       after_explicit_proceed: "confirmOperatorProceed restores canonical account state, produces the current Growth Mission Brief, and opens an owner-model planning discussion. It does not authorize account mutations. Later account calls send proceed_confirmed=true; the approved persistent mission and continuity are verified from server-side state.",
     },
-        operator_work_state: operatorWorkSummary,
+                canonical_continuation: canonicalContinuation,
     growth_mission_contract: {
       version: OPERATOR_GROWTH_MISSION_VERSION,
       permanent_mission: MANIFEST_AUTONOMY_OBJECTIVE,
@@ -17963,8 +17964,11 @@ async function getOperatorWorkState(env: Env, args: Record<string, unknown>): Pr
     ? await env.DB.prepare(`SELECT * FROM operator_work_ledger WHERE status = ? ORDER BY required_for_active_outcome DESC, execution_order ASC, datetime(updated_at) DESC LIMIT ?`).bind(status, limit).all<Record<string, unknown>>()
     : await env.DB.prepare(`SELECT * FROM operator_work_ledger ORDER BY CASE status WHEN 'interrupting' THEN 0 WHEN 'queued' THEN 1 WHEN 'deferred' THEN 2 ELSE 3 END, required_for_active_outcome DESC, execution_order ASC, datetime(updated_at) DESC LIMIT ?`).bind(limit).all<Record<string, unknown>>();
   const items = (result.results ?? []).map(serializeOperatorWorkItem);
-  return {
+    return {
     ok: true,
+    authority: "non_authoritative_execution_telemetry",
+    canonical_continuation: { path: "ENGINEERING_CONTINUATION.md", tool: "getEngineeringContinuation", sole_authority: true },
+    warning: "These D1 records cannot establish, reorder, or resume Lensically work. The canonical continuation ledger wins every conflict.",
     operating_contract: AGENT_NATIVE_OPERATING_CONTRACT,
     work_state: serializeOperatorWorkState(state),
     items,
@@ -20509,23 +20513,29 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-  if (toolName === "getEngineeringContinuation") {
+    if (toolName === "getEngineeringContinuation") {
     const path = "ENGINEERING_CONTINUATION.md";
     const file = await getGithubFile(env, path);
     if (!file.ok || file.content === null) {
-      return { ok: false, error: "engineering_continuation_unavailable", status: file.status, path };
+      return { ok: false, error: "canonical_continuation_unavailable", status: file.status, path };
     }
     const status = file.content.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown";
+    const contract = file.content.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+    const activeJobId = file.content.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+    const activeCheckpoint = file.content.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null;
     return {
       ok: true,
-      status_kind: "engineering_continuation",
-      authority: "canonical_repository_file",
+      status_kind: "canonical_continuation",
+      authority: "sole_canonical_repository_ledger",
       path,
       status,
+      contract,
+      active_job_id: activeJobId,
+      active_checkpoint: activeCheckpoint,
       file_sha: file.sha,
       size: file.size,
       content: file.content,
-      startup_rule: "Reconcile with getRepoStatus, then continue only the Current Action recorded in this file.",
+      startup_rule: "Read Authority and Precedence, Unified Job Queue, and Current Action; reconcile with getRepoStatus; execute only the one ACTIVE job and current checkpoint. No other continuation surface may override this file.",
     };
   }
 
@@ -20567,7 +20577,7 @@ async function handleOperatorMcpEngineeringTool(
       },
             tool_block_prevention: [
                 "Use getOperatorStartupContext only for deliberate non-account bootstrap; engineeringPrecheck is sufficient for routine engineering.",
-        "Call getEngineeringContinuation before starting or resuming an implementation; never reconstruct active engineering state from chat memory.",
+                "Call getEngineeringContinuation before any continuation decision. ENGINEERING_CONTINUATION.md is the sole authority for all Lensically jobs; D1 work state, action-closure receipts, Growth Mission records, and chat memory are telemetry or evidence only.",
         "Call one advertised direct typed Main tool for each external operation.",
         "Use readRepoFile with line bounds for known files.",
         "Use applyRepoTextPatch only for one isolated replacement.",

@@ -1,10 +1,12 @@
-# Engineering Continuation
+# Lensically Continuation Ledger
 
 status: active
 updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
-implementation_id: worker-monolith-refactor
+continuation_contract: canonical-continuation-v1
+active_job_id: worker-monolith-refactor
+active_checkpoint: stage-6t-published-post-lineage-audit-service
 repository_base_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
 production_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
 
@@ -13,9 +15,45 @@ production_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
 
 
 
-This is the single authoritative temporary handoff for active engineering work. Git history preserves prior implementations; this file contains only the current implementation state.
+This is the sole authoritative continuation source for all Lensically work. Fresh chats, scheduled runs, engineering sessions, and operator workflows must call `getEngineeringContinuation` and use this file before deciding what to resume. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents may supply evidence but may not establish or reorder continuation.
 
-## Objective
+## Authority and Precedence
+
+1. A verified P0/P1 security, data-loss, credential, production-safety, or irreversible incident interrupts all normal work.
+2. Otherwise finish the current atomic checkpoint, including validation, exact-SHA release, live verification, and this ledger rewrite, before switching jobs.
+3. The owner's explicit ordering instruction may change the next job; write the revised order here before execution.
+4. Otherwise execute the lowest numbered unblocked job in `Unified Job Queue`.
+5. Dependencies execute before dependents. Exactly one job and one checkpoint may be `ACTIVE`.
+6. Every newly accepted job must be added here with status, precedence, dependencies, completion condition, and next checkpoint before work begins.
+7. D1 `operator_work_state` and `operator_work_ledger` are non-authoritative execution telemetry only. A D1-only item is not resumable work until represented here.
+8. If any runtime receipt conflicts with this file, this file wins; repair the mirror before continuing.
+9. Completed detail is compressed here; Git history and the engineering audit remain the archive.
+
+## Unified Job Queue
+
+### 10 — ACTIVE — `worker-monolith-refactor`
+
+- Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
+- Current checkpoint: Stage 6T published-post lineage audit service extraction.
+- Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
+- Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
+
+### 20 — QUEUED — `chl_autonomous_operator_foundation_v1`
+
+- Starts immediately after `worker-monolith-refactor` completes unless a verified P0/P1 interrupt is recorded here.
+- Completed prerequisites: `github_transient_retry_wiring` and `github_ref_reconciliation`.
+- Required remaining order: `atomic_write_reconciliation`, `repository_control_error_policy`, `hardening_regression_completion`, `canonical_operator_documentation`, `full_blocker_acceptance_campaign`.
+- Completion condition: every required item has focused regression evidence, one exact tested and released SHA, live verification, reconciled repository/production state, and a completed foundation outcome.
+
+### Visible follow-on queue
+
+- 100 — CAPTURED — `remove_normal_recovery_dependencies`; revalidate after the two primary jobs.
+- 110 — CAPTURED — `content_lineage_repair`; revalidate against the completed Stage 6T lineage authority.
+- 120 — CAPTURED — `scheduled_autonomous_runs`; execute only after the foundation is live-verified.
+- 130 — CAPTURED — `human_gate_retirement`; execute only with explicit retirement evidence for each gate.
+- 140 — CAPTURED — `manifest_tomorrow_posting_continuity`; stale time-sensitive wording must be revalidated before acceptance or execution.
+
+## Active Job Objective
 
 Complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
 
@@ -802,7 +840,9 @@ Keep table readiness, winner/join SQL, brand/account identifiers, row retrieval,
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6T, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6T, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
+- After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
 
 
@@ -814,11 +854,23 @@ Remaining work after this checkpoint:
 
 ## Remaining
 
+### Active job — `worker-monolith-refactor`
+
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE
-7. Router and runtime composition
-8. Test and release modernization
-9. Final comparison and production release
+6. Product-service extraction — ACTIVE at Stage 6T
+7. Router and runtime composition — QUEUED AFTER STAGE 6
+8. Test and release modernization — QUEUED AFTER STAGE 7
+9. Final comparison and production release — QUEUED AFTER STAGE 8
+
+### Next job — `chl_autonomous_operator_foundation_v1`
+
+1. `atomic_write_reconciliation`
+2. `repository_control_error_policy`
+3. `hardening_regression_completion`
+4. `canonical_operator_documentation`
+5. `full_blocker_acceptance_campaign`
+
+The visible follow-on queue remains captured under `Unified Job Queue` and may not preempt either primary job without a verified P0/P1 incident or an owner-authored precedence change recorded in this file.
 
 ## Completion Gates
 
@@ -842,24 +894,27 @@ None currently recorded.
 ## Fresh-Chat Startup
 
 1. Discover `Lensically_Operator_Mode`.
-2. Call `getEngineeringContinuation` before reconstructing engineering state from chat or memory.
-3. Call `getRepoStatus` and reconcile repository HEAD and production SHA with this file.
-4. Resume only `Current Action`; do not restart completed checkpoints.
-5. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
-6. On any block: stop, fix the root cause, add prevention or regression coverage, then resume.
-7. Validate and release each bounded implementation checkpoint independently before moving to the next.
-8. Rewrite this file after every meaningful implementation checkpoint.
+2. Call `getEngineeringContinuation`. This file is the only continuation authority for every Lensically job.
+3. Read `Authority and Precedence`, `Unified Job Queue`, and `Current Action` before any other continuation or work-state read.
+4. Call `getRepoStatus` and reconcile repository HEAD and production SHA with this file.
+5. Resume only the one `ACTIVE` job and its one `Current Action`; do not restart completed checkpoints or promote a queued/captured item.
+6. Treat D1 work state, action-closure receipts, chat history, Growth Mission records, and other documents as evidence or telemetry only.
+7. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
+8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume.
+9. Validate and release each bounded implementation checkpoint independently before moving to the next.
+10. Rewrite this file after every meaningful checkpoint, accepted new job, precedence change, completion, or verified interrupt.
 
 ## Rewrite Contract
 
-- Keep exactly one authoritative `ENGINEERING_CONTINUATION.md` at repository root.
-- Rewrite it after every meaningful implementation checkpoint; do not append disconnected session logs.
-- When a new implementation replaces the old one, replace the old scope completely.
-- Keep exactly one authoritative next action under `Current Action`.
+- Keep exactly one authoritative `ENGINEERING_CONTINUATION.md` at repository root. Despite the historical filename, it governs all Lensically continuation work.
+- Rewrite it after every meaningful checkpoint, accepted new job, precedence change, completion, or verified interrupt; do not append disconnected session logs.
+- Keep every accepted incomplete job visible in `Unified Job Queue` with one status and one precedence number.
+- Keep exactly one `ACTIVE` job and one authoritative next action under `Current Action`.
+- A new job cannot begin from chat, D1, an action-closure receipt, Growth Mission state, or another document until it is represented here.
 - Record only verified completed work under `Completed`.
-- When no implementation is active, set `status: idle`, clear implementation-specific work, and state: `No current engineering implementation is in progress.`
+- When no job is active, set `status: idle`, retain the visible queue, clear the current action, and state: `No current Lensically job is active.`
 - Git history is the archive. Do not create competing continuation files.
 
-## Ignore
+## Conflict Rule
 
-Do not follow stale Growth Mission diagnostics, old workflow-session records, human-guidance continuations, or `atomic_write_reconciliation` as engineering authority. This file and live repository evidence are authoritative for the active implementation.
+Do not follow stale Growth Mission diagnostics, old workflow-session records, human-guidance continuations, chat memory, D1 `operator_work_state`, D1 `operator_work_ledger`, or action-closure receipts as continuation authority. They may provide evidence, but this file alone determines the active job, precedence, and next action. Any conflicting mirror must be repaired without changing this ledger's order unless a verified P0/P1 incident or explicit owner instruction is recorded here.

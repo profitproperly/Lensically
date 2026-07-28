@@ -3,7 +3,7 @@
 ## Startup
 
 - Read `AGENTS.md`, `OPERATING_MEMORY.md`, and `CURRENT_STATE.md` before Lensically work.
-- Before engineering, call `getEngineeringContinuation`. `ENGINEERING_CONTINUATION.md` at repository root is the single authoritative temporary handoff; chat history and stale operational records are not engineering continuity.
+- Before any Lensically continuation decision, call `getEngineeringContinuation`. Root `ENGINEERING_CONTINUATION.md` is the sole canonical ledger for every active, queued, and captured job, with explicit precedence and exactly one current action. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents are non-authoritative evidence only.
 - GitHub `main` is authoritative. Pull current source before local Codex work and preserve unrelated changes.
 - Read the target integration point before editing. Do not restore removed systems because old commits or stale documentation mention them.
 
