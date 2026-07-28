@@ -124,12 +124,12 @@ jobs:
         working-directory: lensically-web
         run: npm ci
 
-      - name: Build web product surface
+            - name: Build web product surface
         if: steps.push_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
         run: npm run build
 
-            - name: Typecheck and lifecycle gate
+      - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
@@ -258,12 +258,12 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
-      - name: Clear stale worker transforms
+            - name: Clear stale worker transforms
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
       
-            - name: Typecheck and lifecycle gate
+      - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
