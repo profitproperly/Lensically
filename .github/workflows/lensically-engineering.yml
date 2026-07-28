@@ -363,13 +363,54 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout exact release head
+            - name: Checkout exact release head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
 
-      - name: Verify exact release identity
+            - name: Verify exact release identity
         run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
+
+      - name: Resolve exact-SHA release scope
+        id: release_scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          runs_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/lensically-engineering.yml/runs?event=push&head_sha=${RELEASE_SHA}&per_page=20"
+          curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            "${runs_url}" > /tmp/lensically-push-runs.json
+          if jq -e --arg sha "${RELEASE_SHA}" '.workflow_runs | any(.head_sha == $sha and .conclusion == "success")' /tmp/lensically-push-runs.json > /dev/null; then
+            full_release=false
+          else
+            full_release=true
+          fi
+          deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty')"
+          if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+            git diff --name-only "${deployed_sha}" "${RELEASE_SHA}" > /tmp/lensically-release-files.txt
+          else
+            git show --pretty='' --name-only "${RELEASE_SHA}" > /tmp/lensically-release-files.txt
+            full_release=true
+          fi
+          web_changed=false
+          migrations_changed=false
+          cron_changed=false
+          while IFS= read -r path; do
+            case "${path}" in
+              lensically-web/*) web_changed=true ;;
+              lensically-worker/migrations/*) migrations_changed=true ;;
+              lensically-worker/wrangler*) cron_changed=true ;;
+            esac
+          done < /tmp/lensically-release-files.txt
+          echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
+          echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
+          echo "migrations_changed=${migrations_changed}" >> "${GITHUB_OUTPUT}"
+          echo "cron_changed=${cron_changed}" >> "${GITHUB_OUTPUT}"
+          cat /tmp/lensically-release-files.txt
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -396,23 +437,26 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Restore web dependencies
+            - name: Restore web dependencies
+        if: steps.release_scope.outputs.web_changed == 'true'
         id: release_web_cache
         uses: actions/cache@v4
         with:
           path: lensically-web/node_modules
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
-      - name: Install web dependencies
-        if: steps.release_web_cache.outputs.cache-hit != 'true'
+            - name: Install web dependencies
+        if: steps.release_scope.outputs.web_changed == 'true' && steps.release_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
-      - name: Build exact-head web product
+            - name: Build exact-head web product
+        if: steps.release_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
         run: npm run build:cf
 
-      - name: Run exact-head release gates
+            - name: Run exact-head release gates
+        if: steps.release_scope.outputs.full_release == 'true'
         working-directory: lensically-worker
         run: |
           set -euo pipefail
