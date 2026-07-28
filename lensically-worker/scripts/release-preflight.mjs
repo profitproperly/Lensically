@@ -101,6 +101,9 @@ const operatorSourceCardPersistencePlanningService = read("src/operatorSourceCar
 const operatorSourceCardPersistencePlanningServiceTests = read("test/operatorSourceCardPersistencePlanningService.spec.ts");
 const operatorSourceCardLockService = read("src/operatorSourceCardLockService.ts");
 const operatorSourceCardLockServiceTests = read("test/operatorSourceCardLockService.spec.ts");
+const operatorSourceCardReadService = read("src/operatorSourceCardReadService.ts");
+const operatorSourceCardReadServiceTests = read("test/operatorSourceCardReadService.spec.ts");
+
 
 
 
@@ -300,6 +303,9 @@ if (!workflow.includes("test/operatorSourceCardPersistencePlanningService.spec.t
 }
 if (!workflow.includes("test/operatorSourceCardLockService.spec.ts")) {
   errors.push("operator_source_card_lock_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCardReadService.spec.ts")) {
+  errors.push("operator_source_card_read_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1623,6 +1629,34 @@ if (!operatorSourceCardLockServiceTests.includes("returns exact not-found behavi
     || !operatorSourceCardLockServiceTests.includes("returns deterministic lock persistence intent and success response")) {
   lifecycleErrors.push("operator_source_card_lock_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCardReadService"')
+    || !source.includes("readOperatorSourceCard({")
+    || !source.includes("loadSourceCard: async (sourceCardId)")
+    || !source.includes("loadHistory: async (sourceCard)")
+    || !source.includes("SOURCE_CARD_OWNER_PRESENTATION_CONTRACT")) {
+  lifecycleErrors.push("operator_source_card_read_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "get_source_card") {
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);`)
+    || source.includes("const history = payload.include_history === false")
+    || source.includes("canonical_context: history")) {
+  lifecycleErrors.push("operator_source_card_read_service_returned_to_index");
+}
+if (!operatorSourceCardReadService.includes("export async function readOperatorSourceCard")
+    || !operatorSourceCardReadService.includes("dependencies.loadSourceCard")
+    || !operatorSourceCardReadService.includes("dependencies.loadHistory")
+    || !operatorSourceCardReadService.includes("input.payload.include_history === false")
+    || !operatorSourceCardReadService.includes("source_card_not_found")
+    || !operatorSourceCardReadService.includes("canonical_context")
+    || !operatorSourceCardReadService.includes("owner_presentation")) {
+  lifecycleErrors.push("operator_source_card_read_service_module_incomplete");
+}
+if (!operatorSourceCardReadServiceTests.includes("returns exact not-found behavior without loading history")
+    || !operatorSourceCardReadServiceTests.includes("suppresses history retrieval only when include_history is exactly false")
+    || !operatorSourceCardReadServiceTests.includes("loads canonical history by default and composes the exact response")) {
+  lifecycleErrors.push("operator_source_card_read_service_tests_incomplete");
+}
+
 
 
 

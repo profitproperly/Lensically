@@ -129,6 +129,8 @@ import {
   planOperatorSourceCardPersistence,
 } from "./operatorSourceCardPersistencePlanningService";
 import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
+import { readOperatorSourceCard } from "./operatorSourceCardReadService";
+
 
 
 
@@ -14190,23 +14192,25 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(lockPlanning.plan.body);
   }
 
-    if (toolName === "get_source_card") {
-    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
-    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
-    if (!card) {
-      return operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
-    }
-    const history = payload.include_history === false
-      ? null
-      : await getOperatorSourceCardHistory(env, brand, card);
-        return operatorJsonResponse({
-      source_card: card,
-      canonical_context: history,
-      owner_presentation: {
-        ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
-        account_scope: brand.brand_key,
-      },
+        if (toolName === "get_source_card") {
+    const sourceCardRead = await readOperatorSourceCard({
+      brandKey: brand.brand_key,
+      payload,
+      ownerPresentation: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+    }, {
+      normalizeText: normalizeOperatorText,
+      loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
+        env,
+        brand.brand_key,
+        sourceCardId,
+      ),
+      loadHistory: async (sourceCard) => await getOperatorSourceCardHistory(
+        env,
+        brand,
+        sourceCard,
+      ),
     });
+    return operatorJsonResponse(sourceCardRead.body, sourceCardRead.status);
   }
 
 
