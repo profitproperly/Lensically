@@ -227,7 +227,7 @@ jobs:
       inputs.task != 'worker-deploy'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact head
+            - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.sha }}
@@ -237,9 +237,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            lensically-worker/package-lock.json
-            lensically-web/package-lock.json
+          cache-dependency-path: lensically-worker/package-lock.json
 
       - name: Restore worker dependencies
         id: worker_cache
@@ -257,22 +255,7 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Restore web dependencies
-        id: web_cache
-        uses: actions/cache@v4
-        with:
-          path: lensically-web/node_modules
-          key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
-
-      - name: Install web dependencies
-        if: steps.web_cache.outputs.cache-hit != 'true'
-        working-directory: lensically-web
-        run: npm ci
-
-      - name: Build web product surface
-        working-directory: lensically-web
-        run: npm run build
-
+      
       - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
