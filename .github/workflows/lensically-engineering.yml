@@ -579,7 +579,7 @@ jobs:
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
           test "${actual_crons}" = "${expected_crons}"
 
-            - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
+                  - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
         run: |
           set -euo pipefail
           expected_sha="$(git rev-parse HEAD)"

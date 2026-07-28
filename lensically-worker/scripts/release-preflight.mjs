@@ -304,12 +304,17 @@ if (!workflowLint.includes('name: Lensically workflow lint')
     || !workflowLint.includes("workflow_dispatch:")) {
   errors.push("independent_workflow_yaml_watchdog_incomplete");
 }
-if (!workflowStructureValidator.includes('YAML.parse_file(path).to_ruby')
+if (!workflowStructureValidator.includes("document = YAML.parse_file(path)")
+    || !workflowStructureValidator.includes("assert_no_duplicate_mapping_keys(document)")
+    || !workflowStructureValidator.includes("duplicate_mapping_key")
     || !workflowStructureValidator.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
     || !workflowStructureValidator.includes('job.key?("runs-on")')
-    || !workflowStructureValidator.includes('job["steps"].is_a?(Array)')) {
+    || !workflowStructureValidator.includes('job["steps"].is_a?(Array)')
+    || !workflowStructureValidator.includes("required_worker_release_steps")
+    || !workflowStructureValidator.includes("Verify production runtime, scheduler, retained website, and retired legacy surfaces")) {
   errors.push("engineering_workflow_structure_validator_incomplete");
 }
+
 if (!workflow.includes("for attempt in $(seq 1 45); do")
     || !workflow.includes("runtime_ok=false")
     || !workflow.includes("scheduler_ok=false")
