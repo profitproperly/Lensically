@@ -102,14 +102,14 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
-      - name: Clear stale worker transforms
+            - name: Clear stale worker transforms
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
 
             
 
-            - name: Restore web dependencies
+      - name: Restore web dependencies
         if: steps.push_scope.outputs.web_changed == 'true'
         id: push_web_cache
         uses: actions/cache@v4
