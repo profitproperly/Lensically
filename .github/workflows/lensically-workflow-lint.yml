@@ -1,0 +1,25 @@
+name: Lensically workflow lint
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/lensically-engineering.yml"
+      - ".github/workflows/lensically-workflow-lint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parse-engineering-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Parse engineering workflow YAML
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0)); puts "workflow_yaml_valid"' .github/workflows/lensically-engineering.yml
