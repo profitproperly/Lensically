@@ -112,6 +112,7 @@ import { attachOperatorManifestReviewDraft } from "./operatorManifestReviewDraft
 import { resolveOperatorManifestReviewSource } from "./operatorManifestReviewSourceResolutionService";
 import { scheduleOperatorManifestReviewBatch } from "./operatorManifestReviewBatchSchedulingService";
 import { startOperatorWorkflowSession } from "./operatorWorkflowSessionStartService";
+import { admitOperatorContext } from "./operatorContextAdmissionService";
 
 
 
@@ -13220,47 +13221,33 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(sessionResult);
   }
 
-  if (toolName === "admit_context") {
-    const sectionsInput = Array.isArray(payload.sections) ? payload.sections as Array<Record<string, unknown>> : [];
-    const coverage = sectionsInput.map((section) => {
-      const returnedCount = Number(section.returned_count ?? section.limit ?? 0);
-      const totalCount = Number(section.total_count ?? returnedCount);
-      const hasMore = Boolean(section.has_more ?? (totalCount > returnedCount));
-      return {
-        section: normalizeOperatorMachineKey(section.section, "unknown"),
-        returned_count: returnedCount,
-        total_count: totalCount,
-        limit: Number(section.limit ?? returnedCount),
-        offset: Number(section.offset ?? 0),
-        offsets_read: Array.isArray(section.offsets_read) ? section.offsets_read : [Number(section.offset ?? 0)],
-        has_more: hasMore,
-        coverage_status: section.coverage_status ?? (hasMore ? "partial" : "complete"),
-        source: section.source ?? "existing_db",
-        snapshot_id: section.snapshot_id ?? payload.snapshot_id ?? null,
-      };
+    if (toolName === "admit_context") {
+    const admissionResult = await admitOperatorContext({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      createId: () => crypto.randomUUID(),
+      insertAdmission: async (input) => env.DB.prepare(
+        `INSERT INTO operator_context_admissions (
+          id, brand_key, workflow_session_id, snapshot_id, admission_scope, sections_json,
+          freshness_started_at, freshness_completed_at, is_partial, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        input.admissionId,
+        input.brandKey,
+        input.workflowSessionId,
+        input.snapshotId,
+        input.admissionScope,
+        JSON.stringify(input.sections),
+        input.freshnessStartedAt,
+        input.freshnessCompletedAt,
+        input.isPartial ? 1 : 0,
+        input.notes,
+      ).run(),
     });
-    const isPartial = coverage.some((section) => section.coverage_status === "partial" || section.has_more === true);
-    const admissionId = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO operator_context_admissions (
-        id, brand_key, workflow_session_id, snapshot_id, admission_scope, sections_json,
-        freshness_started_at, freshness_completed_at, is_partial, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        admissionId,
-        brand.brand_key,
-        normalizeOperatorText(payload.workflow_session_id, 120, true),
-        normalizeOperatorText(payload.snapshot_id, 120, true),
-        normalizeOperatorMachineKey(payload.admission_scope, "source_card_selection"),
-        JSON.stringify(coverage),
-        normalizeOperatorText(payload.freshness_started_at, 80, true),
-        normalizeOperatorText(payload.freshness_completed_at, 80, true),
-        isPartial ? 1 : 0,
-        normalizeOperatorText(payload.notes, 2000, true),
-      )
-      .run();
-    return operatorJsonResponse({ context_admission_id: admissionId, coverage, is_partial: isPartial, warnings: isPartial ? ["Context admission is partial."] : [] });
+    return operatorJsonResponse(admissionResult);
   }
 
   if (toolName === "get_production_board") {
