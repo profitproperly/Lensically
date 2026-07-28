@@ -49,7 +49,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-            - name: Checkout pushed head
+      - name: Checkout pushed head
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -107,7 +107,9 @@ jobs:
         run: rm -rf node_modules/.vite node_modules/.cache
 
 
-            - name: Restore web dependencies
+            
+
+      - name: Restore web dependencies
         if: steps.push_scope.outputs.web_changed == 'true'
         id: push_web_cache
         uses: actions/cache@v4
@@ -115,7 +117,9 @@ jobs:
           path: lensically-web/node_modules
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
-            - name: Install web dependencies
+            
+
+      - name: Install web dependencies
         if: steps.push_scope.outputs.web_changed == 'true' && steps.push_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
@@ -133,7 +137,9 @@ jobs:
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
-            - name: Run fast mapped validation
+            
+
+      - name: Run fast mapped validation
         if: steps.push_scope.outputs.full_validation != 'true'
         working-directory: lensically-worker
         run: |
@@ -363,13 +369,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-            - name: Checkout exact release head
+      - name: Checkout exact release head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 0
 
-            - name: Verify exact release identity
+            
+
+      - name: Verify exact release identity
         run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
 
       - name: Resolve exact-SHA release scope
@@ -437,7 +445,9 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-            - name: Restore web dependencies
+            
+
+      - name: Restore web dependencies
         if: steps.release_scope.outputs.web_changed == 'true'
         id: release_web_cache
         uses: actions/cache@v4
@@ -445,17 +455,23 @@ jobs:
           path: lensically-web/node_modules
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
-            - name: Install web dependencies
+            
+
+      - name: Install web dependencies
         if: steps.release_scope.outputs.web_changed == 'true' && steps.release_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
-            - name: Build exact-head web product
+            
+
+      - name: Build exact-head web product
         if: steps.release_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
         run: npm run build:cf
 
-            - name: Run exact-head release gates
+            
+
+      - name: Run exact-head release gates
         if: steps.release_scope.outputs.full_release == 'true'
         working-directory: lensically-worker
         run: |
@@ -512,7 +528,8 @@ jobs:
           npm run test -- --run test/operatorMode.spec.ts --testNamePattern="advertises the curated direct typed Main surface and concise instructions|makes the static router the only public action path|routes operational status and engineering intents deterministically away from content procedures|routes bounded known-file repository search through the main Execution Kernel without Recovery|validates complete Execution Kernel routes without mutations|rejects an MCP session created by a previous Worker deployment before routing|lists only the active static MCP registry and concise instructions|arms, executes, and re-arms the independent scheduled-post alarm with shared cron health|recovers a known Saved Pattern into complete published-post lineage|reconciles prepare_manifest_autonomous_cycle again with the same durable operation id" --reporter=dot --bail=1
 
                         
-            - name: Apply exact-head database migrations
+            
+      - name: Apply exact-head database migrations
         if: steps.release_scope.outputs.migrations_changed == 'true'
         working-directory: lensically-worker
         env:
@@ -529,7 +546,9 @@ jobs:
         run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
 
 
-            - name: Deploy exact validated web head
+            
+
+      - name: Deploy exact validated web head
         if: steps.release_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
         env:
@@ -537,7 +556,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config wrangler.toml
 
-            - name: Verify Wrangler-managed cron triggers
+            
+
+      - name: Verify Wrangler-managed cron triggers
         if: steps.release_scope.outputs.cron_changed == 'true'
         working-directory: lensically-worker
         env:
@@ -570,7 +591,9 @@ jobs:
               verified=true
               break
             fi
-                        sleep 1
+                        
+            sleep 1
+
           done
           if [ "${verified}" != "true" ]; then
             cat /tmp/lensically-runtime-health.json || true
