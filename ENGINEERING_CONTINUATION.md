@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 426734718a096de6b5e2675ba9ca996738c9cfee
-production_sha: 426734718a096de6b5e2675ba9ca996738c9cfee
+repository_base_sha: 6aa0ff31e40c41afddde907fa4f842b156117ab7
+production_sha: 6aa0ff31e40c41afddde907fa4f842b156117ab7
 
 
 
@@ -731,23 +731,33 @@ Completed checkpoint — Stage 6N workflow-session start service extraction:
 - Live production independently confirmed exact SHA `426734718a096de6b5e2675ba9ca996738c9cfee` with 75/75 public tools.
 - The non-authoritative push-time Cloudflare auto-build check remained failed, while the protected migration-first release, Worker/web deployment, cron verification, runtime verification, and independent live MCP verification all passed on the exact SHA.
 
-Current sub-action — Stage 6O context-admission service extraction:
+Completed checkpoint — Stage 6O context-admission service extraction:
 
-Extract `admit_context` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorContextAdmissionService.ts` as the dependency-injected authority for section coverage normalization, pagination metadata, explicit override precedence, snapshot fallback, aggregate partial detection, metadata normalization, durable admission payloads, warnings, and exact response composition.
+- Reduced `admit_context` in `src/index.ts` to explicit UUID, brand, text/machine-key normalization, JSON serialization, context-admission insert SQL, and transport adapters.
+- Added `test/operatorContextAdmissionService.spec.ts` and permanent push/release ownership gates.
+- Push validation passed in run `30317587901`.
+- All eight Operator shards passed in run `30317780108`.
+- Exact-SHA release passed in run `30317831972`.
+- Live production independently confirmed exact SHA `6aa0ff31e40c41afddde907fa4f842b156117ab7` with 75/75 public tools.
 
-- section-array admission and deterministic normalization of section keys
-- returned, total, limit, offset, and offsets-read pagination coverage
-- explicit or inferred `has_more` and `coverage_status`
-- source and snapshot identity fallback behavior
-- aggregate partial-context detection and exact warning text
-- admission identity, workflow-session/snapshot/scope/freshness/notes normalization, durable persistence payload, and exact response keys
-- no persistence before the normalized admission record is complete
+Current sub-action — Stage 6P production-board read service extraction:
 
-Keep UUID creation, context-admission insert SQL, JSON serialization, text/machine-key normalization, brand identity, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `get_production_board` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- optional normalized workflow-session filtering
+- active production-board item retrieval and deterministic database ordering
+- exact item fields for identity, type, lane, title, body, priority, evidence, origin, and timestamps
+- nullable lane, priority, and origin behavior
+- numeric priority conversion when present
+- evidence JSON decoding with an empty-array fallback
+- exact brand identity and empty warnings response
+
+Keep production-board query SQL and ordering, text normalization, evidence JSON parsing, brand identity, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6O, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6P, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
