@@ -132,6 +132,7 @@ const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
+const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
 
 const agentRules = read("../AGENTS.md");
 const currentState = read("../CURRENT_STATE.md");
@@ -288,13 +289,17 @@ if (!testSyntaxValidator.includes('import { transform } from "esbuild"')
 }
 if (!workflowLint.includes('name: Lensically workflow lint')
     || !workflowLint.includes('".github/workflows/lensically-engineering.yml"')
-    || !workflowLint.includes("YAML.parse_file")
-    || !workflowLint.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
-    || !workflowLint.includes('job.key?("runs-on")')
-    || !workflowLint.includes('job["steps"].is_a?(Array)')
+    || !workflowLint.includes("ruby lensically-worker/scripts/validate-engineering-workflow.rb")
     || !workflowLint.includes("workflow_dispatch:")) {
   errors.push("independent_workflow_yaml_watchdog_incomplete");
 }
+if (!workflowStructureValidator.includes('YAML.parse_file(path).to_ruby')
+    || !workflowStructureValidator.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
+    || !workflowStructureValidator.includes('job.key?("runs-on")')
+    || !workflowStructureValidator.includes('job["steps"].is_a?(Array)')) {
+  errors.push("engineering_workflow_structure_validator_incomplete");
+}
+
 
 
 
