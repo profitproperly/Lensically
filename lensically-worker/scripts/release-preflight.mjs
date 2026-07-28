@@ -97,6 +97,9 @@ const operatorSourceCardAdmissionService = read("src/operatorSourceCardAdmission
 const operatorSourceCardAdmissionServiceTests = read("test/operatorSourceCardAdmissionService.spec.ts");
 const operatorSourceCardFamilyResolutionService = read("src/operatorSourceCardFamilyResolutionService.ts");
 const operatorSourceCardFamilyResolutionServiceTests = read("test/operatorSourceCardFamilyResolutionService.spec.ts");
+const operatorSourceCardPersistencePlanningService = read("src/operatorSourceCardPersistencePlanningService.ts");
+const operatorSourceCardPersistencePlanningServiceTests = read("test/operatorSourceCardPersistencePlanningService.spec.ts");
+
 
 
 
@@ -288,6 +291,9 @@ if (!workflow.includes("test/operatorSourceCardAdmissionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorSourceCardFamilyResolutionService.spec.ts")) {
   errors.push("operator_source_card_family_resolution_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCardPersistencePlanningService.spec.ts")) {
+  errors.push("operator_source_card_persistence_planning_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1551,6 +1557,39 @@ if (!operatorSourceCardFamilyResolutionServiceTests.includes("creates a missing 
     || !operatorSourceCardFamilyResolutionServiceTests.includes("increments the canonical version and preserves replacement identity")) {
   lifecycleErrors.push("operator_source_card_family_resolution_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCardPersistencePlanningService"')
+    || !source.includes("planOperatorSourceCardPersistence({")
+    || !source.includes("composeOperatorSourceCardPersistenceResponse({")
+    || !source.includes("normalizeJson: normalizeOperatorJson")
+    || !source.includes("nowIso: () => new Date().toISOString()")
+    || !source.includes("const persistencePlan = persistencePlanning.plan")
+    || !source.includes("await env.DB.batch(sourceCardStatements)")) {
+  lifecycleErrors.push("operator_source_card_persistence_planning_service_import_or_binding_missing");
+}
+if (source.includes("const backfillValidation = savedPatternId !== null")
+    || source.includes("const backfillLockedAt = savedPatternId !== null")
+    || source.includes('error: "saved_pattern_source_card_not_lockable"')
+    || source.includes('status: savedPatternId !== null ? "locked" : "draft"')) {
+  lifecycleErrors.push("operator_source_card_persistence_planning_service_returned_to_index");
+}
+if (!operatorSourceCardPersistencePlanningService.includes("export function planOperatorSourceCardPersistence")
+    || !operatorSourceCardPersistencePlanningService.includes("export function composeOperatorSourceCardPersistenceResponse")
+    || !operatorSourceCardPersistencePlanningService.includes("saved_pattern_source_card_not_lockable")
+    || !operatorSourceCardPersistencePlanningService.includes("retireSupersededCardId")
+    || !operatorSourceCardPersistencePlanningService.includes("familyUpdate")
+    || !operatorSourceCardPersistencePlanningService.includes("selectionLink")
+    || !operatorSourceCardPersistencePlanningService.includes("insertValues")
+    || !operatorSourceCardPersistencePlanningService.includes("owner_presentation")) {
+  lifecycleErrors.push("operator_source_card_persistence_planning_service_module_incomplete");
+}
+if (!operatorSourceCardPersistencePlanningServiceTests.includes("returns exact Saved Pattern lockability rejection before persistence planning")
+    || !operatorSourceCardPersistencePlanningServiceTests.includes("builds a normalized locked plan with every mutation intent")
+    || !operatorSourceCardPersistencePlanningServiceTests.includes("builds a draft plan without lock validation or optional linkage intents")
+    || !operatorSourceCardPersistencePlanningServiceTests.includes("composes the exact persisted-card response from the completed plan")
+    || !operatorSourceCardPersistencePlanningServiceTests.includes("validates an empty object when the persisted card read is missing")) {
+  lifecycleErrors.push("operator_source_card_persistence_planning_service_tests_incomplete");
+}
+
 
 
 

@@ -124,6 +124,11 @@ import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSou
 import { readOperatorSourceCandidateBatch } from "./operatorSourceCandidateBatchReadService";
 import { admitOperatorSourceCardCreation } from "./operatorSourceCardAdmissionService";
 import { resolveOperatorSourceCardFamily } from "./operatorSourceCardFamilyResolutionService";
+import {
+  composeOperatorSourceCardPersistenceResponse,
+  planOperatorSourceCardPersistence,
+} from "./operatorSourceCardPersistencePlanningService";
+
 
 
 
@@ -14014,36 +14019,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       }
 
 
-                const backfillValidation = savedPatternId !== null
-      ? validateSourceCardLockable({
-          brand_key: brand.brand_key,
-          primary_source: primarySource,
-          source_mechanism: sourceMechanism,
-          required_product: requiredProduct,
-          forbidden_surfaces: Array.isArray(payload.forbidden_surfaces) ? payload.forbidden_surfaces : [],
-          pass_conditions: Array.isArray(payload.pass_conditions) ? payload.pass_conditions : [],
-          fail_conditions: Array.isArray(payload.fail_conditions) ? payload.fail_conditions : [],
-          transformation_contract: transformationContract,
-        })
-      : null;
-    if (backfillValidation && !backfillValidation.can_lock) {
-      return operatorJsonResponse({
-        success: false,
-        error: "saved_pattern_source_card_not_lockable",
-        saved_pattern_id: savedPatternId,
-        validation: backfillValidation,
-      }, 400);
-    }
-    const backfillLockedAt = savedPatternId !== null ? new Date().toISOString() : null;
-        const sourceCardStatements = [];
-    if (supersedesSourceCardId) {
+                      const persistencePlanning = planOperatorSourceCardPersistence({
+        brandKey: brand.brand_key,
+        payload,
+        sourceCardId,
+        workflowSessionId,
+        sequenceLabel,
+        primarySource,
+        metricsSnapshot,
+        sourceMechanism,
+        requiredProduct,
+        familyId,
+        sourceSelectionId,
+        versionNumber,
+        supersedesSourceCardId,
+        versionReason,
+        transformationContract,
+        savedPatternId,
+      }, {
+        normalizeMachineKey: normalizeOperatorMachineKey,
+        normalizeText: normalizeOperatorText,
+        normalizeJson: normalizeOperatorJson,
+        parseWorkflowSequence: parseOperatorWorkflowSequence,
+        validateSourceCard: validateSourceCardLockable,
+        nowIso: () => new Date().toISOString(),
+      });
+      if (persistencePlanning.kind === "response") {
+        return operatorJsonResponse(persistencePlanning.body, persistencePlanning.status);
+      }
+      const persistencePlan = persistencePlanning.plan;
+      const insertValues = persistencePlan.insertValues;
+      const sourceCardStatements = [];
+        if (persistencePlan.retireSupersededCardId) {
       sourceCardStatements.push(
         env.DB.prepare(
           `UPDATE operator_source_cards
            SET is_current = 0
            WHERE id = ?
              AND brand_key = ?`,
-        ).bind(supersedesSourceCardId, brand.brand_key),
+        ).bind(persistencePlan.retireSupersededCardId, brand.brand_key),
       );
     }
     sourceCardStatements.push(
@@ -14056,45 +14070,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           recommended_direction, context_admission_id, created_by, family_id, source_selection_id,
           version_number, is_current, supersedes_source_card_id, version_reason, transformation_contract_json
         ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-      ).bind(
-        sourceCardId,
-        brand.brand_key,
-        workflowSessionId,
-        sequenceLabel,
-        normalizeOperatorMachineKey(payload.lane_key, "") || null,
-        normalizeOperatorText(payload.title, 500) || "Source card",
-        normalizeOperatorJson(primarySource, {}),
-        normalizeOperatorJson(payload.secondary_sources, []),
-        normalizeOperatorJson(payload.anti_sources, []),
-        normalizeOperatorJson(metricsSnapshot, null),
-        sourceMechanism,
-        requiredProduct,
-        normalizeOperatorJson(payload.forbidden_surfaces, []),
-        normalizeOperatorJson(payload.danger_surfaces, []),
-        normalizeOperatorJson(payload.current_inventory_constraints, []),
-        normalizeOperatorJson(payload.pass_conditions, []),
-        normalizeOperatorJson(payload.fail_conditions, []),
-        normalizeOperatorText(payload.recommended_direction, 4000, true),
-        normalizeOperatorText(payload.context_admission_id, 120, true),
-        normalizeOperatorMachineKey(payload.created_by, "gpt"),
-        familyId,
-        sourceSelectionId,
-        versionNumber,
-        supersedesSourceCardId,
-        versionReason,
-        normalizeOperatorJson(transformationContract, {}),
+            ).bind(
+        insertValues.sourceCardId,
+        insertValues.brandKey,
+        insertValues.workflowSessionId,
+        insertValues.sequenceLabel,
+        insertValues.laneKey,
+        insertValues.title,
+        insertValues.primarySourceJson,
+        insertValues.secondarySourcesJson,
+        insertValues.antiSourcesJson,
+        insertValues.metricsSnapshotJson,
+        insertValues.sourceMechanism,
+        insertValues.requiredProduct,
+        insertValues.forbiddenSurfacesJson,
+        insertValues.dangerSurfacesJson,
+        insertValues.currentInventoryConstraintsJson,
+        insertValues.passConditionsJson,
+        insertValues.failConditionsJson,
+        insertValues.recommendedDirection,
+        insertValues.contextAdmissionId,
+        insertValues.createdBy,
+        insertValues.familyId,
+        insertValues.sourceSelectionId,
+        insertValues.versionNumber,
+        insertValues.supersedesSourceCardId,
+        insertValues.versionReason,
+        insertValues.transformationContractJson,
       ),
     );
-        if (savedPatternId !== null) {
+            if (persistencePlan.lockedAt) {
       sourceCardStatements.push(
         env.DB.prepare(
           `UPDATE operator_source_cards
            SET status = 'locked', locked_at = ?
            WHERE id = ? AND brand_key = ?`,
-        ).bind(backfillLockedAt, sourceCardId, brand.brand_key),
+        ).bind(persistencePlan.lockedAt, insertValues.sourceCardId, insertValues.brandKey),
       );
     }
-    if (familyId) {
+        if (persistencePlan.familyUpdate) {
       sourceCardStatements.push(
         env.DB.prepare(
           `UPDATE operator_source_card_families
@@ -14105,18 +14119,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            WHERE id = ?
              AND brand_key = ?`,
         ).bind(
-          sourceCardId,
-          (primarySource as Record<string, unknown>)?.threads_post_id ?? null,
-          (primarySource as Record<string, unknown>)?.canonical_source_url ?? null,
-          familyId,
-          brand.brand_key,
+          insertValues.sourceCardId,
+          persistencePlan.familyUpdate.threadsPostId,
+          persistencePlan.familyUpdate.canonicalSourceUrl,
+          persistencePlan.familyUpdate.familyId,
+          insertValues.brandKey,
         ),
       );
     }
-    if (sourceSelectionId) {
-            sourceCardStatements.push(
+        if (persistencePlan.selectionLink) {
+      sourceCardStatements.push(
         env.DB.prepare(
-                    `UPDATE operator_source_selections
+          `UPDATE operator_source_selections
            SET source_card_id = ?,
                disposition = 'linked',
                disposition_reason = 'source_card_linked',
@@ -14124,27 +14138,25 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
                workflow_sequence = COALESCE(?, workflow_sequence)
            WHERE id = ?
              AND brand_key = ?`,
-        ).bind(sourceCardId, parseOperatorWorkflowSequence(sequenceLabel), sourceSelectionId, brand.brand_key),
+        ).bind(
+          insertValues.sourceCardId,
+          persistencePlan.selectionLink.workflowSequence,
+          persistencePlan.selectionLink.sourceSelectionId,
+          insertValues.brandKey,
+        ),
       );
     }
     await env.DB.batch(sourceCardStatements);
 
-    const card = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
-        return operatorJsonResponse({
-      source_card_id: sourceCardId,
-      source_selection_id: sourceSelectionId,
-      family_id: familyId,
-      version_number: versionNumber,
-      supersedes_source_card_id: supersedesSourceCardId,
-                        status: savedPatternId !== null ? "locked" : "draft",
-      locked_at: backfillLockedAt,
-      reused_existing: false,
-      validation: validateSourceCardLockable(card ?? {}),
-      owner_presentation: {
-        ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
-        account_scope: brand.brand_key,
-      },
+        const card = await getOperatorSourceCard(env, insertValues.brandKey, insertValues.sourceCardId);
+    const persistenceResponse = composeOperatorSourceCardPersistenceResponse({
+      plan: persistencePlan,
+      persistedCard: card,
+      ownerPresentation: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+    }, {
+      validateSourceCard: validateSourceCardLockable,
     });
+    return operatorJsonResponse(persistenceResponse.body, persistenceResponse.status);
 
 
   }
