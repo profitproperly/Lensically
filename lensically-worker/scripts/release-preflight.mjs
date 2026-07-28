@@ -93,6 +93,8 @@ const operatorManifestSourceCardBackfillPreparationService = read("src/operatorM
 const operatorManifestSourceCardBackfillPreparationServiceTests = read("test/operatorManifestSourceCardBackfillPreparationService.spec.ts");
 const operatorSourceCandidateBatchReadService = read("src/operatorSourceCandidateBatchReadService.ts");
 const operatorSourceCandidateBatchReadServiceTests = read("test/operatorSourceCandidateBatchReadService.spec.ts");
+const operatorSourceCardAdmissionService = read("src/operatorSourceCardAdmissionService.ts");
+const operatorSourceCardAdmissionServiceTests = read("test/operatorSourceCardAdmissionService.spec.ts");
 
 
 
@@ -277,6 +279,9 @@ if (!workflow.includes("test/operatorManifestSourceCardBackfillPreparationServic
 }
 if (!workflow.includes("test/operatorSourceCandidateBatchReadService.spec.ts")) {
   errors.push("operator_source_candidate_batch_read_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCardAdmissionService.spec.ts")) {
+  errors.push("operator_source_card_admission_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1453,6 +1458,46 @@ if (!operatorSourceCandidateBatchReadServiceTests.includes("rejects a missing ba
     || !operatorSourceCandidateBatchReadServiceTests.includes("applies empty-object, pending, and null defaults deterministically")) {
   lifecycleErrors.push("operator_source_candidate_batch_read_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCardAdmissionService"')
+    || !source.includes("admitOperatorSourceCardCreation({")
+    || !source.includes("persistSavedPatternSelection: async ({")
+    || !source.includes("loadSelection: async (sourceSelectionId)")
+    || !source.includes("validateSourceCard: validateSourceCardLockable")) {
+  lifecycleErrors.push("operator_source_card_admission_service_import_or_binding_missing");
+}
+if (source.includes("const compatibilitySequenceLabel = normalizeOperatorText(payload.sequence_label, 120, true)")
+    || source.includes("const workflowConflict = getLensicallySavedWorkflowConflict(payload)")
+    || source.includes("sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120)")
+    || source.includes("manifest_source_selection_id_or_saved_pattern_id_required")
+    || source.includes("source_selection_workflow_mismatch")
+    || source.includes("selection_already_resolved")) {
+  lifecycleErrors.push("operator_source_card_admission_service_returned_to_index");
+}
+if (!operatorSourceCardAdmissionService.includes("export async function admitOperatorSourceCardCreation")
+    || !operatorSourceCardAdmissionService.includes("dependencies.runBackfillBridge")
+    || !operatorSourceCardAdmissionService.includes("dependencies.getWorkflowConflict")
+    || !operatorSourceCardAdmissionService.includes("dependencies.persistSavedPatternSelection")
+    || !operatorSourceCardAdmissionService.includes("dependencies.loadSelection")
+    || !operatorSourceCardAdmissionService.includes("dependencies.loadSourceCard")
+    || !operatorSourceCardAdmissionService.includes("saved_pattern_not_found")
+    || !operatorSourceCardAdmissionService.includes("manifest_source_selection_id_or_saved_pattern_id_required")
+    || !operatorSourceCardAdmissionService.includes("source_selection_workflow_mismatch")
+    || !operatorSourceCardAdmissionService.includes("selection_already_resolved")
+    || !operatorSourceCardAdmissionService.includes("sourceIdentityKey")) {
+  lifecycleErrors.push("operator_source_card_admission_service_module_incomplete");
+}
+if (!operatorSourceCardAdmissionServiceTests.includes("routes the Manifest backfill compatibility bridge with exact status and identity")
+    || !operatorSourceCardAdmissionServiceTests.includes("returns the exact saved-workflow conflict before any source read")
+    || !operatorSourceCardAdmissionServiceTests.includes("requires a primary source for non-Manifest accounts")
+    || !operatorSourceCardAdmissionServiceTests.includes("requires a Manifest selection or positive Saved Pattern ID")
+    || !operatorSourceCardAdmissionServiceTests.includes("returns exact Saved Pattern not-found behavior before persistence")
+    || !operatorSourceCardAdmissionServiceTests.includes("builds deterministic Saved Pattern selection evidence and hydrates continuation state")
+    || !operatorSourceCardAdmissionServiceTests.includes("reuses an already resolved selection with exact linked-card response")
+    || !operatorSourceCardAdmissionServiceTests.includes("rejects a source-selection workflow mismatch before hydration")
+    || !operatorSourceCardAdmissionServiceTests.includes("hydrates an explicit selection and preserves versioning inputs deterministically")) {
+  lifecycleErrors.push("operator_source_card_admission_service_tests_incomplete");
+}
+
 
 
 
