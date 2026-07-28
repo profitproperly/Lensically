@@ -850,6 +850,18 @@ Remaining work after this checkpoint:
 
 - Stage 7 router and runtime composition.
 - Stage 8 test and release modernization.
+
+  Stage 8 must complete the remaining release-efficiency modernization agreed by the owner before Stage 9 begins:
+
+  - Build web artifacts once during validation and deploy that exact validated artifact without reinstalling dependencies or rebuilding during release.
+  - Validate migration ordering and safety before release, then apply only unapplied production migrations; keep large data backfills on an explicitly measured long-running path.
+  - Update and verify Wrangler cron schedules only when cron or Wrangler configuration changed.
+  - Add fast workflow YAML, schema, indentation, and structural validation before exercising the complete engineering workflow.
+  - Parallelize and deduplicate broad architecture validation, reuse exact-SHA validation evidence and artifacts, and reserve the full suite for affected high-risk surfaces and milestone boundaries.
+  - Preserve complete fallback validation and release behavior whenever exact-SHA validation evidence is missing, a classifier cannot prove the affected surface, or a genuinely high-risk change requires it.
+  - Establish and verify practical timing targets: routine Worker validation and deployment under one minute each; ordinary web, cron, and small-migration paths approximately one to two minutes; workflow infrastructure approximately one to two minutes when clean; broad architecture milestones approximately two to five minutes; large migrations governed by actual database work.
+
+  Stage 8 is incomplete until these paths are source-controlled, regression-protected, benchmarked on real exact-SHA runs, and reflected in the release workflow without weakening production safety.
 - Stage 9 final comparison, cleanup, validation, and production release.
 
 ## Remaining
