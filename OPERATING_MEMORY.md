@@ -40,6 +40,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Speed comes from removing unnecessary work, not skipping required correctness checks.
 - Protect throughput with one active implementation outcome, one interrupting P0/P1 incident when necessary, unlimited captured deferred ideas, and zero untracked side objectives.
 - Freeze scope when validation begins. A failing test permits only the smallest repair required by the frozen acceptance criteria; enhancements wait for the next outcome.
+- Exact owner-supplied implementation text is a frozen specification once its target is known: do not condense it, reinterpret it, or restart discovery. Apply the atomic change and proceed directly through focused validation, exact-SHA release, and live verification. A failure audit cannot close with analysis, retry, recommendation, or chat memory; prevention must be durably enforced first.
 - Use bounded source inspection, one coherent change set, focused validation, one exact-SHA release, and one live verification pass.
 - Do not run separate full validation and deployment loops for a normal change.
 - Do not poll rapidly from chat. Use bounded server-side workflow status reads and inspect detailed logs only after a terminal failure.
