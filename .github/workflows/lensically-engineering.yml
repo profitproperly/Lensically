@@ -314,9 +314,9 @@ jobs:
           name: worker-architecture-baseline-${{ inputs.release_sha || github.sha }}
           path: lensically-worker/worker-architecture-baseline.json
 
-  operator-test-shards:
+    operator-test-shards:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'
-        name: Operator shard ${{ matrix.shard }}/8
+    name: Operator shard ${{ matrix.shard }}/8
     strategy:
       fail-fast: true
       matrix:
