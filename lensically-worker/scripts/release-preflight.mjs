@@ -75,6 +75,8 @@ const operatorManifestReviewBatchSchedulingService = read("src/operatorManifestR
 const operatorManifestReviewBatchSchedulingServiceTests = read("test/operatorManifestReviewBatchSchedulingService.spec.ts");
 const operatorWorkflowSessionStartService = read("src/operatorWorkflowSessionStartService.ts");
 const operatorWorkflowSessionStartServiceTests = read("test/operatorWorkflowSessionStartService.spec.ts");
+const operatorContextAdmissionService = read("src/operatorContextAdmissionService.ts");
+const operatorContextAdmissionServiceTests = read("test/operatorContextAdmissionService.spec.ts");
 
 
 
@@ -224,6 +226,9 @@ if (!workflow.includes("test/operatorManifestReviewBatchSchedulingService.spec.t
 }
 if (!workflow.includes("test/operatorWorkflowSessionStartService.spec.ts")) {
   errors.push("operator_workflow_session_start_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorContextAdmissionService.spec.ts")) {
+  errors.push("operator_context_admission_service_workflow_gate_missing");
 }
 
 
@@ -1120,6 +1125,30 @@ if (!operatorWorkflowSessionStartServiceTests.includes("reuses an account-select
     || !operatorWorkflowSessionStartServiceTests.includes("creates a new session with the canonical template fallback and null notes")
     || !operatorWorkflowSessionStartServiceTests.includes("normalizes a requested template and notes for new-session persistence")) {
   lifecycleErrors.push("operator_workflow_session_start_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorContextAdmissionService"')
+    || !source.includes("admitOperatorContext({")
+    || !source.includes("insertAdmission: async")) {
+  lifecycleErrors.push("operator_context_admission_service_import_or_binding_missing");
+}
+if (source.includes("const sectionsInput = Array.isArray(payload.sections)")
+    || source.includes("const isPartial = coverage.some")
+    || source.includes("Context admission is partial.")) {
+  lifecycleErrors.push("operator_context_admission_service_returned_to_index");
+}
+if (!operatorContextAdmissionService.includes("export async function admitOperatorContext")
+    || !operatorContextAdmissionService.includes("dependencies.insertAdmission")
+    || !operatorContextAdmissionService.includes("dependencies.normalizeMachineKey")
+    || !operatorContextAdmissionService.includes("coverage_status")
+    || !operatorContextAdmissionService.includes("Context admission is partial.")) {
+  lifecycleErrors.push("operator_context_admission_service_module_incomplete");
+}
+if (!operatorContextAdmissionServiceTests.includes("persists an empty complete admission with canonical defaults")
+    || !operatorContextAdmissionServiceTests.includes("normalizes pagination coverage and uses the admission snapshot fallback")
+    || !operatorContextAdmissionServiceTests.includes("preserves explicit pagination overrides and section snapshot precedence")
+    || !operatorContextAdmissionServiceTests.includes("infers partial coverage from remaining pagination and emits the exact warning")
+    || !operatorContextAdmissionServiceTests.includes("normalizes admission metadata and honors explicit partial status")) {
+  lifecycleErrors.push("operator_context_admission_service_tests_incomplete");
 }
 
 
