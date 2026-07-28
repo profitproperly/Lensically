@@ -122,6 +122,8 @@ import { auditOperatorPublishedPostLineage } from "./operatorPublishedPostLineag
 import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCardBackfillService";
 import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSourceCardBackfillPreparationService";
 import { readOperatorSourceCandidateBatch } from "./operatorSourceCandidateBatchReadService";
+import { admitOperatorSourceCardCreation } from "./operatorSourceCardAdmissionService";
+
 
 
 
@@ -13805,190 +13807,132 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-        if (toolName === "create_source_card") {
-
-    const compatibilitySequenceLabel = normalizeOperatorText(payload.sequence_label, 120, true);
-    if (brand.brand_key === "manifest_mental" && compatibilitySequenceLabel === "all_missing_manifest_source_cards") {
-      const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
-        ?? `manifest-source-card-backfill-bridge-${Date.now()}`;
-            const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
-        brand_key: brand.brand_key,
-        limit: 4,
-        proceed_confirmed: true,
-        operation_id: `${bridgeOperationId}-batch`,
-      });
-      const backfillHttpStatus = Math.trunc(Number(backfill.http_status ?? 200));
-      return operatorJsonResponse({
-        ...backfill,
-        compatibility_bridge: "create_source_card.sequence_label",
-      }, backfillHttpStatus >= 100 && backfillHttpStatus <= 599 ? backfillHttpStatus : 200);
-    }
-
-        const workflowConflict = getLensicallySavedWorkflowConflict(payload);
-
-    if (workflowConflict) {
-      return operatorJsonResponse({
-        success: false,
-        error: "lensically_saved_workflow_required",
-        reason: workflowConflict,
-        required_workflow: "Use the selected account's saved workflow before creating source cards. Do not create batch or multi-post source cards unless a backend-supported override exists for that account.",
-      }, 400);
-    }
-        const sourceCardId = crypto.randomUUID();
-    const sourceMechanism = normalizeOperatorText(payload.source_mechanism, 4000);
-    const requiredProduct = normalizeOperatorText(payload.required_product, 4000);
-    let workflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
-    let sequenceLabel = normalizeOperatorText(payload.sequence_label, 120) || `source_card_${Date.now()}`;
-        let primarySource: unknown = payload.primary_source ?? {};
-    let metricsSnapshot: unknown = payload.metrics_snapshot ?? null;
-    let sourceSelectionId: string | null = null;
-    const parsedSavedPatternId = Number(payload.saved_pattern_id);
-    const savedPatternId = Number.isInteger(parsedSavedPatternId) && parsedSavedPatternId > 0
-      ? parsedSavedPatternId
-      : null;
-
-        let familyId: string | null = null;
-    let versionNumber = 1;
-    let supersedesSourceCardId: string | null = null;
-    let versionReason = normalizeOperatorText(payload.version_reason, 2000, true);
-    const createNewVersion = payload.create_new_version === true;
-    const transformationContract = normalizeSourceTransformationContract(payload.transformation_contract);
-
-        if (brand.brand_key === "manifest_mental") {
-      sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120);
-      if (!sourceSelectionId && savedPatternId !== null) {
-        const pattern = await env.DB.prepare(
+            if (toolName === "create_source_card") {
+      const sourceCardAdmission = await admitOperatorSourceCardCreation({
+        brandKey: brand.brand_key,
+        payload,
+        sourceCardId: crypto.randomUUID(),
+        defaultSequenceTimestamp: Date.now(),
+        selectedAt: new Date().toISOString(),
+      }, {
+        manifestBrandKey: "manifest_mental",
+        normalizeText: normalizeOperatorText,
+        getWorkflowConflict: getLensicallySavedWorkflowConflict,
+        normalizeTransformationContract: normalizeSourceTransformationContract,
+        canonicalizeSourceUrl: canonicalizeThreadsSourceUrl,
+        extractPostIdFromUrl: extractThreadsPostIdFromUrl,
+        parseJson: safeParseJsonString,
+        runBackfillBridge: async (operationId) => await callOperatorToolForMcp(
+          request,
+          env,
+          "create_all_missing_manifest_source_cards",
+          {
+            brand_key: brand.brand_key,
+            limit: 4,
+            proceed_confirmed: true,
+            operation_id: operationId,
+          },
+        ),
+        loadSavedPattern: async (savedPatternId) => await env.DB.prepare(
           `SELECT id, post_id, post_text, views, likes, replies, reposts, shares,
                   source_url, posted_at, capture_confidence, updated_at
            FROM external_patterns
            WHERE id = ? AND app_user_id = ? AND account_id = ?
            LIMIT 1`,
-        ).bind(savedPatternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<Record<string, unknown>>();
-        if (!pattern) {
-          return operatorJsonResponse({ success: false, error: "saved_pattern_not_found", saved_pattern_id: savedPatternId }, 404);
-        }
-                const backfillSessionId = `${brand.brand_key}-source-card-backfill-session`;
-        const batchId = `manifest-source-card-backfill-${savedPatternId}`;
-        const selectionId = `manifest-source-card-selection-${savedPatternId}`;
-        const selectedAt = new Date().toISOString();
-        const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
-          typeof pattern.source_url === "string" ? pattern.source_url : null,
-        );
-        const threadsPostId = String(pattern.post_id ?? extractThreadsPostIdFromUrl(canonicalSourceUrl) ?? "").trim() || null;
-        const sourceIdentityKey = threadsPostId
-          ? `threads:${threadsPostId}`
-          : canonicalSourceUrl
-            ? `url:${canonicalSourceUrl}`
-            : `saved_pattern:${savedPatternId}`;
-        const metrics = {
-          views: Number(pattern.views ?? 0),
-          likes: Number(pattern.likes ?? 0),
-          replies: Number(pattern.replies ?? 0),
-          reposts: Number(pattern.reposts ?? 0),
-          quotes: 0,
-          shares: Number(pattern.shares ?? 0),
-          engagement_total: Number(pattern.likes ?? 0) + Number(pattern.replies ?? 0) + Number(pattern.reposts ?? 0) + Number(pattern.shares ?? 0),
-          captured_at: selectedAt,
-        };
-        const sourceSnapshot = {
-          source_candidate_id: `saved_pattern:${savedPatternId}`,
-          source_identity_key: sourceIdentityKey,
-          source_type: "saved_pattern",
-          source_id: savedPatternId,
-          internal_source_id: String(savedPatternId),
-          threads_post_id: threadsPostId,
-          canonical_source_url: canonicalSourceUrl,
-          text: pattern.post_text,
+        ).bind(savedPatternId, SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<Record<string, unknown>>(),
+        persistSavedPatternSelection: async ({
+          savedPatternId,
+          backfillSessionId,
+          batchId,
+          selectionId,
+          selectedAt,
+          sourceIdentityKey,
+          threadsPostId,
+          canonicalSourceUrl,
           metrics,
-          posted_at: pattern.posted_at ?? null,
-          capture_confidence: pattern.capture_confidence ?? null,
-          source_updated_at: pattern.updated_at ?? null,
-          evidence_role: "market_evidence",
-        };
-                await env.DB.batch([
-          env.DB.prepare(
-            `INSERT OR IGNORE INTO operator_source_selection_batches (
-              id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
-              qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
-              production_date, status
-            ) VALUES (?, ?, ?, 'saved_pattern_source_card_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
-          ).bind(
-            batchId,
-            brand.brand_key,
-            backfillSessionId,
-            selectedAt,
-            normalizeOperatorJson({ saved_pattern_id: savedPatternId, purpose: "source_card_backfill" }, {}),
-          ),
-          env.DB.prepare(
-            `INSERT OR IGNORE INTO operator_source_selections (
-              id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
-              source_type, internal_source_id, threads_post_id, canonical_source_url,
-              post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
-            ) VALUES (?, ?, ?, ?, 1, ?, 'saved_pattern', ?, ?, ?, ?, ?, ?, ?, ?)`,
-          ).bind(
-            selectionId,
-            batchId,
-            brand.brand_key,
-            backfillSessionId,
-            sourceIdentityKey,
-            String(savedPatternId),
-            threadsPostId,
-            canonicalSourceUrl,
-            String(pattern.post_text ?? ""),
-            pattern.posted_at ?? null,
-            normalizeOperatorJson(metrics, {}),
-            normalizeOperatorJson(sourceSnapshot, {}),
-            selectedAt,
-          ),
-        ]);
-        sourceSelectionId = selectionId;
+          sourceSnapshot,
+          pattern,
+        }) => {
+          await env.DB.batch([
+            env.DB.prepare(
+              `INSERT OR IGNORE INTO operator_source_selection_batches (
+                id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+                qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+                production_date, status
+              ) VALUES (?, ?, ?, 'saved_pattern_source_card_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
+            ).bind(
+              batchId,
+              brand.brand_key,
+              backfillSessionId,
+              selectedAt,
+              normalizeOperatorJson({ saved_pattern_id: savedPatternId, purpose: "source_card_backfill" }, {}),
+            ),
+            env.DB.prepare(
+              `INSERT OR IGNORE INTO operator_source_selections (
+                id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+                source_type, internal_source_id, threads_post_id, canonical_source_url,
+                post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+              ) VALUES (?, ?, ?, ?, 1, ?, 'saved_pattern', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ).bind(
+              selectionId,
+              batchId,
+              brand.brand_key,
+              backfillSessionId,
+              sourceIdentityKey,
+              String(savedPatternId),
+              threadsPostId,
+              canonicalSourceUrl,
+              String(pattern.post_text ?? ""),
+              pattern.posted_at ?? null,
+              normalizeOperatorJson(metrics, {}),
+              normalizeOperatorJson(sourceSnapshot, {}),
+              selectedAt,
+            ),
+          ]);
+        },
+        loadSelection: async (sourceSelectionId) => await env.DB.prepare(
+          `SELECT *
+           FROM operator_source_selections
+           WHERE id = ?
+             AND brand_key = ?
+           LIMIT 1`,
+        ).bind(sourceSelectionId, brand.brand_key).first<Record<string, unknown>>(),
+        loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
+          env,
+          brand.brand_key,
+          sourceCardId,
+        ),
+        validateSourceCard: validateSourceCardLockable,
+      });
+      if (sourceCardAdmission.kind === "response") {
+        return operatorJsonResponse(sourceCardAdmission.body, sourceCardAdmission.status);
       }
-      if (!sourceSelectionId) {
-        return operatorJsonResponse({ success: false, error: "manifest_source_selection_id_or_saved_pattern_id_required" }, 400);
-      }
-      const selection = await env.DB.prepare(
-        `SELECT *
-         FROM operator_source_selections
-         WHERE id = ?
-           AND brand_key = ?
-         LIMIT 1`,
-      ).bind(sourceSelectionId, brand.brand_key).first<Record<string, unknown>>();
-      if (!selection) {
-        return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
-      }
-            if (selection.source_card_id && !createNewVersion) {
-        const linkedCard = await getOperatorSourceCard(env, brand.brand_key, String(selection.source_card_id));
-        return operatorJsonResponse({
-          source_card_id: selection.source_card_id,
-          source_selection_id: sourceSelectionId,
-          family_id: linkedCard?.family_id ?? null,
-          version_number: linkedCard?.version_number ?? 1,
-          status: linkedCard?.status ?? "unknown",
-          reused_existing: true,
-          reason: "selection_already_resolved",
-          validation: linkedCard ? validateSourceCardLockable(linkedCard) : null,
-        });
-      }
-      const selectionWorkflowSessionId = String(selection.workflow_session_id ?? "");
-      if (workflowSessionId && workflowSessionId !== selectionWorkflowSessionId) {
-        return operatorJsonResponse({ success: false, error: "source_selection_workflow_mismatch" }, 400);
-      }
-            workflowSessionId = selectionWorkflowSessionId || null;
-      const sourceSnapshot = safeParseJsonString(String(selection.source_snapshot_json ?? "{}")) ?? {};
-      primarySource = {
-        ...(sourceSnapshot && typeof sourceSnapshot === "object" && !Array.isArray(sourceSnapshot)
-          ? sourceSnapshot as Record<string, unknown>
-          : {}),
-        source_selection_id: sourceSelectionId,
-        source_batch_id: selection.batch_id,
-        draw_order: Number(selection.draw_order ?? 0),
-        source_identity_key: selection.source_identity_key,
-        threads_post_id: selection.threads_post_id ?? null,
-        canonical_source_url: selection.canonical_source_url ?? null,
-      };
-      metricsSnapshot = safeParseJsonString(String(selection.metrics_snapshot_json ?? "{}")) ?? {};
-      sequenceLabel = normalizeOperatorText(payload.sequence_label, 120)
-        || `daily_draw_${String(selection.batch_id ?? "batch")}_slot_${String(selection.draw_order ?? "")}`;
+
+      const {
+        sourceCardId,
+        sourceMechanism,
+        requiredProduct,
+        workflowSessionId,
+        sequenceLabel,
+        primarySource,
+        metricsSnapshot,
+        sourceSelectionId,
+        savedPatternId,
+        versionReason,
+        createNewVersion,
+        transformationContract,
+        selection,
+      } = sourceCardAdmission.context;
+      let familyId: string | null = null;
+      let versionNumber = 1;
+      let supersedesSourceCardId: string | null = null;
+
+      if (brand.brand_key === "manifest_mental") {
+        if (!selection) {
+          return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
+        }
+
+      
 
       const sourceIdentityKey = String(selection.source_identity_key ?? "");
       let family = await env.DB.prepare(
@@ -14055,10 +13999,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         supersedesSourceCardId = String(currentCard.id);
         versionNumber = Number(currentCard.version_number ?? 1) + 1;
       }
-    } else if (!payload.primary_source || typeof payload.primary_source !== "object" || Array.isArray(payload.primary_source)) {
+        }
 
-      return operatorJsonResponse({ success: false, error: "primary_source is required" }, 400);
-    }
 
                 const backfillValidation = savedPatternId !== null
       ? validateSourceCardLockable({
