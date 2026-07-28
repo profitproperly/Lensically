@@ -307,7 +307,7 @@ jobs:
               ;;
                     esac
 
-            - name: Upload architecture baseline
+                  - name: Upload architecture baseline
         if: inputs.task == 'architecture-baseline'
         uses: actions/upload-artifact@v4
         with:
