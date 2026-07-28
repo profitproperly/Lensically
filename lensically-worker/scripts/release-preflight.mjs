@@ -83,6 +83,9 @@ const operatorSourceCandidateListService = read("src/operatorSourceCandidateList
 const operatorSourceCandidateListServiceTests = read("test/operatorSourceCandidateListService.spec.ts");
 const operatorSavedPatternSourceExclusionService = read("src/operatorSavedPatternSourceExclusionService.ts");
 const operatorSavedPatternSourceExclusionServiceTests = read("test/operatorSavedPatternSourceExclusionService.spec.ts");
+const operatorManifestSourceDrawService = read("src/operatorManifestSourceDrawService.ts");
+const operatorManifestSourceDrawServiceTests = read("test/operatorManifestSourceDrawService.spec.ts");
+
 
 
 
@@ -245,6 +248,10 @@ if (!workflow.includes("test/operatorSourceCandidateListService.spec.ts")) {
 if (!workflow.includes("test/operatorSavedPatternSourceExclusionService.spec.ts")) {
   errors.push("operator_saved_pattern_source_exclusion_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestSourceDrawService.spec.ts")) {
+  errors.push("operator_manifest_source_draw_service_workflow_gate_missing");
+}
+
 
 
 
@@ -1252,6 +1259,35 @@ if (!operatorSavedPatternSourceExclusionServiceTests.includes("rejects missing e
     || !operatorSavedPatternSourceExclusionServiceTests.includes("retires active work in order while preserving all historical data")) {
   lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestSourceDrawService"')
+    || !source.includes("drawOperatorManifestSourceBatch({")
+    || !source.includes("getActiveSession: async")
+    || !source.includes("persistDraw: async")
+    || !source.includes("updateWorkflowStage: async")) {
+  lifecycleErrors.push("operator_manifest_source_draw_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "draw_source_candidate_batch") {
+    if (brand.brand_key !== "manifest_mental")`)
+    || source.includes("if (qualifiedPool.length < MANIFEST_DAILY_SOURCE_DRAW_SIZE)")
+    || source.includes("const selectedCandidates = shuffleOperatorSources(qualifiedPool).slice")) {
+  lifecycleErrors.push("operator_manifest_source_draw_service_returned_to_index");
+}
+if (!operatorManifestSourceDrawService.includes("export async function drawOperatorManifestSourceBatch")
+    || !operatorManifestSourceDrawService.includes("dependencies.getActiveSession")
+    || !operatorManifestSourceDrawService.includes("dependencies.getExistingBatch")
+    || !operatorManifestSourceDrawService.includes("dependencies.persistDraw")
+    || !operatorManifestSourceDrawService.includes("dependencies.updateWorkflowStage")
+    || !operatorManifestSourceDrawService.includes("uniform_random_without_replacement")) {
+  lifecycleErrors.push("operator_manifest_source_draw_service_module_incomplete");
+}
+if (!operatorManifestSourceDrawServiceTests.includes("rejects unsupported brands without mutation")
+    || !operatorManifestSourceDrawServiceTests.includes("requires a normalized active workflow session before reading batches")
+    || !operatorManifestSourceDrawServiceTests.includes("reuses the latest existing batch without pool or persistence work")
+    || !operatorManifestSourceDrawServiceTests.includes("rejects an insufficient qualified source pool without mutation")
+    || !operatorManifestSourceDrawServiceTests.includes("persists one uniform random batch and advances the workflow stage")) {
+  lifecycleErrors.push("operator_manifest_source_draw_service_tests_incomplete");
+}
+
 
 
 
