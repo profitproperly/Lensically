@@ -117,6 +117,8 @@ const operatorDraftDecisionService = read("src/operatorDraftDecisionService.ts")
 const operatorDraftDecisionServiceTests = read("test/operatorDraftDecisionService.spec.ts");
 const operatorActiveGateReadService = read("src/operatorActiveGateReadService.ts");
 const operatorActiveGateReadServiceTests = read("test/operatorActiveGateReadService.spec.ts");
+const operatorGateMutationPlanningService = read("src/operatorGateMutationPlanningService.ts");
+const operatorGateMutationPlanningServiceTests = read("test/operatorGateMutationPlanningService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -347,6 +349,9 @@ if (!workflow.includes("test/operatorDraftDecisionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorActiveGateReadService.spec.ts")) {
   errors.push("operator_active_gate_read_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorGateMutationPlanningService.spec.ts")) {
+  errors.push("operator_gate_mutation_planning_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1932,6 +1937,40 @@ if (!operatorActiveGateReadServiceTests.includes("passes null scopes when option
     || !operatorActiveGateReadServiceTests.includes("normalizes every supplied scope and returns the exact gates response")) {
   lifecycleErrors.push("operator_active_gate_read_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorGateMutationPlanningService"')
+    || !source.includes("planOperatorGateMutation({")
+    || !source.includes("loadMemory: async (memoryId)")
+    || !source.includes("loadExistingGate: async ({ brandScope, gateKey, laneScope, contentTypeScope })")
+    || !source.includes("createGateId: () => crypto.randomUUID()")
+    || !source.includes('if (gateMutation.mode === "update")')
+    || !source.includes("return operatorJsonResponse(gateMutation.body)")) {
+  lifecycleErrors.push("operator_gate_mutation_planning_service_import_or_binding_missing");
+}
+if (source.includes("let description = normalizeOperatorText(payload.description, 4000, true)")
+    || source.includes("const gateKey = normalizeOperatorMachineKey(payload.gate_key)")
+    || source.includes("const gateId = existing?.id ?? crypto.randomUUID()")) {
+  lifecycleErrors.push("operator_gate_mutation_planning_service_returned_to_index");
+}
+if (!operatorGateMutationPlanningService.includes("export async function planOperatorGateMutation")
+    || !operatorGateMutationPlanningService.includes("dependencies.loadMemory")
+    || !operatorGateMutationPlanningService.includes("dependencies.loadExistingGate")
+    || !operatorGateMutationPlanningService.includes("dependencies.createGateId")
+    || !operatorGateMutationPlanningService.includes("memory_not_found")
+    || !operatorGateMutationPlanningService.includes("gate_key and description are required")
+    || !operatorGateMutationPlanningService.includes('createdFrom = "strategy_memory"')
+    || !operatorGateMutationPlanningService.includes('mode: existing?.id ? "update" : "insert"')
+    || !operatorGateMutationPlanningService.includes("sourceMemoryIdsJson")
+    || !operatorGateMutationPlanningService.includes("created_from_memory_id")) {
+  lifecycleErrors.push("operator_gate_mutation_planning_service_module_incomplete");
+}
+if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found for an invalid promotion ID before gate lookup")
+    || !operatorGateMutationPlanningServiceTests.includes("returns memory_not_found when the account-scoped promotion source is absent")
+    || !operatorGateMutationPlanningServiceTests.includes("returns the exact required-fields rejection before identity lookup")
+    || !operatorGateMutationPlanningServiceTests.includes("uses promoted memory fallbacks and builds an exact update plan")
+    || !operatorGateMutationPlanningServiceTests.includes("builds a normalized account-scoped insert plan and exact response")) {
+  lifecycleErrors.push("operator_gate_mutation_planning_service_tests_incomplete");
+}
+
 
 
 

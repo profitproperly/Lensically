@@ -52,7 +52,7 @@ export async function planOperatorGateMutation<TBrand, TStage>(
   dependencies: {
     normalizeText: (value: unknown, maxLength: number, allowEmpty?: boolean) => string | null;
     normalizeMachineKey: (value: unknown, fallback?: string) => string;
-    normalizeStage: (value: unknown, fallback: string) => TStage;
+        normalizeStage: (value: unknown, fallback: "gate_evaluation") => TStage;
     normalizeJson: (value: unknown, fallback: unknown) => string;
     loadMemory: (memoryId: number) => Promise<StrategyMemoryRecord | null>;
     loadExistingGate: (identity: {

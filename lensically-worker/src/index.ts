@@ -140,6 +140,8 @@ import {
   planOperatorDraftDecision,
 } from "./operatorDraftDecisionService";
 import { readOperatorActiveGates } from "./operatorActiveGateReadService";
+import { planOperatorGateMutation } from "./operatorGateMutationPlanningService";
+
 
 
 
@@ -14528,43 +14530,34 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(activeGateRead);
   }
 
-  if (toolName === "create_or_update_gate" || toolName === "promote_memory_to_gate") {
-    let description = normalizeOperatorText(payload.description, 4000, true);
-    let displayName = normalizeOperatorText(payload.display_name, 240, true);
-    let sourceMemoryIds: unknown = payload.source_memory_ids ?? [];
-    let createdFrom = normalizeOperatorMachineKey(payload.created_from, "owner_feedback");
-    if (toolName === "promote_memory_to_gate") {
-      const memoryId = Number(payload.memory_id);
-      const memory = Number.isFinite(memoryId)
-        ? await env.DB.prepare(
-          `SELECT id, title, body FROM gpt_strategy_memory WHERE id = ? AND account_id = ? LIMIT 1`,
-        ).bind(memoryId, brand.account_id).first<{ id: number; title: string | null; body: string }>()
-        : null;
-      if (!memory) {
-        return operatorJsonResponse({ success: false, error: "memory_not_found" }, 404);
-      }
-      displayName = displayName ?? memory.title ?? normalizeOperatorText(payload.gate_key, 120) ?? "Promoted memory gate";
-      description = description ?? memory.body;
-      sourceMemoryIds = [memory.id];
-      createdFrom = "strategy_memory";
+    if (toolName === "create_or_update_gate" || toolName === "promote_memory_to_gate") {
+    const gateMutation = await planOperatorGateMutation({
+      toolName,
+      payload,
+      accountBrandKey: brand.brand_key,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      normalizeStage: normalizeOperatorStage,
+      normalizeJson: normalizeOperatorJson,
+      loadMemory: async (memoryId) => await env.DB.prepare(
+        `SELECT id, title, body FROM gpt_strategy_memory WHERE id = ? AND account_id = ? LIMIT 1`,
+      ).bind(memoryId, brand.account_id).first<{ id: number; title: string | null; body: string }>(),
+      loadExistingGate: async ({ brandScope, gateKey, laneScope, contentTypeScope }) => await env.DB.prepare(
+        `SELECT id FROM operator_gates
+         WHERE COALESCE(brand_key, '__global__') = COALESCE(?, '__global__')
+           AND gate_key = ?
+           AND COALESCE(lane_scope, '__all__') = COALESCE(?, '__all__')
+           AND COALESCE(content_type_scope, '__all__') = COALESCE(?, '__all__')
+         LIMIT 1`,
+      ).bind(brandScope, gateKey, laneScope, contentTypeScope).first<{ id: string }>(),
+      createGateId: () => crypto.randomUUID(),
+    });
+    if (gateMutation.kind === "response") {
+      return operatorJsonResponse(gateMutation.body, gateMutation.status);
     }
-    const gateKey = normalizeOperatorMachineKey(payload.gate_key);
-    if (!gateKey || !description) {
-      return operatorJsonResponse({ success: false, error: "gate_key and description are required" }, 400);
-    }
-    const brandScope = payload.brand_key === null || payload.brand_key === "global" ? null : brand.brand_key;
-    const laneScope = normalizeOperatorMachineKey(payload.lane_scope, "") || null;
-    const contentTypeScope = normalizeOperatorMachineKey(payload.content_type_scope ?? payload.content_type, "") || null;
-    const existing = await env.DB.prepare(
-      `SELECT id FROM operator_gates
-       WHERE COALESCE(brand_key, '__global__') = COALESCE(?, '__global__')
-         AND gate_key = ?
-         AND COALESCE(lane_scope, '__all__') = COALESCE(?, '__all__')
-         AND COALESCE(content_type_scope, '__all__') = COALESCE(?, '__all__')
-       LIMIT 1`,
-    ).bind(brandScope, gateKey, laneScope, contentTypeScope).first<{ id: string }>();
-    const gateId = existing?.id ?? crypto.randomUUID();
-    if (existing?.id) {
+    const { identity, values } = gateMutation;
+    if (gateMutation.mode === "update") {
       await env.DB.prepare(
         `UPDATE operator_gates
          SET display_name = ?, description = ?, stage_scope = ?, gate_type = ?, severity = ?,
@@ -14573,19 +14566,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          WHERE id = ?`,
       )
         .bind(
-          displayName ?? gateKey,
-          description,
-          normalizeOperatorStage(payload.stage_scope, "gate_evaluation"),
-          normalizeOperatorMachineKey(payload.gate_type, "hard"),
-          normalizeOperatorMachineKey(payload.severity, "block"),
-          normalizeOperatorMachineKey(payload.evaluator, "hybrid"),
-          payload.active === false ? 0 : 1,
-          Number(payload.order_index ?? 100),
-          normalizeOperatorJson(payload.pass_examples, []),
-          normalizeOperatorJson(payload.fail_examples, []),
-          normalizeOperatorJson(sourceMemoryIds, []),
-          createdFrom,
-          gateId,
+          values.displayName,
+          values.description,
+          values.stageScope,
+          values.gateType,
+          values.severity,
+          values.evaluator,
+          values.activeFlag,
+          values.orderIndex,
+          values.passExamplesJson,
+          values.failExamplesJson,
+          values.sourceMemoryIdsJson,
+          values.createdFrom,
+          gateMutation.gateId,
         )
         .run();
     } else {
@@ -14597,28 +14590,29 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
-          gateId,
-          brandScope,
-          gateKey,
-          displayName ?? gateKey,
-          description,
-          normalizeOperatorStage(payload.stage_scope, "gate_evaluation"),
-          laneScope,
-          contentTypeScope,
-          normalizeOperatorMachineKey(payload.gate_type, "hard"),
-          normalizeOperatorMachineKey(payload.severity, "block"),
-          normalizeOperatorMachineKey(payload.evaluator, "hybrid"),
-          payload.active === false ? 0 : 1,
-          Number(payload.order_index ?? 100),
-          normalizeOperatorJson(payload.pass_examples, []),
-          normalizeOperatorJson(payload.fail_examples, []),
-          normalizeOperatorJson(sourceMemoryIds, []),
-          createdFrom,
+          gateMutation.gateId,
+          identity.brandScope,
+          identity.gateKey,
+          values.displayName,
+          values.description,
+          values.stageScope,
+          identity.laneScope,
+          identity.contentTypeScope,
+          values.gateType,
+          values.severity,
+          values.evaluator,
+          values.activeFlag,
+          values.orderIndex,
+          values.passExamplesJson,
+          values.failExamplesJson,
+          values.sourceMemoryIdsJson,
+          values.createdFrom,
         )
         .run();
     }
-    return operatorJsonResponse({ gate_id: gateId, gate_key: gateKey, active: payload.active !== false, created_from_memory_id: toolName === "promote_memory_to_gate" ? payload.memory_id ?? null : null });
+    return operatorJsonResponse(gateMutation.body);
   }
+
 
   if (toolName === "list_strategy_memory") {
     const kind = normalizeOperatorMachineKey(payload.kind, "");
