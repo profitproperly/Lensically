@@ -1331,11 +1331,15 @@ if (!source.includes('from "./operatorManifestSourceCardBackfillService"')
     || !source.includes("callTool: async (internalToolName, internalPayload)")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_service_import_or_binding_missing");
 }
-if (source.includes("const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 4)), 1), 4)")
-    || source.includes("const patterns = Array.isArray(prepared.patterns)")
-    || source.includes("for (const pattern of patterns)")) {
+// Ownership markers must remain handler-specific. Generic loop fragments are shared across domains
+// and may never be used to decide that this service returned to index.ts.
+if (source.includes(`if (toolName === "create_all_missing_manifest_source_cards") {
+    if (brand.brand_key !== "manifest_mental")`)
+    || source.includes("manifest_source_card_backfill_prepare_failed")
+    || source.includes("failed_saved_pattern_id: savedPatternId")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_service_returned_to_index");
 }
+
 if (!operatorManifestSourceCardBackfillService.includes("export async function createAllMissingManifestSourceCards")
     || !operatorManifestSourceCardBackfillService.includes("dependencies.callTool")
     || !operatorManifestSourceCardBackfillService.includes('"prepare_manifest_source_card_backfill"')
