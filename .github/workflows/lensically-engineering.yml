@@ -141,7 +141,8 @@ jobs:
                     npm run test -- --run test/operatorManifestReviewBatchSchedulingService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorWorkflowSessionStartService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorContextAdmissionService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorProductionBoardService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorProductionBoardService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorSourceCandidateListService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
 
@@ -387,7 +388,8 @@ jobs:
                     npm run test -- --run test/operatorManifestReviewBatchSchedulingService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorWorkflowSessionStartService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorContextAdmissionService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorProductionBoardService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorProductionBoardService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorSourceCandidateListService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
 

@@ -79,6 +79,8 @@ const operatorContextAdmissionService = read("src/operatorContextAdmissionServic
 const operatorContextAdmissionServiceTests = read("test/operatorContextAdmissionService.spec.ts");
 const operatorProductionBoardService = read("src/operatorProductionBoardService.ts");
 const operatorProductionBoardServiceTests = read("test/operatorProductionBoardService.spec.ts");
+const operatorSourceCandidateListService = read("src/operatorSourceCandidateListService.ts");
+const operatorSourceCandidateListServiceTests = read("test/operatorSourceCandidateListService.spec.ts");
 
 
 
@@ -234,6 +236,9 @@ if (!workflow.includes("test/operatorContextAdmissionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorProductionBoardService.spec.ts")) {
   errors.push("operator_production_board_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCandidateListService.spec.ts")) {
+  errors.push("operator_source_candidate_list_service_workflow_gate_missing");
 }
 
 
@@ -1182,6 +1187,32 @@ if (!operatorProductionBoardServiceTests.includes("returns an empty board with e
     || !operatorProductionBoardServiceTests.includes("converts numeric priorities and decodes evidence payloads")
     || !operatorProductionBoardServiceTests.includes("falls back to an empty evidence array when parsing returns null")) {
   lifecycleErrors.push("operator_production_board_service_tests_incomplete");
+}
+if (!source.includes('from "./operatorSourceCandidateListService"')
+    || !source.includes("listOperatorSourceCandidates({")
+    || !source.includes("listCandidates: async")
+    || !source.includes("manifestSourceMinVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES")) {
+  lifecycleErrors.push("operator_source_candidate_list_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "list_source_candidates") {
+    const sourceTypes = Array.isArray(payload.source_types)`)
+    || source.includes("const { candidates, total_count: totalCount } = await listSourceCandidatesForBrand")
+    || source.includes('eligibility_min_likes: brand.brand_key === "manifest_mental"')) {
+  lifecycleErrors.push("operator_source_candidate_list_service_returned_to_index");
+}
+if (!operatorSourceCandidateListService.includes("export async function listOperatorSourceCandidates")
+    || !operatorSourceCandidateListService.includes("dependencies.listCandidates")
+    || !operatorSourceCandidateListService.includes("sourceTypes")
+    || !operatorSourceCandidateListService.includes("has_more")
+    || !operatorSourceCandidateListService.includes("eligibility_min_likes")) {
+  lifecycleErrors.push("operator_source_candidate_list_service_module_incomplete");
+}
+if (!operatorSourceCandidateListServiceTests.includes("uses empty source filters and canonical pagination defaults")
+    || !operatorSourceCandidateListServiceTests.includes("normalizes mixed source types and numeric pagination inputs")
+    || !operatorSourceCandidateListServiceTests.includes("reports continuation when returned candidates do not exhaust the total")
+    || !operatorSourceCandidateListServiceTests.includes("reports complete pagination when the returned window reaches the total")
+    || !operatorSourceCandidateListServiceTests.includes("returns Manifest eligibility metadata and null for other brands")) {
+  lifecycleErrors.push("operator_source_candidate_list_service_tests_incomplete");
 }
 
 
