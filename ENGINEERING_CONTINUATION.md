@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ac-generation-run-admission-and-context
-repository_base_sha: 4a38718afdf5c7279dcc9a424aae58e3f2742a1c
-production_sha: 4a38718afdf5c7279dcc9a424aae58e3f2742a1c
+active_checkpoint: stage-6ad-generation-run-idempotency-and-persistence-planning
+repository_base_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
+production_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AC generation-run admission and canonical-context service extraction.
+- Current checkpoint: Stage 6AD generation-run idempotency and persistence-planning service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -973,20 +973,31 @@ Completed checkpoint — Stage 6AB source-card read service extraction:
 - Hardened exact-SHA release and live verification passed in run `30398370226`.
 - Live production independently confirmed exact SHA `4a38718afdf5c7279dcc9a424aae58e3f2742a1c` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AC generation-run admission and canonical-context service extraction:
+Completed checkpoint — Stage 6AC generation-run admission and canonical-context service extraction:
 
-Extract the bounded front half of `create_generation_run` into a focused dependency-injected service while preserving:
+- Added `src/operatorGenerationRunAdmissionService.ts` as the dependency-injected authority for saved-workflow admission, locked source-card requirements, adaptation-plan normalization, Manifest goal enforcement, canonical-history retrieval, rejection context, performance learning, and latest-24 prior adaptation context assembly.
+- Reduced the front half of `create_generation_run` in `src/index.ts` to source-card/history/rejection/performance adapters, brand identity, and HTTP transport before the preserved idempotency and persistence branch.
+- Added `test/operatorGenerationRunAdmissionService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Focused validation passed in run `30399015950`.
+- Push validation passed in run `30399001183`.
+- All eight Operator shards passed in run `30399307921`.
+- Hardened exact-SHA release and live verification passed in run `30399390663`.
+- Live production independently confirmed exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6` with 75/75 public tools.
 
-- saved-workflow conflict rejection and exact required-workflow payload
-- normalized source-card ID admission and exact `locked_source_card_required` rejection
-- locked source-card retrieval
-- adaptation-plan normalization
-- Manifest-specific adaptation-goal requirement and exact rejection
-- canonical source-card history, account rejection context, and latest performance-learning retrieval
-- deterministic prior-adaptation context assembly with the latest 24 historical runs
-- continuation state for operation idempotency and generation-run persistence
+ACTIVE checkpoint — Stage 6AD generation-run idempotency and persistence-planning service extraction:
 
-Keep source-card/history/rejection/performance retrieval helpers, account and brand identifiers, shared normalizers, operation-id handling, all SQL and D1 writes, random ID generation, serialization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the remaining deterministic `create_generation_run` logic into a focused dependency-injected service while preserving:
+
+- normalized optional `operation_id`
+- account/source-card scoped existing-run lookup only when an operation ID exists
+- exact existing-run reuse response, JSON parsing fallbacks, version/family fallbacks, status default, and idempotency reason
+- normalized generation-run insert values for adaptation context, objective, prompt summary, and metadata
+- canonical source-card family/version identity
+- transformation-contract version metadata
+- deterministic new-run success response including performance learning
+
+Keep existing-run and insert SQL, D1 execution, account and Threads identifiers, random run ID generation, shared text/JSON normalizers, JSON parsing, transformation-contract version constant, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 
@@ -1023,7 +1034,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AC
+6. Product-service extraction — ACTIVE at Stage 6AD
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
