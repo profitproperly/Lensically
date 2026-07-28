@@ -36,7 +36,9 @@ describe("Operator MCP protocol contract", () => {
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
     expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v2");
     expect(OPERATOR_GOVERNING_STANDARDS.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
-    expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("may not end with analysis");
+        expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("may not end with analysis");
+    expect(OPERATOR_GOVERNING_STANDARDS.exact_owner_approved_text).toContain("A retry is not prevention.");
+    expect(OPERATOR_GOVERNING_STANDARDS.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(OPERATOR_GOVERNING_STANDARDS.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
   });
 
