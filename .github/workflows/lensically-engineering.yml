@@ -317,9 +317,9 @@ jobs:
   operator-test-shards:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'
     name: Operator shard ${{ matrix.shard }}/8
-    strategy:
+        strategy:
       fail-fast: true
-            matrix:
+      matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: ubuntu-latest
     steps:
