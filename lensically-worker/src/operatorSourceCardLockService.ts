@@ -24,7 +24,8 @@ export async function planOperatorSourceCardLock(
 ): Promise<OperatorSourceCardLockResult> {
   const sourceCardId = dependencies.normalizeText(payload.source_card_id, 120);
   const card = sourceCardId ? await dependencies.loadSourceCard(sourceCardId) : null;
-  if (!card) {
+    if (!sourceCardId || !card) {
+
     return {
       kind: "response",
       status: 404,
