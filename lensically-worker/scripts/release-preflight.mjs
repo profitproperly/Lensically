@@ -91,6 +91,9 @@ const operatorManifestSourceCardBackfillService = read("src/operatorManifestSour
 const operatorManifestSourceCardBackfillServiceTests = read("test/operatorManifestSourceCardBackfillService.spec.ts");
 const operatorManifestSourceCardBackfillPreparationService = read("src/operatorManifestSourceCardBackfillPreparationService.ts");
 const operatorManifestSourceCardBackfillPreparationServiceTests = read("test/operatorManifestSourceCardBackfillPreparationService.spec.ts");
+const operatorSourceCandidateBatchReadService = read("src/operatorSourceCandidateBatchReadService.ts");
+const operatorSourceCandidateBatchReadServiceTests = read("test/operatorSourceCandidateBatchReadService.spec.ts");
+
 
 
 
@@ -269,6 +272,10 @@ if (!workflow.includes("test/operatorManifestSourceCardBackfillService.spec.ts")
 if (!workflow.includes("test/operatorManifestSourceCardBackfillPreparationService.spec.ts")) {
   errors.push("operator_manifest_source_card_backfill_preparation_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorSourceCandidateBatchReadService.spec.ts")) {
+  errors.push("operator_source_candidate_batch_read_service_workflow_gate_missing");
+}
+
 
 
 
@@ -1391,6 +1398,34 @@ if (!operatorManifestSourceCardBackfillPreparationServiceTests.includes("rejects
     || !operatorManifestSourceCardBackfillPreparationServiceTests.includes("returns complete state and clamps negative uncarded totals to zero")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCandidateBatchReadService"')
+    || !source.includes("readOperatorSourceCandidateBatch(payload")
+    || !source.includes("listSelections: async (batchId)")) {
+  lifecycleErrors.push("operator_source_candidate_batch_read_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "get_source_candidate_batch") {
+    const batchId = normalizeOperatorText(payload.source_batch_id, 120);`)
+    || source.includes("metadata: safeParseJsonString(String(batch.metadata_json")
+    || source.includes("canonical_source_card_version: row.canonical_source_card_version === null")) {
+  lifecycleErrors.push("operator_source_candidate_batch_read_service_returned_to_index");
+}
+if (!operatorSourceCandidateBatchReadService.includes("export async function readOperatorSourceCandidateBatch")
+    || !operatorSourceCandidateBatchReadService.includes("dependencies.loadBatch")
+    || !operatorSourceCandidateBatchReadService.includes("dependencies.listSelections")
+    || !operatorSourceCandidateBatchReadService.includes("dependencies.parseJson")
+    || !operatorSourceCandidateBatchReadService.includes("source_batch_not_found")
+    || !operatorSourceCandidateBatchReadService.includes("canonical_source_card_version")
+    || !operatorSourceCandidateBatchReadService.includes('disposition: row.disposition ?? "pending"')
+    || !operatorSourceCandidateBatchReadService.includes("workflow_sequence")) {
+  lifecycleErrors.push("operator_source_candidate_batch_read_service_module_incomplete");
+}
+if (!operatorSourceCandidateBatchReadServiceTests.includes("rejects a missing batch ID before any repository read")
+    || !operatorSourceCandidateBatchReadServiceTests.includes("returns exact not-found behavior without reading selections")
+    || !operatorSourceCandidateBatchReadServiceTests.includes("parses batch and selection snapshots and serializes complete canonical state")
+    || !operatorSourceCandidateBatchReadServiceTests.includes("applies empty-object, pending, and null defaults deterministically")) {
+  lifecycleErrors.push("operator_source_candidate_batch_read_service_tests_incomplete");
+}
+
 
 
 

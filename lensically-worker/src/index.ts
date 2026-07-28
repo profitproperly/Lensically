@@ -121,6 +121,8 @@ import { drawOperatorManifestSourceBatch } from "./operatorManifestSourceDrawSer
 import { auditOperatorPublishedPostLineage } from "./operatorPublishedPostLineageAuditService";
 import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCardBackfillService";
 import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSourceCardBackfillPreparationService";
+import { readOperatorSourceCandidateBatch } from "./operatorSourceCandidateBatchReadService";
+
 
 
 
@@ -13765,77 +13767,43 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-  if (toolName === "get_source_candidate_batch") {
-    const batchId = normalizeOperatorText(payload.source_batch_id, 120);
-    if (!batchId) {
-      return operatorJsonResponse({ success: false, error: "source_batch_id is required" }, 400);
-    }
-    const batch = await env.DB.prepare(
-      `SELECT *
-       FROM operator_source_selection_batches
-       WHERE id = ?
-         AND brand_key = ?
-       LIMIT 1`,
-    ).bind(batchId, brand.brand_key).first<Record<string, unknown>>();
-    if (!batch) {
-      return operatorJsonResponse({ success: false, error: "source_batch_not_found" }, 404);
-    }
+    if (toolName === "get_source_candidate_batch") {
+    const sourceBatch = await readOperatorSourceCandidateBatch(payload, {
+      normalizeText: normalizeOperatorText,
+      loadBatch: async (batchId) => await env.DB.prepare(
+        `SELECT *
+         FROM operator_source_selection_batches
+         WHERE id = ?
+           AND brand_key = ?
+         LIMIT 1`,
+      ).bind(batchId, brand.brand_key).first<Record<string, unknown>>(),
+      listSelections: async (batchId) => {
         const rows = await env.DB.prepare(
-      `SELECT
-         s.*,
-         f.id AS canonical_family_id,
-         f.current_source_card_id AS canonical_source_card_id,
-         c.version_number AS canonical_source_card_version,
-         c.status AS canonical_source_card_status
-       FROM operator_source_selections s
-       LEFT JOIN operator_source_card_families f
-         ON f.brand_key = s.brand_key
-        AND f.source_identity_key = s.source_identity_key
-        AND f.status = 'active'
-       LEFT JOIN operator_source_cards c
-         ON c.id = f.current_source_card_id
-        AND c.brand_key = s.brand_key
-       WHERE s.batch_id = ?
-         AND s.brand_key = ?
-       ORDER BY s.draw_order ASC`,
-    ).bind(batchId, brand.brand_key).all<Record<string, unknown>>();
-
-    return operatorJsonResponse({
-      source_batch: {
-        ...batch,
-        metadata: safeParseJsonString(String(batch.metadata_json ?? "{}")) ?? {},
+          `SELECT
+             s.*,
+             f.id AS canonical_family_id,
+             f.current_source_card_id AS canonical_source_card_id,
+             c.version_number AS canonical_source_card_version,
+             c.status AS canonical_source_card_status
+           FROM operator_source_selections s
+           LEFT JOIN operator_source_card_families f
+             ON f.brand_key = s.brand_key
+            AND f.source_identity_key = s.source_identity_key
+            AND f.status = 'active'
+           LEFT JOIN operator_source_cards c
+             ON c.id = f.current_source_card_id
+            AND c.brand_key = s.brand_key
+           WHERE s.batch_id = ?
+             AND s.brand_key = ?
+           ORDER BY s.draw_order ASC`,
+        ).bind(batchId, brand.brand_key).all<Record<string, unknown>>();
+        return rows.results ?? [];
       },
-      selections: (rows.results ?? []).map((row) => ({
-        source_selection_id: row.id,
-        source_batch_id: row.batch_id,
-        draw_order: Number(row.draw_order ?? 0),
-        source_identity_key: row.source_identity_key,
-        source_type: row.source_type,
-        internal_source_id: row.internal_source_id,
-        threads_post_id: row.threads_post_id ?? null,
-        canonical_source_url: row.canonical_source_url ?? null,
-        post_text: row.post_text,
-        original_posted_at: row.original_posted_at ?? null,
-        metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "{}")) ?? {},
-        source_snapshot: safeParseJsonString(String(row.source_snapshot_json ?? "{}")) ?? {},
-                source_card_id: row.source_card_id ?? null,
-        canonical_family_id: row.canonical_family_id ?? null,
-        canonical_source_card_id: row.canonical_source_card_id ?? null,
-        canonical_source_card_version: row.canonical_source_card_version === null || row.canonical_source_card_version === undefined
-          ? null
-          : Number(row.canonical_source_card_version),
-                canonical_source_card_status: row.canonical_source_card_status ?? null,
-        disposition: row.disposition ?? 'pending',
-        disposition_reason: row.disposition_reason ?? null,
-        disposition_at: row.disposition_at ?? null,
-        workflow_sequence: row.workflow_sequence === null || row.workflow_sequence === undefined
-          ? null
-          : Number(row.workflow_sequence),
-        selected_at: row.selected_at,
-
-      })),
+      parseJson: safeParseJsonString,
     });
+    return operatorJsonResponse(sourceBatch.body, sourceBatch.status);
   }
+
 
         if (toolName === "create_source_card") {
 
