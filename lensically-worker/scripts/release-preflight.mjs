@@ -362,7 +362,8 @@ if (!workflow.includes("for attempt in $(seq 1 45); do")
   errors.push("release_runtime_propagation_guard_incomplete");
 }
 if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"')
-    || workflow.includes('run: npx wrangler deploy --config wrangler.jsonc')
+    || !workflow.includes("node ../lensically-worker/scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.toml")
+    || workflow.includes('run: npx wrangler deploy')
     || !wranglerDeployRetry.includes("export function isTransientWranglerDeployFailure")
     || !wranglerDeployRetry.includes("export function getDeployRetryDelayMs")
     || !wranglerDeployRetry.includes("export async function runWranglerDeployWithRetry")
