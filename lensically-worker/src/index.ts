@@ -130,6 +130,8 @@ import {
 } from "./operatorSourceCardPersistencePlanningService";
 import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
 import { readOperatorSourceCard } from "./operatorSourceCardReadService";
+import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionService";
+
 
 
 
@@ -14214,39 +14216,41 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-    if (toolName === "create_generation_run") {
-        const workflowConflict = getLensicallySavedWorkflowConflict(payload);
-    if (workflowConflict) {
-      return operatorJsonResponse({
-        success: false,
-        error: "lensically_saved_workflow_required",
-        reason: workflowConflict,
-        required_workflow: "Create generation runs according to the selected account's saved workflow. Do not create batch or multi-post generation runs unless a backend-supported override exists for that account.",
-      }, 400);
+        if (toolName === "create_generation_run") {
+    const generationAdmission = await admitOperatorGenerationRun({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      getWorkflowConflict: getLensicallySavedWorkflowConflict,
+      normalizeText: normalizeOperatorText,
+      normalizeAdaptationPlan: normalizeGenerationAdaptationPlan,
+      loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
+        env,
+        brand.brand_key,
+        sourceCardId,
+      ),
+      loadCanonicalContext: async (sourceCard) => await getOperatorSourceCardHistory(
+        env,
+        brand,
+        sourceCard,
+      ),
+      loadAccountRejectionContext: async () => await buildOperatorRejectionContext(env, brand),
+      loadPerformanceLearning: async () => await getLatestOperatorPerformanceLearning(
+        env,
+        brand.brand_key,
+        false,
+      ),
+    });
+    if (generationAdmission.kind === "response") {
+      return operatorJsonResponse(generationAdmission.body, generationAdmission.status);
     }
-    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
-    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
-    if (!card || card.status !== "locked") {
-      return operatorJsonResponse({ success: false, error: "locked_source_card_required" }, 400);
-    }
-        const adaptationPlan = normalizeGenerationAdaptationPlan(payload.adaptation_plan);
-    if (brand.brand_key === "manifest_mental" && !normalizeOperatorText(adaptationPlan.adaptation_goal, 1500, true)) {
-      return operatorJsonResponse({ success: false, error: "manifest_adaptation_goal_required" }, 400);
-    }
-        const canonicalContext = await getOperatorSourceCardHistory(env, brand, card);
-        const accountRejectionContext = await buildOperatorRejectionContext(env, brand);
-    const performanceLearning = await getLatestOperatorPerformanceLearning(env, brand.brand_key, false);
-    const priorAdaptationContext = {
-
-      family: canonicalContext.family ?? null,
-      versions: canonicalContext.versions ?? [],
-      prior_runs: Array.isArray(canonicalContext.adaptation_history)
-        ? (canonicalContext.adaptation_history as unknown[]).slice(-24)
-        : [],
-            account_rejection_context: accountRejectionContext,
-      performance_learning: performanceLearning,
-    };
-
+    const {
+      sourceCardId,
+      sourceCard: card,
+      adaptationPlan,
+      priorAdaptationContext,
+      performanceLearning,
+    } = generationAdmission.context;
 
     const operationId = normalizeOperatorText(payload.operation_id, 240, true);
     if (operationId) {

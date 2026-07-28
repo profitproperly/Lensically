@@ -103,6 +103,9 @@ const operatorSourceCardLockService = read("src/operatorSourceCardLockService.ts
 const operatorSourceCardLockServiceTests = read("test/operatorSourceCardLockService.spec.ts");
 const operatorSourceCardReadService = read("src/operatorSourceCardReadService.ts");
 const operatorSourceCardReadServiceTests = read("test/operatorSourceCardReadService.spec.ts");
+const operatorGenerationRunAdmissionService = read("src/operatorGenerationRunAdmissionService.ts");
+const operatorGenerationRunAdmissionServiceTests = read("test/operatorGenerationRunAdmissionService.spec.ts");
+
 
 
 
@@ -306,6 +309,9 @@ if (!workflow.includes("test/operatorSourceCardLockService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorSourceCardReadService.spec.ts")) {
   errors.push("operator_source_card_read_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorGenerationRunAdmissionService.spec.ts")) {
+  errors.push("operator_generation_run_admission_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1656,6 +1662,43 @@ if (!operatorSourceCardReadServiceTests.includes("returns exact not-found behavi
     || !operatorSourceCardReadServiceTests.includes("loads canonical history by default and composes the exact response")) {
   lifecycleErrors.push("operator_source_card_read_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorGenerationRunAdmissionService"')
+    || !source.includes("admitOperatorGenerationRun({")
+    || !source.includes("getWorkflowConflict: getLensicallySavedWorkflowConflict")
+    || !source.includes("normalizeAdaptationPlan: normalizeGenerationAdaptationPlan")
+    || !source.includes("loadCanonicalContext: async (sourceCard)")
+    || !source.includes("loadAccountRejectionContext: async ()")
+    || !source.includes("loadPerformanceLearning: async ()")
+    || !source.includes("generationAdmission.context")) {
+  lifecycleErrors.push("operator_generation_run_admission_service_import_or_binding_missing");
+}
+if (source.includes("Create generation runs according to the selected account's saved workflow")
+    || source.includes("const adaptationPlan = normalizeGenerationAdaptationPlan(payload.adaptation_plan)")
+    || source.includes("const canonicalContext = await getOperatorSourceCardHistory(env, brand, card)")
+    || source.includes("manifest_adaptation_goal_required")) {
+  lifecycleErrors.push("operator_generation_run_admission_service_returned_to_index");
+}
+if (!operatorGenerationRunAdmissionService.includes("export async function admitOperatorGenerationRun")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.getWorkflowConflict")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.loadSourceCard")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.normalizeAdaptationPlan")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.loadCanonicalContext")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.loadAccountRejectionContext")
+    || !operatorGenerationRunAdmissionService.includes("dependencies.loadPerformanceLearning")
+    || !operatorGenerationRunAdmissionService.includes("locked_source_card_required")
+    || !operatorGenerationRunAdmissionService.includes("manifest_adaptation_goal_required")
+    || !operatorGenerationRunAdmissionService.includes("slice(-24)")) {
+  lifecycleErrors.push("operator_generation_run_admission_service_module_incomplete");
+}
+if (!operatorGenerationRunAdmissionServiceTests.includes("returns the exact saved-workflow conflict before any source-card lookup")
+    || !operatorGenerationRunAdmissionServiceTests.includes("requires a normalized locked source card before adaptation work")
+    || !operatorGenerationRunAdmissionServiceTests.includes("requires a Manifest adaptation goal before context retrieval")
+    || !operatorGenerationRunAdmissionServiceTests.includes("allows a non-Manifest run without an adaptation goal")
+    || !operatorGenerationRunAdmissionServiceTests.includes("assembles canonical context with only the latest 24 historical runs")
+    || !operatorGenerationRunAdmissionServiceTests.includes("uses empty canonical defaults when optional history fields are malformed")) {
+  lifecycleErrors.push("operator_generation_run_admission_service_tests_incomplete");
+}
+
 
 
 
