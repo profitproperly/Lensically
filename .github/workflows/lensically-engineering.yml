@@ -310,9 +310,9 @@ jobs:
       - name: Upload architecture baseline
         if: inputs.task == 'architecture-baseline'
         uses: actions/upload-artifact@v4
-        with:
+                with:
           name: worker-architecture-baseline-${{ inputs.release_sha || github.sha }}
-                    path: lensically-worker/worker-architecture-baseline.json
+          path: lensically-worker/worker-architecture-baseline.json
 
   operator-test-shards:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'
