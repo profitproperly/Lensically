@@ -153,7 +153,7 @@ describe("readOperatorSourceCandidateBatch", () => {
         disposition_at: undefined,
         workflow_sequence: undefined,
         selected_at: "2026-07-29T09:00:00.000Z",
-      }])),
+            }]),
       parseJson,
     });
 
