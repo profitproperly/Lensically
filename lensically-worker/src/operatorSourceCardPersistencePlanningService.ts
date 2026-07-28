@@ -24,7 +24,8 @@ export interface OperatorSourceCardPersistencePlanningDependencies {
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
   normalizeJson(value: unknown, fallback: unknown): string;
   parseWorkflowSequence(sequenceLabel: string): number | null;
-  validateSourceCard(sourceCard: JsonRecord): JsonRecord;
+    validateSourceCard(sourceCard: JsonRecord): unknown;
+
   nowIso(): string;
 }
 
@@ -92,7 +93,7 @@ export function planOperatorSourceCardPersistence(
     : [];
 
   if (input.savedPatternId !== null) {
-    const validation = dependencies.validateSourceCard({
+        const validation = dependencies.validateSourceCard({
       brand_key: input.brandKey,
       primary_source: input.primarySource,
       source_mechanism: input.sourceMechanism,
@@ -102,7 +103,12 @@ export function planOperatorSourceCardPersistence(
       fail_conditions: failConditions,
       transformation_contract: input.transformationContract,
     });
-    if (validation.can_lock !== true) {
+    const validationRecord = validation
+      && typeof validation === "object"
+      && !Array.isArray(validation)
+      ? validation as JsonRecord
+      : {};
+    if (validationRecord.can_lock !== true) {
       return {
         kind: "response",
         status: 400,
