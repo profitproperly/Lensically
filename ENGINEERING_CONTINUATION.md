@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ab-source-card-read-service
-repository_base_sha: 1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46
-production_sha: 1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46
+active_checkpoint: stage-6ac-generation-run-admission-and-context
+repository_base_sha: 4a38718afdf5c7279dcc9a424aae58e3f2742a1c
+production_sha: 4a38718afdf5c7279dcc9a424aae58e3f2742a1c
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AB source-card read service extraction.
+- Current checkpoint: Stage 6AC generation-run admission and canonical-context service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -962,17 +962,32 @@ Completed checkpoint — Stage 6AA source-card lock service extraction:
 - Hardened exact-SHA release and live verification passed in run `30397661959`.
 - Live production independently confirmed exact SHA `1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AB source-card read service extraction:
+Completed checkpoint — Stage 6AB source-card read service extraction:
 
-Extract `get_source_card` into a focused dependency-injected service while preserving:
+- Added `src/operatorSourceCardReadService.ts` as the dependency-injected authority for source-card ID admission, not-found behavior, exact history suppression, canonical-history retrieval, and owner-presentation response composition.
+- Reduced `get_source_card` in `src/index.ts` to account-scoped card and history retrieval, brand identity, owner-presentation and normalization adapters, and HTTP transport.
+- Added `test/operatorSourceCardReadService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Focused validation passed in run `30397984735`.
+- Push validation passed in run `30397973487`.
+- All eight Operator shards passed in run `30398286541`.
+- Hardened exact-SHA release and live verification passed in run `30398370226`.
+- Live production independently confirmed exact SHA `4a38718afdf5c7279dcc9a424aae58e3f2742a1c` with 75/75 public tools.
 
-- normalized source-card ID admission and exact `source_card_not_found` behavior
-- account-scoped source-card lookup
-- exact `include_history === false` short-circuit
-- canonical source-card history retrieval when history is enabled or omitted
-- deterministic source-card, canonical-context, and owner-presentation response composition
+ACTIVE checkpoint — Stage 6AC generation-run admission and canonical-context service extraction:
 
-Keep source-card and history SQL or helper retrieval, account and brand identifiers, owner-presentation constants, shared normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the bounded front half of `create_generation_run` into a focused dependency-injected service while preserving:
+
+- saved-workflow conflict rejection and exact required-workflow payload
+- normalized source-card ID admission and exact `locked_source_card_required` rejection
+- locked source-card retrieval
+- adaptation-plan normalization
+- Manifest-specific adaptation-goal requirement and exact rejection
+- canonical source-card history, account rejection context, and latest performance-learning retrieval
+- deterministic prior-adaptation context assembly with the latest 24 historical runs
+- continuation state for operation idempotency and generation-run persistence
+
+Keep source-card/history/rejection/performance retrieval helpers, account and brand identifiers, shared normalizers, operation-id handling, all SQL and D1 writes, random ID generation, serialization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 
@@ -1008,7 +1023,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AB
+6. Product-service extraction — ACTIVE at Stage 6AC
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
