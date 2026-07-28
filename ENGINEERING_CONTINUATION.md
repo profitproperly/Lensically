@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ag-draft-shown-transition-and-inventory
-repository_base_sha: f8359287495da591f5ba74cd1635e8523d7b1d12
-production_sha: f8359287495da591f5ba74cd1635e8523d7b1d12
+active_checkpoint: stage-6ah-draft-decision-transition-and-persistence
+repository_base_sha: 767488484466991c1c9def80849536578bd3c635
+production_sha: 767488484466991c1c9def80849536578bd3c635
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AG draft-shown transition and inventory-planning service extraction.
+- Current checkpoint: Stage 6AH draft approve/reject transition and persistence-planning service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1023,17 +1023,31 @@ Completed checkpoint — Stage 6AF generation-draft gate and persistence-plannin
 - Hardened exact-SHA release and live verification passed in run `30403912812`.
 - Live production independently confirmed exact SHA `f8359287495da591f5ba74cd1635e8523d7b1d12` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AG draft-shown transition and inventory-planning service extraction:
+Completed checkpoint — Stage 6AG draft-shown transition and inventory-planning service extraction:
 
-Extract the deterministic `mark_draft_shown` workflow into a focused dependency-injected service while preserving:
+- Added `src/operatorDraftShownTransitionService.ts` as the dependency-injected authority for draft-ID admission, account-scoped lookup, shown-or-advanced idempotency, showable and transition validation, status-update intent, inventory intent, and success response composition.
+- Reduced `mark_draft_shown` in `src/index.ts` to draft retrieval, transition adapter, the unchanged status UPDATE, inventory persistence, brand identity, and HTTP transport.
+- Added `test/operatorDraftShownTransitionService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Tightened the transition dependency to the canonicalized string status after type validation exposed an unsafe unknown-status contract; preflight now enforces the canonicalized transition call.
+- Focused validation passed in run `30404505729`.
+- Push validation passed in run `30404493896`.
+- All eight Operator shards passed in run `30404777076`.
+- Hardened exact-SHA release and live verification passed in run `30404867940`.
+- Live production independently confirmed exact SHA `767488484466991c1c9def80849536578bd3c635` with 75/75 public tools.
+
+ACTIVE checkpoint — Stage 6AH draft approve/reject transition and persistence-planning service extraction:
+
+Extract the deterministic `approve_draft` and `reject_draft` workflow into a focused dependency-injected service while preserving:
 
 - normalized draft ID admission and exact required-field rejection
 - account-scoped draft retrieval and exact not-found response
-- idempotent reuse for shown, approved, scheduled, and published drafts
-- showable and allowed-transition admission with the exact rejection payload
-- deterministic status-update intent, inventory-write intent, and success response
+- approved versus rejected target-status selection
+- idempotent reuse for already-applied decisions, including scheduled and published approval states
+- allowed-transition validation and exact invalid-transition response
+- normalized feedback, rejection reason fallback, score and strategy updates
+- deterministic update values, inventory-write intent for approved drafts, and final response composition
 
-Keep draft retrieval, status-update SQL and D1 execution, inventory persistence, brand identity, shared normalization, transition validation, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Keep draft retrieval, status-update SQL and D1 execution, inventory persistence, account and brand identity, shared text/JSON normalization, transition validation, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 
 
@@ -1071,7 +1085,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AG
+6. Product-service extraction — ACTIVE at Stage 6AH
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
