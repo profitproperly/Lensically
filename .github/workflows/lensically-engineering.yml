@@ -222,7 +222,8 @@ jobs:
                     npm run test -- --run test/operatorSourceCardPersistencePlanningService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardLockService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardReadService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
 
@@ -529,7 +530,8 @@ jobs:
                     npm run test -- --run test/operatorSourceCardPersistencePlanningService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardLockService.spec.ts --reporter=dot --bail=1
                     npm run test -- --run test/operatorSourceCardReadService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
+                    npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
+          npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
           npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
           npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
 

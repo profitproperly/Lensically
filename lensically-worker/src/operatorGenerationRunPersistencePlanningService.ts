@@ -12,8 +12,9 @@ export interface OperatorGenerationRunPersistencePlanningDependencies {
 
 export interface OperatorGenerationRunInsertValues {
   runId: string;
-  accountId: string;
-  threadsUserId: string;
+    accountId: unknown;
+  threadsUserId: unknown;
+
   sourceCardId: string;
   sourceCardFamilyId: unknown;
   sourceCardVersionNumber: number;
@@ -44,8 +45,9 @@ export async function planOperatorGenerationRunPersistence(
     priorAdaptationContext: JsonRecord;
     performanceLearning: unknown;
     runId: string;
-    accountId: string;
-    threadsUserId: string;
+        accountId: unknown;
+    threadsUserId: unknown;
+
     transformationContractVersion: string;
   },
   dependencies: OperatorGenerationRunPersistencePlanningDependencies,

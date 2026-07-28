@@ -105,6 +105,9 @@ const operatorSourceCardReadService = read("src/operatorSourceCardReadService.ts
 const operatorSourceCardReadServiceTests = read("test/operatorSourceCardReadService.spec.ts");
 const operatorGenerationRunAdmissionService = read("src/operatorGenerationRunAdmissionService.ts");
 const operatorGenerationRunAdmissionServiceTests = read("test/operatorGenerationRunAdmissionService.spec.ts");
+const operatorGenerationRunPersistencePlanningService = read("src/operatorGenerationRunPersistencePlanningService.ts");
+const operatorGenerationRunPersistencePlanningServiceTests = read("test/operatorGenerationRunPersistencePlanningService.spec.ts");
+
 
 
 
@@ -312,6 +315,9 @@ if (!workflow.includes("test/operatorSourceCardReadService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorGenerationRunAdmissionService.spec.ts")) {
   errors.push("operator_generation_run_admission_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorGenerationRunPersistencePlanningService.spec.ts")) {
+  errors.push("operator_generation_run_persistence_planning_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1698,6 +1704,37 @@ if (!operatorGenerationRunAdmissionServiceTests.includes("returns the exact save
     || !operatorGenerationRunAdmissionServiceTests.includes("uses empty canonical defaults when optional history fields are malformed")) {
   lifecycleErrors.push("operator_generation_run_admission_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorGenerationRunPersistencePlanningService"')
+    || !source.includes("planOperatorGenerationRunPersistence({")
+    || !source.includes("loadExistingRun: async ({ sourceCardId: existingSourceCardId, operationId })")
+    || !source.includes("parseJson: safeParseJsonString")
+    || !source.includes("const generationPlan = generationPersistence.plan")
+    || !source.includes("const insertValues = generationPlan.insertValues")) {
+  lifecycleErrors.push("operator_generation_run_persistence_planning_service_import_or_binding_missing");
+}
+if (source.includes("const operationId = normalizeOperatorText(payload.operation_id, 240, true)")
+    || source.includes("generation_operation_already_completed")
+    || source.includes("canonical_source_card_reuse: Boolean(card.family_id)")
+    || source.includes("source_card_version_number: Number(card.version_number ?? 1)")) {
+  lifecycleErrors.push("operator_generation_run_persistence_planning_service_returned_to_index");
+}
+if (!operatorGenerationRunPersistencePlanningService.includes("export async function planOperatorGenerationRunPersistence")
+    || !operatorGenerationRunPersistencePlanningService.includes("dependencies.loadExistingRun")
+    || !operatorGenerationRunPersistencePlanningService.includes("generation_operation_already_completed")
+    || !operatorGenerationRunPersistencePlanningService.includes("adaptationPlanJson")
+    || !operatorGenerationRunPersistencePlanningService.includes("priorAdaptationContextJson")
+    || !operatorGenerationRunPersistencePlanningService.includes("transformation_contract_version")
+    || !operatorGenerationRunPersistencePlanningService.includes("performance_learning")) {
+  lifecycleErrors.push("operator_generation_run_persistence_planning_service_module_incomplete");
+}
+if (!operatorGenerationRunPersistencePlanningServiceTests.includes("skips the existing-run lookup when operation ID is absent")
+    || !operatorGenerationRunPersistencePlanningServiceTests.includes("returns the exact existing-run reuse response with parsed persisted context")
+    || !operatorGenerationRunPersistencePlanningServiceTests.includes("falls back to current context and defaults when persisted JSON is unavailable")
+    || !operatorGenerationRunPersistencePlanningServiceTests.includes("builds normalized insert values and exact new-run response")
+    || !operatorGenerationRunPersistencePlanningServiceTests.includes("uses canonical family and version defaults for a root source card")) {
+  lifecycleErrors.push("operator_generation_run_persistence_planning_service_tests_incomplete");
+}
+
 
 
 

@@ -131,6 +131,8 @@ import {
 import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
 import { readOperatorSourceCard } from "./operatorSourceCardReadService";
 import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionService";
+import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPersistencePlanningService";
+
 
 
 
@@ -14252,29 +14254,37 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       performanceLearning,
     } = generationAdmission.context;
 
-    const operationId = normalizeOperatorText(payload.operation_id, 240, true);
-    if (operationId) {
-      const existingRun = await env.DB.prepare(
+        const generationPersistence = await planOperatorGenerationRunPersistence({
+      payload,
+      sourceCardId,
+      sourceCard: card,
+      adaptationPlan,
+      priorAdaptationContext,
+      performanceLearning,
+      runId: crypto.randomUUID(),
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      transformationContractVersion: SOURCE_TRANSFORMATION_CONTRACT_VERSION,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeJson: normalizeOperatorJson,
+      parseJson: safeParseJsonString,
+      loadExistingRun: async ({ sourceCardId: existingSourceCardId, operationId }) => await env.DB.prepare(
         `SELECT * FROM gpt_generation_runs
          WHERE account_id = ? AND source_card_id = ?
            AND json_extract(metadata_json, '$.operation_id') = ?
          ORDER BY datetime(updated_at) DESC LIMIT 1`,
-      ).bind(brand.account_id, sourceCardId, operationId).first<Record<string, unknown>>();
-      if (existingRun?.id) {
-        return operatorJsonResponse({
-          run_id: existingRun.id,
-          source_card_id: sourceCardId,
-          source_card_family_id: existingRun.source_card_family_id ?? card.family_id ?? null,
-          source_card_version_number: Number(existingRun.source_card_version_number ?? card.version_number ?? 1),
-          adaptation_plan: safeParseJsonString(String(existingRun.adaptation_plan_json ?? "{}")) ?? adaptationPlan,
-          prior_adaptation_context: safeParseJsonString(String(existingRun.prior_adaptation_context_json ?? "{}")) ?? priorAdaptationContext,
-          status: existingRun.status ?? "drafted",
-          reused_existing: true,
-          idempotency_reason: "generation_operation_already_completed",
-        });
-      }
+      ).bind(
+        brand.account_id,
+        existingSourceCardId,
+        operationId,
+      ).first<Record<string, unknown>>(),
+    });
+    if (generationPersistence.kind === "response") {
+      return operatorJsonResponse(generationPersistence.body, generationPersistence.status);
     }
-    const runId = crypto.randomUUID();
+    const generationPlan = generationPersistence.plan;
+    const insertValues = generationPlan.insertValues;
     await env.DB.prepare(
       `INSERT INTO gpt_generation_runs (
         id, account_id, threads_user_id, source_card_id, source_card_family_id,
@@ -14283,35 +14293,21 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'drafted', ?)`,
     )
       .bind(
-        runId,
-        brand.account_id,
-        brand.profile.threads_user_id,
-        sourceCardId,
-        card.family_id ?? null,
-        Number(card.version_number ?? 1),
-        normalizeOperatorJson(adaptationPlan, {}),
-        normalizeOperatorJson(priorAdaptationContext, {}),
-        normalizeOperatorText(payload.objective, 1000, true),
-        normalizeOperatorText(payload.prompt_summary, 4000, true),
-        normalizeOperatorJson({
-          source: "operator_mode_mcp",
-          operation_id: operationId,
-          canonical_source_card_reuse: Boolean(card.family_id),
-          transformation_contract_version: SOURCE_TRANSFORMATION_CONTRACT_VERSION,
-        }, {}),
+        insertValues.runId,
+        insertValues.accountId,
+        insertValues.threadsUserId,
+        insertValues.sourceCardId,
+        insertValues.sourceCardFamilyId,
+        insertValues.sourceCardVersionNumber,
+        insertValues.adaptationPlanJson,
+        insertValues.priorAdaptationContextJson,
+        insertValues.objective,
+        insertValues.promptSummary,
+        insertValues.metadataJson,
       )
       .run();
 
-        return operatorJsonResponse({
-      run_id: runId,
-      source_card_id: sourceCardId,
-      source_card_family_id: card.family_id ?? null,
-      source_card_version_number: Number(card.version_number ?? 1),
-      adaptation_plan: adaptationPlan,
-            prior_adaptation_context: priorAdaptationContext,
-      performance_learning: performanceLearning,
-      status: "drafted",
-    });
+    return operatorJsonResponse(generationPlan.body);
 
 
   }
