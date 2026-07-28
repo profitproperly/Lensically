@@ -341,11 +341,11 @@ jobs:
         working-directory: lensically-worker
         run: npm ci
 
-      - name: Clear stale worker transforms
+            - name: Clear stale worker transforms
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-            - name: Verify lifecycle and run deterministic shard
+      - name: Verify lifecycle and run deterministic shard
         working-directory: lensically-worker
         run: |
           set -euo pipefail
