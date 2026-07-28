@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: p1-stage-6y-workflow-dispatch-failure
-repository_base_sha: 234b9cee724e9a33a0d7ddf9eb1dfa5931191286
-production_sha: 3e34725c54517b5ba46f6e613616ee8d8e02cbad
+active_checkpoint: stage-6z-source-card-validation-and-persistence-planning
+repository_base_sha: bf8e959bda3328d5f8cd300db211257e7bfebc8c
+production_sha: bf8e959bda3328d5f8cd300db211257e7bfebc8c
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: P1 Stage 6Y workflow-dispatch failure repair; Stage 6Y final validation and release closure are blocked until workflow dispatch is restored.
+- Current checkpoint: Stage 6Z source-card validation and persistence-planning service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -922,29 +922,36 @@ Completion evidence:
 - Exact-SHA release passed in run `30386834611`.
 - Live production independently confirmed exact SHA `be4156efce0f2b947e950735dca13bf79a023664` with 75/75 public tools.
 
-ACTIVE P1 interrupt — Stage 6Y workflow dispatch failure:
+Completed checkpoint — Stage 6Y source-card family resolution and version-admission service extraction:
 
-- Incident ID: `ee5a3901-5d44-4b15-8571-2a90d55e4f6e`.
-- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `234b9cee724e9a33a0d7ddf9eb1dfa5931191286`; no dispatch side effect was confirmed.
-- Preceding release evidence: run `30394733163` deployed exact SHA `3e34725c54517b5ba46f6e613616ee8d8e02cbad`, but its verification step falsely failed because the live edge still reported the prior SHA during a 12-second propagation window. Independent live verification later confirmed `3e34725c54517b5ba46f6e613616ee8d8e02cbad` with 75/75 tools.
-- Prevention attempt `234b9cee724e9a33a0d7ddf9eb1dfa5931191286` extended propagation tolerance and independent diagnostics but made the workflow undispatchable; that workflow-definition defect is now the sole active checkpoint.
-- Required outcome: identify and repair the exact workflow-definition defect, extend permanent structural prevention to cover it, successfully dispatch and pass focused validation on the repaired exact SHA, complete broad validation, release that exact SHA, verify live production, then close Stage 6Y.
-- Stage 6Y implementation and all passing evidence remain preserved and may not be reverted or bypassed unless the root-cause repair requires a direct correction.
+- Added `src/operatorSourceCardFamilyResolutionService.ts` as the dependency-injected authority for canonical family lookup, active-family creation inputs, current-card lookup, canonical-card reuse, selection linking, exact version-reason admission, superseded-card identity, and deterministic version increments.
+- Reduced the Manifest family/version branch of `create_source_card` in `src/index.ts` to family ID generation, account-scoped SQL and D1 writes, workflow-sequence parsing, source-card retrieval, validation, owner-presentation, and HTTP transport adapters.
+- Added `test/operatorSourceCardFamilyResolutionService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Initial Stage 6Y focused validation passed in run `30394363137`, push validation passed in run `30394346091`, and all eight Operator shards passed in run `30394654532` on exact SHA `3e34725c54517b5ba46f6e613616ee8d8e02cbad`.
+- Release run `30394733163` deployed that exact SHA but falsely failed live verification because the edge still reported the prior SHA during a 12-second propagation window; independent verification confirmed the deployment and 75/75 tools.
+- Incident `ee5a3901-5d44-4b15-8571-2a90d55e4f6e` was caused by the hardened verification step being indented into the preceding cron shell block, creating a duplicate YAML `run` key that Psych silently overwrote and GitHub rejected before dispatch.
+- Permanent prevention now includes a 90-second bounded propagation window, independent evidence collection for every live surface, raw syntax-tree duplicate YAML mapping-key rejection, required worker-release step checks, and release-preflight enforcement of those guards.
+- Independent workflow lint passed in run `30395508375`.
+- Recovered focused validation passed in run `30395538814`.
+- Recovered push validation passed in run `30395508408`.
+- All eight recovered Operator shards passed in run `30395807705`.
+- Hardened exact-SHA release and live verification passed in run `30395901043`.
+- Live production independently confirmed exact SHA `bf8e959bda3328d5f8cd300db211257e7bfebc8c` with 75/75 public tools.
 
-Blocked checkpoint — Stage 6Y source-card family resolution and version-admission service extraction:
+ACTIVE checkpoint — Stage 6Z source-card validation and persistence-planning service extraction:
 
+Extract the final deterministic planning slice of `create_source_card` into a focused dependency-injected service while preserving:
 
-Extract the next bounded Manifest-only slice of `create_source_card` into a focused dependency-injected service while preserving:
+- Saved Pattern lockability validation input composition and exact `saved_pattern_source_card_not_lockable` rejection
+- deterministic locked/draft status and locked-at planning
+- normalized source-card insert values across source evidence, constraints, conditions, recommendation, context, creator, family, selection, and version fields
+- superseded-card retirement intent
+- family-current-card update intent with Threads post and canonical URL evidence
+- source-selection linkage intent with workflow-sequence preservation
+- final persisted-card validation and owner-presentation response composition
 
-- canonical family lookup by brand and source identity
-- active family creation from the selected source when no family exists
-- current canonical source-card lookup
-- existing canonical-card reuse, source-selection linking, workflow-sequence preservation, validation, and owner-presentation response
-- exact `version_reason_required` rejection for requested new versions
-- superseded-card identity and deterministic version-number increment
-- continuation state for final source-card validation and persistence
+Keep current-time generation, every shared normalization and JSON serializer, workflow-sequence parsing, card retrieval, all SQL statement construction and D1 batch execution, account and brand identifiers, owner-presentation constants, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
-Keep family ID generation, all family/selection SQL and D1 writes, workflow-sequence parsing, source-card retrieval, validation helpers, owner-presentation constants, account and brand identifiers, final source-card persistence, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
@@ -977,7 +984,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6Y
+6. Product-service extraction — ACTIVE at Stage 6Z
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
