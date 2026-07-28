@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6y-source-card-family-resolution-and-version-admission
-repository_base_sha: be4156efce0f2b947e950735dca13bf79a023664
-production_sha: be4156efce0f2b947e950735dca13bf79a023664
+active_checkpoint: p1-stage-6y-workflow-dispatch-failure
+repository_base_sha: 234b9cee724e9a33a0d7ddf9eb1dfa5931191286
+production_sha: 3e34725c54517b5ba46f6e613616ee8d8e02cbad
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6Y source-card family resolution and version-admission service extraction.
+- Current checkpoint: P1 Stage 6Y workflow-dispatch failure repair; Stage 6Y final validation and release closure are blocked until workflow dispatch is restored.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -922,7 +922,17 @@ Completion evidence:
 - Exact-SHA release passed in run `30386834611`.
 - Live production independently confirmed exact SHA `be4156efce0f2b947e950735dca13bf79a023664` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6Y source-card family resolution and version-admission service extraction:
+ACTIVE P1 interrupt — Stage 6Y workflow dispatch failure:
+
+- Incident ID: `ee5a3901-5d44-4b15-8571-2a90d55e4f6e`.
+- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `234b9cee724e9a33a0d7ddf9eb1dfa5931191286`; no dispatch side effect was confirmed.
+- Preceding release evidence: run `30394733163` deployed exact SHA `3e34725c54517b5ba46f6e613616ee8d8e02cbad`, but its verification step falsely failed because the live edge still reported the prior SHA during a 12-second propagation window. Independent live verification later confirmed `3e34725c54517b5ba46f6e613616ee8d8e02cbad` with 75/75 tools.
+- Prevention attempt `234b9cee724e9a33a0d7ddf9eb1dfa5931191286` extended propagation tolerance and independent diagnostics but made the workflow undispatchable; that workflow-definition defect is now the sole active checkpoint.
+- Required outcome: identify and repair the exact workflow-definition defect, extend permanent structural prevention to cover it, successfully dispatch and pass focused validation on the repaired exact SHA, complete broad validation, release that exact SHA, verify live production, then close Stage 6Y.
+- Stage 6Y implementation and all passing evidence remain preserved and may not be reverted or bypassed unless the root-cause repair requires a direct correction.
+
+Blocked checkpoint — Stage 6Y source-card family resolution and version-admission service extraction:
+
 
 Extract the next bounded Manifest-only slice of `create_source_card` into a focused dependency-injected service while preserving:
 
