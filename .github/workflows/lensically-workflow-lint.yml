@@ -16,10 +16,10 @@ jobs:
   parse-engineering-workflow:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact head
+            - name: Checkout exact head
         uses: actions/checkout@v4
 
-            - name: Parse and validate engineering workflow
+      - name: Parse and validate engineering workflow
         run: |
           set -euo pipefail
           ruby -e '
