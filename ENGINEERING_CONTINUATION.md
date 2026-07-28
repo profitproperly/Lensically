@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: p1-stage-6w-workflow-dispatch-failure
-repository_base_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
-production_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
+active_checkpoint: stage-6x-source-card-admission-and-selection-resolution
+repository_base_sha: 9d6c7e248678a59445f183bec24b98c206e4e0cb
+production_sha: 9d6c7e248678a59445f183bec24b98c206e4e0cb
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: P1 Stage 6W workflow-dispatch failure repair; Stage 6W validation is blocked until the workflow can dispatch again.
+- Current checkpoint: Stage 6X source-card admission and existing-selection resolution service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -859,15 +859,18 @@ Completed checkpoint — Stage 6V Manifest source-card backfill preparation read
 - Exact-SHA release passed in run `30378860110`.
 - Live production independently confirmed exact SHA `98ee4aa16b3b907f72c00a049242a41f8979ce24` with 75/75 public tools.
 
-ACTIVE P1 interrupt — Stage 6W workflow dispatch failure:
+Completed checkpoint — P1 Stage 6W workflow dispatch repair:
 
 - Incident ID: `906f8889-b2c6-48ae-8199-f5857ba5d281`.
-- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `42d2114d0cb89d0bebbea67c6246bb346e387b10`; no dispatch side effect was confirmed.
-- Precedence: this interrupt is the sole active checkpoint and blocks normal monolith work.
-- Required outcome: identify the exact workflow-definition or dispatch root cause, repair it, add permanent prevention, successfully dispatch and pass focused validation on the repaired exact SHA, then resume Stage 6W validation from the canonical checkpoint.
-- Stage 6W implementation remains preserved and may not be reverted or bypassed unless the root-cause repair requires a direct correction.
+- Root cause: repeated exact-text workflow edits accumulated indentation, moving job keys and step markers into adjacent mappings or shell block scalars until GitHub rejected `workflow_dispatch` with HTTP 422.
+- Repaired the complete workflow structure and restored typed dispatch on exact SHA `ef7f1e2ae4eef64a517258531d6ac8f31aaba607`.
+- Added independent `.github/workflows/lensically-workflow-lint.yml` validation and standalone `scripts/validate-engineering-workflow.rb` enforcement for required top-level jobs, job-level runners, step-list structure, named steps, embedded step markers, and the architecture upload step.
+- Added `scripts/validate-test-syntax.mjs` to focused, push, shard, and release validation so malformed TypeScript tests fail before broad execution.
+- Independent workflow validation passed in run `30384815102`.
+- Successful focused validation after dispatch restoration passed in run `30384959721`.
+- The interrupt is closed; normal monolith work resumed only after prevention was source-controlled and verified.
 
-Blocked sub-action — Stage 6W source-candidate batch read service extraction:
+Completed checkpoint — Stage 6W source-candidate batch read service extraction:
 
 
 Extract `get_source_candidate_batch` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
@@ -882,8 +885,30 @@ Extract `get_source_candidate_batch` from `handleOperatorTool` into a focused de
 
 Keep text normalization, all SQL, account and brand identifiers, shared JSON parsing, row retrieval, and HTTP transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
+Completion evidence:
 
+- Added `src/operatorSourceCandidateBatchReadService.ts` as the dependency-injected authority for admission, not-found behavior, metadata parsing, ordered selection serialization, numeric/null conversion, disposition defaults, and response composition.
+- Reduced `get_source_candidate_batch` in `src/index.ts` to normalization, account-scoped SQL, shared JSON parsing, row retrieval, brand identity, and HTTP transport adapters.
+- Added `test/operatorSourceCandidateBatchReadService.spec.ts`, handler-specific ownership gates, and repository-wide TypeScript test syntax validation.
+- Focused validation passed in run `30384959721`.
+- Push validation passed in run `30384941401`.
+- All eight Operator shards passed in run `30385032360`.
+- Exact-SHA release passed in run `30385116533`.
+- Live production independently confirmed exact SHA `9d6c7e248678a59445f183bec24b98c206e4e0cb` with 75/75 public tools.
 
+ACTIVE checkpoint — Stage 6X source-card admission and existing-selection resolution service extraction:
+
+Extract the bounded front half of `create_source_card` into a focused dependency-injected service while preserving:
+
+- compatibility bridge admission for `all_missing_manifest_source_cards`
+- saved-workflow conflict rejection and exact error payload
+- source mechanism, required product, workflow-session, sequence-label, version-reason, versioning, and transformation-contract normalization
+- Manifest `source_selection_id` or positive saved-pattern compatibility admission
+- existing Saved Pattern not-found behavior and canonical source identity precedence
+- existing-selection not-found, workflow mismatch, and already-resolved card reuse behavior
+- deterministic response composition for reused existing cards
+
+Keep random ID generation, current-time generation, canonical URL/post-ID helpers, all SQL and D1 batch writes, source-card persistence, family/version writes, account/brand identifiers, shared normalization helpers, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
