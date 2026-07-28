@@ -111,6 +111,8 @@ const operatorGenerationDraftAdmissionService = read("src/operatorGenerationDraf
 const operatorGenerationDraftAdmissionServiceTests = read("test/operatorGenerationDraftAdmissionService.spec.ts");
 const operatorGenerationDraftPersistencePlanningService = read("src/operatorGenerationDraftPersistencePlanningService.ts");
 const operatorGenerationDraftPersistencePlanningServiceTests = read("test/operatorGenerationDraftPersistencePlanningService.spec.ts");
+const operatorDraftShownTransitionService = read("src/operatorDraftShownTransitionService.ts");
+const operatorDraftShownTransitionServiceTests = read("test/operatorDraftShownTransitionService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -332,6 +334,9 @@ if (!workflow.includes("test/operatorGenerationDraftAdmissionService.spec.ts")) 
 }
 if (!workflow.includes("test/operatorGenerationDraftPersistencePlanningService.spec.ts")) {
   errors.push("operator_generation_draft_persistence_planning_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorDraftShownTransitionService.spec.ts")) {
+  errors.push("operator_draft_shown_transition_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1827,6 +1832,38 @@ if (!operatorGenerationDraftPersistencePlanningServiceTests.includes("runs candi
     || !operatorGenerationDraftPersistencePlanningServiceTests.includes("uses scores fallback and stable operator metadata in the persistence plan")) {
   lifecycleErrors.push("operator_generation_draft_persistence_planning_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorDraftShownTransitionService"')
+    || !source.includes("planOperatorDraftShownTransition({")
+    || !source.includes("loadDraft: async (draftId)")
+    || !source.includes("isAllowedTransition: isAllowedOperatorTransition")
+    || !source.includes("const shownPlan = shownTransition.plan")
+    || !source.includes("await insertOperatorInventory(env")) {
+  lifecycleErrors.push("operator_draft_shown_transition_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "mark_draft_shown") {
+    const draftId = normalizeOperatorText(payload.draft_id, 120);`)
+    || source.includes('idempotency_reason: "draft_already_shown_or_advanced"')
+    || source.includes('return operatorJsonResponse({ success: false, error: "draft_not_showable", draft_id: draftId')) {
+  lifecycleErrors.push("operator_draft_shown_transition_service_returned_to_index");
+}
+if (!operatorDraftShownTransitionService.includes("export async function planOperatorDraftShownTransition")
+    || !operatorDraftShownTransitionService.includes("dependencies.loadDraft")
+    || !operatorDraftShownTransitionService.includes("dependencies.isAllowedTransition")
+    || !operatorDraftShownTransitionService.includes("draft_already_shown_or_advanced")
+    || !operatorDraftShownTransitionService.includes("draft_not_showable")
+    || !operatorDraftShownTransitionService.includes("updateStatus: \"shown\"")
+    || !operatorDraftShownTransitionService.includes("inventory")) {
+  lifecycleErrors.push("operator_draft_shown_transition_service_module_incomplete");
+}
+if (!operatorDraftShownTransitionServiceTests.includes("returns the exact required-ID rejection without loading a draft")
+    || !operatorDraftShownTransitionServiceTests.includes("returns the exact not-found response after account-scoped retrieval")
+    || !operatorDraftShownTransitionServiceTests.includes("returns exact idempotent reuse for %s drafts")
+    || !operatorDraftShownTransitionServiceTests.includes("returns the exact not-showable rejection before transition validation")
+    || !operatorDraftShownTransitionServiceTests.includes("returns the exact rejection when the shown transition is not allowed")
+    || !operatorDraftShownTransitionServiceTests.includes("builds exact update, inventory, and success intents for an eligible draft")) {
+  lifecycleErrors.push("operator_draft_shown_transition_service_tests_incomplete");
+}
+
 
 
 

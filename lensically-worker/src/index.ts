@@ -134,6 +134,7 @@ import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionServ
 import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPersistencePlanningService";
 import { admitOperatorGenerationDraft } from "./operatorGenerationDraftAdmissionService";
 import { planOperatorGenerationDraftPersistence } from "./operatorGenerationDraftPersistencePlanningService";
+import { planOperatorDraftShownTransition } from "./operatorDraftShownTransitionService";
 
 
 
@@ -14407,35 +14408,38 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(draftPersistence.body);
   }
 
-  if (toolName === "mark_draft_shown") {
-    const draftId = normalizeOperatorText(payload.draft_id, 120);
-    if (!draftId) {
-      return operatorJsonResponse({ success: false, error: "draft_id is required" }, 400);
+    if (toolName === "mark_draft_shown") {
+    const shownTransition = await planOperatorDraftShownTransition({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      loadDraft: async (draftId) => await getOperatorDraft(env, brand, draftId),
+      isAllowedTransition: isAllowedOperatorTransition,
+    });
+    if (shownTransition.kind === "response") {
+      return operatorJsonResponse(shownTransition.body, shownTransition.status);
     }
-    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
-    if (!draft) {
-      return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
-    }
-    if (draft.status === "shown" || draft.status === "approved" || draft.status === "scheduled" || draft.status === "published") {
-      return operatorJsonResponse({ draft_id: draftId, status: draft.status, reused_existing: true, idempotency_reason: "draft_already_shown_or_advanced" });
-    }
-    if (!draft.showable || !isAllowedOperatorTransition(draft.status, "shown")) {
-      return operatorJsonResponse({ success: false, error: "draft_not_showable", draft_id: draftId, status: draft.status, showable: draft.showable }, 400);
-    }
+    const shownPlan = shownTransition.plan;
     await env.DB.prepare(
       `UPDATE gpt_generation_drafts SET status = 'shown' WHERE id = ? AND account_id = ?`,
-    ).bind(draftId, brand.account_id).run();
+    ).bind(shownPlan.draftId, brand.account_id).run();
+    const inventory = shownPlan.inventory;
     await insertOperatorInventory(env, {
       brandKey: brand.brand_key,
       sourceType: "draft",
-      sourceId: draftId,
-      text: draft.text,
-      sourceCardId: draft.source_card_id,
+      sourceId: String(inventory.sourceId),
+      text: String(inventory.text ?? ""),
+      sourceCardId: typeof inventory.sourceCardId === "string" ? inventory.sourceCardId : null,
       status: "shown",
-      strategy: draft.strategy && typeof draft.strategy === "object" ? draft.strategy as Record<string, unknown> : null,
-      analysis: draft.strategy && typeof draft.strategy === "object" ? (draft.strategy as Record<string, unknown>).analysis as Record<string, unknown> ?? null : null,
+      strategy: inventory.strategy && typeof inventory.strategy === "object" && !Array.isArray(inventory.strategy)
+        ? inventory.strategy as Record<string, unknown>
+        : null,
+      analysis: inventory.analysis && typeof inventory.analysis === "object" && !Array.isArray(inventory.analysis)
+        ? inventory.analysis as Record<string, unknown>
+        : null,
     });
-    return operatorJsonResponse({ draft_id: draftId, status: "shown" });
+    return operatorJsonResponse(shownPlan.body);
   }
 
   if (toolName === "approve_draft" || toolName === "reject_draft") {
