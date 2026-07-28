@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6z-source-card-validation-and-persistence-planning
-repository_base_sha: bf8e959bda3328d5f8cd300db211257e7bfebc8c
-production_sha: bf8e959bda3328d5f8cd300db211257e7bfebc8c
+active_checkpoint: stage-6aa-source-card-lock-service
+repository_base_sha: a2ff062b8bb31dc181be697eb45f3b44c53c45d0
+production_sha: a2ff062b8bb31dc181be697eb45f3b44c53c45d0
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6Z source-card validation and persistence-planning service extraction.
+- Current checkpoint: Stage 6AA source-card lock service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -938,19 +938,31 @@ Completed checkpoint — Stage 6Y source-card family resolution and version-admi
 - Hardened exact-SHA release and live verification passed in run `30395901043`.
 - Live production independently confirmed exact SHA `bf8e959bda3328d5f8cd300db211257e7bfebc8c` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6Z source-card validation and persistence-planning service extraction:
+Completed checkpoint — Stage 6Z source-card validation and persistence-planning service extraction:
 
-Extract the final deterministic planning slice of `create_source_card` into a focused dependency-injected service while preserving:
+- Added `src/operatorSourceCardPersistencePlanningService.ts` as the deterministic authority for Saved Pattern lockability admission, locked/draft planning, normalized insert values, superseded-card retirement intent, family and selection linkage intent, and final response composition.
+- Reduced the final `create_source_card` branch in `src/index.ts` to SQL statement construction, D1 batch execution, typed brand identity, persisted-card retrieval, clock and normalization adapters, and HTTP transport.
+- Added `test/operatorSourceCardPersistencePlanningService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Corrected one typed adapter boundary so persisted-card retrieval continues to use canonical `brand.brand_key` rather than the planner's serialized string.
+- Focused validation passed in run `30396626665`.
+- Push validation passed in run `30396609705`.
+- All eight Operator shards passed in run `30396925216`.
+- Hardened exact-SHA release and live verification passed in run `30397022485`.
+- Live production independently confirmed exact SHA `a2ff062b8bb31dc181be697eb45f3b44c53c45d0` with 75/75 public tools.
 
-- Saved Pattern lockability validation input composition and exact `saved_pattern_source_card_not_lockable` rejection
-- deterministic locked/draft status and locked-at planning
-- normalized source-card insert values across source evidence, constraints, conditions, recommendation, context, creator, family, selection, and version fields
-- superseded-card retirement intent
-- family-current-card update intent with Threads post and canonical URL evidence
-- source-selection linkage intent with workflow-sequence preservation
-- final persisted-card validation and owner-presentation response composition
+ACTIVE checkpoint — Stage 6AA source-card lock service extraction:
 
-Keep current-time generation, every shared normalization and JSON serializer, workflow-sequence parsing, card retrieval, all SQL statement construction and D1 batch execution, account and brand identifiers, owner-presentation constants, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract `lock_source_card` into a focused dependency-injected service while preserving:
+
+- required normalized `source_card_id` admission
+- account-scoped source-card lookup and exact `source_card_not_found` behavior
+- lockability validation and exact rejection payload with current status
+- deterministic locked-at generation through an explicit clock adapter
+- persistence intent for the locked status and timestamp
+- exact successful response with warnings
+
+Keep source-card SQL lookup and update, account and brand identifiers, validation helpers, current-time generation, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 Remaining work after this checkpoint:
@@ -984,7 +996,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6Z
+6. Product-service extraction — ACTIVE at Stage 6AA
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
