@@ -89,6 +89,9 @@ const operatorPublishedPostLineageAuditService = read("src/operatorPublishedPost
 const operatorPublishedPostLineageAuditServiceTests = read("test/operatorPublishedPostLineageAuditService.spec.ts");
 const operatorManifestSourceCardBackfillService = read("src/operatorManifestSourceCardBackfillService.ts");
 const operatorManifestSourceCardBackfillServiceTests = read("test/operatorManifestSourceCardBackfillService.spec.ts");
+const operatorManifestSourceCardBackfillPreparationService = read("src/operatorManifestSourceCardBackfillPreparationService.ts");
+const operatorManifestSourceCardBackfillPreparationServiceTests = read("test/operatorManifestSourceCardBackfillPreparationService.spec.ts");
+
 
 
 
@@ -263,6 +266,10 @@ if (!workflow.includes("test/operatorPublishedPostLineageAuditService.spec.ts"))
 if (!workflow.includes("test/operatorManifestSourceCardBackfillService.spec.ts")) {
   errors.push("operator_manifest_source_card_backfill_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestSourceCardBackfillPreparationService.spec.ts")) {
+  errors.push("operator_manifest_source_card_backfill_preparation_service_workflow_gate_missing");
+}
+
 
 
 
@@ -1355,6 +1362,36 @@ if (!operatorManifestSourceCardBackfillServiceTests.includes("rejects non-Manife
     || !operatorManifestSourceCardBackfillServiceTests.includes("returns complete state when verification finds no remaining patterns")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestSourceCardBackfillPreparationService"')
+    || !source.includes("prepareOperatorManifestSourceCardBackfill({")
+    || !source.includes("loadState: async ({ limit })")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "prepare_manifest_source_card_backfill") {
+
+    if (brand.brand_key !== "manifest_mental")`)
+    || source.includes("already_carded_count: alreadyCardedCount")
+    || source.includes("completion_rule: \"Complete only when every Saved Pattern has a linked source card.\"")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_returned_to_index");
+}
+if (!operatorManifestSourceCardBackfillPreparationService.includes("export async function prepareOperatorManifestSourceCardBackfill")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("dependencies.loadState")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("dependencies.canonicalizeThreadsSourceUrl")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("dependencies.extractThreadsPostIdFromUrl")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("source_identity_key")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("engagement_total")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("completion_rule")
+    || !operatorManifestSourceCardBackfillPreparationService.includes("interruption_rule")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_module_incomplete");
+}
+if (!operatorManifestSourceCardBackfillPreparationServiceTests.includes("rejects non-Manifest brands before reading state")
+    || !operatorManifestSourceCardBackfillPreparationServiceTests.includes("applies the exact default and bounded limits before state retrieval")
+    || !operatorManifestSourceCardBackfillPreparationServiceTests.includes("uses deterministic source identity precedence across post ID, URL, and Saved Pattern ID")
+    || !operatorManifestSourceCardBackfillPreparationServiceTests.includes("serializes metrics, nullable metadata, and exact rules without mutation")
+    || !operatorManifestSourceCardBackfillPreparationServiceTests.includes("returns complete state and clamps negative uncarded totals to zero")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_tests_incomplete");
+}
+
 
 
 

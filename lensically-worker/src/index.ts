@@ -120,6 +120,8 @@ import { excludeOperatorSavedPatternSource } from "./operatorSavedPatternSourceE
 import { drawOperatorManifestSourceBatch } from "./operatorManifestSourceDrawService";
 import { auditOperatorPublishedPostLineage } from "./operatorPublishedPostLineageAuditService";
 import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCardBackfillService";
+import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSourceCardBackfillPreparationService";
+
 
 
 
@@ -13702,99 +13704,66 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-  if (toolName === "prepare_manifest_source_card_backfill") {
-
-    if (brand.brand_key !== "manifest_mental") {
-      return operatorJsonResponse({ success: false, error: "manifest_mental_required" }, 400);
-    }
+    if (toolName === "prepare_manifest_source_card_backfill") {
     await ensureOperatorWorkflowTables(env);
-    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 8)), 1), 25);
-    const totalRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total
-       FROM external_patterns
-       WHERE app_user_id = ? AND account_id = ?`,
-    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number | string }>();
-    const cardedRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total
-       FROM external_patterns p
-       WHERE p.app_user_id = ?
-         AND p.account_id = ?
-         AND EXISTS (
-           SELECT 1
-           FROM operator_source_selections s
-           JOIN operator_source_cards c
-             ON c.id = s.source_card_id
-            AND c.brand_key = s.brand_key
-           WHERE s.brand_key = ?
-             AND s.source_type = 'saved_pattern'
-             AND s.internal_source_id = CAST(p.id AS TEXT)
-         )`,
-    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key).first<{ total: number | string }>();
-    const rows = await env.DB.prepare(
-      `SELECT p.id, p.post_id, p.post_text, p.views, p.likes, p.replies, p.reposts,
-              p.shares, p.source_url, p.posted_at, p.capture_confidence, p.updated_at
-       FROM external_patterns p
-       WHERE p.app_user_id = ?
-         AND p.account_id = ?
-         AND NOT EXISTS (
-           SELECT 1
-           FROM operator_source_selections s
-           JOIN operator_source_cards c
-             ON c.id = s.source_card_id
-            AND c.brand_key = s.brand_key
-           WHERE s.brand_key = ?
-             AND s.source_type = 'saved_pattern'
-             AND s.internal_source_id = CAST(p.id AS TEXT)
-         )
-       ORDER BY p.id ASC
-       LIMIT ?`,
-    ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key, limit).all<Record<string, unknown>>();
-    const savedPatternTotal = Number(totalRow?.total ?? 0);
-    const alreadyCardedCount = Number(cardedRow?.total ?? 0);
-    const uncardedCount = Math.max(0, savedPatternTotal - alreadyCardedCount);
-    const patterns = (rows.results ?? []).map((row) => {
-      const canonicalSourceUrl = canonicalizeThreadsSourceUrl(
-        typeof row.source_url === "string" ? row.source_url : null,
-      );
-      const threadsPostId = String(row.post_id ?? extractThreadsPostIdFromUrl(canonicalSourceUrl) ?? "").trim() || null;
-      const savedPatternId = Number(row.id);
-      return {
-        saved_pattern_id: savedPatternId,
-        source_identity_key: threadsPostId
-          ? `threads:${threadsPostId}`
-          : canonicalSourceUrl
-            ? `url:${canonicalSourceUrl}`
-            : `saved_pattern:${savedPatternId}`,
-        threads_post_id: threadsPostId,
-        canonical_source_url: canonicalSourceUrl,
-        post_text: row.post_text,
-        posted_at: row.posted_at ?? null,
-        capture_confidence: row.capture_confidence ?? null,
-        source_updated_at: row.updated_at ?? null,
-        metrics: {
-          views: Number(row.views ?? 0),
-          likes: Number(row.likes ?? 0),
-          replies: Number(row.replies ?? 0),
-          reposts: Number(row.reposts ?? 0),
-          shares: Number(row.shares ?? 0),
-          engagement_total: Number(row.likes ?? 0) + Number(row.replies ?? 0) + Number(row.reposts ?? 0) + Number(row.shares ?? 0),
-        },
-      };
+    const preparation = await prepareOperatorManifestSourceCardBackfill({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      manifestBrandKey: "manifest_mental",
+      loadState: async ({ limit }) => {
+        const totalRow = await env.DB.prepare(
+          `SELECT COUNT(*) AS total
+           FROM external_patterns
+           WHERE app_user_id = ? AND account_id = ?`,
+        ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id).first<{ total: number | string }>();
+        const cardedRow = await env.DB.prepare(
+          `SELECT COUNT(*) AS total
+           FROM external_patterns p
+           WHERE p.app_user_id = ?
+             AND p.account_id = ?
+             AND EXISTS (
+               SELECT 1
+               FROM operator_source_selections s
+               JOIN operator_source_cards c
+                 ON c.id = s.source_card_id
+                AND c.brand_key = s.brand_key
+               WHERE s.brand_key = ?
+                 AND s.source_type = 'saved_pattern'
+                 AND s.internal_source_id = CAST(p.id AS TEXT)
+             )`,
+        ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key).first<{ total: number | string }>();
+        const rows = await env.DB.prepare(
+          `SELECT p.id, p.post_id, p.post_text, p.views, p.likes, p.replies, p.reposts,
+                  p.shares, p.source_url, p.posted_at, p.capture_confidence, p.updated_at
+           FROM external_patterns p
+           WHERE p.app_user_id = ?
+             AND p.account_id = ?
+             AND NOT EXISTS (
+               SELECT 1
+               FROM operator_source_selections s
+               JOIN operator_source_cards c
+                 ON c.id = s.source_card_id
+                AND c.brand_key = s.brand_key
+               WHERE s.brand_key = ?
+                 AND s.source_type = 'saved_pattern'
+                 AND s.internal_source_id = CAST(p.id AS TEXT)
+             )
+           ORDER BY p.id ASC
+           LIMIT ?`,
+        ).bind(SAVED_PATTERNS_APP_USER_ID, brand.account_id, brand.brand_key, limit).all<Record<string, unknown>>();
+        return {
+          savedPatternTotal: totalRow?.total ?? 0,
+          alreadyCardedCount: cardedRow?.total ?? 0,
+          rows: rows.results ?? [],
+        };
+      },
+      canonicalizeThreadsSourceUrl,
+      extractThreadsPostIdFromUrl,
     });
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      status: uncardedCount === 0 ? "complete" : "ready",
-      saved_pattern_total: savedPatternTotal,
-      already_carded_count: alreadyCardedCount,
-      uncarded_count: uncardedCount,
-      batch_limit: limit,
-      returned_count: patterns.length,
-      patterns,
-      completion_rule: "Complete only when every Saved Pattern has a linked source card.",
-      interruption_rule: "Report an uncarded count only when execution is forced to stop before completion.",
-    });
+    return operatorJsonResponse(preparation.body, preparation.status);
   }
+
 
   if (toolName === "get_source_candidate_batch") {
     const batchId = normalizeOperatorText(payload.source_batch_id, 120);
