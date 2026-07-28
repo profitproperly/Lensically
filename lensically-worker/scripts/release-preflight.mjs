@@ -113,6 +113,8 @@ const operatorGenerationDraftPersistencePlanningService = read("src/operatorGene
 const operatorGenerationDraftPersistencePlanningServiceTests = read("test/operatorGenerationDraftPersistencePlanningService.spec.ts");
 const operatorDraftShownTransitionService = read("src/operatorDraftShownTransitionService.ts");
 const operatorDraftShownTransitionServiceTests = read("test/operatorDraftShownTransitionService.spec.ts");
+const operatorDraftDecisionService = read("src/operatorDraftDecisionService.ts");
+const operatorDraftDecisionServiceTests = read("test/operatorDraftDecisionService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -337,6 +339,9 @@ if (!workflow.includes("test/operatorGenerationDraftPersistencePlanningService.s
 }
 if (!workflow.includes("test/operatorDraftShownTransitionService.spec.ts")) {
   errors.push("operator_draft_shown_transition_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorDraftDecisionService.spec.ts")) {
+  errors.push("operator_draft_decision_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1863,6 +1868,41 @@ if (!operatorDraftShownTransitionServiceTests.includes("returns the exact requir
     || !operatorDraftShownTransitionServiceTests.includes("builds exact update, inventory, and success intents for an eligible draft")) {
   lifecycleErrors.push("operator_draft_shown_transition_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorDraftDecisionService"')
+    || !source.includes("planOperatorDraftDecision({")
+    || !source.includes("composeOperatorDraftDecisionResponse(decisionPlan, memory)")
+    || !source.includes("loadDraft: async (draftId)")
+    || !source.includes("const decisionPlan = decisionPlanning.plan")
+    || !source.includes("saveGptStrategyMemory(env, decisionPlan.memory)")) {
+  lifecycleErrors.push("operator_draft_decision_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "approve_draft" || toolName === "reject_draft") {
+    const draftId = normalizeOperatorText(payload.draft_id, 120);`)
+    || source.includes('idempotency_reason: "draft_decision_already_applied"')
+    || source.includes("const memoryKind = toolName === \"approve_draft\"")) {
+  lifecycleErrors.push("operator_draft_decision_service_returned_to_index");
+}
+if (!operatorDraftDecisionService.includes("export async function planOperatorDraftDecision")
+    || !operatorDraftDecisionService.includes("export function composeOperatorDraftDecisionResponse")
+    || !operatorDraftDecisionService.includes("dependencies.loadDraft")
+    || !operatorDraftDecisionService.includes("dependencies.isAllowedTransition")
+    || !operatorDraftDecisionService.includes("draft_decision_already_applied")
+    || !operatorDraftDecisionService.includes("invalid_status_transition")
+    || !operatorDraftDecisionService.includes("claimUpdate")
+    || !operatorDraftDecisionService.includes("memory")
+    || !operatorDraftDecisionService.includes("inventory")) {
+  lifecycleErrors.push("operator_draft_decision_service_module_incomplete");
+}
+if (!operatorDraftDecisionServiceTests.includes("returns the exact required-ID rejection before loading a draft")
+    || !operatorDraftDecisionServiceTests.includes("returns the exact not-found response after account-scoped retrieval")
+    || !operatorDraftDecisionServiceTests.includes("returns exact idempotent reuse for %s from %s")
+    || !operatorDraftDecisionServiceTests.includes("returns the exact invalid-transition response with canonical statuses")
+    || !operatorDraftDecisionServiceTests.includes("builds complete approval update, claim, memory, inventory, and response intents")
+    || !operatorDraftDecisionServiceTests.includes("uses feedback then the stable default for rejection reasons and draft strategy fallback")
+    || !operatorDraftDecisionServiceTests.includes("composes the exact persisted decision response with nullable memory identity")) {
+  lifecycleErrors.push("operator_draft_decision_service_tests_incomplete");
+}
+
 
 
 

@@ -135,6 +135,10 @@ import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPer
 import { admitOperatorGenerationDraft } from "./operatorGenerationDraftAdmissionService";
 import { planOperatorGenerationDraftPersistence } from "./operatorGenerationDraftPersistencePlanningService";
 import { planOperatorDraftShownTransition } from "./operatorDraftShownTransitionService";
+import {
+  composeOperatorDraftDecisionResponse,
+  planOperatorDraftDecision,
+} from "./operatorDraftDecisionService";
 
 
 
@@ -14442,26 +14446,23 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(shownPlan.body);
   }
 
-  if (toolName === "approve_draft" || toolName === "reject_draft") {
-    const draftId = normalizeOperatorText(payload.draft_id, 120);
-    if (!draftId) {
-      return operatorJsonResponse({ success: false, error: "draft_id is required" }, 400);
+    if (toolName === "approve_draft" || toolName === "reject_draft") {
+    const decisionPlanning = await planOperatorDraftDecision({
+      toolName,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeJson: normalizeOperatorJson,
+      loadDraft: async (draftId) => await getOperatorDraft(env, brand, draftId),
+      isAllowedTransition: isAllowedOperatorTransition,
+    });
+    if (decisionPlanning.kind === "response") {
+      return operatorJsonResponse(decisionPlanning.body, decisionPlanning.status);
     }
-    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
-    if (!draft) {
-      return operatorJsonResponse({ success: false, error: "draft_not_found" }, 404);
-    }
-    const nextStatus = toolName === "approve_draft" ? "approved" : "rejected";
-    if (draft.status === nextStatus || (toolName === "approve_draft" && ["scheduled", "published"].includes(draft.status))) {
-      return operatorJsonResponse({ draft_id: draftId, status: draft.status, reused_existing: true, idempotency_reason: "draft_decision_already_applied" });
-    }
-    if (!isAllowedOperatorTransition(draft.status, nextStatus)) {
-      return operatorJsonResponse({ success: false, error: "invalid_status_transition", from: draft.status, to: nextStatus }, 400);
-    }
-    const feedback = normalizeOperatorText(payload.feedback_note, 4000, true);
-    const rejectionReason = toolName === "reject_draft"
-      ? normalizeOperatorText(payload.rejection_reason, 4000, true) ?? feedback ?? "Rejected from operator mode."
-      : null;
+    const decisionPlan = decisionPlanning.plan;
     await env.DB.prepare(
       `UPDATE gpt_generation_drafts
        SET status = ?,
@@ -14473,44 +14474,39 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          AND account_id = ?`,
     )
       .bind(
-        nextStatus,
-        feedback,
-        rejectionReason,
-        normalizeOperatorJson(payload.score ?? payload.scores, null),
-        payload.strategy ? normalizeOperatorJson(payload.strategy, {}) : null,
-        draftId,
+        decisionPlan.nextStatus,
+        decisionPlan.draftUpdate.feedback,
+        decisionPlan.draftUpdate.rejectionReason,
+        decisionPlan.draftUpdate.scoreJson,
+        decisionPlan.draftUpdate.strategyJson,
+        decisionPlan.draftId,
         brand.account_id,
-            )
+      )
       .run();
     await env.DB.prepare(
       `UPDATE operator_daily_source_claims
        SET status = ?, disposition_reason = COALESCE(?, disposition_reason)
        WHERE brand_key = ? AND draft_id = ?`,
     ).bind(
-      toolName === "approve_draft" ? "approved" : "revision_required",
-      toolName === "reject_draft" ? rejectionReason : feedback,
+      decisionPlan.claimUpdate.status,
+      decisionPlan.claimUpdate.dispositionReason,
       brand.brand_key,
-      draftId,
+      decisionPlan.draftId,
     ).run();
-    const memoryKind = toolName === "approve_draft" ? "approval_feedback" : "rejection_feedback";
-    const memory = await saveGptStrategyMemory(env, {
-      accountId: brand.account_id,
-      threadsUserId: brand.profile.threads_user_id,
-      kind: memoryKind,
-      title: toolName === "approve_draft" ? "Draft approved from operator mode" : "Draft rejected from operator mode",
-      body: `Draft id: ${draftId}\nStatus: ${nextStatus}\n${feedback || rejectionReason || "No feedback note provided."}`,
-      metadataJson: normalizeOperatorJson({ source: "operator_mode_mcp", draft_id: draftId, source_card_id: draft.source_card_id }, {}),
-    });
+    const memory = await saveGptStrategyMemory(env, decisionPlan.memory);
+    const inventory = decisionPlan.inventory;
     await insertOperatorInventory(env, {
       brandKey: brand.brand_key,
       sourceType: "draft",
-      sourceId: draftId,
-      text: draft.text,
-      sourceCardId: draft.source_card_id,
-      status: nextStatus,
-      strategy: payload.strategy && typeof payload.strategy === "object" ? payload.strategy as Record<string, unknown> : (draft.strategy as Record<string, unknown> | null),
+      sourceId: decisionPlan.draftId,
+      text: String(inventory.text ?? ""),
+      sourceCardId: typeof inventory.sourceCardId === "string" ? inventory.sourceCardId : null,
+      status: decisionPlan.nextStatus,
+      strategy: inventory.strategy && typeof inventory.strategy === "object" && !Array.isArray(inventory.strategy)
+        ? inventory.strategy as Record<string, unknown>
+        : null,
     });
-    return operatorJsonResponse({ draft_id: draftId, status: nextStatus, memory_id: memory?.id ?? null });
+    return operatorJsonResponse(composeOperatorDraftDecisionResponse(decisionPlan, memory));
   }
 
   if (toolName === "list_active_gates") {
