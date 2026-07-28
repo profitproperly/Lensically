@@ -129,9 +129,9 @@ jobs:
         working-directory: lensically-web
         run: npm run build
 
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
-                run: |
+        run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
@@ -263,9 +263,9 @@ jobs:
         run: rm -rf node_modules/.vite node_modules/.cache
 
       
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
-                run: |
+        run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
