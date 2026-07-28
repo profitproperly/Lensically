@@ -27,9 +27,9 @@ describe("Operator MCP protocol contract", () => {
     expect(result.protocolVersion).toBe("2025-03-26");
         expect(String(result.instructions)).toContain("Full tool surface loaded: 112 tools available and usable.");
     expect(String(result.instructions)).toContain("Call the advertised direct typed tool");
-    expect(String(result.instructions).split("\n").slice(0, 2)).toEqual([
-      "LENSICALLY OPERATOR MODE STARTUP AUTHORITY — READ FIRST.",
-      "GOVERNING STANDARDS: AUTONOMY. EFFICIENCY. PREVENTION.",
+        expect(String(result.instructions).split("\n").slice(0, 2)).toEqual([
+      "# LENSICALLY OPERATOR MODE — STARTUP AUTHORITY",
+      "",
     ]);
         expect(String(result.instructions)).toContain("A note in chat memory is not enforcement.");
     expect(String(result.instructions)).toContain("Resume the original objective only after prevention is locked in.");
