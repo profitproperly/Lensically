@@ -1466,7 +1466,7 @@ if (!source.includes('from "./operatorSourceCardAdmissionService"')
   lifecycleErrors.push("operator_source_card_admission_service_import_or_binding_missing");
 }
 if (source.includes("const compatibilitySequenceLabel = normalizeOperatorText(payload.sequence_label, 120, true)")
-    || source.includes("const workflowConflict = getLensicallySavedWorkflowConflict(payload)")
+    || source.includes("Use the selected account's saved workflow before creating source cards. Do not create batch or multi-post source cards")
     || source.includes("sourceSelectionId = normalizeOperatorText(payload.source_selection_id, 120)")
     || source.includes("manifest_source_selection_id_or_saved_pattern_id_required")
     || source.includes("source_selection_workflow_mismatch")
