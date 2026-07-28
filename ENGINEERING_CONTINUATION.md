@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6w-source-candidate-batch-read-service
+active_checkpoint: p1-stage-6w-workflow-dispatch-failure
 repository_base_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
 production_sha: 98ee4aa16b3b907f72c00a049242a41f8979ce24
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6W source-candidate batch read service extraction.
+- Current checkpoint: P1 Stage 6W workflow-dispatch failure repair; Stage 6W validation is blocked until the workflow can dispatch again.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -859,7 +859,16 @@ Completed checkpoint — Stage 6V Manifest source-card backfill preparation read
 - Exact-SHA release passed in run `30378860110`.
 - Live production independently confirmed exact SHA `98ee4aa16b3b907f72c00a049242a41f8979ce24` with 75/75 public tools.
 
-Current sub-action — Stage 6W source-candidate batch read service extraction:
+ACTIVE P1 interrupt — Stage 6W workflow dispatch failure:
+
+- Incident ID: `906f8889-b2c6-48ae-8199-f5857ba5d281`.
+- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `42d2114d0cb89d0bebbea67c6246bb346e387b10`; no dispatch side effect was confirmed.
+- Precedence: this interrupt is the sole active checkpoint and blocks normal monolith work.
+- Required outcome: identify the exact workflow-definition or dispatch root cause, repair it, add permanent prevention, successfully dispatch and pass focused validation on the repaired exact SHA, then resume Stage 6W validation from the canonical checkpoint.
+- Stage 6W implementation remains preserved and may not be reverted or bypassed unless the root-cause repair requires a direct correction.
+
+Blocked sub-action — Stage 6W source-candidate batch read service extraction:
+
 
 Extract `get_source_candidate_batch` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
 
