@@ -16107,6 +16107,21 @@ function compactStartupDocument(path: string, file: { ok: boolean; status: numbe
   };
 }
 
+export function parseCanonicalContinuationMetadata(content: string | null): {
+  status: string;
+  contract: string | null;
+  active_job_id: string | null;
+  active_checkpoint: string | null;
+} {
+  return {
+    status: content?.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown",
+    contract: content?.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null,
+    active_job_id: content?.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null,
+    active_checkpoint: content?.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null,
+  };
+}
+
+
 function operatorStartupFallbackRoutes(): string[] {
   return [
     "Call one advertised direct typed Main tool for each external operation; do not use profile IDs, generic inputs envelopes, or wrapper routing.",
@@ -16137,20 +16152,17 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const sourcePaths = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", continuationPath];
   const docFiles = await Promise.all(sourcePaths.map((path) => getGithubFile(env, path)));
   const sourceDocuments = sourcePaths.map((path, index) => compactStartupDocument(path, docFiles[index]));
-  const continuationFile = docFiles[3];
-  const continuationStatus = continuationFile.content?.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown";
-  const continuationContract = continuationFile.content?.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null;
-  const activeJobId = continuationFile.content?.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null;
-  const activeCheckpoint = continuationFile.content?.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+    const continuationFile = docFiles[3];
+  const continuationMetadata = parseCanonicalContinuationMetadata(continuationFile.content);
   const canonicalContinuation = {
     ok: continuationFile.ok && continuationFile.content !== null,
     authority: "sole_canonical_repository_ledger",
     path: continuationPath,
     tool: "getEngineeringContinuation",
-    status: continuationStatus,
-    contract: continuationContract,
-    active_job_id: activeJobId,
-    active_checkpoint: activeCheckpoint,
+        status: continuationMetadata.status,
+    contract: continuationMetadata.contract,
+    active_job_id: continuationMetadata.active_job_id,
+    active_checkpoint: continuationMetadata.active_checkpoint,
     file_sha: continuationFile.sha,
     size: continuationFile.size,
     precedence_rule: "Read Authority and Precedence, Unified Job Queue, and Current Action. No chat, D1 work state, Growth Mission, action-closure receipt, or other document may override this ledger.",
@@ -20499,19 +20511,16 @@ async function handleOperatorMcpEngineeringTool(
     if (!file.ok || file.content === null) {
       return { ok: false, error: "canonical_continuation_unavailable", status: file.status, path };
     }
-    const status = file.content.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown";
-    const contract = file.content.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null;
-    const activeJobId = file.content.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null;
-    const activeCheckpoint = file.content.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null;
+        const metadata = parseCanonicalContinuationMetadata(file.content);
     return {
       ok: true,
       status_kind: "canonical_continuation",
       authority: "sole_canonical_repository_ledger",
       path,
-      status,
-      contract,
-      active_job_id: activeJobId,
-      active_checkpoint: activeCheckpoint,
+            status: metadata.status,
+      contract: metadata.contract,
+      active_job_id: metadata.active_job_id,
+      active_checkpoint: metadata.active_checkpoint,
       file_sha: file.sha,
       size: file.size,
       content: file.content,
