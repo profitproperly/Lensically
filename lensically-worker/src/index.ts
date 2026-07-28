@@ -139,6 +139,7 @@ import {
   composeOperatorDraftDecisionResponse,
   planOperatorDraftDecision,
 } from "./operatorDraftDecisionService";
+import { readOperatorActiveGates } from "./operatorActiveGateReadService";
 
 
 
@@ -14509,15 +14510,22 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(composeOperatorDraftDecisionResponse(decisionPlan, memory));
   }
 
-  if (toolName === "list_active_gates") {
-    const gates = await listOperatorGates(
-      env,
-      brand.brand_key,
-      payload.stage_scope ? normalizeOperatorStage(payload.stage_scope) : null,
-      normalizeOperatorMachineKey(payload.lane_key, "") || null,
-      normalizeOperatorMachineKey(payload.content_type, "") || null,
-    );
-    return operatorJsonResponse({ gates });
+    if (toolName === "list_active_gates") {
+    const activeGateRead = await readOperatorActiveGates({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      normalizeStage: normalizeOperatorStage,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      listGates: async ({ brandKey, stageScope, laneKey, contentType }) => await listOperatorGates(
+        env,
+        brandKey,
+        stageScope,
+        laneKey,
+        contentType,
+      ),
+    });
+    return operatorJsonResponse(activeGateRead);
   }
 
   if (toolName === "create_or_update_gate" || toolName === "promote_memory_to_gate") {

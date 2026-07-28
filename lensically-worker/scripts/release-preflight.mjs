@@ -115,6 +115,8 @@ const operatorDraftShownTransitionService = read("src/operatorDraftShownTransiti
 const operatorDraftShownTransitionServiceTests = read("test/operatorDraftShownTransitionService.spec.ts");
 const operatorDraftDecisionService = read("src/operatorDraftDecisionService.ts");
 const operatorDraftDecisionServiceTests = read("test/operatorDraftDecisionService.spec.ts");
+const operatorActiveGateReadService = read("src/operatorActiveGateReadService.ts");
+const operatorActiveGateReadServiceTests = read("test/operatorActiveGateReadService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -342,6 +344,9 @@ if (!workflow.includes("test/operatorDraftShownTransitionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorDraftDecisionService.spec.ts")) {
   errors.push("operator_draft_decision_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorActiveGateReadService.spec.ts")) {
+  errors.push("operator_active_gate_read_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1902,6 +1907,29 @@ if (!operatorDraftDecisionServiceTests.includes("returns the exact required-ID r
     || !operatorDraftDecisionServiceTests.includes("composes the exact persisted decision response with nullable memory identity")) {
   lifecycleErrors.push("operator_draft_decision_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorActiveGateReadService"')
+    || !source.includes("readOperatorActiveGates({")
+    || !source.includes("listGates: async ({ brandKey, stageScope, laneKey, contentType })")
+    || !source.includes("return operatorJsonResponse(activeGateRead)")) {
+  lifecycleErrors.push("operator_active_gate_read_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "list_active_gates") {
+    const gates = await listOperatorGates(`)
+    || source.includes("payload.stage_scope ? normalizeOperatorStage(payload.stage_scope) : null")) {
+  lifecycleErrors.push("operator_active_gate_read_service_returned_to_index");
+}
+if (!operatorActiveGateReadService.includes("export async function readOperatorActiveGates")
+    || !operatorActiveGateReadService.includes("dependencies.normalizeStage")
+    || !operatorActiveGateReadService.includes("dependencies.normalizeMachineKey")
+    || !operatorActiveGateReadService.includes("dependencies.listGates")
+    || !operatorActiveGateReadService.includes("return { gates }")) {
+  lifecycleErrors.push("operator_active_gate_read_service_module_incomplete");
+}
+if (!operatorActiveGateReadServiceTests.includes("passes null scopes when optional filters are absent")
+    || !operatorActiveGateReadServiceTests.includes("normalizes every supplied scope and returns the exact gates response")) {
+  lifecycleErrors.push("operator_active_gate_read_service_tests_incomplete");
+}
+
 
 
 
