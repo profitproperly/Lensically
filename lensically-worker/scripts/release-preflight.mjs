@@ -87,6 +87,9 @@ const operatorManifestSourceDrawService = read("src/operatorManifestSourceDrawSe
 const operatorManifestSourceDrawServiceTests = read("test/operatorManifestSourceDrawService.spec.ts");
 const operatorPublishedPostLineageAuditService = read("src/operatorPublishedPostLineageAuditService.ts");
 const operatorPublishedPostLineageAuditServiceTests = read("test/operatorPublishedPostLineageAuditService.spec.ts");
+const operatorManifestSourceCardBackfillService = read("src/operatorManifestSourceCardBackfillService.ts");
+const operatorManifestSourceCardBackfillServiceTests = read("test/operatorManifestSourceCardBackfillService.spec.ts");
+
 
 
 
@@ -257,6 +260,10 @@ if (!workflow.includes("test/operatorManifestSourceDrawService.spec.ts")) {
 if (!workflow.includes("test/operatorPublishedPostLineageAuditService.spec.ts")) {
   errors.push("operator_published_post_lineage_audit_service_workflow_gate_missing");
 }
+if (!workflow.includes("test/operatorManifestSourceCardBackfillService.spec.ts")) {
+  errors.push("operator_manifest_source_card_backfill_service_workflow_gate_missing");
+}
+
 
 
 
@@ -1319,6 +1326,32 @@ if (!operatorPublishedPostLineageAuditServiceTests.includes("applies exact defau
     || !operatorPublishedPostLineageAuditServiceTests.includes("counts mixed results and omits saved-pattern identity for other source types")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorManifestSourceCardBackfillService"')
+    || !source.includes("createAllMissingManifestSourceCards({")
+    || !source.includes("callTool: async (internalToolName, internalPayload)")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_service_import_or_binding_missing");
+}
+if (source.includes("const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 4)), 1), 4)")
+    || source.includes("const patterns = Array.isArray(prepared.patterns)")
+    || source.includes("for (const pattern of patterns)")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_service_returned_to_index");
+}
+if (!operatorManifestSourceCardBackfillService.includes("export async function createAllMissingManifestSourceCards")
+    || !operatorManifestSourceCardBackfillService.includes("dependencies.callTool")
+    || !operatorManifestSourceCardBackfillService.includes('"prepare_manifest_source_card_backfill"')
+    || !operatorManifestSourceCardBackfillService.includes('"create_source_card"')
+    || !operatorManifestSourceCardBackfillService.includes("manifest_source_card_creation_failed")
+    || !operatorManifestSourceCardBackfillService.includes("continuation_required")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_service_module_incomplete");
+}
+if (!operatorManifestSourceCardBackfillServiceTests.includes("rejects non-Manifest brands before any internal tool call")
+    || !operatorManifestSourceCardBackfillServiceTests.includes("maps prepare failures without starting source-card creation")
+    || !operatorManifestSourceCardBackfillServiceTests.includes("constructs source-faithful payloads sequentially and returns ready continuation state")
+    || !operatorManifestSourceCardBackfillServiceTests.includes("stops on the first source-card failure with exact partial evidence")
+    || !operatorManifestSourceCardBackfillServiceTests.includes("returns complete state when verification finds no remaining patterns")) {
+  lifecycleErrors.push("operator_manifest_source_card_backfill_service_tests_incomplete");
+}
+
 
 
 

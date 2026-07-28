@@ -119,6 +119,8 @@ import { listOperatorSourceCandidates } from "./operatorSourceCandidateListServi
 import { excludeOperatorSavedPatternSource } from "./operatorSavedPatternSourceExclusionService";
 import { drawOperatorManifestSourceBatch } from "./operatorManifestSourceDrawService";
 import { auditOperatorPublishedPostLineage } from "./operatorPublishedPostLineageAuditService";
+import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCardBackfillService";
+
 
 
 
@@ -13681,129 +13683,24 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(recovered.payload, recovered.status);
   }
 
-        if (toolName === "create_all_missing_manifest_source_cards") {
-    if (brand.brand_key !== "manifest_mental") {
-      return operatorJsonResponse({ success: false, error: "manifest_mental_required" }, 400);
-    }
-    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 4)), 1), 4);
-    const baseOperationId = normalizeOperatorText(payload.operation_id, 160, true)
-      ?? `manifest-source-card-backfill-${Date.now()}`;
-    const prepared = await callOperatorToolForMcp(request, env, "prepare_manifest_source_card_backfill", {
-      brand_key: brand.brand_key,
-      limit,
-      proceed_confirmed: true,
-      operation_id: `${baseOperationId}-prepare`,
+          if (toolName === "create_all_missing_manifest_source_cards") {
+    const backfill = await createAllMissingManifestSourceCards({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      manifestBrandKey: "manifest_mental",
+      normalizeText: normalizeOperatorText,
+      nowMillis: () => Date.now(),
+      callTool: async (internalToolName, internalPayload) => await callOperatorToolForMcp(
+        request,
+        env,
+        internalToolName,
+        internalPayload,
+      ),
     });
-    const prepareHttpStatus = Math.trunc(Number(prepared.http_status ?? 200));
-    if (prepareHttpStatus >= 400 || prepared.ok === false || prepared.success === false || prepared.error) {
-      return operatorJsonResponse({
-        success: false,
-        status: "interrupted",
-        error: prepared.error ?? "manifest_source_card_backfill_prepare_failed",
-        created_count: 0,
-        reused_count: 0,
-        remaining_count: Number(prepared.uncarded_count ?? 0),
-      }, prepareHttpStatus >= 400 ? prepareHttpStatus : 500);
-    }
-    const patterns = Array.isArray(prepared.patterns)
-      ? prepared.patterns.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
-      : [];
-    let createdCount = 0;
-    let reusedCount = 0;
-    const cards: Array<Record<string, unknown>> = [];
-    for (const pattern of patterns) {
-      const savedPatternId = Math.trunc(Number(pattern.saved_pattern_id ?? 0));
-      if (savedPatternId <= 0) continue;
-      const sourceText = String(pattern.post_text ?? "").replace(/\s+/g, " ").trim();
-      const title = sourceText.slice(0, 180) || `Saved Pattern ${savedPatternId}`;
-      const cardResult = await callOperatorToolForMcp(request, env, "create_source_card", {
-        brand_key: brand.brand_key,
-        saved_pattern_id: savedPatternId,
-        sequence_label: `saved_pattern_${savedPatternId}`,
-        title,
-        source_mechanism: `Preserve the Saved Pattern's central premise, delivery structure, tone, and payoff. Canonical source: ${sourceText.slice(0, 1400)}`,
-        required_product: `Deliver the same emotional or practical audience reward as this Saved Pattern without replacing its premise: ${sourceText.slice(0, 1400)}`,
-        transformation_contract: {
-          must_preserve_function: [
-            "Preserve the Saved Pattern's central premise and audience reward.",
-            "Preserve its recognizable delivery structure, tone, and payoff.",
-            "Keep the adaptation close to the source rather than inventing an adjacent concept.",
-          ],
-          audience_reward: "The same emotional or practical reward delivered by the Saved Pattern.",
-          notes: "Use only slight wording changes. Do not invent scenes, characters, activities, settings, events, metaphors, or premises.",
-        },
-        forbidden_surfaces: [],
-        pass_conditions: [
-          "The adaptation remains grounded in the Saved Pattern's premise, structure, tone, and payoff.",
-          "The same audience reward remains intact.",
-          "Only slight wording changes are made and no new premise is introduced.",
-        ],
-        fail_conditions: [
-          "The central premise or payoff is replaced.",
-          "The adaptation becomes generic advice or an unrelated concept.",
-          "A new scene, character, activity, setting, event, metaphor, or premise is invented.",
-          "The complete source text is copied exactly.",
-        ],
-        recommended_direction: "Create a close, source-faithful adaptation with the same hook function, meaning, tone, and payoff.",
-        proceed_confirmed: true,
-        operation_id: `${baseOperationId}-pattern-${savedPatternId}`,
-      });
-      const cardHttpStatus = Math.trunc(Number(cardResult.http_status ?? 200));
-      if (cardHttpStatus >= 400 || cardResult.ok === false || cardResult.success === false || cardResult.error) {
-        const remainingBeforeStop = Math.max(
-          0,
-          Number(prepared.uncarded_count ?? patterns.length) - createdCount - reusedCount,
-        );
-        return operatorJsonResponse({
-          success: false,
-          status: "interrupted",
-          error: cardResult.error ?? "manifest_source_card_creation_failed",
-          failed_saved_pattern_id: savedPatternId,
-          created_count: createdCount,
-          reused_count: reusedCount,
-          remaining_count: remainingBeforeStop,
-          cards,
-        }, cardHttpStatus >= 400 ? cardHttpStatus : 500);
-      }
-      const reused = cardResult.reused_existing === true;
-      if (reused) reusedCount += 1;
-      else createdCount += 1;
-      cards.push({
-        saved_pattern_id: savedPatternId,
-        source_card_id: cardResult.source_card_id ?? null,
-        source_selection_id: cardResult.source_selection_id ?? null,
-        status: cardResult.status ?? null,
-        reused_existing: reused,
-      });
-    }
-    const after = await callOperatorToolForMcp(request, env, "prepare_manifest_source_card_backfill", {
-      brand_key: brand.brand_key,
-      limit: 1,
-      proceed_confirmed: true,
-      operation_id: `${baseOperationId}-verify`,
-    });
-    const remainingCount = Math.max(0, Number(after.uncarded_count ?? 0));
-    const totalCount = Number(after.saved_pattern_total ?? prepared.saved_pattern_total ?? 0);
-    const totalCardedAfter = Math.max(0, totalCount - remainingCount);
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      status: remainingCount === 0 ? "complete" : "ready",
-      saved_pattern_total: totalCount,
-      already_carded_before: Number(prepared.already_carded_count ?? 0),
-      processed_count: cards.length,
-      created_count: createdCount,
-      reused_count: reusedCount,
-      total_carded_after: totalCardedAfter,
-      remaining_count: remainingCount,
-      batch_limit: limit,
-      cards,
-      continuation_required: remainingCount > 0,
-      next_action: remainingCount > 0
-        ? "Call create_all_missing_manifest_source_cards again with a new operation_id."
-        : null,
-    });
+    return operatorJsonResponse(backfill.body, backfill.status);
   }
+
 
   if (toolName === "prepare_manifest_source_card_backfill") {
 
