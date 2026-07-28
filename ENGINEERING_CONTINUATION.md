@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 14c3bc78a4a56bf1123f5b3688d2762dda238160
-production_sha: 14c3bc78a4a56bf1123f5b3688d2762dda238160
+repository_base_sha: 6856effbdf57781b6de6b253158995ce639325bb
+production_sha: 6856effbdf57781b6de6b253158995ce639325bb
 
 
 
@@ -752,22 +752,34 @@ Completed checkpoint — Stage 6P production-board read service extraction:
 - Exact-SHA release passed in run `30319110116`.
 - Live production independently confirmed exact SHA `14c3bc78a4a56bf1123f5b3688d2762dda238160` with 75/75 public tools.
 
-Current sub-action — Stage 6Q source-candidate list service extraction:
+Completed checkpoint — Stage 6Q source-candidate list service extraction:
 
-Extract `list_source_candidates` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorSourceCandidateListService.ts` as the dependency-injected authority for source-type normalization, pagination defaults, candidate passthrough, counts, continuation state, and Manifest-only eligibility metadata.
+- Reduced `list_source_candidates` in `src/index.ts` to the existing source-candidate retrieval helper, selected brand closure, Manifest threshold constant, and transport adapters.
+- Added `test/operatorSourceCandidateListService.spec.ts` and permanent push/release ownership gates.
+- Push validation passed in run `30320010951`.
+- All eight Operator shards passed in run `30320211636`.
+- Exact-SHA release passed in run `30320260146`.
+- Live production independently confirmed exact SHA `6856effbdf57781b6de6b253158995ce639325bb` with 75/75 public tools.
 
-- source-type array normalization to strings
-- numeric limit and offset defaults
-- exact source-candidate retrieval inputs
-- returned count, total count, deterministic `has_more` pagination state, and candidate passthrough
-- Manifest-only minimum verified-like eligibility metadata and null behavior for other brands
-- exact response keys and no mutation
+Current sub-action — Stage 6R saved-pattern source exclusion service extraction:
 
-Keep source-candidate retrieval/query mechanics, brand object access, Manifest threshold constant, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract the active non-destructive path of `delete_saved_pattern_source` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- positive integer pattern identity and explicit owner approval containing `delete`
+- exact 400 rejection response with no reads or mutation
+- account-scoped saved-pattern lookup and exact not-found response
+- canonical URL and Threads post-ID identity precedence
+- durable active source-exclusion upsert with the owner reason
+- active source-selection skip and unresolved daily-claim `source_deleted` state
+- exact historical-preservation response, source identity, and skipped-selection count
+- no destructive deletion of saved patterns, source cards, generations, inventory, gates, or analytics
+
+Keep pattern lookup SQL, URL canonicalization, Threads post-ID extraction, UUID creation, exclusion/selection/claim D1 writes, account and brand identity, constants, and shared transport as explicit `index.ts` adapters. Preserve the retired destructive path as unreachable historical documentation. Add focused deterministic tests and permanent ownership gates before exact-SHA release. Do not invoke the product deletion tool during engineering.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6Q, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6R, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
