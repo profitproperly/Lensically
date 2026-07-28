@@ -131,6 +131,7 @@ const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
+const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 
 const agentRules = read("../AGENTS.md");
 const currentState = read("../CURRENT_STATE.md");
@@ -285,6 +286,13 @@ if (!testSyntaxValidator.includes('import { transform } from "esbuild"')
     || !testSyntaxValidator.includes("test_syntax_invalid")) {
   errors.push("test_syntax_validator_incomplete");
 }
+if (!workflowLint.includes('name: Lensically workflow lint')
+    || !workflowLint.includes('".github/workflows/lensically-engineering.yml"')
+    || !workflowLint.includes("YAML.parse_file")
+    || !workflowLint.includes("workflow_dispatch:")) {
+  errors.push("independent_workflow_yaml_watchdog_incomplete");
+}
+
 
 
 
