@@ -136,7 +136,7 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
     errors.push("release_migration_apply_missing");
   }
-  if (!releaseWorkflow.includes("\n      - name: Apply exact-head database migrations\n        working-directory: lensically-worker")) {
+    if (!releaseWorkflow.includes("\n      - name: Apply exact-head database migrations\n        if: steps.release_scope.outputs.migrations_changed == 'true'\n        working-directory: lensically-worker")) {
     errors.push("release_migration_step_indentation_invalid");
   }
 
