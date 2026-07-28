@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 6856effbdf57781b6de6b253158995ce639325bb
-production_sha: 6856effbdf57781b6de6b253158995ce639325bb
+repository_base_sha: a7ad935e17e7617d7bb4959791648605414b5b5b
+production_sha: a7ad935e17e7617d7bb4959791648605414b5b5b
 
 
 
@@ -762,24 +762,36 @@ Completed checkpoint — Stage 6Q source-candidate list service extraction:
 - Exact-SHA release passed in run `30320260146`.
 - Live production independently confirmed exact SHA `6856effbdf57781b6de6b253158995ce639325bb` with 75/75 public tools.
 
-Current sub-action — Stage 6R saved-pattern source exclusion service extraction:
+Completed checkpoint — Stage 6R saved-pattern source exclusion service extraction:
 
-Extract the active non-destructive path of `delete_saved_pattern_source` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorSavedPatternSourceExclusionService.ts` as the dependency-injected authority for explicit owner admission, pattern identity, source identity precedence, durable exclusion, active selection/claim retirement, historical preservation, and exact responses.
+- Reduced the active `delete_saved_pattern_source` path in `src/index.ts` to explicit account-scoped lookup, URL/post-ID helpers, UUID, exclusion/selection/claim D1 writes, brand/account constants, and transport adapters.
+- Preserved the retired destructive deletion path as unreachable historical documentation and added a permanent release gate for that retirement marker.
+- Added `test/operatorSavedPatternSourceExclusionService.spec.ts` and permanent push/release ownership gates.
+- No product deletion tool was invoked during engineering.
+- Push validation passed in run `30321243932`.
+- All eight Operator shards passed in run `30321427919`.
+- Exact-SHA release passed in run `30321485440`.
+- Live production independently confirmed exact SHA `a7ad935e17e7617d7bb4959791648605414b5b5b` with 75/75 public tools.
 
-- positive integer pattern identity and explicit owner approval containing `delete`
-- exact 400 rejection response with no reads or mutation
-- account-scoped saved-pattern lookup and exact not-found response
-- canonical URL and Threads post-ID identity precedence
-- durable active source-exclusion upsert with the owner reason
-- active source-selection skip and unresolved daily-claim `source_deleted` state
-- exact historical-preservation response, source identity, and skipped-selection count
-- no destructive deletion of saved patterns, source cards, generations, inventory, gates, or analytics
+Current sub-action — Stage 6S Manifest source-draw batch service extraction:
 
-Keep pattern lookup SQL, URL canonicalization, Threads post-ID extraction, UUID creation, exclusion/selection/claim D1 writes, account and brand identity, constants, and shared transport as explicit `index.ts` adapters. Preserve the retired destructive path as unreachable historical documentation. Add focused deterministic tests and permanent ownership gates before exact-SHA release. Do not invoke the product deletion tool during engineering.
+Extract `draw_source_candidate_batch` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- Manifest-only admission and exact unsupported-brand response
+- required normalized workflow-session identity and active-session admission
+- idempotent reuse of the latest existing batch and exact selection serialization
+- source-type normalization, qualified-pool construction, and exact insufficient-pool response
+- uniform random selection without replacement with the fixed daily draw size
+- batch/selection identities, draw order, metrics snapshots, metadata flags, and exact response keys
+- atomic batch and selection persistence followed by workflow-stage advancement
+- no mutation for unsupported brand, missing/inactive session, existing-batch reuse, or insufficient pool
+
+Keep active-session/batch/selection SQL, qualified-pool construction, shuffling, UUID/time creation, JSON serialization, atomic D1 persistence, workflow-stage update, brand identity, constants, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6R, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6S, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
