@@ -234,12 +234,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Checkout exact head
+            - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.sha }}
 
-            - name: Setup Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
