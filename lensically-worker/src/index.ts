@@ -14148,7 +14148,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }
     await env.DB.batch(sourceCardStatements);
 
-        const card = await getOperatorSourceCard(env, insertValues.brandKey, insertValues.sourceCardId);
+            const card = await getOperatorSourceCard(env, brand.brand_key, insertValues.sourceCardId);
     const persistenceResponse = composeOperatorSourceCardPersistenceResponse({
       plan: persistencePlan,
       persistedCard: card,
