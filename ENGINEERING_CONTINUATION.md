@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 5b992795837f960799afe44f074f9e224d0c96bd
-production_sha: 5b992795837f960799afe44f074f9e224d0c96bd
+repository_base_sha: 426734718a096de6b5e2675ba9ca996738c9cfee
+production_sha: 426734718a096de6b5e2675ba9ca996738c9cfee
 
 
 
@@ -719,21 +719,35 @@ Completed checkpoint — Stage 6M Manifest review-batch scheduling service extra
 - Exact-SHA release passed in run `30315179170`.
 - Live production independently confirmed exact SHA `5b992795837f960799afe44f074f9e224d0c96bd` with 75/75 public tools.
 
-Current sub-action — Stage 6N workflow-session start service extraction:
+Completed checkpoint — Stage 6N workflow-session start service extraction:
 
-Extract `start_workflow_session` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorWorkflowSessionStartService.ts` as the dependency-injected authority for active-session reuse, current-stage guidance, canonical template fallback, optional notes, new-session admission, idempotency fields, and exact response composition.
+- Reduced `start_workflow_session` in `src/index.ts` to explicit active-session lookup, typed brand key, UUID, workflow-template payload, session insert SQL, normalization, and transport adapters.
+- Added `test/operatorWorkflowSessionStartService.spec.ts` and permanent push/release ownership gates.
+- Corrected the canonical brand-key lookup adapter before release.
+- Push validation passed in run `30316220624`.
+- All eight Operator shards passed in run `30316438088`.
+- Exact-SHA release passed in run `30316502002`.
+- Live production independently confirmed exact SHA `426734718a096de6b5e2675ba9ca996738c9cfee` with 75/75 public tools.
+- The non-authoritative push-time Cloudflare auto-build check remained failed, while the protected migration-first release, Worker/web deployment, cron verification, runtime verification, and independent live MCP verification all passed on the exact SHA.
 
-- active-session reuse and exact idempotency fields
-- current-stage normalization and account-selection next-stage guidance
-- workflow-template response payload on both reused and new sessions
-- new session identity, canonical template fallback, optional notes, active/account-selection persistence state, and exact response keys
-- no duplicate session creation when an active session already exists
+Current sub-action — Stage 6O context-admission service extraction:
 
-Keep active-session lookup, UUID creation, workflow-template payload, session insert SQL, text normalization, template constant, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `admit_context` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- section-array admission and deterministic normalization of section keys
+- returned, total, limit, offset, and offsets-read pagination coverage
+- explicit or inferred `has_more` and `coverage_status`
+- source and snapshot identity fallback behavior
+- aggregate partial-context detection and exact warning text
+- admission identity, workflow-session/snapshot/scope/freshness/notes normalization, durable persistence payload, and exact response keys
+- no persistence before the normalized admission record is complete
+
+Keep UUID creation, context-admission insert SQL, JSON serialization, text/machine-key normalization, brand identity, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6N, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6O, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
