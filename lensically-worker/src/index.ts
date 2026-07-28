@@ -114,6 +114,7 @@ import { scheduleOperatorManifestReviewBatch } from "./operatorManifestReviewBat
 import { startOperatorWorkflowSession } from "./operatorWorkflowSessionStartService";
 import { admitOperatorContext } from "./operatorContextAdmissionService";
 import { readOperatorProductionBoard } from "./operatorProductionBoardService";
+import { listOperatorSourceCandidates } from "./operatorSourceCandidateListService";
 
 
 
@@ -13277,20 +13278,28 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(boardResult);
   }
 
-        if (toolName === "list_source_candidates") {
-    const sourceTypes = Array.isArray(payload.source_types)
-      ? payload.source_types.map((value) => String(value))
-      : [];
-    const limit = Number(payload.limit ?? 50);
-    const offset = Number(payload.offset ?? 0);
-    const { candidates, total_count: totalCount } = await listSourceCandidatesForBrand(env, brand, sourceTypes, limit, offset);
-    return operatorJsonResponse({
-      candidates,
-      returned_count: candidates.length,
-      total_count: totalCount,
-      has_more: offset + candidates.length < totalCount,
-      eligibility_min_likes: brand.brand_key === "manifest_mental" ? MANIFEST_SOURCE_MIN_VERIFIED_LIKES : null,
+          if (toolName === "list_source_candidates") {
+    const candidateResult = await listOperatorSourceCandidates({
+      brandKey: brand.brand_key,
+      payload,
+    }, {
+      manifestBrandKey: "manifest_mental",
+      manifestSourceMinVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      listCandidates: async (input) => {
+        const result = await listSourceCandidatesForBrand(
+          env,
+          brand,
+          input.sourceTypes,
+          input.limit,
+          input.offset,
+        );
+        return {
+          candidates: result.candidates,
+          totalCount: result.total_count,
+        };
+      },
     });
+    return operatorJsonResponse(candidateResult);
   }
 
   if (toolName === "delete_saved_pattern_source") {
