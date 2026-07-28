@@ -80,8 +80,8 @@ describe("readOperatorSourceCandidateBatch", () => {
         disposition_reason: "daily_batch",
         disposition_at: "2026-07-29T08:00:00.000Z",
         workflow_sequence: "12",
-        selected_at: "2026-07-29T07:59:00.000Z",
-      }])),
+                selected_at: "2026-07-29T07:59:00.000Z",
+      }]),
     });
 
     const result = await readOperatorSourceCandidateBatch({

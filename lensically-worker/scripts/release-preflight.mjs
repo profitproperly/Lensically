@@ -129,6 +129,7 @@ const capabilityLifecycle = JSON.parse(read("src/systemDirectory/capabilityLifec
 const tests = read("test/operatorMode.spec.ts");
 const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
+const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 
 const agentRules = read("../AGENTS.md");
@@ -275,6 +276,16 @@ if (!workflow.includes("test/operatorManifestSourceCardBackfillPreparationServic
 if (!workflow.includes("test/operatorSourceCandidateBatchReadService.spec.ts")) {
   errors.push("operator_source_candidate_batch_read_service_workflow_gate_missing");
 }
+if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
+  errors.push("test_syntax_validation_workflow_coverage_missing");
+}
+if (!testSyntaxValidator.includes('import { transform } from "esbuild"')
+    || !testSyntaxValidator.includes("await collect(testRoot)")
+    || !testSyntaxValidator.includes("await transform(source")
+    || !testSyntaxValidator.includes("test_syntax_invalid")) {
+  errors.push("test_syntax_validator_incomplete");
+}
+
 
 
 
