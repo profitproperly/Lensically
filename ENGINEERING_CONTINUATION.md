@@ -6,8 +6,8 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: p1-stage-6ad-cloudflare-assets-upload-failure
-repository_base_sha: 7d05f33689257b258bf92fd8c4e0e9e122d0a593
+active_checkpoint: p1-stage-6ad-retry-workflow-dispatch-failure
+repository_base_sha: 20fb6e1ba2484c287f49bc6f7d7e5d5747266be7
 production_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: P1 Stage 6AD Cloudflare assets-upload release failure repair; Stage 6AD release closure is blocked until bounded transient retry prevention is live-verified.
+- Current checkpoint: P1 Stage 6AD retry-workflow dispatch failure repair; the underlying Cloudflare assets-upload P1 and Stage 6AD release closure remain blocked until workflow dispatch and bounded transient retry are both live-verified.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -984,7 +984,15 @@ Completed checkpoint — Stage 6AC generation-run admission and canonical-contex
 - Hardened exact-SHA release and live verification passed in run `30399390663`.
 - Live production independently confirmed exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6` with 75/75 public tools.
 
-ACTIVE P1 interrupt — Stage 6AD Cloudflare assets-upload release failure:
+ACTIVE P1 interrupt — Stage 6AD retry-workflow dispatch failure:
+
+- Incident ID: `c4ed0a57-d40c-4559-9b4f-e4efbcccc408`.
+- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `20fb6e1ba2484c287f49bc6f7d7e5d5747266be7`; no dispatch side effect was confirmed.
+- Precedence: this workflow-definition failure is the sole active checkpoint because it blocks validation of the underlying Cloudflare deploy retry repair.
+- Required outcome: identify and repair the exact workflow YAML/schema defect, extend permanent structural prevention if the existing validator missed a new class, prove independent workflow lint and manual dispatch on the repaired exact SHA, then resume the preserved Cloudflare retry validation and Stage 6AD release.
+- The bounded Wrangler retry implementation, tests, underlying Cloudflare P1, and all Stage 6AD evidence remain preserved.
+
+Blocked underlying P1 — Stage 6AD Cloudflare assets-upload release failure:
 
 - Incident ID: `42a3220d-8e39-4d98-a55e-249824fd71e6`.
 - Observed: release run `30400293362` passed exact-SHA identity and scope resolution but `wrangler deploy` failed before deployment while creating `/assets-upload-session` with Cloudflare API error code `10013` and an explicit unknown/transient error response.
