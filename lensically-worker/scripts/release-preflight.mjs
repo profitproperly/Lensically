@@ -1161,9 +1161,12 @@ if (!source.includes('from "./operatorProductionBoardService"')
     || !source.includes("parseJsonString: safeParseJsonString")) {
   lifecycleErrors.push("operator_production_board_service_import_or_binding_missing");
 }
-if (source.includes("items: (rows.results ?? []).map")
-    || source.includes("priority: row.priority === null")
-    || source.includes("evidence: safeParseJsonString")) {
+if (source.includes(`if (toolName === "get_production_board") {
+    const rows = await env.DB.prepare(`)
+    || source.includes(").bind(brand.brand_key, normalizeOperatorText(payload.workflow_session_id, 120, true), normalizeOperatorText(payload.workflow_session_id, 120, true)).all<Record<string, unknown>>();")
+    || source.includes(`return operatorJsonResponse({
+      brand_key: brand.brand_key,
+      items: (rows.results ?? []).map((row) => ({`)) {
   lifecycleErrors.push("operator_production_board_service_returned_to_index");
 }
 if (!operatorProductionBoardService.includes("export async function readOperatorProductionBoard")
