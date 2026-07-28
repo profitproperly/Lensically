@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6t-published-post-lineage-audit-service
+active_checkpoint: stage-6u-manifest-source-card-backfill-service
 repository_base_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
 production_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6T published-post lineage audit service extraction.
+- Current checkpoint: Stage 6U Manifest source-card backfill orchestration service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -824,23 +824,36 @@ Completed checkpoint — Stage 6S Manifest source-draw batch service extraction:
 - Exact-SHA release passed in run `30323430663`.
 - Live production independently confirmed exact SHA `3778d498c5b0de62c830e1d9f3fe80c0200a0aba` with 75/75 public tools.
 
-Current sub-action — Stage 6T published-post lineage audit service extraction:
+Completed checkpoint — Stage 6T published-post lineage audit service extraction:
 
-Extract `audit_published_post_lineage` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
+- Added `src/operatorPublishedPostLineageAuditService.ts` as the dependency-injected authority for bounded criteria normalization, deterministic missing-stage classification, stable metrics and lineage serialization, numeric saved-pattern and scheduled-post identifiers, and exact aggregate counts.
+- Reduced `audit_published_post_lineage` in `src/index.ts` to archive/workflow/metric readiness, account-scoped winner and joined-lineage SQL, row retrieval, brand identity, and transport adapters.
+- Added `test/operatorPublishedPostLineageAuditService.spec.ts` and permanent push/release ownership gates.
+- Focused validation passed in run `30376255584`.
+- Push validation passed in run `30376240050`.
+- All eight Operator shards passed in run `30376560945`.
+- Exact-SHA release passed in run `30376685998`.
+- Live production independently confirmed exact SHA `087dd043a4b58f8f2c9e51d759354afe5b15ce75` with 75/75 public tools.
 
-- archive, workflow, and metric-snapshot table readiness before reading
-- bounded `minimum_likes`, `days`, and `limit` normalization with exact defaults and limits
-- account-scoped winner ordering and joined source, source-card, generation-run, draft, scheduled-post, and metric lineage
-- deterministic missing-stage classification for source, source card, generation run, draft, scheduled post, and metrics
-- stable metrics and lineage serialization, including numeric saved-pattern and scheduled-post identifiers
-- exact complete/incomplete counts, criteria, brand identity, and response keys
-- no product mutation
+Current sub-action — Stage 6U Manifest source-card backfill orchestration service extraction:
 
-Keep table readiness, winner/join SQL, brand/account identifiers, row retrieval, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `create_all_missing_manifest_source_cards` from `handleOperatorTool` into a focused dependency-injected orchestration service while preserving:
+
+- Manifest-only admission
+- bounded batch-limit normalization and stable operation-ID fallback
+- prepare-call invocation, HTTP-status normalization, interruption mapping, and remaining-count preservation
+- valid Saved Pattern filtering and deterministic sequential processing
+- exact source-text normalization, title fallback, source-faithful source-card payload construction, and per-pattern idempotency keys
+- first-failure stop behavior with created, reused, remaining, failed-pattern, and completed-card evidence
+- final verification call, exact total/carded/remaining calculations, completion status, continuation flag, and next action
+- no direct database or product mutation
+
+Keep internal MCP invocation, shared text normalization, clock access, brand identity, and HTTP transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6T, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Complete Stage 6U, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
 - Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
 - After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
@@ -869,7 +882,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6T
+6. Product-service extraction — ACTIVE at Stage 6U
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
