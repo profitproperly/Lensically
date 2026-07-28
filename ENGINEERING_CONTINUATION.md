@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6af-generation-draft-gate-and-persistence
-repository_base_sha: d4764aa8c0e6f9c316f3f611affcf453d554eb90
-production_sha: d4764aa8c0e6f9c316f3f611affcf453d554eb90
+active_checkpoint: stage-6ag-draft-shown-transition-and-inventory
+repository_base_sha: f8359287495da591f5ba74cd1635e8523d7b1d12
+production_sha: f8359287495da591f5ba74cd1635e8523d7b1d12
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AF generation-draft gate and persistence-planning service extraction.
+- Current checkpoint: Stage 6AG draft-shown transition and inventory-planning service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1012,18 +1012,28 @@ Completed checkpoint — Stage 6AE generation-draft admission and idempotency se
 - Hardened exact-SHA release and live verification passed in run `30403084297`.
 - Live production independently confirmed exact SHA `d4764aa8c0e6f9c316f3f611affcf453d554eb90` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AF generation-draft gate and persistence-planning service extraction:
+Completed checkpoint — Stage 6AF generation-draft gate and persistence-planning service extraction:
 
-Extract the remaining deterministic `submit_candidate_draft` and `save_self_rejected_draft` logic into a focused dependency-injected service while preserving:
+- Added `src/operatorGenerationDraftPersistencePlanningService.ts` as the dependency-injected authority for candidate versus self-rejected status selection, draft-index and context normalization, candidate-only gate orchestration, normalized insert values, and final response composition with repair guidance.
+- Reduced the remaining `submit_candidate_draft` and `save_self_rejected_draft` branch in `src/index.ts` to draft ID generation, gate and normalization adapters, the unchanged draft INSERT statement, account and Threads identity, and HTTP transport.
+- Added `test/operatorGenerationDraftPersistencePlanningService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Focused validation passed in run `30403512520`.
+- Push validation passed in run `30403503357`.
+- All eight Operator shards passed in run `30403796036`.
+- Hardened exact-SHA release and live verification passed in run `30403912812`.
+- Live production independently confirmed exact SHA `f8359287495da591f5ba74cd1635e8523d7b1d12` with 75/75 public tools.
 
-- candidate versus self-rejected status selection
-- normalized draft index, strategy, and analysis records
-- candidate-only gate execution with the exact source-card, draft, lane, analysis, and model-gate inputs
-- deterministic self-rejected no-gate defaults
-- normalized draft insert values for rejection reason, score, strategy/analysis, gate summary, showable flag, and metadata
-- final response composition including repair guidance derived from blocking failures
+ACTIVE checkpoint — Stage 6AG draft-shown transition and inventory-planning service extraction:
 
-Keep draft ID generation, draft insert SQL and D1 execution, account and Threads identifiers, the gate runner, shared text/machine-key/JSON normalizers, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the deterministic `mark_draft_shown` workflow into a focused dependency-injected service while preserving:
+
+- normalized draft ID admission and exact required-field rejection
+- account-scoped draft retrieval and exact not-found response
+- idempotent reuse for shown, approved, scheduled, and published drafts
+- showable and allowed-transition admission with the exact rejection payload
+- deterministic status-update intent, inventory-write intent, and success response
+
+Keep draft retrieval, status-update SQL and D1 execution, inventory persistence, brand identity, shared normalization, transition validation, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 
 
@@ -1061,7 +1071,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AF
+6. Product-service extraction — ACTIVE at Stage 6AG
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
