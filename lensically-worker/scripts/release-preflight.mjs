@@ -302,7 +302,7 @@ if (!operatorMcpProtocol.includes("buildOperatorMcpInitializeResult")
   lifecycleErrors.push("operator_mcp_protocol_module_incomplete");
 }
 if (!operatorMcpProtocolTests.includes("builds the exact default initialize payload")
-    || !operatorMcpProtocolTests.includes("builds the exact four-line selected-key handshake")) {
+    || !operatorMcpProtocolTests.includes("builds the visible standards-first selected-key handshake")) {
   lifecycleErrors.push("operator_mcp_protocol_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpToolDefinitions"')) {
