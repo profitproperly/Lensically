@@ -95,6 +95,9 @@ const operatorSourceCandidateBatchReadService = read("src/operatorSourceCandidat
 const operatorSourceCandidateBatchReadServiceTests = read("test/operatorSourceCandidateBatchReadService.spec.ts");
 const operatorSourceCardAdmissionService = read("src/operatorSourceCardAdmissionService.ts");
 const operatorSourceCardAdmissionServiceTests = read("test/operatorSourceCardAdmissionService.spec.ts");
+const operatorSourceCardFamilyResolutionService = read("src/operatorSourceCardFamilyResolutionService.ts");
+const operatorSourceCardFamilyResolutionServiceTests = read("test/operatorSourceCardFamilyResolutionService.spec.ts");
+
 
 
 
@@ -282,6 +285,9 @@ if (!workflow.includes("test/operatorSourceCandidateBatchReadService.spec.ts")) 
 }
 if (!workflow.includes("test/operatorSourceCardAdmissionService.spec.ts")) {
   errors.push("operator_source_card_admission_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCardFamilyResolutionService.spec.ts")) {
+  errors.push("operator_source_card_family_resolution_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1497,6 +1503,39 @@ if (!operatorSourceCardAdmissionServiceTests.includes("routes the Manifest backf
     || !operatorSourceCardAdmissionServiceTests.includes("hydrates an explicit selection and preserves versioning inputs deterministically")) {
   lifecycleErrors.push("operator_source_card_admission_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCardFamilyResolutionService"')
+    || !source.includes("resolveOperatorSourceCardFamily({")
+    || !source.includes("loadFamily: async (sourceIdentityKey)")
+    || !source.includes("createFamily: async ({")
+    || !source.includes("linkSelectionToCurrentCard: async ({")
+    || !source.includes("parseWorkflowSequence: parseOperatorWorkflowSequence")
+    || !source.includes("validateSourceCard: validateSourceCardLockable")) {
+  lifecycleErrors.push("operator_source_card_family_resolution_service_import_or_binding_missing");
+}
+if (source.includes('const sourceIdentityKey = String(selection.source_identity_key ?? "")')
+    || source.includes('reason: "canonical_source_card_reused"')
+    || source.includes("supersedesSourceCardId = String(currentCard.id)")
+    || source.includes("versionNumber = Number(currentCard.version_number ?? 1) + 1")) {
+  lifecycleErrors.push("operator_source_card_family_resolution_service_returned_to_index");
+}
+if (!operatorSourceCardFamilyResolutionService.includes("export async function resolveOperatorSourceCardFamily")
+    || !operatorSourceCardFamilyResolutionService.includes("dependencies.loadFamily")
+    || !operatorSourceCardFamilyResolutionService.includes("dependencies.createFamily")
+    || !operatorSourceCardFamilyResolutionService.includes("dependencies.loadSourceCard")
+    || !operatorSourceCardFamilyResolutionService.includes("dependencies.linkSelectionToCurrentCard")
+    || !operatorSourceCardFamilyResolutionService.includes("canonical_source_card_reused")
+    || !operatorSourceCardFamilyResolutionService.includes("version_reason_required")
+    || !operatorSourceCardFamilyResolutionService.includes("supersedesSourceCardId")) {
+  lifecycleErrors.push("operator_source_card_family_resolution_service_module_incomplete");
+}
+if (!operatorSourceCardFamilyResolutionServiceTests.includes("creates a missing active family from exact selection identity")
+    || !operatorSourceCardFamilyResolutionServiceTests.includes("continues with an existing family that has no current card")
+    || !operatorSourceCardFamilyResolutionServiceTests.includes("reuses the current canonical card and links the selection deterministically")
+    || !operatorSourceCardFamilyResolutionServiceTests.includes("requires a version reason before replacing the current card")
+    || !operatorSourceCardFamilyResolutionServiceTests.includes("increments the canonical version and preserves replacement identity")) {
+  lifecycleErrors.push("operator_source_card_family_resolution_service_tests_incomplete");
+}
+
 
 
 

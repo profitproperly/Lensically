@@ -123,6 +123,8 @@ import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCar
 import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSourceCardBackfillPreparationService";
 import { readOperatorSourceCandidateBatch } from "./operatorSourceCandidateBatchReadService";
 import { admitOperatorSourceCardCreation } from "./operatorSourceCardAdmissionService";
+import { resolveOperatorSourceCardFamily } from "./operatorSourceCardFamilyResolutionService";
+
 
 
 
@@ -13923,7 +13925,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         transformationContract,
         selection,
       } = sourceCardAdmission.context;
-      let familyId: string | null = null;
+            let familyId: string | null = null;
       let versionNumber = 1;
       let supersedesSourceCardId: string | null = null;
 
@@ -13931,75 +13933,85 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         if (!selection) {
           return operatorJsonResponse({ success: false, error: "source_selection_not_found" }, 404);
         }
-
-      
-
-      const sourceIdentityKey = String(selection.source_identity_key ?? "");
-      let family = await env.DB.prepare(
-        `SELECT *
-         FROM operator_source_card_families
-         WHERE brand_key = ?
-           AND source_identity_key = ?
-         LIMIT 1`,
-      ).bind(brand.brand_key, sourceIdentityKey).first<Record<string, unknown>>();
-      if (!family) {
-        familyId = crypto.randomUUID();
-        await env.DB.prepare(
-          `INSERT INTO operator_source_card_families (
-            id, brand_key, source_identity_key, source_type, internal_source_id,
-            threads_post_id, canonical_source_url, status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-        ).bind(
-          familyId,
-          brand.brand_key,
-          sourceIdentityKey,
-          String(selection.source_type ?? ""),
-          String(selection.internal_source_id ?? ""),
-          selection.threads_post_id ?? null,
-          selection.canonical_source_url ?? null,
-        ).run();
-        family = { id: familyId, current_source_card_id: null };
-      } else {
-        familyId = String(family.id);
-      }
-
-      const currentCardId = family.current_source_card_id ? String(family.current_source_card_id) : null;
-      const currentCard = currentCardId ? await getOperatorSourceCard(env, brand.brand_key, currentCardId) : null;
-      if (currentCard && !createNewVersion) {
-        await env.DB.prepare(
-                    `UPDATE operator_source_selections
-           SET source_card_id = ?,
-               disposition = 'linked',
-               disposition_reason = 'canonical_source_card_reused',
-               disposition_at = CURRENT_TIMESTAMP,
-               workflow_sequence = COALESCE(?, workflow_sequence)
-           WHERE id = ?
-             AND brand_key = ?
-             AND source_card_id IS NULL`,
-        ).bind(currentCard.id, parseOperatorWorkflowSequence(sequenceLabel), sourceSelectionId, brand.brand_key).run();
-        return operatorJsonResponse({
-          source_card_id: currentCard.id,
-          source_selection_id: sourceSelectionId,
-          family_id: familyId,
-          version_number: currentCard.version_number ?? 1,
-          status: currentCard.status,
-                    reused_existing: true,
-          reason: "canonical_source_card_reused",
-          validation: validateSourceCardLockable(currentCard),
-          owner_presentation: {
-            ...SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
-            account_scope: brand.brand_key,
+        const familyResolution = await resolveOperatorSourceCardFamily({
+          brandKey: brand.brand_key,
+          selection,
+          sourceSelectionId: sourceSelectionId!,
+          sequenceLabel,
+          createNewVersion,
+          versionReason,
+          newFamilyId: crypto.randomUUID(),
+          ownerPresentation: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
+        }, {
+          loadFamily: async (sourceIdentityKey) => await env.DB.prepare(
+            `SELECT *
+             FROM operator_source_card_families
+             WHERE brand_key = ?
+               AND source_identity_key = ?
+             LIMIT 1`,
+          ).bind(brand.brand_key, sourceIdentityKey).first<Record<string, unknown>>(),
+          createFamily: async ({
+            familyId: newFamilyId,
+            sourceIdentityKey,
+            sourceType,
+            internalSourceId,
+            threadsPostId,
+            canonicalSourceUrl,
+          }) => {
+            await env.DB.prepare(
+              `INSERT INTO operator_source_card_families (
+                id, brand_key, source_identity_key, source_type, internal_source_id,
+                threads_post_id, canonical_source_url, status
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
+            ).bind(
+              newFamilyId,
+              brand.brand_key,
+              sourceIdentityKey,
+              sourceType,
+              internalSourceId,
+              threadsPostId,
+              canonicalSourceUrl,
+            ).run();
           },
+          loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
+            env,
+            brand.brand_key,
+            sourceCardId,
+          ),
+          linkSelectionToCurrentCard: async ({
+            sourceCardId,
+            sourceSelectionId: resolvedSelectionId,
+            workflowSequence,
+          }) => {
+            await env.DB.prepare(
+              `UPDATE operator_source_selections
+               SET source_card_id = ?,
+                   disposition = 'linked',
+                   disposition_reason = 'canonical_source_card_reused',
+                   disposition_at = CURRENT_TIMESTAMP,
+                   workflow_sequence = COALESCE(?, workflow_sequence)
+               WHERE id = ?
+                 AND brand_key = ?
+                 AND source_card_id IS NULL`,
+            ).bind(
+              sourceCardId,
+              workflowSequence,
+              resolvedSelectionId,
+              brand.brand_key,
+            ).run();
+          },
+          parseWorkflowSequence: parseOperatorWorkflowSequence,
+          validateSourceCard: validateSourceCardLockable,
         });
-      }
-      if (currentCard && createNewVersion) {
-        if (!versionReason) {
-          return operatorJsonResponse({ success: false, error: "version_reason_required" }, 400);
+        if (familyResolution.kind === "response") {
+          return operatorJsonResponse(familyResolution.body, familyResolution.status);
         }
-        supersedesSourceCardId = String(currentCard.id);
-        versionNumber = Number(currentCard.version_number ?? 1) + 1;
+        ({
+          familyId,
+          versionNumber,
+          supersedesSourceCardId,
+        } = familyResolution.context);
       }
-        }
 
 
                 const backfillValidation = savedPatternId !== null
