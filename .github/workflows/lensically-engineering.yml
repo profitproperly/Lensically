@@ -49,8 +49,37 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pushed head
+            - name: Checkout pushed head
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Classify pushed change
+        id: push_scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          if [[ -z "${before}" || "${before}" =~ ^0+$ ]] || ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            before="$(git rev-parse HEAD^)"
+          fi
+          git diff --name-only "${before}" HEAD > /tmp/lensically-changed-files.txt
+          full_validation=false
+          web_changed=false
+          while IFS= read -r path; do
+            case "${path}" in
+              lensically-web/*)
+                web_changed=true
+                full_validation=true
+                ;;
+              .github/workflows/*|lensically-worker/package.json|lensically-worker/package-lock.json|lensically-worker/wrangler*|lensically-worker/migrations/*|lensically-worker/scripts/*|lensically-worker/src/index.ts|lensically-worker/tsconfig*|lensically-worker/vitest*)
+                full_validation=true
+                ;;
+            esac
+          done < /tmp/lensically-changed-files.txt
+          echo "full_validation=${full_validation}" >> "${GITHUB_OUTPUT}"
+          echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
+          cat /tmp/lensically-changed-files.txt
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -78,19 +107,21 @@ jobs:
         run: rm -rf node_modules/.vite node_modules/.cache
 
 
-      - name: Restore web dependencies
+            - name: Restore web dependencies
+        if: steps.push_scope.outputs.web_changed == 'true'
         id: push_web_cache
         uses: actions/cache@v4
         with:
           path: lensically-web/node_modules
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
-      - name: Install web dependencies
-        if: steps.push_web_cache.outputs.cache-hit != 'true'
+            - name: Install web dependencies
+        if: steps.push_scope.outputs.web_changed == 'true' && steps.push_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
       - name: Build web product surface
+        if: steps.push_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
         run: npm run build
 
@@ -102,7 +133,37 @@ jobs:
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
-      - name: Run push smoke validation
+            - name: Run fast mapped validation
+        if: steps.push_scope.outputs.full_validation != 'true'
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          node scripts/run-operator-validation.mjs smoke
+          tests=()
+          while IFS= read -r path; do
+            case "${path}" in
+              lensically-worker/test/*.spec.ts|lensically-worker/*.test.ts)
+                tests+=("${path#lensically-worker/}")
+                ;;
+              lensically-worker/src/*.ts)
+                stem="$(basename "${path}" .ts)"
+                candidate="test/${stem}.spec.ts"
+                if [[ -f "${candidate}" ]]; then
+                  tests+=("${candidate}")
+                else
+                  echo "Missing direct regression test for ${path}" >&2
+                  exit 1
+                fi
+                ;;
+            esac
+          done < /tmp/lensically-changed-files.txt
+          if (( ${#tests[@]} > 0 )); then
+            mapfile -t unique_tests < <(printf '%s\n' "${tests[@]}" | sort -u)
+            npx vitest --run "${unique_tests[@]}" --reporter=dot --bail=1
+          fi
+
+      - name: Run full push validation
+        if: steps.push_scope.outputs.full_validation == 'true'
         working-directory: lensically-worker
         run: |
           set -euo pipefail
