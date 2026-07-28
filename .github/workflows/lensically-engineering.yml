@@ -79,9 +79,9 @@ jobs:
           done < /tmp/lensically-changed-files.txt
           echo "full_validation=${full_validation}" >> "${GITHUB_OUTPUT}"
           echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
-          cat /tmp/lensically-changed-files.txt
+                    cat /tmp/lensically-changed-files.txt
 
-            - name: Setup Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -225,7 +225,13 @@ jobs:
 
 
 
-    fast-validation:
+    
+
+
+
+
+
+  fast-validation:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.task != 'operator-tests' &&
@@ -313,9 +319,9 @@ jobs:
     name: Operator shard ${{ matrix.shard }}/8
     strategy:
       fail-fast: true
-      matrix:
+            matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-        runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4

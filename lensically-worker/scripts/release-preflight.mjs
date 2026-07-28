@@ -289,9 +289,13 @@ if (!testSyntaxValidator.includes('import { transform } from "esbuild"')
 if (!workflowLint.includes('name: Lensically workflow lint')
     || !workflowLint.includes('".github/workflows/lensically-engineering.yml"')
     || !workflowLint.includes("YAML.parse_file")
+    || !workflowLint.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
+    || !workflowLint.includes('job.key?("runs-on")')
+    || !workflowLint.includes('job["steps"].is_a?(Array)')
     || !workflowLint.includes("workflow_dispatch:")) {
   errors.push("independent_workflow_yaml_watchdog_incomplete");
 }
+
 
 
 
