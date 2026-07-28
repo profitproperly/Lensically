@@ -3702,8 +3702,26 @@ describe("operator mode MCP endpoint", () => {
     const databaseSchemaTool = listed.tools.find((tool) => tool.name === "getDatabaseSchemaState");
             expect(databaseSchemaTool?.description).toContain("expected D1 table");
     expect(databaseSchemaTool?.inputSchema?.required).toContain("table_name");
-    expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
+        expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
+    expect(engineeringContinuationTool?.description).toContain("sole canonical");
     expect(engineeringContinuationTool?.inputSchema?.properties).toEqual({});
+    const continuation = await mcpTool<{
+      authority: string;
+      contract: string;
+      active_job_id: string;
+      active_checkpoint: string;
+      startup_rule: string;
+      content: string;
+    }>("getEngineeringContinuation");
+    expect(continuation).toMatchObject({
+      authority: "sole_canonical_repository_ledger",
+      contract: "canonical-continuation-v1",
+      active_job_id: "worker-monolith-refactor",
+      active_checkpoint: "stage-6t-published-post-lineage-audit-service",
+    });
+    expect(continuation.startup_rule).toContain("No other continuation surface may override this file");
+    expect(continuation.content).toContain("## Unified Job Queue");
+    expect(continuation.content).toContain("20 — QUEUED — `chl_autonomous_operator_foundation_v1`");
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
     expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");
@@ -5122,7 +5140,8 @@ describe("operator mode MCP endpoint", () => {
       no_account_sections_present: boolean;
             tool_surface: { public_tool_count: number; categories: { engineering: number; admin: number; operator: number } };
       runtime: { mcp_version: string; registry_generation: string };
-      source_documents: Array<{ path: string; ok: boolean; status: number; size: number }>;
+            source_documents: Array<{ path: string; ok: boolean; status: number; size: number }>;
+      canonical_continuation: { authority: string; path: string; tool: string; contract: string; active_job_id: string; active_checkpoint: string };
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
     expect(startup.bootstrap_version).toBe("operator-startup-v4");
@@ -5137,14 +5156,24 @@ describe("operator mode MCP endpoint", () => {
     expect(startup.no_account_sections_present).toBe(true);
         expect(startup.tool_surface.public_tool_count).toBe(registry.tools.length);
         expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v2" });
-    expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md"]);
+        expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", "ENGINEERING_CONTINUATION.md"]);
+    expect(startup.canonical_continuation).toMatchObject({
+      authority: "sole_canonical_repository_ledger",
+      path: "ENGINEERING_CONTINUATION.md",
+      tool: "getEngineeringContinuation",
+      contract: "canonical-continuation-v1",
+      active_job_id: "worker-monolith-refactor",
+      active_checkpoint: "stage-6t-published-post-lineage-audit-service",
+    });
         expect(startup.source_documents.every((document) => !Object.prototype.hasOwnProperty.call(document, "excerpt"))).toBe(true);
     expect(startup.boundary.first_key_response_template).toHaveLength(4);
     expect(startup.boundary.before_proceed_forbidden).toContain("account_state");
     const serialized = JSON.stringify(startup);
     expect(serialized).not.toContain("collaboration_contract");
     expect(serialized).not.toContain("open_implementation_backlog");
-    expect(serialized).not.toContain("active_runtime_config_deployment");
+        expect(serialized).not.toContain("active_runtime_config_deployment");
+    expect(serialized).not.toContain("operator_work_state");
+    expect(serialized).not.toContain("atomic_write_reconciliation");
     expect(serialized.length).toBeLessThan(25000);
   }, 30000);
 

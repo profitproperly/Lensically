@@ -18141,16 +18141,9 @@ async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Pro
 }
 
 async function buildOperatorActionClosure(env: Env, toolName: string, result: Record<string, unknown>): Promise<Record<string, unknown>> {
-  let workState: Record<string, unknown> | null = null;
-  try {
-    workState = await env.DB.prepare(`SELECT * FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>() ?? null;
-  } catch (error) {
-    if (!getErrorMessage(error).includes("no such table: operator_work_state")) throw error;
-  }
-  const durableOutcome = workState?.status === "active"
-    ? normalizeOperatorText(workState.active_outcome_title, 500, true)
-    : null;
-    const durableNextAction = normalizeOperatorText(workState?.next_action, 1200, true);
+  const canonicalContinuationPath = "ENGINEERING_CONTINUATION.md";
+  const canonicalContinuationTool = "getEngineeringContinuation";
+  const canonicalContinuationNextAction = "Call getEngineeringContinuation and execute only the one ACTIVE job and Current Action recorded in ENGINEERING_CONTINUATION.md. No D1 work state, action-closure receipt, Growth Mission record, other document, or chat memory may override it.";
   const manifestAutonomousCycleTool = new Set([
     "prepare_manifest_autonomous_cycle",
     "persist_manifest_autonomous_post",
@@ -18186,23 +18179,12 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
           : toolName === "get_manifest_cycle_receipt" && manifestCycleCompleted
             ? "The canonical cycle is complete; verify scheduler health and end only after all completion conditions pass."
             : "Continue the active autonomous Manifest cycle from its canonical receipt and exact next incomplete operation.";
-  const explicitNextAction = normalizeOperatorText(
-    result.next_action ?? result.recommended_next_action ?? result.required_action,
-    1200,
-    true,
-  );
-  const failed = result.ok === false;
+    const failed = result.ok === false;
   const hasIncident = Boolean(result.hardening_incident);
-    const nextAction = explicitNextAction
-    ?? manifestAutonomousFallbackNextAction
-    ?? durableNextAction
+  const nextAction = manifestAutonomousFallbackNextAction
     ?? (hasIncident
-      ? "Advance the blocking hardening incident through evidence-gated closure before resuming the interrupted objective."
-      : failed
-        ? "Contain and classify this failure, preserve the safe checkpoint, and repair the shared cause before retrying."
-        : operatorToolMutatesState(toolName)
-          ? "Verify the completed mutation, record evidence, and continue the active outcome from the resulting checkpoint."
-          : "Use this evidence to execute the highest-priority queued prerequisite for the active outcome.");
+      ? `Record the verified P0/P1 interrupt and its precedence in ${canonicalContinuationPath}, then follow ${canonicalContinuationTool}.`
+      : canonicalContinuationNextAction);
   const ownerActionRequired = result.owner_action_required === true
     || ["explicit_proceed_required", "owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
   const temporaryDependency = normalizeOperatorText(result.temporary_dependency, 500, true);
@@ -18212,17 +18194,15 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
     current_live_state: `tool:${toolName}; outcome:${failed ? "failed" : "completed"}; production_commit:${env.LENSICALLY_COMMIT_SHA?.trim() || "runtime-bound"}`,
     target_agent_native_state: "Mission-driven scheduled operation with durable state, one active outcome, evidence-gated execution, and optional owner interaction.",
-        active_outcome: manifestAutonomousCycleTool
+                active_outcome: manifestAutonomousCycleTool
       ? "Complete the active autonomous Manifest cycle through canonical receipt closure with zero cycle-horizon missing slots."
-      : durableOutcome ?? "Select and activate the highest-value deferred outcome through the durable intake guard.",
+      : `Defined only by ${canonicalContinuationPath}; call ${canonicalContinuationTool}.`,
     next_action: nextAction,
         priority_reason: manifestAutonomousCycleTool
       ? "The prepared Manifest cycle remains the sole active objective until its canonical completion receipt proves zero cycle-horizon missing slots."
       : hasIncident
-        ? "P0/P1 hardening incidents supersede normal work."
-        : workState?.scope_frozen === 1
-          ? "The durable active-outcome scope is frozen until its recorded completion conditions pass."
-          : "The operator must select the highest-value eligible deferred outcome before new execution begins.",
+        ? `Verified P0/P1 incidents may interrupt only after they are recorded in ${canonicalContinuationPath}.`
+        : `${canonicalContinuationPath} is the sole continuation and precedence authority. D1 work state is telemetry only.`, 
     completion_evidence: failed
       ? ["shared cause repaired", "focused regression passed", "exact tested head released", "live behavior verified"]
       : ["result verified", "durable state updated", "next checkpoint selected"],
@@ -18231,10 +18211,10 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     retirement_condition: retirementCondition,
     progress_recorded: true,
     deferred_work_preserved: true,
-        checkpoint: manifestAutonomousCycleTool
+                checkpoint: manifestAutonomousCycleTool
       ? `Continue the same canonical Manifest cycle after tool:${toolName}; use its receipt, exact remaining slots, and deterministic operation IDs. Do not switch to unrelated durable work.`
-      : `Continue from durable outcome state after tool:${toolName}; do not reconstruct the next action from chat memory.`,
-    deferred_work_ledger: "operator_work_ledger",
+      : `Resume only through ${canonicalContinuationTool}; this receipt is non-authoritative for continuation.`,
+    deferred_work_ledger: canonicalContinuationPath,
   };
   const validation = validateOperatorActionClosure(closure);
   return { ...closure, guard_passed: validation.ok, guard_errors: validation.errors };
