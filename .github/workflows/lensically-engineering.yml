@@ -579,27 +579,44 @@ jobs:
           actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
           test "${actual_crons}" = "${expected_crons}"
 
-      - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
+            - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
         run: |
           set -euo pipefail
           expected_sha="$(git rev-parse HEAD)"
           verified=false
-          for attempt in $(seq 1 12); do
+          for attempt in $(seq 1 45); do
+            runtime_ok=false
+            scheduler_ok=false
+            dashboard_ok=false
+
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
-              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null \
-              && curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
-              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null \
-              && curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
-              && grep -q "Operator Dashboard" /tmp/lensically-dashboard.html \
-              && test "$(curl --silent --output /tmp/gpt-memory-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/gpt-memory/dashboard')" = "410" \
-              && test "$(curl --silent --output /tmp/agent-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/agent/accounts')" = "410" \
-              && test "$(curl --silent --output /tmp/intelligence-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/threads/intelligence-dashboard')" = "410"; then
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null; then
+              runtime_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
+              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
+              scheduler_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
+              && grep -q "Operator Dashboard" /tmp/lensically-dashboard.html; then
+              dashboard_ok=true
+            fi
+
+            gpt_memory_status="$(curl --silent --output /tmp/gpt-memory-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/gpt-memory/dashboard' || true)"
+            agent_status="$(curl --silent --output /tmp/agent-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/agent/accounts' || true)"
+            intelligence_status="$(curl --silent --output /tmp/intelligence-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/threads/intelligence-dashboard' || true)"
+
+            if [ "${runtime_ok}" = "true" ] \
+              && [ "${scheduler_ok}" = "true" ] \
+              && [ "${dashboard_ok}" = "true" ] \
+              && [ "${gpt_memory_status}" = "410" ] \
+              && [ "${agent_status}" = "410" ] \
+              && [ "${intelligence_status}" = "410" ]; then
               verified=true
               break
             fi
-                        
-            sleep 1
 
+            sleep 2
           done
           if [ "${verified}" != "true" ]; then
             cat /tmp/lensically-runtime-health.json || true
@@ -610,3 +627,4 @@ jobs:
             cat /tmp/intelligence-retired.json || true
             exit 1
           fi
+

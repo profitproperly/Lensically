@@ -310,6 +310,17 @@ if (!workflowStructureValidator.includes('YAML.parse_file(path).to_ruby')
     || !workflowStructureValidator.includes('job["steps"].is_a?(Array)')) {
   errors.push("engineering_workflow_structure_validator_incomplete");
 }
+if (!workflow.includes("for attempt in $(seq 1 45); do")
+    || !workflow.includes("runtime_ok=false")
+    || !workflow.includes("scheduler_ok=false")
+    || !workflow.includes("dashboard_ok=false")
+    || !workflow.includes('gpt_memory_status="$(curl')
+    || !workflow.includes('agent_status="$(curl')
+    || !workflow.includes('intelligence_status="$(curl')
+    || !workflow.includes("sleep 2")) {
+  errors.push("release_runtime_propagation_guard_incomplete");
+}
+
 
 
 
