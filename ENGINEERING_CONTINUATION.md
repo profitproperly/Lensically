@@ -6,8 +6,8 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ad-generation-run-idempotency-and-persistence-planning
-repository_base_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
+active_checkpoint: p1-stage-6ad-cloudflare-assets-upload-failure
+repository_base_sha: 7d05f33689257b258bf92fd8c4e0e9e122d0a593
 production_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AD generation-run idempotency and persistence-planning service extraction.
+- Current checkpoint: P1 Stage 6AD Cloudflare assets-upload release failure repair; Stage 6AD release closure is blocked until bounded transient retry prevention is live-verified.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -984,7 +984,16 @@ Completed checkpoint — Stage 6AC generation-run admission and canonical-contex
 - Hardened exact-SHA release and live verification passed in run `30399390663`.
 - Live production independently confirmed exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AD generation-run idempotency and persistence-planning service extraction:
+ACTIVE P1 interrupt — Stage 6AD Cloudflare assets-upload release failure:
+
+- Incident ID: `42a3220d-8e39-4d98-a55e-249824fd71e6`.
+- Observed: release run `30400293362` passed exact-SHA identity and scope resolution but `wrangler deploy` failed before deployment while creating `/assets-upload-session` with Cloudflare API error code `10013` and an explicit unknown/transient error response.
+- Production remained exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6`; no deployment side effect was confirmed.
+- Root release-plane defect: the Worker deployment step has no bounded retry classification for transient Cloudflare API and assets-upload transport failures, so one external transient aborts an otherwise fully validated release.
+- Required outcome: add source-controlled bounded exponential retry for known transient Wrangler/Cloudflare failures, fail immediately for deterministic failures, preserve complete logs and exact-SHA identity, enforce the retry contract in release preflight, successfully validate and release the repaired exact SHA, independently verify production, then close Stage 6AD.
+- Stage 6AD implementation and passing focused, push, and eight-shard evidence remain preserved and may not be reverted or bypassed.
+
+Blocked checkpoint — Stage 6AD generation-run idempotency and persistence-planning service extraction:
 
 Extract the remaining deterministic `create_generation_run` logic into a focused dependency-injected service while preserving:
 
