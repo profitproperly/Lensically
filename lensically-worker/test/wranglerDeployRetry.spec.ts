@@ -4,7 +4,7 @@ import {
   getDeployRetryDelayMs,
   isTransientWranglerDeployFailure,
   runWranglerDeployWithRetry,
-} from "../scripts/run-wrangler-deploy-with-retry.mjs";
+} from "../scripts/wrangler-deploy-retry-core.mjs";
 
 function createWriter() {
   return { write: vi.fn(() => true) };

@@ -108,6 +108,7 @@ const operatorGenerationRunAdmissionServiceTests = read("test/operatorGeneration
 const operatorGenerationRunPersistencePlanningService = read("src/operatorGenerationRunPersistencePlanningService.ts");
 const operatorGenerationRunPersistencePlanningServiceTests = read("test/operatorGenerationRunPersistencePlanningService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
+const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
 
 
@@ -364,13 +365,18 @@ if (!workflow.includes("for attempt in $(seq 1 45); do")
 if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"')
     || !workflow.includes("node ../lensically-worker/scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.toml")
     || workflow.includes('run: npx wrangler deploy')
-    || !wranglerDeployRetry.includes("export function isTransientWranglerDeployFailure")
-    || !wranglerDeployRetry.includes("export function getDeployRetryDelayMs")
-    || !wranglerDeployRetry.includes("export async function runWranglerDeployWithRetry")
-    || !wranglerDeployRetry.includes("maxAttempts = 4")
-    || !wranglerDeployRetry.includes("[code:\\s*10013]")
-    || !wranglerDeployRetry.includes("deterministic failure; not retrying")
-    || !wranglerDeployRetry.includes("transient retry budget exhausted")
+        || !wranglerDeployRetry.includes('from "./wrangler-deploy-retry-core.mjs"')
+    || !wranglerDeployRetry.includes('from "node:child_process"')
+    || !wranglerDeployRetry.includes("spawn: spawnSync")
+    || !wranglerDeployRetryCore.includes("export function isTransientWranglerDeployFailure")
+    || !wranglerDeployRetryCore.includes("export function getDeployRetryDelayMs")
+    || !wranglerDeployRetryCore.includes("export async function runWranglerDeployWithRetry")
+    || !wranglerDeployRetryCore.includes("maxAttempts = 4")
+    || !wranglerDeployRetryCore.includes("[code:\\s*10013]")
+    || !wranglerDeployRetryCore.includes("deterministic failure; not retrying")
+    || !wranglerDeployRetryCore.includes("transient retry budget exhausted")
+    || wranglerDeployRetryCore.includes('from "node:')
+    || wranglerDeployRetryCore.includes("process.")
     || !wranglerDeployRetryTests.includes("classifies Cloudflare assets-upload code 10013 as transient")
     || !wranglerDeployRetryTests.includes("recovers after one classified transient failure")
     || !wranglerDeployRetryTests.includes("fails immediately for a deterministic deployment error")
