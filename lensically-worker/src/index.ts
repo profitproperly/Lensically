@@ -16171,7 +16171,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     return {
     ok: true,
     startup_authority: OPERATOR_GOVERNING_STANDARDS,
-    bootstrap_version: "operator-startup-v5",
+        bootstrap_version: "operator-startup-v6",
     operating_contract: {
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
@@ -16193,7 +16193,9 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       proceed_confirmation_tool: "confirmOperatorProceed",
       account_call_requirement: { server_side_continuity_required: true },
       before_proceed_forbidden: ["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"],
-      first_key_response_template: [
+            first_key_response_template: [
+        "Governing standards: Autonomy. Efficiency. Prevention.",
+        "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
         "Lensically Operator Mode MCP is active.",
         "Selected key: <canonical_brand_key>",
         `Full tool surface loaded: ${tools.length} tools available and usable.`,

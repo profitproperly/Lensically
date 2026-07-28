@@ -5124,7 +5124,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const startup = await mcpTool<{
             bootstrap_version: string;
-      startup_authority: { version: string; authority: string; startup_display_required: boolean; standards: Array<{ key: string; title: string; rule: string }>; governing_rule: string };
+            startup_authority: { version: string; authority: string; startup_display_required: boolean; exact_owner_approved_text: string; exact_spec_execution_rule: string; prevention_closure_rule: string; standards: Array<{ key: string; title: string }>; governing_rule: string };
       operating_contract: {
         public_gateway: string;
         router: string;
@@ -5140,14 +5140,17 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
             canonical_continuation: { authority: string; path: string; tool: string; contract: string | null; active_job_id: string | null; active_checkpoint: string | null };
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
-        expect(startup.bootstrap_version).toBe("operator-startup-v5");
+                expect(startup.bootstrap_version).toBe("operator-startup-v6");
     expect(startup.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v1",
+      version: "operator-governing-standards-v2",
       authority: "highest_lensically_operating_authority",
       startup_display_required: true,
     });
+    expect(startup.startup_authority.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
+    expect(startup.startup_authority.exact_owner_approved_text).toContain("Resume the original objective only after prevention is locked in.");
+    expect(startup.startup_authority.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
+    expect(startup.startup_authority.prevention_closure_rule).toContain("may not end with analysis");
     expect(startup.startup_authority.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
-    expect(startup.startup_authority.governing_rule).toContain("Do not bypass fixes.");
     expect(startup.operating_contract).toMatchObject({
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
@@ -5166,7 +5169,11 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
       tool: "getEngineeringContinuation",
     });
         expect(startup.source_documents.every((document) => !Object.prototype.hasOwnProperty.call(document, "excerpt"))).toBe(true);
-    expect(startup.boundary.first_key_response_template).toHaveLength(4);
+        expect(startup.boundary.first_key_response_template).toHaveLength(6);
+    expect(startup.boundary.first_key_response_template.slice(0, 2)).toEqual([
+      "Governing standards: Autonomy. Efficiency. Prevention.",
+      "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
+    ]);
     expect(startup.boundary.before_proceed_forbidden).toContain("account_state");
     const serialized = JSON.stringify(startup);
     expect(serialized).not.toContain("collaboration_contract");
@@ -5347,7 +5354,9 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
       expect(selected.isError).not.toBe(true);
       expect(selected.structuredContent.account_data_loaded).toBe(false);
             expect(selected.structuredContent.tool_count).toBe(startup.tool_surface.public_tool_count);
-      expect(selected.structuredContent.handshake).toEqual([
+            expect(selected.structuredContent.handshake).toEqual([
+        "Governing standards: Autonomy. Efficiency. Prevention.",
+        "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
         "Lensically Operator Mode MCP is active.",
         `Selected key: ${key}`,
         `Full tool surface loaded: ${startup.tool_surface.public_tool_count} tools available and usable.`,
@@ -6183,7 +6192,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
         d1_autonomy_bypassed: boolean;
       };
             status_kind?: string;
-      startup_authority?: { version: string; standards: Array<{ key: string }>; governing_rule: string };
+            startup_authority?: { version: string; exact_owner_approved_text: string; exact_spec_execution_rule: string; prevention_closure_rule: string; standards: Array<{ key: string }>; governing_rule: string };
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
       profile_id: "engineering_precheck",
@@ -6192,9 +6201,11 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
-    expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v1" });
+        expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v2" });
+    expect(status.structuredContent.startup_authority?.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
+    expect(status.structuredContent.startup_authority?.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
+    expect(status.structuredContent.startup_authority?.prevention_closure_rule).toContain("may not end with analysis");
     expect(status.structuredContent.startup_authority?.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
-    expect(status.structuredContent.startup_authority?.governing_rule).toContain("Do not bypass fixes.");
     expect(status.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "source_defined_direct_completed",
       d1_execution_library_bypassed: true,

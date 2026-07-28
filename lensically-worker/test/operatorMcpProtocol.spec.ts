@@ -31,13 +31,19 @@ describe("Operator MCP protocol contract", () => {
       "LENSICALLY OPERATOR MODE STARTUP AUTHORITY — READ FIRST.",
       "GOVERNING STANDARDS: AUTONOMY. EFFICIENCY. PREVENTION.",
     ]);
-    expect(String(result.instructions)).toContain("Do not bypass fixes.");
-    expect(String(result.instructions)).toContain("same failure twice is unacceptable");
+        expect(String(result.instructions)).toContain("A note in chat memory is not enforcement.");
+    expect(String(result.instructions)).toContain("Resume the original objective only after prevention is locked in.");
+    expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
+    expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v2");
+    expect(OPERATOR_GOVERNING_STANDARDS.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
+    expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("may not end with analysis");
     expect(OPERATOR_GOVERNING_STANDARDS.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
   });
 
-  it("builds the exact four-line selected-key handshake", () => {
+    it("builds the visible standards-first selected-key handshake", () => {
     expect(buildOperatorKeyHandshakeLines(75, "manifest_mental")).toEqual([
+      "Governing standards: Autonomy. Efficiency. Prevention.",
+      "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
       "Lensically Operator Mode MCP is active.",
       "Selected key: manifest_mental",
       "Full tool surface loaded: 75 tools available and usable.",
