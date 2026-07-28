@@ -97,12 +97,12 @@ jobs:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-      - name: Install worker dependencies
+            - name: Install worker dependencies
         if: steps.push_worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
 
-            - name: Clear stale worker transforms
+      - name: Clear stale worker transforms
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
