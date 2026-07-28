@@ -133,6 +133,7 @@ import { readOperatorSourceCard } from "./operatorSourceCardReadService";
 import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionService";
 import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPersistencePlanningService";
 import { admitOperatorGenerationDraft } from "./operatorGenerationDraftAdmissionService";
+import { planOperatorGenerationDraftPersistence } from "./operatorGenerationDraftPersistencePlanningService";
 
 
 
@@ -14351,25 +14352,35 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (draftAdmission.kind === "response") {
       return operatorJsonResponse(draftAdmission.body, draftAdmission.status);
     }
-    const { runId, sourceCardId, text } = draftAdmission.context;
+        const { runId, sourceCardId, text } = draftAdmission.context;
     const draftId = crypto.randomUUID();
-    const status = toolName === "save_self_rejected_draft" ? "self_rejected" : "candidate";
-    const draftIndex = Number.isFinite(Number(payload.draft_index)) ? Math.max(0, Math.trunc(Number(payload.draft_index))) : 1;
-    const strategy = payload.strategy && typeof payload.strategy === "object" && !Array.isArray(payload.strategy) ? payload.strategy as Record<string, unknown> : {};
-    const analysis = payload.draft_analysis && typeof payload.draft_analysis === "object" && !Array.isArray(payload.draft_analysis) ? payload.draft_analysis as Record<string, unknown> : {};
-    let gateRun = { showable: false, gate_results: [] as Record<string, unknown>[], blocking_failures: [] as Record<string, unknown>[], warnings: [] as string[] };
-    if (status === "candidate") {
-      gateRun = await runOperatorGates(env, {
+    const draftPersistence = await planOperatorGenerationDraftPersistence({
+      toolName,
+      payload,
+      draftId,
+      runId,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      sourceCardId,
+      text,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      normalizeJson: normalizeOperatorJson,
+      runGates: async (gateInput) => await runOperatorGates(env, {
         brand,
-        sourceCardId,
-        draftId,
-        draftText: text,
+        sourceCardId: String(gateInput.sourceCardId),
+        draftId: String(gateInput.draftId),
+        draftText: String(gateInput.draftText),
         stageScope: "gate_evaluation",
-        laneKey: normalizeOperatorMachineKey(analysis.lane_key ?? strategy.pillar, "") || null,
-        draftAnalysis: analysis,
-        modelGateResults: Array.isArray(payload.model_gate_results) ? payload.model_gate_results as Array<Record<string, unknown>> : null,
-      });
-    }
+        laneKey: typeof gateInput.laneKey === "string" ? gateInput.laneKey : null,
+        draftAnalysis: gateInput.draftAnalysis as Record<string, unknown>,
+        modelGateResults: Array.isArray(gateInput.modelGateResults)
+          ? gateInput.modelGateResults as Array<Record<string, unknown>>
+          : null,
+      }),
+    });
+    const insertValues = draftPersistence.insertValues;
     await env.DB.prepare(
       `INSERT INTO gpt_generation_drafts (
         id, run_id, account_id, threads_user_id, source_card_id, draft_index, text, status,
@@ -14377,30 +14388,23 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
-        draftId,
-        runId,
-        brand.account_id,
-        brand.profile.threads_user_id,
-        sourceCardId,
-        draftIndex,
-        text,
-        status,
-        normalizeOperatorText(payload.rejection_reason, 2000, true),
-        normalizeOperatorJson(payload.score ?? payload.scores, null),
-        normalizeOperatorJson({ ...strategy, analysis }, {}),
-        normalizeOperatorJson({ gate_results: gateRun.gate_results, blocking_failures: gateRun.blocking_failures }, {}),
-        gateRun.showable ? 1 : 0,
-        normalizeOperatorJson({ source: "operator_mode_mcp" }, {}),
+        insertValues.draftId,
+        insertValues.runId,
+        insertValues.accountId,
+        insertValues.threadsUserId,
+        insertValues.sourceCardId,
+        insertValues.draftIndex,
+        insertValues.text,
+        insertValues.status,
+        insertValues.rejectionReason,
+        insertValues.scoreJson,
+        insertValues.strategyJson,
+        insertValues.gateSummaryJson,
+        insertValues.showable,
+        insertValues.metadataJson,
       )
       .run();
-    return operatorJsonResponse({
-      draft_id: draftId,
-      status,
-      showable: gateRun.showable,
-      gate_results: gateRun.gate_results,
-      blocking_failures: gateRun.blocking_failures,
-      repair_guidance: gateRun.blocking_failures.map((failure) => failure.repair_guidance).filter(Boolean),
-    });
+    return operatorJsonResponse(draftPersistence.body);
   }
 
   if (toolName === "mark_draft_shown") {

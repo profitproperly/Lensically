@@ -109,6 +109,8 @@ const operatorGenerationRunPersistencePlanningService = read("src/operatorGenera
 const operatorGenerationRunPersistencePlanningServiceTests = read("test/operatorGenerationRunPersistencePlanningService.spec.ts");
 const operatorGenerationDraftAdmissionService = read("src/operatorGenerationDraftAdmissionService.ts");
 const operatorGenerationDraftAdmissionServiceTests = read("test/operatorGenerationDraftAdmissionService.spec.ts");
+const operatorGenerationDraftPersistencePlanningService = read("src/operatorGenerationDraftPersistencePlanningService.ts");
+const operatorGenerationDraftPersistencePlanningServiceTests = read("test/operatorGenerationDraftPersistencePlanningService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -327,6 +329,9 @@ if (!workflow.includes("test/operatorGenerationRunPersistencePlanningService.spe
 }
 if (!workflow.includes("test/operatorGenerationDraftAdmissionService.spec.ts")) {
   errors.push("operator_generation_draft_admission_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorGenerationDraftPersistencePlanningService.spec.ts")) {
+  errors.push("operator_generation_draft_persistence_planning_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1796,6 +1801,33 @@ if (!operatorGenerationDraftAdmissionServiceTests.includes("returns the exact re
     || !operatorGenerationDraftAdmissionServiceTests.includes("returns normalized continuation context below the draft limit")) {
   lifecycleErrors.push("operator_generation_draft_admission_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorGenerationDraftPersistencePlanningService"')
+    || !source.includes("planOperatorGenerationDraftPersistence({")
+    || !source.includes("runGates: async (gateInput)")
+    || !source.includes("const insertValues = draftPersistence.insertValues")
+    || !source.includes("return operatorJsonResponse(draftPersistence.body)")) {
+  lifecycleErrors.push("operator_generation_draft_persistence_planning_service_import_or_binding_missing");
+}
+if (source.includes('const status = toolName === "save_self_rejected_draft"')
+    || source.includes("const draftIndex = Number.isFinite(Number(payload.draft_index))")
+    || source.includes("repair_guidance: gateRun.blocking_failures")) {
+  lifecycleErrors.push("operator_generation_draft_persistence_planning_service_returned_to_index");
+}
+if (!operatorGenerationDraftPersistencePlanningService.includes("export async function planOperatorGenerationDraftPersistence")
+    || !operatorGenerationDraftPersistencePlanningService.includes('status === "candidate"')
+    || !operatorGenerationDraftPersistencePlanningService.includes("dependencies.runGates")
+    || !operatorGenerationDraftPersistencePlanningService.includes("gateSummaryJson")
+    || !operatorGenerationDraftPersistencePlanningService.includes("metadataJson")
+    || !operatorGenerationDraftPersistencePlanningService.includes("repair_guidance")) {
+  lifecycleErrors.push("operator_generation_draft_persistence_planning_service_module_incomplete");
+}
+if (!operatorGenerationDraftPersistencePlanningServiceTests.includes("runs candidate gates with exact context and builds insert values plus repair guidance")
+    || !operatorGenerationDraftPersistencePlanningServiceTests.includes("skips gates and returns deterministic defaults for self-rejected drafts")
+    || !operatorGenerationDraftPersistencePlanningServiceTests.includes("normalizes malformed strategy and analysis with a zero floor for draft index")
+    || !operatorGenerationDraftPersistencePlanningServiceTests.includes("uses scores fallback and stable operator metadata in the persistence plan")) {
+  lifecycleErrors.push("operator_generation_draft_persistence_planning_service_tests_incomplete");
+}
+
 
 
 
