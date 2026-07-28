@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: p1-stage-6ad-retry-workflow-dispatch-failure
-repository_base_sha: 20fb6e1ba2484c287f49bc6f7d7e5d5747266be7
-production_sha: 9dfe2921ce4526e833cdb65220a42be03e54bae6
+active_checkpoint: stage-6ae-generation-draft-admission-and-idempotency
+repository_base_sha: 0925330ffb604d293706fb36ed72bc3d5c6ef536
+production_sha: 0925330ffb604d293706fb36ed72bc3d5c6ef536
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: P1 Stage 6AD retry-workflow dispatch failure repair; the underlying Cloudflare assets-upload P1 and Stage 6AD release closure remain blocked until workflow dispatch and bounded transient retry are both live-verified.
+- Current checkpoint: Stage 6AE generation-draft admission and idempotency service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -984,36 +984,34 @@ Completed checkpoint — Stage 6AC generation-run admission and canonical-contex
 - Hardened exact-SHA release and live verification passed in run `30399390663`.
 - Live production independently confirmed exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6` with 75/75 public tools.
 
-ACTIVE P1 interrupt — Stage 6AD retry-workflow dispatch failure:
+Completed checkpoint — Stage 6AD generation-run idempotency and persistence-planning service extraction:
 
-- Incident ID: `c4ed0a57-d40c-4559-9b4f-e4efbcccc408`.
-- Observed: `runGitHubWorkflow` returned HTTP 422 `workflow_dispatch_failed` for exact SHA `20fb6e1ba2484c287f49bc6f7d7e5d5747266be7`; no dispatch side effect was confirmed.
-- Precedence: this workflow-definition failure is the sole active checkpoint because it blocks validation of the underlying Cloudflare deploy retry repair.
-- Required outcome: identify and repair the exact workflow YAML/schema defect, extend permanent structural prevention if the existing validator missed a new class, prove independent workflow lint and manual dispatch on the repaired exact SHA, then resume the preserved Cloudflare retry validation and Stage 6AD release.
-- The bounded Wrangler retry implementation, tests, underlying Cloudflare P1, and all Stage 6AD evidence remain preserved.
+- Added `src/operatorGenerationRunPersistencePlanningService.ts` as the deterministic authority for optional operation idempotency, existing-run reuse, persisted JSON fallbacks, normalized insert values, canonical source-card identity, transformation metadata, and final success response composition.
+- Reduced the remaining `create_generation_run` branch in `src/index.ts` to the existing-run SQL query, generation-run insert execution, account and Threads identity, random ID generation, serialization and parsing adapters, and HTTP transport.
+- Added `test/operatorGenerationRunPersistencePlanningService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Initial focused validation passed in run `30399897140`, push validation passed in run `30399880855`, and all eight Operator shards passed in run `30400187250`.
+- Release run `30400293362` failed safely before deployment on transient Cloudflare assets-upload error code `10013`; production remained unchanged.
+- Added `scripts/wrangler-deploy-retry-core.mjs`, the thin Node CLI `scripts/run-wrangler-deploy-with-retry.mjs`, and `test/wranglerDeployRetry.spec.ts` with bounded exponential retry for classified transient Cloudflare/network failures and deterministic fail-fast behavior.
+- Generalized the retry wrapper to both Worker and web Wrangler deployments and permanently forbade direct unprotected deploy commands in release preflight.
+- Repaired the workflow-dispatch indentation defect, extended independent workflow validation, and separated Worker-safe retry logic from the Node `child_process` adapter.
+- Independent workflow lint passed in run `30400866816`; restored manual dispatch passed in run `30400907538`.
+- Final focused validation passed in run `30401840070`.
+- Final push validation passed in run `30401807425`.
+- All eight final Operator shards passed in run `30402116711`.
+- Hardened exact-SHA release and live verification passed in run `30402189072`.
+- Live production independently confirmed exact SHA `0925330ffb604d293706fb36ed72bc3d5c6ef536` with 75/75 public tools.
 
-Blocked underlying P1 — Stage 6AD Cloudflare assets-upload release failure:
+ACTIVE checkpoint — Stage 6AE generation-draft admission and idempotency service extraction:
 
-- Incident ID: `42a3220d-8e39-4d98-a55e-249824fd71e6`.
-- Observed: release run `30400293362` passed exact-SHA identity and scope resolution but `wrangler deploy` failed before deployment while creating `/assets-upload-session` with Cloudflare API error code `10013` and an explicit unknown/transient error response.
-- Production remained exact SHA `9dfe2921ce4526e833cdb65220a42be03e54bae6`; no deployment side effect was confirmed.
-- Root release-plane defect: the Worker deployment step has no bounded retry classification for transient Cloudflare API and assets-upload transport failures, so one external transient aborts an otherwise fully validated release.
-- Required outcome: add source-controlled bounded exponential retry for known transient Wrangler/Cloudflare failures, fail immediately for deterministic failures, preserve complete logs and exact-SHA identity, enforce the retry contract in release preflight, successfully validate and release the repaired exact SHA, independently verify production, then close Stage 6AD.
-- Stage 6AD implementation and passing focused, push, and eight-shard evidence remain preserved and may not be reverted or bypassed.
+Extract the bounded front half of `submit_candidate_draft` and `save_self_rejected_draft` into a focused dependency-injected service while preserving:
 
-Blocked checkpoint — Stage 6AD generation-run idempotency and persistence-planning service extraction:
+- normalized `run_id`, `source_card_id`, and draft text admission with the exact required-fields rejection
+- account/run/source-card/text scoped identical-draft lookup
+- exact existing-draft reuse response, gate-summary parsing, showable normalization, and idempotency reason
+- existing draft-count retrieval and the exact two-draft saved-workflow limit rejection
+- continuation state for candidate gate execution, draft insert persistence, and final response composition
 
-Extract the remaining deterministic `create_generation_run` logic into a focused dependency-injected service while preserving:
-
-- normalized optional `operation_id`
-- account/source-card scoped existing-run lookup only when an operation ID exists
-- exact existing-run reuse response, JSON parsing fallbacks, version/family fallbacks, status default, and idempotency reason
-- normalized generation-run insert values for adaptation context, objective, prompt summary, and metadata
-- canonical source-card family/version identity
-- transformation-contract version metadata
-- deterministic new-run success response including performance learning
-
-Keep existing-run and insert SQL, D1 execution, account and Threads identifiers, random run ID generation, shared text/JSON normalizers, JSON parsing, transformation-contract version constant, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Keep identical-draft and count SQL, D1 execution, account and Threads identifiers, random draft ID generation, shared normalizers and JSON parsing, gate execution, status selection, insert serialization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 
 
@@ -1051,7 +1049,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AD
+6. Product-service extraction — ACTIVE at Stage 6AE
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
