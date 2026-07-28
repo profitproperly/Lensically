@@ -5,8 +5,8 @@ updated_at: 2026-07-27
 repository: profitproperly/Lensically
 branch: main
 implementation_id: worker-monolith-refactor
-repository_base_sha: 6aa0ff31e40c41afddde907fa4f842b156117ab7
-production_sha: 6aa0ff31e40c41afddde907fa4f842b156117ab7
+repository_base_sha: 14c3bc78a4a56bf1123f5b3688d2762dda238160
+production_sha: 14c3bc78a4a56bf1123f5b3688d2762dda238160
 
 
 
@@ -741,23 +741,33 @@ Completed checkpoint — Stage 6O context-admission service extraction:
 - Exact-SHA release passed in run `30317831972`.
 - Live production independently confirmed exact SHA `6aa0ff31e40c41afddde907fa4f842b156117ab7` with 75/75 public tools.
 
-Current sub-action — Stage 6P production-board read service extraction:
+Completed checkpoint — Stage 6P production-board read service extraction:
 
-Extract `get_production_board` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+- Added `src/operatorProductionBoardService.ts` as the dependency-injected authority for optional session filtering, production-board item serialization, nullable fields, numeric priority conversion, evidence decoding fallback, brand identity, and exact response composition.
+- Reduced `get_production_board` in `src/index.ts` to explicit active-item query SQL and ordering, session normalization, evidence parsing, brand, and transport adapters.
+- Added `test/operatorProductionBoardService.spec.ts` and permanent push/release ownership gates.
+- Corrected an initially broad ownership assertion so unrelated handlers cannot trigger the production-board gate.
+- Push validation passed in run `30318849577`.
+- All eight Operator shards passed in run `30319055680`.
+- Exact-SHA release passed in run `30319110116`.
+- Live production independently confirmed exact SHA `14c3bc78a4a56bf1123f5b3688d2762dda238160` with 75/75 public tools.
 
-- optional normalized workflow-session filtering
-- active production-board item retrieval and deterministic database ordering
-- exact item fields for identity, type, lane, title, body, priority, evidence, origin, and timestamps
-- nullable lane, priority, and origin behavior
-- numeric priority conversion when present
-- evidence JSON decoding with an empty-array fallback
-- exact brand identity and empty warnings response
+Current sub-action — Stage 6Q source-candidate list service extraction:
 
-Keep production-board query SQL and ordering, text normalization, evidence JSON parsing, brand identity, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Extract `list_source_candidates` from `handleOperatorTool` into a focused dependency-injected service while preserving:
+
+- source-type array normalization to strings
+- numeric limit and offset defaults
+- exact source-candidate retrieval inputs
+- returned count, total count, deterministic `has_more` pagination state, and candidate passthrough
+- Manifest-only minimum verified-like eligibility metadata and null behavior for other brands
+- exact response keys and no mutation
+
+Keep source-candidate retrieval/query mechanics, brand object access, Manifest threshold constant, and shared transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6P, then continue Stage 6 product-service extraction in bounded domain clusters.
+- Complete Stage 6Q, then continue Stage 6 product-service extraction in bounded domain clusters.
 
 
 
