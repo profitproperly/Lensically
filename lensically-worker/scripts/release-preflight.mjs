@@ -107,6 +107,8 @@ const operatorGenerationRunAdmissionService = read("src/operatorGenerationRunAdm
 const operatorGenerationRunAdmissionServiceTests = read("test/operatorGenerationRunAdmissionService.spec.ts");
 const operatorGenerationRunPersistencePlanningService = read("src/operatorGenerationRunPersistencePlanningService.ts");
 const operatorGenerationRunPersistencePlanningServiceTests = read("test/operatorGenerationRunPersistencePlanningService.spec.ts");
+const operatorGenerationDraftAdmissionService = read("src/operatorGenerationDraftAdmissionService.ts");
+const operatorGenerationDraftAdmissionServiceTests = read("test/operatorGenerationDraftAdmissionService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -322,6 +324,9 @@ if (!workflow.includes("test/operatorGenerationRunAdmissionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorGenerationRunPersistencePlanningService.spec.ts")) {
   errors.push("operator_generation_run_persistence_planning_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorGenerationDraftAdmissionService.spec.ts")) {
+  errors.push("operator_generation_draft_admission_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1763,6 +1768,35 @@ if (!operatorGenerationRunPersistencePlanningServiceTests.includes("skips the ex
     || !operatorGenerationRunPersistencePlanningServiceTests.includes("uses canonical family and version defaults for a root source card")) {
   lifecycleErrors.push("operator_generation_run_persistence_planning_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorGenerationDraftAdmissionService"')
+    || !source.includes("admitOperatorGenerationDraft(payload")
+    || !source.includes("loadExistingDraft: async ({ runId, sourceCardId, text })")
+    || !source.includes("countExistingDrafts: async ({ runId, sourceCardId })")
+    || !source.includes("draftAdmission.context")) {
+  lifecycleErrors.push("operator_generation_draft_admission_service_import_or_binding_missing");
+}
+if (source.includes('error: "run_id, source_card_id, and text are required"')
+    || source.includes("identical_run_draft_already_exists")
+    || source.includes("existing_draft_count: existingDraftCount")) {
+  lifecycleErrors.push("operator_generation_draft_admission_service_returned_to_index");
+}
+if (!operatorGenerationDraftAdmissionService.includes("export async function admitOperatorGenerationDraft")
+    || !operatorGenerationDraftAdmissionService.includes("dependencies.loadExistingDraft")
+    || !operatorGenerationDraftAdmissionService.includes("dependencies.countExistingDrafts")
+    || !operatorGenerationDraftAdmissionService.includes("run_id, source_card_id, and text are required")
+    || !operatorGenerationDraftAdmissionService.includes("identical_run_draft_already_exists")
+    || !operatorGenerationDraftAdmissionService.includes("existingDraftCount >= 2")
+    || !operatorGenerationDraftAdmissionService.includes("lensically_saved_workflow_required")) {
+  lifecycleErrors.push("operator_generation_draft_admission_service_module_incomplete");
+}
+if (!operatorGenerationDraftAdmissionServiceTests.includes("returns the exact required-fields rejection before database reads")
+    || !operatorGenerationDraftAdmissionServiceTests.includes("returns the exact identical-draft reuse response with parsed gate arrays")
+    || !operatorGenerationDraftAdmissionServiceTests.includes("uses empty gate arrays when an existing draft summary is malformed")
+    || !operatorGenerationDraftAdmissionServiceTests.includes("returns the exact saved-workflow rejection at the two-draft limit")
+    || !operatorGenerationDraftAdmissionServiceTests.includes("returns normalized continuation context below the draft limit")) {
+  lifecycleErrors.push("operator_generation_draft_admission_service_tests_incomplete");
+}
+
 
 
 

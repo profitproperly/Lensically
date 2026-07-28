@@ -132,6 +132,7 @@ import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
 import { readOperatorSourceCard } from "./operatorSourceCardReadService";
 import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionService";
 import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPersistencePlanningService";
+import { admitOperatorGenerationDraft } from "./operatorGenerationDraftAdmissionService";
 
 
 
@@ -14326,42 +14327,31 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(result);
   }
 
-    if (toolName === "submit_candidate_draft" || toolName === "save_self_rejected_draft") {
-    const runId = normalizeOperatorText(payload.run_id, 120);
-    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
-    const text = normalizeOperatorText(payload.text, 20000);
-    if (!runId || !sourceCardId || !text) {
-      return operatorJsonResponse({ success: false, error: "run_id, source_card_id, and text are required" }, 400);
+        if (toolName === "submit_candidate_draft" || toolName === "save_self_rejected_draft") {
+    const draftAdmission = await admitOperatorGenerationDraft(payload, {
+      normalizeText: normalizeOperatorText,
+      parseJson: safeParseJsonString,
+      loadExistingDraft: async ({ runId, sourceCardId, text }) => await env.DB.prepare(
+        `SELECT * FROM gpt_generation_drafts
+         WHERE account_id = ? AND run_id = ? AND source_card_id = ? AND text = ?
+         ORDER BY datetime(updated_at) DESC LIMIT 1`,
+      ).bind(
+        brand.account_id,
+        runId,
+        sourceCardId,
+        text,
+      ).first<Record<string, unknown>>(),
+      countExistingDrafts: async ({ runId, sourceCardId }) => await countGenerationDraftsForRun(
+        env,
+        brand.account_id,
+        runId,
+        sourceCardId,
+      ),
+    });
+    if (draftAdmission.kind === "response") {
+      return operatorJsonResponse(draftAdmission.body, draftAdmission.status);
     }
-    const existingDraft = await env.DB.prepare(
-      `SELECT * FROM gpt_generation_drafts
-       WHERE account_id = ? AND run_id = ? AND source_card_id = ? AND text = ?
-       ORDER BY datetime(updated_at) DESC LIMIT 1`,
-    ).bind(brand.account_id, runId, sourceCardId, text).first<Record<string, unknown>>();
-    if (existingDraft?.id) {
-      const gateSummary = safeParseJsonString(String(existingDraft.gate_summary_json ?? "{}"));
-      const gateRecord = gateSummary && typeof gateSummary === "object" && !Array.isArray(gateSummary)
-        ? gateSummary as Record<string, unknown>
-        : {};
-      return operatorJsonResponse({
-        draft_id: existingDraft.id,
-        status: existingDraft.status,
-        showable: Number(existingDraft.showable ?? 0) === 1,
-        gate_results: Array.isArray(gateRecord.gate_results) ? gateRecord.gate_results : [],
-        blocking_failures: Array.isArray(gateRecord.blocking_failures) ? gateRecord.blocking_failures : [],
-        reused_existing: true,
-        idempotency_reason: "identical_run_draft_already_exists",
-      });
-    }
-        const existingDraftCount = await countGenerationDraftsForRun(env, brand.account_id, runId, sourceCardId);
-    if (existingDraftCount >= 2) {
-      return operatorJsonResponse({
-        success: false,
-        error: "lensically_saved_workflow_required",
-        existing_draft_count: existingDraftCount,
-        required_workflow: "Lensically account workflows are source-card controlled. A single source-card run may create one candidate plus one repair candidate unless an account has a backend-supported override. Start the next source-card loop instead of adding more drafts to the same run.",
-      }, 400);
-    }
+    const { runId, sourceCardId, text } = draftAdmission.context;
     const draftId = crypto.randomUUID();
     const status = toolName === "save_self_rejected_draft" ? "self_rejected" : "candidate";
     const draftIndex = Number.isFinite(Number(payload.draft_index)) ? Math.max(0, Math.trunc(Number(payload.draft_index))) : 1;
