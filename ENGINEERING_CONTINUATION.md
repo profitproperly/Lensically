@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6aa-source-card-lock-service
-repository_base_sha: a2ff062b8bb31dc181be697eb45f3b44c53c45d0
-production_sha: a2ff062b8bb31dc181be697eb45f3b44c53c45d0
+active_checkpoint: stage-6ab-source-card-read-service
+repository_base_sha: 1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46
+production_sha: 1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AA source-card lock service extraction.
+- Current checkpoint: Stage 6AB source-card read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -950,18 +950,30 @@ Completed checkpoint — Stage 6Z source-card validation and persistence-plannin
 - Hardened exact-SHA release and live verification passed in run `30397022485`.
 - Live production independently confirmed exact SHA `a2ff062b8bb31dc181be697eb45f3b44c53c45d0` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AA source-card lock service extraction:
+Completed checkpoint — Stage 6AA source-card lock service extraction:
 
-Extract `lock_source_card` into a focused dependency-injected service while preserving:
+- Added `src/operatorSourceCardLockService.ts` as the dependency-injected authority for source-card ID admission, card lookup, lockability validation, exact rejection behavior, lock timestamp planning, and success response composition.
+- Reduced `lock_source_card` in `src/index.ts` to account-scoped retrieval, SQL update execution, brand identity, validation and clock adapters, and HTTP transport.
+- Added `test/operatorSourceCardLockService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Corrected the service's successful-branch TypeScript invariant to explicitly require both the normalized ID and loaded card without changing runtime behavior.
+- Focused validation passed in run `30397475418`.
+- Push validation passed in run `30397457723`.
+- All eight Operator shards passed in run `30397540363`.
+- Hardened exact-SHA release and live verification passed in run `30397661959`.
+- Live production independently confirmed exact SHA `1f7fd170be8a0bfb0bc8ac641fd49d62a4251e46` with 75/75 public tools.
 
-- required normalized `source_card_id` admission
-- account-scoped source-card lookup and exact `source_card_not_found` behavior
-- lockability validation and exact rejection payload with current status
-- deterministic locked-at generation through an explicit clock adapter
-- persistence intent for the locked status and timestamp
-- exact successful response with warnings
+ACTIVE checkpoint — Stage 6AB source-card read service extraction:
 
-Keep source-card SQL lookup and update, account and brand identifiers, validation helpers, current-time generation, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract `get_source_card` into a focused dependency-injected service while preserving:
+
+- normalized source-card ID admission and exact `source_card_not_found` behavior
+- account-scoped source-card lookup
+- exact `include_history === false` short-circuit
+- canonical source-card history retrieval when history is enabled or omitted
+- deterministic source-card, canonical-context, and owner-presentation response composition
+
+Keep source-card and history SQL or helper retrieval, account and brand identifiers, owner-presentation constants, shared normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 
@@ -996,7 +1008,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AA
+6. Product-service extraction — ACTIVE at Stage 6AB
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
