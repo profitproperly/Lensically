@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6aj-gate-mutation-admission-and-persistence
-repository_base_sha: c8bd31fc56cd566bb90bd1615673efac0573ccb5
-production_sha: c8bd31fc56cd566bb90bd1615673efac0573ccb5
+active_checkpoint: stage-6ak-strategy-memory-list-read-service
+repository_base_sha: b8b3edf9075fde54540bd5690c5bc901a31ae72c
+production_sha: b8b3edf9075fde54540bd5690c5bc901a31ae72c
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AJ gate mutation admission and persistence-planning service extraction.
+- Current checkpoint: Stage 6AK strategy-memory list read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1058,20 +1058,30 @@ Completed checkpoint — Stage 6AI active-gate read service extraction:
 - Hardened exact-SHA release and live verification passed in run `30408586436`.
 - Live production independently confirmed exact SHA `c8bd31fc56cd566bb90bd1615673efac0573ccb5` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AJ gate mutation admission and persistence-planning service extraction:
+Completed checkpoint — Stage 6AJ gate mutation admission and persistence-planning service extraction:
 
-Extract the deterministic `create_or_update_gate` and `promote_memory_to_gate` workflow into a focused dependency-injected service while preserving:
+- Added `src/operatorGateMutationPlanningService.ts` as the dependency-injected authority for create/update and memory-promotion admission, promoted-memory fallbacks and lineage, gate identity and scope normalization, create-versus-update selection, normalized persistence values, and exact response composition.
+- Reduced `create_or_update_gate` and `promote_memory_to_gate` in `src/index.ts` to account-scoped memory lookup, existing-gate identity lookup, random gate-ID generation, the unchanged gate UPDATE and INSERT statements, canonical account and brand identity, shared normalization adapters, and HTTP transport.
+- Added `test/operatorGateMutationPlanningService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Focused validation passed in run `30409195300`.
+- Push validation passed in run `30409179386`.
+- All eight Operator shards passed in run `30409440670`.
+- Hardened exact-SHA release and live verification passed in run `30409518252`.
+- Live production independently confirmed exact SHA `b8b3edf9075fde54540bd5690c5bc901a31ae72c` with 75/75 public tools.
 
-- normalized description, display name, source-memory IDs, and created-from values
-- promotion memory-ID parsing, account-scoped memory retrieval, and exact `memory_not_found` response
-- promoted-memory fallbacks for display name, description, source-memory lineage, and `strategy_memory` origin
-- normalized gate-key and description admission with the exact required-fields rejection
-- global versus account brand scope plus normalized lane and content-type scopes
-- existing gate identity lookup across brand, gate key, lane, and content type
-- deterministic create-versus-update selection and normalized persistence values for stage, type, severity, evaluator, active state, order, examples, source-memory lineage, and origin
-- exact final response including promoted memory identity
+ACTIVE checkpoint — Stage 6AK strategy-memory list read service extraction:
 
-Keep memory and existing-gate SQL reads, gate UPDATE and INSERT SQL execution, random gate-ID generation, account and brand identity, shared text/stage/machine-key/JSON normalizers, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the deterministic `list_strategy_memory` workflow into a focused dependency-injected service while preserving:
+
+- optional memory-kind normalization
+- default limit 50 with an inclusive 1-to-100 clamp
+- offset normalization with a zero floor
+- empty versus single-kind filter construction
+- account-scoped active-memory list and count retrieval with identical filters
+- exact response composition for items, returned count, total count, and `has_more`
+
+Keep the strategy-memory list and count helpers, canonical account identity, shared machine-key normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 
 
 
@@ -1110,7 +1120,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AJ
+6. Product-service extraction — ACTIVE at Stage 6AK
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
