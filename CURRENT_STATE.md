@@ -24,6 +24,7 @@
 - The mandatory autonomous capability lifecycle is source-controlled in `lensically-worker/src/systemDirectory/capabilityLifecycle.json`. Future models resolve and reuse existing capabilities first; when a capability is missing, they create and store its declaration, Directory entry, canonical typed handler, static route, focused regression, validation scope, exact-head release plan, and live-verification contract without routine owner prompting.
 - Fast validation and release preflight fail closed when a new tool or Directory entry lacks a complete lifecycle declaration. Compatibility bridges and duplicate implementation paths are forbidden.
 - Mandatory startup reports the lifecycle version, canonical location, autonomous execution rule, and required completion sequence.
+- `operator-governing-standards-v2` exposes the owner-approved startup authority verbatim in initialize, startup context, engineering precheck, and the visible selected-key handshake. Exact owner specifications may not be condensed or rediscovered once the target is known. Failure audits may not close on analysis, retry, recommendation, or chat memory; durable prevention evidence is required before resumption.
 - Account workflow calls still retain the controls that protect real business state: selected account, explicit Proceed boundary, server-side continuity, idempotency, authorization, content gates, scheduling ownership, and scheduler safety.
 
 ## Continuous Hardening and Autonomous Operation
