@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/lensically-engineering.yml"
       - ".github/workflows/lensically-workflow-lint.yml"
+      - "lensically-worker/scripts/validate-engineering-workflow.rb"
   workflow_dispatch:
 
 permissions:
@@ -16,10 +17,8 @@ jobs:
   parse-engineering-workflow:
     runs-on: ubuntu-latest
     steps:
-            - name: Checkout exact head
+      - name: Checkout exact head
         uses: actions/checkout@v4
 
-            - name: Parse and validate engineering workflow
+      - name: Parse and validate engineering workflow
         run: ruby lensically-worker/scripts/validate-engineering-workflow.rb .github/workflows/lensically-engineering.yml
-
-
