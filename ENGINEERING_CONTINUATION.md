@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
 status: active
-updated_at: 2026-07-27
+updated_at: 2026-07-28
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6u-manifest-source-card-backfill-service
-repository_base_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
-production_sha: 3778d498c5b0de62c830e1d9f3fe80c0200a0aba
+active_checkpoint: stage-6v-manifest-source-card-backfill-preparation-service
+repository_base_sha: d8fea027b6f003421677ac4a662768eea7cf14a7
+production_sha: d8fea027b6f003421677ac4a662768eea7cf14a7
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6U Manifest source-card backfill orchestration service extraction.
+- Current checkpoint: Stage 6V Manifest source-card backfill preparation read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -835,25 +835,40 @@ Completed checkpoint — Stage 6T published-post lineage audit service extractio
 - Exact-SHA release passed in run `30376685998`.
 - Live production independently confirmed exact SHA `087dd043a4b58f8f2c9e51d759354afe5b15ce75` with 75/75 public tools.
 
-Current sub-action — Stage 6U Manifest source-card backfill orchestration service extraction:
+Completed checkpoint — Stage 6U Manifest source-card backfill orchestration service extraction:
 
-Extract `create_all_missing_manifest_source_cards` from `handleOperatorTool` into a focused dependency-injected orchestration service while preserving:
+- Added `src/operatorManifestSourceCardBackfillService.ts` as the dependency-injected authority for Manifest-only admission, bounded batch limits, stable operation identities, prepare and verification calls, source-faithful per-pattern payloads, deterministic sequential processing, interruption evidence, created/reused counts, and continuation state.
+- Reduced `create_all_missing_manifest_source_cards` in `src/index.ts` to internal MCP invocation, shared text normalization, clock access, brand identity, and HTTP transport adapters.
+- Added `test/operatorManifestSourceCardBackfillService.spec.ts` and permanent push/release ownership gates.
+- Initial validation correctly blocked release because the new ownership gate used the generic fragment `for (const pattern of patterns)`, which also existed in unrelated domains.
+- Replaced the overbroad assertion with handler-specific legacy markers and source-controlled a permanent rule forbidding generic loop fragments in service-ownership gates.
+- Focused validation passed in run `30377405604`.
+- Push validation passed in run `30377390972`.
+- All eight Operator shards passed in run `30377687928`.
+- Exact-SHA release passed in run `30377766628`.
+- Live production independently confirmed exact SHA `d8fea027b6f003421677ac4a662768eea7cf14a7` with 75/75 public tools.
+
+Current sub-action — Stage 6V Manifest source-card backfill preparation read service extraction:
+
+Extract `prepare_manifest_source_card_backfill` from `handleOperatorTool` into a focused dependency-injected read service while preserving:
 
 - Manifest-only admission
-- bounded batch-limit normalization and stable operation-ID fallback
-- prepare-call invocation, HTTP-status normalization, interruption mapping, and remaining-count preservation
-- valid Saved Pattern filtering and deterministic sequential processing
-- exact source-text normalization, title fallback, source-faithful source-card payload construction, and per-pattern idempotency keys
-- first-failure stop behavior with created, reused, remaining, failed-pattern, and completed-card evidence
-- final verification call, exact total/carded/remaining calculations, completion status, continuation flag, and next action
-- no direct database or product mutation
+- workflow-table readiness before reading
+- bounded `limit` normalization with exact default and maximum
+- account-scoped Saved Pattern total, already-carded count, and ordered uncarded-row retrieval
+- canonical Threads URL and post-ID fallback behavior
+- deterministic source identity precedence across Threads post ID, canonical URL, and Saved Pattern ID
+- stable numeric metric serialization and engagement-total calculation
+- exact complete/ready status, counts, batch metadata, patterns, completion rule, and interruption rule
+- no product mutation
 
-Keep internal MCP invocation, shared text normalization, clock access, brand identity, and HTTP transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+Keep table readiness, all SQL, account identifiers, canonical URL/post-ID helpers, row retrieval, brand identity, and transport as explicit `index.ts` adapters. Add focused deterministic tests and permanent ownership gates before exact-SHA release.
+
 
 
 Remaining work after this checkpoint:
 
-- Complete Stage 6U, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Complete Stage 6V, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
 - Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
 - After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
@@ -882,7 +897,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6U
+6. Product-service extraction — ACTIVE at Stage 6V
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
