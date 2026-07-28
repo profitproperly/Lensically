@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6x-source-card-admission-and-selection-resolution
-repository_base_sha: 9d6c7e248678a59445f183bec24b98c206e4e0cb
-production_sha: 9d6c7e248678a59445f183bec24b98c206e4e0cb
+active_checkpoint: stage-6y-source-card-family-resolution-and-version-admission
+repository_base_sha: be4156efce0f2b947e950735dca13bf79a023664
+production_sha: be4156efce0f2b947e950735dca13bf79a023664
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6X source-card admission and existing-selection resolution service extraction.
+- Current checkpoint: Stage 6Y source-card family resolution and version-admission service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -896,7 +896,7 @@ Completion evidence:
 - Exact-SHA release passed in run `30385116533`.
 - Live production independently confirmed exact SHA `9d6c7e248678a59445f183bec24b98c206e4e0cb` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6X source-card admission and existing-selection resolution service extraction:
+Completed checkpoint — Stage 6X source-card admission and existing-selection resolution service extraction:
 
 Extract the bounded front half of `create_source_card` into a focused dependency-injected service while preserving:
 
@@ -910,9 +910,35 @@ Extract the bounded front half of `create_source_card` into a focused dependency
 
 Keep random ID generation, current-time generation, canonical URL/post-ID helpers, all SQL and D1 batch writes, source-card persistence, family/version writes, account/brand identifiers, shared normalization helpers, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
+Completion evidence:
+
+- Added `src/operatorSourceCardAdmissionService.ts` as the dependency-injected authority for compatibility bridging, workflow conflict admission, source-card input normalization, Saved Pattern selection construction, selection hydration, workflow mismatch rejection, and already-resolved card reuse.
+- Reduced the front half of `create_source_card` in `src/index.ts` to random/time generation, account-scoped SQL, D1 selection persistence, helper adapters, and HTTP transport.
+- Added `test/operatorSourceCardAdmissionService.spec.ts`, both workflow lanes, repository-wide syntax coverage, and permanent handler-specific ownership gates.
+- Corrected one overbroad ownership marker that collided with `create_generation_run`; the repaired gate now uses source-card-specific retired response text.
+- Focused validation passed in run `30386460574`.
+- Push validation passed in run `30386446329`.
+- All eight Operator shards passed in run `30386748632`.
+- Exact-SHA release passed in run `30386834611`.
+- Live production independently confirmed exact SHA `be4156efce0f2b947e950735dca13bf79a023664` with 75/75 public tools.
+
+ACTIVE checkpoint — Stage 6Y source-card family resolution and version-admission service extraction:
+
+Extract the next bounded Manifest-only slice of `create_source_card` into a focused dependency-injected service while preserving:
+
+- canonical family lookup by brand and source identity
+- active family creation from the selected source when no family exists
+- current canonical source-card lookup
+- existing canonical-card reuse, source-selection linking, workflow-sequence preservation, validation, and owner-presentation response
+- exact `version_reason_required` rejection for requested new versions
+- superseded-card identity and deterministic version-number increment
+- continuation state for final source-card validation and persistence
+
+Keep family ID generation, all family/selection SQL and D1 writes, workflow-sequence parsing, source-card retrieval, validation helpers, owner-presentation constants, account and brand identifiers, final source-card persistence, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+
 Remaining work after this checkpoint:
 
-- Complete Stage 6W, then continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
 - Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
 - After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
@@ -941,7 +967,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6W
+6. Product-service extraction — ACTIVE at Stage 6Y
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
