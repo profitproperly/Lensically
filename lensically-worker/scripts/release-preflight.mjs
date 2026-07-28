@@ -73,6 +73,8 @@ const operatorManifestReviewSourceResolutionService = read("src/operatorManifest
 const operatorManifestReviewSourceResolutionServiceTests = read("test/operatorManifestReviewSourceResolutionService.spec.ts");
 const operatorManifestReviewBatchSchedulingService = read("src/operatorManifestReviewBatchSchedulingService.ts");
 const operatorManifestReviewBatchSchedulingServiceTests = read("test/operatorManifestReviewBatchSchedulingService.spec.ts");
+const operatorWorkflowSessionStartService = read("src/operatorWorkflowSessionStartService.ts");
+const operatorWorkflowSessionStartServiceTests = read("test/operatorWorkflowSessionStartService.spec.ts");
 
 
 
@@ -219,6 +221,9 @@ if (!workflow.includes("test/operatorManifestReviewSourceResolutionService.spec.
 }
 if (!workflow.includes("test/operatorManifestReviewBatchSchedulingService.spec.ts")) {
   errors.push("operator_manifest_review_batch_scheduling_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorWorkflowSessionStartService.spec.ts")) {
+  errors.push("operator_workflow_session_start_service_workflow_gate_missing");
 }
 
 
@@ -1089,8 +1094,36 @@ if (!operatorManifestReviewBatchSchedulingServiceTests.includes("returns the exa
     || !operatorManifestReviewBatchSchedulingServiceTests.includes("isolates scheduling gate failures without scheduler or lineage writes")
     || !operatorManifestReviewBatchSchedulingServiceTests.includes("isolates scheduler failures and keeps continuation state deterministic")
     || !operatorManifestReviewBatchSchedulingServiceTests.includes("persists scheduled state, strategy lineage, inventory, and completed review status")) {
-  lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_tests_incomplete");
+    lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorWorkflowSessionStartService"')
+    || !source.includes("startOperatorWorkflowSession({")
+    || !source.includes("getActiveSession: ()")
+    || !source.includes("insertSession: async")) {
+  lifecycleErrors.push("operator_workflow_session_start_service_import_or_binding_missing");
+}
+if (source.includes("active_workflow_session_already_exists")
+    || source.includes("next_required_stage: existingSession.current_stage")) {
+  lifecycleErrors.push("operator_workflow_session_start_service_returned_to_index");
+}
+if (!operatorWorkflowSessionStartService.includes("export async function startOperatorWorkflowSession")
+    || !operatorWorkflowSessionStartService.includes("dependencies.getActiveSession")
+    || !operatorWorkflowSessionStartService.includes("dependencies.insertSession")
+    || !operatorWorkflowSessionStartService.includes("dependencies.workflowTemplatePayload")
+    || !operatorWorkflowSessionStartService.includes("active_workflow_session_already_exists")
+    || !operatorWorkflowSessionStartService.includes('current_stage: "account_selection"')) {
+  lifecycleErrors.push("operator_workflow_session_start_service_module_incomplete");
+}
+if (!operatorWorkflowSessionStartServiceTests.includes("reuses an account-selection session with exact idempotency guidance")
+    || !operatorWorkflowSessionStartServiceTests.includes("reuses later-stage sessions without forcing context admission")
+    || !operatorWorkflowSessionStartServiceTests.includes("preserves the missing existing-stage display and next-stage edge contract")
+    || !operatorWorkflowSessionStartServiceTests.includes("creates a new session with the canonical template fallback and null notes")
+    || !operatorWorkflowSessionStartServiceTests.includes("normalizes a requested template and notes for new-session persistence")) {
+  lifecycleErrors.push("operator_workflow_session_start_service_tests_incomplete");
+}
+
+
+
 
 
 
