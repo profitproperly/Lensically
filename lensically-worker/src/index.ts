@@ -128,6 +128,8 @@ import {
   composeOperatorSourceCardPersistenceResponse,
   planOperatorSourceCardPersistence,
 } from "./operatorSourceCardPersistencePlanningService";
+import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
+
 
 
 
@@ -14161,24 +14163,31 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
   }
 
-  if (toolName === "lock_source_card") {
-    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
-    const card = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
-    if (!card) {
-      return operatorJsonResponse({ success: false, error: "source_card_not_found" }, 404);
+    if (toolName === "lock_source_card") {
+    const lockPlanning = await planOperatorSourceCardLock(payload, {
+      normalizeText: normalizeOperatorText,
+      loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
+        env,
+        brand.brand_key,
+        sourceCardId,
+      ),
+      validateSourceCard: validateSourceCardLockable,
+      nowIso: () => new Date().toISOString(),
+    });
+    if (lockPlanning.kind === "response") {
+      return operatorJsonResponse(lockPlanning.body, lockPlanning.status);
     }
-    const validation = validateSourceCardLockable(card);
-    if (!validation.can_lock) {
-      return operatorJsonResponse({ success: false, source_card_id: sourceCardId, status: card.status, validation }, 400);
-    }
-    const lockedAt = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE operator_source_cards
        SET status = 'locked', locked_at = ?
        WHERE id = ?
          AND brand_key = ?`,
-    ).bind(lockedAt, sourceCardId, brand.brand_key).run();
-    return operatorJsonResponse({ source_card_id: sourceCardId, status: "locked", locked_at: lockedAt, warnings: [] });
+    ).bind(
+      lockPlanning.plan.lockedAt,
+      lockPlanning.plan.sourceCardId,
+      brand.brand_key,
+    ).run();
+    return operatorJsonResponse(lockPlanning.plan.body);
   }
 
     if (toolName === "get_source_card") {

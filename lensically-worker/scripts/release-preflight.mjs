@@ -99,6 +99,9 @@ const operatorSourceCardFamilyResolutionService = read("src/operatorSourceCardFa
 const operatorSourceCardFamilyResolutionServiceTests = read("test/operatorSourceCardFamilyResolutionService.spec.ts");
 const operatorSourceCardPersistencePlanningService = read("src/operatorSourceCardPersistencePlanningService.ts");
 const operatorSourceCardPersistencePlanningServiceTests = read("test/operatorSourceCardPersistencePlanningService.spec.ts");
+const operatorSourceCardLockService = read("src/operatorSourceCardLockService.ts");
+const operatorSourceCardLockServiceTests = read("test/operatorSourceCardLockService.spec.ts");
+
 
 
 
@@ -294,6 +297,9 @@ if (!workflow.includes("test/operatorSourceCardFamilyResolutionService.spec.ts")
 }
 if (!workflow.includes("test/operatorSourceCardPersistencePlanningService.spec.ts")) {
   errors.push("operator_source_card_persistence_planning_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorSourceCardLockService.spec.ts")) {
+  errors.push("operator_source_card_lock_service_workflow_gate_missing");
 }
 if ((workflow.match(/node scripts\/validate-test-syntax\.mjs/g) ?? []).length < 3) {
   errors.push("test_syntax_validation_workflow_coverage_missing");
@@ -1589,6 +1595,35 @@ if (!operatorSourceCardPersistencePlanningServiceTests.includes("returns exact S
     || !operatorSourceCardPersistencePlanningServiceTests.includes("validates an empty object when the persisted card read is missing")) {
   lifecycleErrors.push("operator_source_card_persistence_planning_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorSourceCardLockService"')
+    || !source.includes("planOperatorSourceCardLock(payload")
+    || !source.includes("loadSourceCard: async (sourceCardId)")
+    || !source.includes("nowIso: () => new Date().toISOString()")
+    || !source.includes("lockPlanning.plan.lockedAt")
+    || !source.includes("lockPlanning.plan.sourceCardId")) {
+  lifecycleErrors.push("operator_source_card_lock_service_import_or_binding_missing");
+}
+if (source.includes(`if (toolName === "lock_source_card") {
+    const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);`)
+    || source.includes("return operatorJsonResponse({ success: false, source_card_id: sourceCardId, status: card.status, validation }, 400)")
+    || source.includes('return operatorJsonResponse({ source_card_id: sourceCardId, status: "locked", locked_at: lockedAt, warnings: [] })')) {
+  lifecycleErrors.push("operator_source_card_lock_service_returned_to_index");
+}
+if (!operatorSourceCardLockService.includes("export async function planOperatorSourceCardLock")
+    || !operatorSourceCardLockService.includes("dependencies.loadSourceCard")
+    || !operatorSourceCardLockService.includes("dependencies.validateSourceCard")
+    || !operatorSourceCardLockService.includes("source_card_not_found")
+    || !operatorSourceCardLockService.includes("lockedAt")
+    || !operatorSourceCardLockService.includes("warnings: []")) {
+  lifecycleErrors.push("operator_source_card_lock_service_module_incomplete");
+}
+if (!operatorSourceCardLockServiceTests.includes("returns exact not-found behavior for a missing source-card ID without a lookup")
+    || !operatorSourceCardLockServiceTests.includes("returns exact not-found behavior after an account-scoped lookup")
+    || !operatorSourceCardLockServiceTests.includes("returns the exact lockability rejection with current status")
+    || !operatorSourceCardLockServiceTests.includes("returns deterministic lock persistence intent and success response")) {
+  lifecycleErrors.push("operator_source_card_lock_service_tests_incomplete");
+}
+
 
 
 
