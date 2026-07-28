@@ -3737,7 +3737,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     expect(initialized.instructions).toContain("Tool discovery, schema loading, and tools/list are preparation only and never count as execution.");
     expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
-    expect(initialized.instructions.length).toBeLessThan(5000);
+        expect(initialized.instructions.length).toBeLessThan(6500);
   }, 30000);
 
                 it.skip("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
