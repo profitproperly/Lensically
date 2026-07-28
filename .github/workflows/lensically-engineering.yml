@@ -231,10 +231,10 @@ jobs:
       inputs.task != 'operator-tests' &&
       inputs.task != 'worker-deploy'
     
-    runs-on: ubuntu-latest
+        runs-on: ubuntu-latest
     steps:
 
-            - name: Checkout exact head
+      - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.sha }}
