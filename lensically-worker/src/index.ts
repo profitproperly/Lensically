@@ -14517,9 +14517,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }, {
       normalizeStage: normalizeOperatorStage,
       normalizeMachineKey: normalizeOperatorMachineKey,
-      listGates: async ({ brandKey, stageScope, laneKey, contentType }) => await listOperatorGates(
+            listGates: async ({ stageScope, laneKey, contentType }) => await listOperatorGates(
         env,
-        brandKey,
+        brand.brand_key,
         stageScope,
         laneKey,
         contentType,

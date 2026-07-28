@@ -1909,7 +1909,8 @@ if (!operatorDraftDecisionServiceTests.includes("returns the exact required-ID r
 }
 if (!source.includes('from "./operatorActiveGateReadService"')
     || !source.includes("readOperatorActiveGates({")
-    || !source.includes("listGates: async ({ brandKey, stageScope, laneKey, contentType })")
+        || !source.includes("listGates: async ({ stageScope, laneKey, contentType })")
+    || !source.includes("brand.brand_key,\n        stageScope")
     || !source.includes("return operatorJsonResponse(activeGateRead)")) {
   lifecycleErrors.push("operator_active_gate_read_service_import_or_binding_missing");
 }
