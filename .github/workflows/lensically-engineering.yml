@@ -246,14 +246,14 @@ jobs:
           cache: npm
           cache-dependency-path: lensically-worker/package-lock.json
 
-      - name: Restore worker dependencies
+            - name: Restore worker dependencies
         id: worker_cache
         uses: actions/cache@v4
         with:
           path: lensically-worker/node_modules
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
-            - name: Install worker dependencies
+      - name: Install worker dependencies
         if: steps.worker_cache.outputs.cache-hit != 'true'
         working-directory: lensically-worker
         run: npm ci
