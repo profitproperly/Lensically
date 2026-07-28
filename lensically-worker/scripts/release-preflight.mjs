@@ -1848,7 +1848,7 @@ if (source.includes(`if (toolName === "mark_draft_shown") {
 }
 if (!operatorDraftShownTransitionService.includes("export async function planOperatorDraftShownTransition")
     || !operatorDraftShownTransitionService.includes("dependencies.loadDraft")
-    || !operatorDraftShownTransitionService.includes("dependencies.isAllowedTransition")
+        || !operatorDraftShownTransitionService.includes("dependencies.isAllowedTransition(currentStatus, \"shown\")")
     || !operatorDraftShownTransitionService.includes("draft_already_shown_or_advanced")
     || !operatorDraftShownTransitionService.includes("draft_not_showable")
     || !operatorDraftShownTransitionService.includes("updateStatus: \"shown\"")

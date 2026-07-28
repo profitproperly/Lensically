@@ -15,7 +15,7 @@ type OperatorDraftShownResult =
 type OperatorDraftShownDependencies = {
   normalizeText: (value: unknown, maxLength: number) => string | null;
   loadDraft: (draftId: string) => Promise<JsonRecord | null>;
-  isAllowedTransition: (currentStatus: unknown, targetStatus: "shown") => boolean;
+    isAllowedTransition: (currentStatus: string, targetStatus: "shown") => boolean;
 };
 
 const ALREADY_SHOWN_OR_ADVANCED = new Set([
@@ -61,7 +61,7 @@ export async function planOperatorDraftShownTransition(input: {
   }
 
   const showable = Boolean(draft.showable);
-  if (!showable || !dependencies.isAllowedTransition(draft.status, "shown")) {
+    if (!showable || !dependencies.isAllowedTransition(currentStatus, "shown")) {
     return {
       kind: "response",
       status: 400,
