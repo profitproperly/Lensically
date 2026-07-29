@@ -6,6 +6,8 @@ import {
   createScopedOperatorWrapperTool,
   type OperatorMcpToolDefinition,
 } from "../src/operatorMcpToolDefinitions";
+import { OPERATOR_GOVERNING_STANDARDS_ACK } from "../src/operatorMcpProtocol";
+
 
 const accountTool: OperatorMcpToolDefinition = {
   name: "get_account_state",
@@ -45,11 +47,13 @@ describe("Operator MCP tool-definition construction", () => {
 
   it("adds execution metadata only to the returned clone", () => {
     const enriched = addOperatorExecutionMetadataSchema(accountTool, true);
-    expect(enriched.inputSchema.properties).toMatchObject({
+        expect(enriched.inputSchema.properties).toMatchObject({
       brand_key: { type: "string" },
+      governing_standards_ack: { type: "string", const: OPERATOR_GOVERNING_STANDARDS_ACK },
       proceed_confirmed: { type: "boolean" },
       operation_id: { type: "string" },
     });
+    expect(enriched.inputSchema.required).toContain("governing_standards_ack");
     expect(accountTool.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
   });
 
@@ -76,7 +80,13 @@ describe("Operator MCP tool-definition construction", () => {
       "om_get_account_state",
       "vx_get_account_state",
     ]);
-    expect(tools.find((tool) => tool.name === "get_account_state")?.inputSchema.properties).toHaveProperty("proceed_confirmed");
+        expect(tools.find((tool) => tool.name === "get_account_state")?.inputSchema.properties).toHaveProperty("proceed_confirmed");
     expect(tools.find((tool) => tool.name === "engineeringPrecheck")?.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
+    for (const tool of tools) {
+      expect(tool.inputSchema.properties).toMatchObject({
+        governing_standards_ack: { type: "string", const: OPERATOR_GOVERNING_STANDARDS_ACK },
+      });
+      expect(tool.inputSchema.required).toContain("governing_standards_ack");
+    }
   });
 });

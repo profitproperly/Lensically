@@ -1,9 +1,10 @@
-export const OPERATOR_MCP_VERSION = "1.40.3";
+export const OPERATOR_MCP_VERSION = "1.41.0";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v2";
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v3";
+export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
 
 export const OPERATOR_GOVERNING_STANDARDS_TEXT = `# LENSICALLY OPERATOR MODE — STARTUP AUTHORITY
 
@@ -104,7 +105,9 @@ export const OPERATOR_GOVERNING_STANDARDS = {
   version: OPERATOR_GOVERNING_STANDARDS_VERSION,
   authority: "highest_lensically_operating_authority",
   exact_owner_approved_text: OPERATOR_GOVERNING_STANDARDS_TEXT,
-  startup_display_required: true,
+    startup_display_required: true,
+  per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
+  per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
   redundant_inspection_rule: "Once the exact specification, target file, and integration point are known, repeated search or read calls for the same settled evidence are forbidden unless a concrete contradiction or failed replacement requires them.",
@@ -124,7 +127,9 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     return [
     ...buildOperatorGoverningStandardsStartupLines(),
     "",
-    "Use Lensically Operator Mode as the source of truth.",
+        "Use Lensically Operator Mode as the source of truth.",
+    `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
+    "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
     "Tool discovery, schema loading, and tools/list are preparation only and never count as execution.",
     "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",

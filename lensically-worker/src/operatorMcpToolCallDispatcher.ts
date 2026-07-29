@@ -4,6 +4,11 @@ import {
   mcpToolResultResponse,
   type OperatorMcpJsonRpcId,
 } from "./operatorMcpTransport";
+import {
+  OPERATOR_GOVERNING_STANDARDS_ACK,
+  OPERATOR_GOVERNING_STANDARDS_TEXT,
+  OPERATOR_GOVERNING_STANDARDS_VERSION,
+} from "./operatorMcpProtocol";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -124,12 +129,28 @@ export async function dispatchOperatorMcpToolCall(
   dependencies: OperatorMcpToolCallDependencies,
 ): Promise<Response> {
   const { request, id, params } = input;
-  const requestedToolName = typeof params.name === "string" ? params.name : "";
+    const requestedToolName = typeof params.name === "string" ? params.name : "";
   const requestedArgs = asRecord(params.arguments) ?? {};
+  if (requestedArgs.governing_standards_ack !== OPERATOR_GOVERNING_STANDARDS_ACK) {
+    return mcpToolResultResponse(id, {
+      ok: false,
+      error: "governing_standards_ack_required",
+      requested_tool: requestedToolName,
+      governing_standards: {
+        version: OPERATOR_GOVERNING_STANDARDS_VERSION,
+        required_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
+        exact_text: OPERATOR_GOVERNING_STANDARDS_TEXT,
+      },
+      account_data_loaded: false,
+      execution_started: false,
+    }, "Lensically blocked the action before execution because the mandatory governing-standards acknowledgment was absent or altered.", true);
+  }
+  const governedRequestedArgs = { ...requestedArgs };
+  delete governedRequestedArgs.governing_standards_ack;
   const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName);
   const legacyGatewayEntry = requestedToolName === dependencies.routedExecutionGateway;
   const gatewayAccountDataLoaded = directPublicEntry || legacyGatewayEntry
-    ? await dependencies.gatewayAccountDataLoaded(requestedArgs)
+    ? await dependencies.gatewayAccountDataLoaded(governedRequestedArgs)
     : false;
 
   if (!directPublicEntry && !legacyGatewayEntry) {
@@ -142,16 +163,16 @@ export async function dispatchOperatorMcpToolCall(
   }
 
   let toolName = requestedToolName;
-  let rawArgs: JsonRecord = directPublicEntry
+    let rawArgs: JsonRecord = directPublicEntry
     ? {
-        ...requestedArgs,
-        execution_guard: await dependencies.createExecutionGuard(requestedToolName, requestedArgs),
+        ...governedRequestedArgs,
+        execution_guard: await dependencies.createExecutionGuard(requestedToolName, governedRequestedArgs),
       }
-    : requestedArgs;
+    : governedRequestedArgs;
   let routedGatewayMetadata: JsonRecord | null = null;
 
   if (requestedToolName === dependencies.routedExecutionGateway) {
-    const compiledProfile = dependencies.compilePublicProfileRequest(requestedArgs);
+    const compiledProfile = dependencies.compilePublicProfileRequest(governedRequestedArgs);
     if (!compiledProfile.ok) {
       return mcpToolResultResponse(id, {
         ...compiledProfile,

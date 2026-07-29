@@ -1,3 +1,5 @@
+import { OPERATOR_GOVERNING_STANDARDS_ACK } from "./operatorMcpProtocol";
+
 export type OperatorMcpToolDefinition = {
   name: string;
   title: string;
@@ -72,21 +74,33 @@ export function addOperatorExecutionMetadataSchema(
   includeMetadata: boolean,
 ): OperatorMcpToolDefinition {
   const cloned = cloneOperatorMcpTool(tool);
-  if (!includeMetadata) return cloned;
-
   const schema = cloned.inputSchema;
   const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
     ? { ...(schema.properties as Record<string, unknown>) }
     : {};
-  properties.proceed_confirmed = {
-    type: "boolean",
-    description: "Optional compatibility field for guided workflows. Autonomous Manifest cycle tools do not require a Proceed handshake.",
-  };
-  properties.operation_id = {
+  properties.governing_standards_ack = {
     type: "string",
-    description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
+    const: OPERATOR_GOVERNING_STANDARDS_ACK,
+    description: "Mandatory pre-action acknowledgment. Evaluate Autonomy, Efficiency, and Prevention before this call; stop on blockers, fix and record the root cause, add permanent prevention, then resume.",
   };
-  cloned.inputSchema = { ...schema, properties };
+  if (includeMetadata) {
+    properties.proceed_confirmed = {
+      type: "boolean",
+      description: "Optional compatibility field for guided workflows. Autonomous Manifest cycle tools do not require a Proceed handshake.",
+    };
+    properties.operation_id = {
+      type: "string",
+      description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
+    };
+  }
+  const required = new Set(Array.isArray(schema.required) ? schema.required as string[] : []);
+  required.add("governing_standards_ack");
+  cloned.inputSchema = {
+    ...schema,
+    properties,
+    required: [...required],
+    additionalProperties: false,
+  };
   return cloned;
 }
 

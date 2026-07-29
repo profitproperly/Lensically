@@ -34,7 +34,8 @@ describe("Operator MCP protocol contract", () => {
         expect(String(result.instructions)).toContain("A note in chat memory is not enforcement.");
     expect(String(result.instructions)).toContain("Resume the original objective only after prevention is locked in.");
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
-    expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v2");
+        expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v3");
+    expect(OPERATOR_GOVERNING_STANDARDS.per_action_enforcement).toContain("rejects missing or altered acknowledgment");
     expect(OPERATOR_GOVERNING_STANDARDS.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
                 expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("may not end with analysis");
     expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("durable prevention evidence must exist");

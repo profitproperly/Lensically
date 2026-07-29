@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  dispatchOperatorMcpToolCall,
+  dispatchOperatorMcpToolCall as rawDispatchOperatorMcpToolCall,
   type OperatorMcpToolCallDependencies,
 } from "../src/operatorMcpToolCallDispatcher";
+import { OPERATOR_GOVERNING_STANDARDS_ACK } from "../src/operatorMcpProtocol";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -96,7 +97,46 @@ async function structuredContent(response: Response): Promise<JsonRecord> {
   return result.structuredContent as JsonRecord;
 }
 
+async function dispatchOperatorMcpToolCall(
+  input: Parameters<typeof rawDispatchOperatorMcpToolCall>[0],
+  dependencies: OperatorMcpToolCallDependencies,
+): Promise<Response> {
+  const argumentsRecord = input.params.arguments && typeof input.params.arguments === "object" && !Array.isArray(input.params.arguments)
+    ? input.params.arguments as JsonRecord
+    : {};
+  return rawDispatchOperatorMcpToolCall({
+    ...input,
+    params: {
+      ...input.params,
+      arguments: {
+        governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK,
+        ...argumentsRecord,
+      },
+    },
+  }, dependencies);
+}
+
 describe("Operator MCP tool-call dispatcher", () => {
+  it("fails closed before routing or account loading when governing standards are not acknowledged", async () => {
+    const dependencies = baseDependencies();
+    const response = await rawDispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 0,
+      params: { name: "getRepoStatus", arguments: {} },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "governing_standards_ack_required",
+      account_data_loaded: false,
+      execution_started: false,
+      governing_standards: {
+        required_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
+      },
+    });
+    expect(dependencies.gatewayAccountDataLoaded).not.toHaveBeenCalled();
+    expect(dependencies.createExecutionGuard).not.toHaveBeenCalled();
+    expect(dependencies.executeAccountTool).not.toHaveBeenCalled();
+  });
   it("preserves direct-public admission and rejects hidden routes", async () => {
     const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
