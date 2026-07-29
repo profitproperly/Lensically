@@ -278,6 +278,19 @@ export async function dispatchOperatorKeyedRuntimeTool(
   };
 }
 
+export type OperatorResponseRuntimeDispatch =
+  | { handled: false }
+  | { handled: true; response: Response };
+
+export async function dispatchOperatorKeyedResponseTool(
+  toolName: string,
+  handlers: Readonly<Record<string, () => Promise<Response>>>,
+): Promise<OperatorResponseRuntimeDispatch> {
+  const handler = handlers[toolName];
+  if (!handler) return { handled: false };
+  return { handled: true, response: await handler() };
+}
+
 export type OperatorManifestRuntimeDispatch = OperatorRuntimeDispatch;
 
 

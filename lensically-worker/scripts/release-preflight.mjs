@@ -896,7 +896,7 @@ if (operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "start_
   lifecycleErrors.push("operator_workflow_context_source_runtime_dispatch_returned_to_index");
 }
 const operatorCreateSourceCardDispatchStart = source.indexOf(
-  'if (toolName === "create_source_card")',
+  "const sourceCardGenerationRuntimeDispatch = await dispatchOperatorKeyedResponseTool(",
   operatorSourceDrawDispatchStart,
 );
 const operatorSourceLineageBackfillRuntimeShell = operatorSourceDrawDispatchStart >= 0
@@ -920,6 +920,28 @@ if (operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "draw_s
     || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "prepare_manifest_source_card_backfill")')
     || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "get_source_candidate_batch")')) {
   lifecycleErrors.push("operator_source_lineage_backfill_runtime_dispatch_returned_to_index");
+}
+const operatorRunGatesDispatchStart = source.indexOf(
+  'if (toolName === "run_gates")',
+  operatorCreateSourceCardDispatchStart,
+);
+const operatorSourceCardGenerationRuntimeShell = operatorCreateSourceCardDispatchStart >= 0
+  && operatorRunGatesDispatchStart > operatorCreateSourceCardDispatchStart
+  ? source.slice(operatorCreateSourceCardDispatchStart, operatorRunGatesDispatchStart)
+  : "";
+if (!operatorSourceCardGenerationRuntimeShell.includes("dispatchOperatorKeyedResponseTool(toolName, {")
+    || !operatorSourceCardGenerationRuntimeShell.includes("create_source_card: async () =>")
+    || !operatorSourceCardGenerationRuntimeShell.includes("lock_source_card: async () =>")
+    || !operatorSourceCardGenerationRuntimeShell.includes("get_source_card: async () =>")
+    || !operatorSourceCardGenerationRuntimeShell.includes("create_generation_run: async () =>")
+    || !operatorSourceCardGenerationRuntimeShell.includes("if (sourceCardGenerationRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_source_card_generation_runtime_dispatch_cutover_incomplete");
+}
+if (operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "create_source_card")')
+    || operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "lock_source_card")')
+    || operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "get_source_card")')
+    || operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "create_generation_run")')) {
+  lifecycleErrors.push("operator_source_card_generation_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -954,7 +976,9 @@ if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorM
     || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
     || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")
         || !operatorMcpRoutingPolicy.includes("export async function admitOperatorRuntimeToolCall")
-        || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorKeyedRuntimeTool")
+            || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorKeyedRuntimeTool")
+    || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorKeyedResponseTool")
+    || !operatorMcpRoutingPolicy.includes("response: await handler()")
     || !operatorMcpRoutingPolicy.includes("handlers[toolName]")
     || !operatorMcpRoutingPolicy.includes("status: result.status ?? 200")
     || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorManifestRuntimeTool")
@@ -983,8 +1007,10 @@ if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicali
     || !operatorMcpRoutingPolicyTests.includes("preserves the retired monolithic commit response")
     || !operatorMcpRoutingPolicyTests.includes("normalizes ambiguous persistence exceptions without retrying")
         || !operatorMcpRoutingPolicyTests.includes("routes scheduled review and leaves unrelated tools unhandled")
-    || !operatorMcpRoutingPolicyTests.includes("executes only the exact matching handler and preserves explicit status")
-    || !operatorMcpRoutingPolicyTests.includes("defaults handled responses to 200 and leaves unknown tools untouched")) {
+        || !operatorMcpRoutingPolicyTests.includes("executes only the exact matching handler and preserves explicit status")
+    || !operatorMcpRoutingPolicyTests.includes("defaults handled responses to 200 and leaves unknown tools untouched")
+    || !operatorMcpRoutingPolicyTests.includes("returns the exact Response from only the matching response handler")
+    || !operatorMcpRoutingPolicyTests.includes("leaves an unknown response tool unhandled without invoking handlers")) {
   lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpTransport"')) {
@@ -1913,6 +1939,7 @@ if (!operatorSourceCandidateBatchReadServiceTests.includes("rejects a missing ba
   lifecycleErrors.push("operator_source_candidate_batch_read_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSourceCardAdmissionService"')
+    || !source.includes("create_source_card: async () =>")
     || !source.includes("admitOperatorSourceCardCreation({")
     || !source.includes("persistSavedPatternSelection: async ({")
     || !source.includes("loadSelection: async (sourceSelectionId)")
@@ -2016,6 +2043,7 @@ if (!operatorSourceCardPersistencePlanningServiceTests.includes("returns exact S
   lifecycleErrors.push("operator_source_card_persistence_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSourceCardLockService"')
+    || !source.includes("lock_source_card: async () =>")
     || !source.includes("planOperatorSourceCardLock(payload")
     || !source.includes("loadSourceCard: async (sourceCardId)")
     || !source.includes("nowIso: () => new Date().toISOString()")
@@ -2044,6 +2072,7 @@ if (!operatorSourceCardLockServiceTests.includes("returns exact not-found behavi
   lifecycleErrors.push("operator_source_card_lock_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSourceCardReadService"')
+    || !source.includes("get_source_card: async () =>")
     || !source.includes("readOperatorSourceCard({")
     || !source.includes("loadSourceCard: async (sourceCardId)")
     || !source.includes("loadHistory: async (sourceCard)")
@@ -2071,6 +2100,7 @@ if (!operatorSourceCardReadServiceTests.includes("returns exact not-found behavi
   lifecycleErrors.push("operator_source_card_read_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorGenerationRunAdmissionService"')
+    || !source.includes("create_generation_run: async () =>")
     || !source.includes("admitOperatorGenerationRun({")
     || !source.includes("getWorkflowConflict: getLensicallySavedWorkflowConflict")
     || !source.includes("normalizeAdaptationPlan: normalizeGenerationAdaptationPlan")

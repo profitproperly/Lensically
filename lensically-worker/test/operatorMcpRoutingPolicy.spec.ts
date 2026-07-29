@@ -6,7 +6,8 @@ import {
   canonicalOperatorExecutionArgs,
   canonicalScopedOperatorMcpToolName,
   classifyOperatorMcpHandler,
-      createOperatorMcpRoutingPolicy,
+            createOperatorMcpRoutingPolicy,
+  dispatchOperatorKeyedResponseTool,
   dispatchOperatorKeyedRuntimeTool,
   dispatchOperatorManifestRuntimeTool,
   operatorMcpCallRequiresProceed,
@@ -399,6 +400,28 @@ describe("Operator keyed runtime dispatch", () => {
     expect(handled).toEqual({ handled: true, body: { ok: true }, status: 200 });
     expect(unknown).toEqual({ handled: false });
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the exact Response from only the matching response handler", async () => {
+    const first = vi.fn(async () => new Response("first", { status: 201 }));
+    const second = vi.fn(async () => new Response("second", { status: 409 }));
+
+    const result = await dispatchOperatorKeyedResponseTool("second", { first, second });
+
+    expect(result.handled).toBe(true);
+    if (result.handled) {
+      expect(result.response.status).toBe(409);
+      expect(await result.response.text()).toBe("second");
+    }
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves an unknown response tool unhandled without invoking handlers", async () => {
+    const handler = vi.fn(async () => new Response("known"));
+
+    expect(await dispatchOperatorKeyedResponseTool("unknown", { known: handler })).toEqual({ handled: false });
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

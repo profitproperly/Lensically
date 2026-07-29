@@ -90,7 +90,8 @@ import {
 } from "./operatorMcpRegistryComposition";
 import {
   admitOperatorRuntimeToolCall,
-    createOperatorMcpRoutingPolicy,
+      createOperatorMcpRoutingPolicy,
+  dispatchOperatorKeyedResponseTool,
   dispatchOperatorKeyedRuntimeTool,
   dispatchOperatorManifestRuntimeTool,
 } from "./operatorMcpRoutingPolicy";
@@ -13123,7 +13124,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     );
   }
 
-            if (toolName === "create_source_card") {
+              const sourceCardGenerationRuntimeDispatch = await dispatchOperatorKeyedResponseTool(toolName, {
+    create_source_card: async () => {
       const sourceCardAdmission = await admitOperatorSourceCardCreation({
         brandKey: brand.brand_key,
         payload,
@@ -13465,12 +13467,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     }, {
       validateSourceCard: validateSourceCardLockable,
     });
-    return operatorJsonResponse(persistenceResponse.body, persistenceResponse.status);
-
-
-  }
-
-    if (toolName === "lock_source_card") {
+        return operatorJsonResponse(persistenceResponse.body, persistenceResponse.status);
+    },
+    lock_source_card: async () => {
     const lockPlanning = await planOperatorSourceCardLock(payload, {
       normalizeText: normalizeOperatorText,
       loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
@@ -13494,10 +13493,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       lockPlanning.plan.sourceCardId,
       brand.brand_key,
     ).run();
-    return operatorJsonResponse(lockPlanning.plan.body);
-  }
-
-        if (toolName === "get_source_card") {
+        return operatorJsonResponse(lockPlanning.plan.body);
+    },
+    get_source_card: async () => {
     const sourceCardRead = await readOperatorSourceCard({
       brandKey: brand.brand_key,
       payload,
@@ -13515,11 +13513,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         sourceCard,
       ),
     });
-    return operatorJsonResponse(sourceCardRead.body, sourceCardRead.status);
-  }
-
-
-        if (toolName === "create_generation_run") {
+        return operatorJsonResponse(sourceCardRead.body, sourceCardRead.status);
+    },
+    create_generation_run: async () => {
     const generationAdmission = await admitOperatorGenerationRun({
       brandKey: brand.brand_key,
       payload,
@@ -13608,9 +13604,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       )
       .run();
 
-    return operatorJsonResponse(generationPlan.body);
-
-
+        return operatorJsonResponse(generationPlan.body);
+    },
+  });
+  if (sourceCardGenerationRuntimeDispatch.handled) {
+    return sourceCardGenerationRuntimeDispatch.response;
   }
 
     if (toolName === "run_gates") {
