@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7e-router-closure
-repository_base_sha: 3ab716529baf5232487e590dff4dbf4ced04a1bc
-production_sha: 3ab716529baf5232487e590dff4dbf4ced04a1bc
+active_checkpoint: stage-8a-workflow-modernization-audit
+repository_base_sha: 2f2cba9ff040e8a8aa295e6fb79c0ae0c8ccc5c6
+production_sha: 2f2cba9ff040e8a8aa295e6fb79c0ae0c8ccc5c6
 
 
 
@@ -1400,11 +1400,22 @@ Completed checkpoint — Stage 7D6 scheduling and results runtime routing:
 - Exact-SHA release passed in run `30430312310`.
 - Live production independently confirmed exact SHA `3ab716529baf5232487e590dff4dbf4ced04a1bc` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7E router closure:
+Completed checkpoint — Stage 7E router closure:
 
-Enforce one whole-handler closure gate proving `handleOperatorTool` contains the composed admission and runtime dispatch boundaries, the unknown-tool fallback, and zero direct `if (toolName === ...)` product branches. The audit has already found no residual product-runtime branches; remaining direct matches belong to separate engineering/admin routers and operation-key helpers.
+- Added one whole-handler lifecycle gate proving `handleOperatorTool` contains the composed admission and runtime dispatch boundaries, the unknown-tool fallback, and zero direct `if (toolName === ...)` product branches.
+- Audited the repository and confirmed remaining direct tool comparisons belong only to separate engineering/admin routers and operation-key helpers.
+- Push validation passed in run `30430534288`.
+- All eight Operator shards passed in run `30430569239`.
+- Exact-SHA release passed in run `30430853219`.
+- Live production independently confirmed exact SHA `2f2cba9ff040e8a8aa295e6fb79c0ae0c8ccc5c6` with 75/75 public tools.
 
-Run focused validation, all eight shards, exact-SHA release, and independent live verification on the closure-gated head. If clean, mark Stage 7 complete and activate Stage 8 test and release modernization.
+Stage 7 router and runtime composition — COMPLETE AND DEPLOYED.
+
+ACTIVE checkpoint — Stage 8A workflow modernization audit:
+
+Audit the current engineering workflow, workflow lint/structure validator, change classifier, validation evidence, artifact handling, migration lane, cron lane, Worker release, and web release against every Stage 8 requirement. Identify only real gaps and select the smallest coherent first implementation slice.
+
+The first implementation must improve measured release efficiency while preserving complete fallback validation whenever exact-SHA evidence is missing, classification is uncertain, or a high-risk surface changed. Add source-controlled enforcement and focused regressions, then validate and release the bounded Stage 8A slice before advancing.
 
 
 
@@ -1456,8 +1467,8 @@ Remaining work after this checkpoint:
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
-7. Router and runtime composition — ACTIVE at Stage 7E closure
-8. Test and release modernization — QUEUED AFTER STAGE 7
+7. Router and runtime composition — COMPLETE AND DEPLOYED
+8. Test and release modernization — ACTIVE at Stage 8A
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
