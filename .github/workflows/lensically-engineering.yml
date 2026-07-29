@@ -409,10 +409,12 @@ jobs:
               lensically-worker/wrangler*) cron_changed=true ;;
             esac
           done < /tmp/lensically-release-files.txt
-          echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
+                    echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
           echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
           echo "migrations_changed=${migrations_changed}" >> "${GITHUB_OUTPUT}"
           echo "cron_changed=${cron_changed}" >> "${GITHUB_OUTPUT}"
+          echo "validated_run_id=${validated_run_id}" >> "${GITHUB_OUTPUT}"
+          echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
           cat /tmp/lensically-release-files.txt
 
       - name: Setup Node
