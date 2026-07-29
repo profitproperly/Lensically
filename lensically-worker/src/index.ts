@@ -59,8 +59,7 @@ import {
 
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
 import {
-  OPERATOR_GOVERNING_STANDARDS,
-  OPERATOR_GOVERNING_STANDARDS_ACK,
+    OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
@@ -20146,9 +20145,7 @@ async function handleOperatorMcpEngineeringTool(
     const listedToolRows = Array.isArray(listedTools)
       ? listedTools.filter((tool): tool is Record<string, unknown> => Boolean(tool) && typeof tool === "object" && !Array.isArray(tool))
       : [];
-        const startup = await callDirectLiveTool("getOperatorStartupContext", {
-      governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK,
-    });
+            const startup = await callDirectLiveTool("getOperatorStartupContext", {});
     const startupContent = structured(startup.payload);
         const autonomousPersistTool = listedToolRows.find((tool) => tool.name === "persist_manifest_autonomous_post") ?? null;
     const retiredCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;

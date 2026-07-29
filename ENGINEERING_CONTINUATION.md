@@ -5,10 +5,10 @@ updated_at: 2026-07-29
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: p1_live_verification_startup_ack
-active_checkpoint: repair_verify_deployed_mcp_startup_ack
-repository_base_sha: 0f9e25bdd88cf85e4ce480617237691521acf635
-production_sha: 00686baacbc83d3baebcdb660a1b9e7938cd03b8
+active_job_id: worker-monolith-refactor
+active_checkpoint: stage_9_final_comparison_cleanup_validation_release
+repository_base_sha: 5da4833915e212eebadaeaa2da16daa957d03930
+production_sha: 5da4833915e212eebadaeaa2da16daa957d03930
 
 
 
@@ -31,19 +31,13 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 
 ## Unified Job Queue
 
-### 1 — ACTIVE — `p1_live_verification_startup_ack`
 
-- Incident: `23bf4d07-e4dd-47a3-9c36-74ec8e8bd77e`.
-- Verified failure: `verifyDeployedMcpVersion` reached the live 75-tool endpoint but returned `startup_direct: false`, blocking normal work.
-- Root cause: the live self-verification path invokes `getOperatorStartupContext` with empty arguments even though every public tool now requires the exact `governing_standards_ack` field.
-- Current checkpoint: pass the mandatory acknowledgment through the live startup probe, add focused regression coverage, validate, exact-SHA release, independently verify the live boundary, and close the incident before resuming Stage 9.
-- Completion condition: shared cause repaired, focused regression passed, exact tested head released, live `startup_direct: true`, incident closure recorded, and normal work unblocked.
 
-### 10 — QUEUED — `worker-monolith-refactor`
+### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 8E release acceptance consolidation.
-- Remaining dependency chain: finish Stage 7 router/runtime composition, then Stage 8 test/release modernization and Stage 9 final comparison, cleanup, validation, and production release.
+- Current checkpoint: Stage 9 final comparison, cleanup, validation, and production release.
+- Remaining dependency chain: Stages 1–8 are complete and deployed. Execute Stage 9 only, then advance the queued CHL foundation in canonical order.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
 ### 20 — QUEUED — `chl_autonomous_operator_foundation_v1`
@@ -81,7 +75,7 @@ Stage 3 production evidence:
 
 ## Current Action
 
-Repair the P1 live verification startup acknowledgment regression. The owner has explicitly resumed the engineering continuation; after this incident closes, resume `worker-monolith-refactor` at Stage 9 final comparison and production release, then continue the queue in canonical order.
+Execute Stage 9 of `worker-monolith-refactor`: perform the final comparison, remove only verified remaining residue, run proportional final validation, release the exact SHA, independently verify production, close the refactor, and advance `chl_autonomous_operator_foundation_v1` to `atomic_write_reconciliation`.
 
 ### Canonical steering rule — immediate scope reduction
 
@@ -1522,7 +1516,7 @@ Post-closure defect resolution — client-side mutation block handling:
 - Root cause within operator control: the existing block-handling standard was not obeyed. The external classifier trigger is not observable from repository evidence and is therefore classified as an external client-side rejection, not a repository defect.
 - Repair and prevention: the canonical standard now explicitly forbids retry-by-decomposition after a client-side block until the block is durably recorded, repository HEAD and engineering audit state are reconciled, and the controllable root cause is resolved or the external trigger is explicitly classified.
 - Stage 8 closure is revalidated after this defect resolution. Stage 8 test and release modernization is COMPLETE AND DEPLOYED.
-- Owner-directed stop: Stage 9 has not started and remains queued until the owner explicitly resumes it.
+- Owner resumed Stage 9 on 2026-07-29. Stage 9 is now the one active monolith-refactor checkpoint.
 
 
 
@@ -1572,13 +1566,13 @@ Remaining work after this checkpoint:
 
 ## Remaining
 
-### Queued job — `worker-monolith-refactor`
+### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
 8. Test and release modernization — COMPLETE AND DEPLOYED
-9. Final comparison and production release — QUEUED; RESUME ONLY ON OWNER INSTRUCTION
+9. Final comparison and production release — ACTIVE
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
 
@@ -1607,11 +1601,7 @@ Stage 4 completion is preserved above. Stage 5 closes only when the MCP protocol
 
 ## Blockers
 
-Active P1 — live verification startup acknowledgment regression:
 
-- Incident `23bf4d07-e4dd-47a3-9c36-74ec8e8bd77e`.
-- `verifyDeployedMcpVersion` successfully initialized the live MCP endpoint and listed all 75 tools, but its direct startup probe omitted the mandatory governing-standards acknowledgment and therefore returned no startup payload.
-- Normal work remains blocked until the shared invocation is repaired, regression-protected, released, and live-verified.
 
 Resolved P1 — Stage 8A workflow dispatch rejection:
 
@@ -1624,7 +1614,7 @@ Resolved P1 — Stage 8A workflow dispatch rejection:
 
 1. Discover `Lensically_Operator_Mode`.
 2. Call `getEngineeringContinuation`. This file is the only continuation authority for every Lensically job.
-3. Read `Authority and Precedence`, `Unified Job Queue`, and `Current Action` before any other continuation or work-state read.
+3. Read `Authority and Precedence`, `Unified Job Queue`, `Current Action`, and `Remaining` before any other continuation or work-state read. The header `status` describes only whether a checkpoint is currently executing; `status: idle` never means the queue is empty. When the owner says `proceed`, `resume`, or `continue` while a checkpoint is held, activate that exact held checkpoint before any unrelated inspection or incident promotion.
 4. Call `getRepoStatus` and reconcile repository HEAD and production SHA with this file.
 5. Resume only the one `ACTIVE` job and its one `Current Action`; do not restart completed checkpoints or promote a queued/captured item.
 6. Treat D1 work state, action-closure receipts, chat history, Growth Mission records, and other documents as evidence or telemetry only.

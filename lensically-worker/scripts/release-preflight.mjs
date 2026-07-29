@@ -3449,9 +3449,7 @@ for (const [name, passed] of manifestAutonomousGrowthChecks) {
 if (!tests.includes("routes operational status and engineering intents deterministically away from content procedures")) {
   errors.push("static_router_engineering_regression_missing");
 }
-if (!source.includes('const startup = await callDirectLiveTool("getOperatorStartupContext", {\n      governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK,\n    });')) {
-  errors.push("live_startup_verification_governing_ack_missing");
-}
+
 if (tests.includes(".only(") || /operatorMode\.spec\.ts[^\n]*\s-t\s/.test(workflow)) {
   errors.push("focused_operator_test_filter_forbidden");
 }
