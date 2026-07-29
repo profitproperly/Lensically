@@ -783,7 +783,7 @@ if (!operatorToolAdmissionShell.includes("admitOperatorRuntimeToolCall({ request
   lifecycleErrors.push("operator_runtime_admission_cutover_incomplete");
 }
 const operatorAccountStateDispatchStart = source.indexOf(
-  'if (toolName === "get_account_state")',
+  "const accountCoverageRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
   operatorToolHandlerDispatchStart,
 );
 const operatorManifestRuntimeShell = operatorToolHandlerDispatchStart >= 0
@@ -805,6 +805,28 @@ if (operatorManifestRuntimeShell.includes("if (isOperatorManifestCycleServiceToo
     || operatorManifestRuntimeShell.includes('if (toolName === "persist_manifest_autonomous_post")')
     || operatorManifestRuntimeShell.includes('if (toolName === "review_manifest_scheduled_post")')) {
   lifecycleErrors.push("operator_manifest_runtime_dispatch_returned_to_index");
+}
+const operatorClaimReviewDispatchStart = source.indexOf(
+  'if (toolName === "claim_manifest_review_batch")',
+  operatorAccountStateDispatchStart,
+);
+const operatorAccountCoverageRuntimeShell = operatorAccountStateDispatchStart >= 0
+  && operatorClaimReviewDispatchStart > operatorAccountStateDispatchStart
+  ? source.slice(operatorAccountStateDispatchStart, operatorClaimReviewDispatchStart)
+  : "";
+if (!operatorAccountCoverageRuntimeShell.includes("dispatchOperatorKeyedRuntimeTool(toolName, {")
+    || !operatorAccountCoverageRuntimeShell.includes("get_account_state: async () =>")
+    || !operatorAccountCoverageRuntimeShell.includes("read_lensically_ui_surface: async () =>")
+    || !operatorAccountCoverageRuntimeShell.includes("discard_manifest_review_batch: async () =>")
+    || !operatorAccountCoverageRuntimeShell.includes("get_hourly_coverage: async () =>")
+    || !operatorAccountCoverageRuntimeShell.includes("if (accountCoverageRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_account_coverage_runtime_dispatch_cutover_incomplete");
+}
+if (operatorAccountCoverageRuntimeShell.includes('if (toolName === "get_account_state")')
+    || operatorAccountCoverageRuntimeShell.includes('if (toolName === "read_lensically_ui_surface")')
+    || operatorAccountCoverageRuntimeShell.includes('if (toolName === "discard_manifest_review_batch")')
+    || operatorAccountCoverageRuntimeShell.includes('if (toolName === "get_hourly_coverage")')) {
+  lifecycleErrors.push("operator_account_coverage_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -839,6 +861,9 @@ if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorM
     || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
     || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")
         || !operatorMcpRoutingPolicy.includes("export async function admitOperatorRuntimeToolCall")
+        || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorKeyedRuntimeTool")
+    || !operatorMcpRoutingPolicy.includes("handlers[toolName]")
+    || !operatorMcpRoutingPolicy.includes("status: result.status ?? 200")
     || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorManifestRuntimeTool")
     || !operatorMcpRoutingPolicy.includes('toolName === "prepare_manifest_autonomous_cycle"')
     || !operatorMcpRoutingPolicy.includes('toolName === "persist_manifest_autonomous_post"')
@@ -864,7 +889,9 @@ if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicali
     || !operatorMcpRoutingPolicyTests.includes("normalizes preparation exceptions through cycle observation")
     || !operatorMcpRoutingPolicyTests.includes("preserves the retired monolithic commit response")
     || !operatorMcpRoutingPolicyTests.includes("normalizes ambiguous persistence exceptions without retrying")
-    || !operatorMcpRoutingPolicyTests.includes("routes scheduled review and leaves unrelated tools unhandled")) {
+        || !operatorMcpRoutingPolicyTests.includes("routes scheduled review and leaves unrelated tools unhandled")
+    || !operatorMcpRoutingPolicyTests.includes("executes only the exact matching handler and preserves explicit status")
+    || !operatorMcpRoutingPolicyTests.includes("defaults handled responses to 200 and leaves unknown tools untouched")) {
   lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpTransport"')) {

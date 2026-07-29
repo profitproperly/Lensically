@@ -251,13 +251,35 @@ export async function admitOperatorRuntimeToolCall<TBrand>(
   };
 }
 
-export type OperatorManifestRuntimeDispatch =
+export type OperatorRuntimeDispatch =
   | { handled: false }
   | {
       handled: true;
       body: Record<string, unknown>;
       status: number;
     };
+
+export type OperatorRuntimeHandler = () => Promise<{
+  body: Record<string, unknown>;
+  status?: number;
+}>;
+
+export async function dispatchOperatorKeyedRuntimeTool(
+  toolName: string,
+  handlers: Readonly<Record<string, OperatorRuntimeHandler>>,
+): Promise<OperatorRuntimeDispatch> {
+  const handler = handlers[toolName];
+  if (!handler) return { handled: false };
+  const result = await handler();
+  return {
+    handled: true,
+    body: result.body,
+    status: result.status ?? 200,
+  };
+}
+
+export type OperatorManifestRuntimeDispatch = OperatorRuntimeDispatch;
+
 
 export async function dispatchOperatorManifestRuntimeTool(
   input: {

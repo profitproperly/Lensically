@@ -90,7 +90,8 @@ import {
 } from "./operatorMcpRegistryComposition";
 import {
   admitOperatorRuntimeToolCall,
-  createOperatorMcpRoutingPolicy,
+    createOperatorMcpRoutingPolicy,
+  dispatchOperatorKeyedRuntimeTool,
   dispatchOperatorManifestRuntimeTool,
 } from "./operatorMcpRoutingPolicy";
 import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
@@ -11873,7 +11874,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(manifestRuntimeDispatch.body, manifestRuntimeDispatch.status);
   }
 
-    if (toolName === "get_account_state") {
+      const accountCoverageRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
+    get_account_state: async () => {
     const state = await readOperatorAccountState({
       brandKey: brand.brand_key,
       accountId: brand.account_id,
@@ -11910,11 +11912,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         null,
       ),
     });
-    return operatorJsonResponse(state);
-  }
-
-
-    if (toolName === "read_lensically_ui_surface") {
+          return { body: state, status: 200 };
+    },
+    read_lensically_ui_surface: async () => {
     const surfaceResult = await readOperatorLensicallyUiSurface({
       brandKey: brand.brand_key,
       accountId: brand.account_id,
@@ -11989,11 +11989,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         };
       },
     });
-    return operatorJsonResponse(surfaceResult.body, surfaceResult.status);
-  }
-
-
-    if (toolName === "discard_manifest_review_batch") {
+          return { body: surfaceResult.body, status: surfaceResult.status };
+    },
+    discard_manifest_review_batch: async () => {
     const retirement = await retireOperatorManifestReviewBatch({
       brandKey: brand.brand_key,
       payload,
@@ -12014,11 +12012,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         `UPDATE operator_review_batches SET status = 'retired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
       ).bind(reviewBatchId, brandKey).run(),
     });
-    return operatorJsonResponse(retirement.body, retirement.status);
-  }
-
-
-                  if (toolName === "get_hourly_coverage") {
+          return { body: retirement.body, status: retirement.status };
+    },
+    get_hourly_coverage: async () => {
     const coverageResponse = await handleOperatorHourlyCoverageService({
       brandKey: brand.brand_key,
       payload,
@@ -12099,7 +12095,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ),
       now: () => new Date().toISOString(),
     });
-    return operatorJsonResponse(coverageResponse);
+          return { body: coverageResponse, status: 200 };
+    },
+  });
+  if (accountCoverageRuntimeDispatch.handled) {
+    return operatorJsonResponse(accountCoverageRuntimeDispatch.body, accountCoverageRuntimeDispatch.status);
   }
 
   if (toolName === "claim_manifest_review_batch") {

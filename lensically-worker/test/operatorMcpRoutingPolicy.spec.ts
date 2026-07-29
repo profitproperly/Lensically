@@ -6,7 +6,8 @@ import {
   canonicalOperatorExecutionArgs,
   canonicalScopedOperatorMcpToolName,
   classifyOperatorMcpHandler,
-    createOperatorMcpRoutingPolicy,
+      createOperatorMcpRoutingPolicy,
+  dispatchOperatorKeyedRuntimeTool,
   dispatchOperatorManifestRuntimeTool,
   operatorMcpCallRequiresProceed,
   operatorMcpProceedConfirmed,
@@ -357,7 +358,7 @@ describe("Operator Manifest runtime dispatch", () => {
     });
   });
 
-  it("routes scheduled review and leaves unrelated tools unhandled", async () => {
+    it("routes scheduled review and leaves unrelated tools unhandled", async () => {
     const { dependencies } = createManifestRuntimeDependencies();
     const review = await dispatchOperatorManifestRuntimeTool({
       toolName: "review_manifest_scheduled_post",
@@ -376,6 +377,34 @@ describe("Operator Manifest runtime dispatch", () => {
     expect(unrelated).toEqual({ handled: false });
   });
 });
+
+describe("Operator keyed runtime dispatch", () => {
+  it("executes only the exact matching handler and preserves explicit status", async () => {
+    const first = vi.fn(async () => ({ body: { source: "first" } }));
+    const second = vi.fn(async () => ({ body: { source: "second" }, status: 206 }));
+
+    const result = await dispatchOperatorKeyedRuntimeTool("second", { first, second });
+
+    expect(result).toEqual({ handled: true, body: { source: "second" }, status: 206 });
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults handled responses to 200 and leaves unknown tools untouched", async () => {
+    const handler = vi.fn(async () => ({ body: { ok: true } }));
+
+    const handled = await dispatchOperatorKeyedRuntimeTool("known", { known: handler });
+    const unknown = await dispatchOperatorKeyedRuntimeTool("unknown", { known: handler });
+
+    expect(handled).toEqual({ handled: true, body: { ok: true }, status: 200 });
+    expect(unknown).toEqual({ handled: false });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+
+
 
 
 
