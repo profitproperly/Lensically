@@ -6,6 +6,17 @@ misindented_step_lines = source.lines.each_with_index.filter_map do |line, index
   index + 1 if line.match?(/^ {8,}- name:/)
 end
 abort("misindented_step_markers:#{misindented_step_lines.join(",")}") unless misindented_step_lines.empty?
+canonical_gate_commands = [
+  "node scripts/release-preflight.mjs",
+  "node scripts/test-d1-migration-release.mjs",
+  "node scripts/test-d1-backfill-runner.mjs",
+  "node scripts/d1-migration-release.mjs --check",
+]
+misindented_gate_commands = source.lines.each_with_index.filter_map do |line, index|
+  stripped = line.strip
+  index + 1 if canonical_gate_commands.include?(stripped) && !line.match?(/^ {10}\S/)
+end
+abort("misindented_gate_commands:#{misindented_gate_commands.join(",")}") unless misindented_gate_commands.empty?
 if source.lines.any? { |line| line.match?(/^\s+run:\s+node scripts\/run-full-validation\.mjs\s*$/) }
   abort("shared_full_validation_requires_block_run")
 end
