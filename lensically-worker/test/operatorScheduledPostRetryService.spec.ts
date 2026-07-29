@@ -42,7 +42,7 @@ describe("operator scheduled-post retry", () => {
   it.each([
     [{ published_post_id: "threads-42", status: "approved" }],
     [{ published_post_id: null, status: "posted" }],
-  ])("rejects an already-published record", async ([override]) => {
+  ])("rejects an already-published record", async (override) => {
     const dependencies = createDependencies();
     dependencies.getRetryable.mockResolvedValueOnce({
       id: 42,

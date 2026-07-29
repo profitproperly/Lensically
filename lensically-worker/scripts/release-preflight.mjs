@@ -2161,8 +2161,10 @@ if (!operatorScheduledPostRetryServiceTests.includes("returns the exact not-foun
     || !operatorScheduledPostRetryServiceTests.includes("rejects a non-approved record with its current status")
     || !operatorScheduledPostRetryServiceTests.includes("uses the injected clock to reject a future approved record")
     || !operatorScheduledPostRetryServiceTests.includes("processes once and returns exact refreshed publication success")
-    || !operatorScheduledPostRetryServiceTests.includes("returns the refreshed publish error with a 502 response")
-    || !operatorScheduledPostRetryServiceTests.includes("uses the exact fallback when refreshed state is unavailable")) {
+        || !operatorScheduledPostRetryServiceTests.includes("returns the refreshed publish error with a 502 response")
+    || !operatorScheduledPostRetryServiceTests.includes("uses the exact fallback when refreshed state is unavailable")
+    || !operatorScheduledPostRetryServiceTests.includes("async (override) =>")
+    || operatorScheduledPostRetryServiceTests.includes("async ([override]) =>")) {
   lifecycleErrors.push("operator_scheduled_post_retry_service_tests_incomplete");
 }
 
