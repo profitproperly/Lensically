@@ -775,11 +775,26 @@ export async function persistLockedSourceSelectionPlan(
   }
   const existing = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
 
-  if (existing.length) {
+    if (existing.length) {
     const existingSignature = existing.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
     const requestedSignature = input.receipts.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
-    if (existingSignature !== requestedSignature) throw new Error("locked_source_selection_plan_conflict");
-    return existing;
+    if (existingSignature === requestedSignature) return existing;
+    const committedStrategy = await db.prepare(
+      `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies
+       WHERE brand_key = ? AND cycle_id = ?`,
+    ).bind(input.brand_key, input.cycle_id).first<{ total: number }>();
+    if (Number(committedStrategy?.total ?? 0) > 0) {
+      throw new Error("locked_source_selection_plan_conflict_after_strategy_commit");
+    }
+    await db.batch([
+      db.prepare(
+        `DELETE FROM operator_source_selection_plans WHERE brand_key = ? AND cycle_id = ?`,
+      ).bind(input.brand_key, input.cycle_id),
+      db.prepare(
+        `DELETE FROM operator_source_selection_receipts
+         WHERE brand_key = ? AND scope_type = 'cycle' AND scope_id = ?`,
+      ).bind(input.brand_key, input.cycle_id),
+    ]);
   }
   const statements = input.receipts.map((receipt, index) => db.prepare(
     `INSERT INTO operator_source_selection_plans (

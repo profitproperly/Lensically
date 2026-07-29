@@ -74,8 +74,20 @@ function createHarness() {
       { id: "card-disproven", source_identity_key: "weak", lifetime_label: "disproven" },
     ] as JsonRecord[]),
     loadSourceExclusions: vi.fn(async () => ["excluded"]),
-    selectSourceLineup: vi.fn(() => ({ receipts: [{ source_card_id: "card-allowed" }] })),
-    persistLockedSourceSelectionPlan: vi.fn(async () => [{ id: "selection-1", source_card_id: "card-allowed" }] as JsonRecord[]),
+        selectSourceLineup: vi.fn((selectionInput: { slot_keys: string[] }) => ({
+      receipts: selectionInput.slot_keys.map((slotKey, index) => ({
+        slot_key: slotKey,
+        source_identity_key: `allowed-${index}`,
+        source_card_family_id: `family-${index}`,
+        source_card_id: `card-allowed-${index}`,
+      })),
+    })),
+    persistLockedSourceSelectionPlan: vi.fn(async (selectionInput: { receipts: JsonRecord[] }) => selectionInput.receipts.map((receipt, index) => ({
+      ...receipt,
+      selection_order: index + 1,
+      engine_version: "source-selection-v1",
+      status: "locked",
+    }))),
     buildRollingEvidence: vi.fn(async () => ({
       snapshot: {
         id: "evidence-1",
@@ -204,10 +216,15 @@ describe("Operator Manifest cycle construction service", () => {
       slot_keys: slots.map((slot) => slot.key),
       seed: "manifest_mental:cycle-1:prepare-op-1",
     });
-    expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalledWith({
+        expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalledWith({
       brand_key: "manifest_mental",
       cycle_id: "cycle-1",
-      receipts: [{ source_card_id: "card-allowed" }],
+      receipts: slots.map((slot, index) => ({
+        slot_key: slot.key,
+        source_identity_key: `allowed-${index}`,
+        source_card_family_id: `family-${index}`,
+        source_card_id: `card-allowed-${index}`,
+      })),
     });
     expect(mocks.attachEvidenceSnapshot).toHaveBeenCalledWith("cycle-1", "manifest_mental", "evidence-1");
     expect(mocks.beginCycleReceipt).toHaveBeenCalledWith(expect.objectContaining({
@@ -257,12 +274,18 @@ describe("Operator Manifest cycle construction service", () => {
     });
   });
 
-  it("refreshes an existing cycle with a compact cycle and decision reference", async () => {
-    const { dependencies, mocks } = createHarness();
+    it("refreshes an existing cycle with a compact cycle and decision reference", async () => {
+    const { dependencies, mocks, slots } = createHarness();
     mocks.readExistingCycle.mockResolvedValueOnce({ id: "cycle-existing" });
-    mocks.readLockedSourceSelectionPlan.mockResolvedValueOnce([
-      { id: "selection-existing", source_card_id: "card-existing" },
-    ]);
+    mocks.readLockedSourceSelectionPlan.mockResolvedValueOnce(slots.map((slot, index) => ({
+      slot_key: slot.key,
+      selection_order: index + 1,
+      source_identity_key: `existing-${index}`,
+      source_card_family_id: `family-existing-${index}`,
+      source_card_id: `card-existing-${index}`,
+      engine_version: "source-selection-v1",
+      status: "locked",
+    })));
     mocks.readPreparedCycle.mockResolvedValueOnce({
       id: "cycle-existing",
       brand_key: "manifest_mental",
@@ -309,7 +332,48 @@ describe("Operator Manifest cycle construction service", () => {
         coverage_reconciled: true,
       },
     });
-    expect((result.cycle as JsonRecord).account_position).toBeUndefined();
+        expect((result.cycle as JsonRecord).account_position).toBeUndefined();
+  });
+
+  it("replaces a stale locked source plan before strategy commit", async () => {
+    const { dependencies, mocks, slots } = createHarness();
+    mocks.readExistingCycle.mockResolvedValueOnce({ id: "cycle-existing" });
+    mocks.readLockedSourceSelectionPlan.mockResolvedValueOnce([
+      {
+        slot_key: "2026-07-27T18:00",
+        selection_order: 1,
+        source_card_id: "stale-card",
+        engine_version: "source-selection-v1",
+        status: "locked",
+      },
+    ]);
+    mocks.readPreparedCycle.mockResolvedValueOnce({
+      id: "cycle-existing",
+      brand_key: "manifest_mental",
+      operation_id: "prepare-op-1",
+      status: "prepared",
+      target_slots: slots,
+      missing_slots: slots,
+      scheduled_post_ids: [],
+    });
+
+    const result = await constructOperatorManifestAutonomousCycle(input, dependencies);
+
+    expect(mocks.loadLockedSourceCards).toHaveBeenCalled();
+    expect(mocks.selectSourceLineup).toHaveBeenCalledWith(expect.objectContaining({
+      slot_keys: slots.map((slot) => slot.key),
+    }));
+    expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      reused_existing: true,
+      source_selection_plan_status: "locked",
+      locked_source_selection_plan: slots.map((slot, index) => ({
+        slot_key: slot.key,
+        selection_order: index + 1,
+        source_card_id: `card-allowed-${index}`,
+      })),
+    });
   });
 
     it("completes a fully occupied horizon without source-plan work", async () => {

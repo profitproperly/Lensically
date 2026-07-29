@@ -3487,8 +3487,17 @@ if (!source.includes('work_key: "manifest_autonomous_posting_restoration"')) {
 }
 if (!source.includes("locked_source_selection_plan: lockedSourceSelectionPlan")
     || !source.includes("all_locked_source_plan_items_preserved")
+    || !source.includes("plan_centric_operational_tier: true")
+    || !source.includes("target_slots_reconstructable_from_locked_plan: true")
     || !source.includes("model_source_substitution_allowed: false")) {
   errors.push("bounded_manifest_locked_source_plan_missing");
+}
+if (!operatorManifestCycleConstructionService.includes("pending_horizon_reconciliation")
+    || !operatorManifestCycleConstructionService.includes("locked_source_selection_plan_incomplete_after_reconciliation")
+    || !operatorManifestCycleConstructionServiceTests.includes("replaces a stale locked source plan before strategy commit")
+    || !sourceFamilySelection.includes("locked_source_selection_plan_conflict_after_strategy_commit")
+    || !sourceFamilySelection.includes("DELETE FROM operator_source_selection_receipts")) {
+  errors.push("manifest_locked_source_plan_horizon_reconciliation_missing");
 }
 if (source.includes('callDirectLiveTool("getOperatorStartupContext"')) {
   errors.push("self_referential_live_startup_probe_forbidden");

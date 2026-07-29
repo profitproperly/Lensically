@@ -1204,8 +1204,57 @@ export function compactManifestAutonomousPreparationPayload(
     (bounded.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(bounded);
     if (Number((bounded.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
       return bounded;
+        }
     }
+
+  if (lockedSourceSelectionPlan.length > 0) {
+    const planCentric: Record<string, unknown> = {
+      success: true,
+      reused_existing: payload.reused_existing === true,
+      refreshed_live_state: payload.refreshed_live_state === true,
+      rolling_evidence: compactManifestRollingEvidence(payload.rolling_evidence),
+      strategy_required: payload.strategy_required === true,
+      source_backed_generation_only: payload.source_backed_generation_only === true,
+      source_selection_plan_status: payload.source_selection_plan_status ?? null,
+      locked_source_selection_plan: lockedSourceSelectionPlan,
+      model_source_substitution_allowed: false,
+      remaining_missing_count: payload.remaining_missing_count ?? missingSlots.length,
+      next_missing_slot: compactManifestAutonomousSlot(payload.next_missing_slot),
+      next_action: payload.next_action ?? null,
+      cycle: {
+        id: cycle.id ?? null,
+        brand_key: cycle.brand_key ?? null,
+        operation_id: cycle.operation_id ?? null,
+        status: cycle.status ?? null,
+        timezone: cycle.timezone ?? null,
+        horizon_hours: cycle.horizon_hours ?? null,
+        horizon_start_local: cycle.horizon_start_local ?? null,
+        horizon_end_local: cycle.horizon_end_local ?? null,
+        target_slot_count: Array.isArray(cycle.target_slots) ? cycle.target_slots.length : 0,
+        missing_slot_count: Array.isArray(cycle.missing_slots) ? cycle.missing_slots.length : 0,
+        strategy_version_id: cycle.strategy_version_id ?? null,
+        exposure_snapshot_id: cycle.exposure_snapshot_id ?? null,
+      },
+      reconciliation_contract: payload.reconciliation_contract ?? {},
+      payload_contract: {
+        server_bounded: true,
+        model_payload_sizing: false,
+        byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+        original_bytes: originalBytes,
+        returned_bytes: 0,
+        truncated: true,
+        actionable_autonomous_cycle_preserved: true,
+        plan_centric_operational_tier: true,
+        all_locked_source_plan_items_preserved: lockedSourceSelectionPlan.length === (Array.isArray(payload.locked_source_selection_plan) ? payload.locked_source_selection_plan.length : 0),
+        target_slots_reconstructable_from_locked_plan: true,
+        rolling_evidence_manifest_preserved: true,
+      },
+    };
+    (planCentric.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(planCentric);
+    if (Number((planCentric.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) {
+      return planCentric;
     }
+  }
 
   const accountClock = accountPosition.clock && typeof accountPosition.clock === "object" && !Array.isArray(accountPosition.clock)
     ? accountPosition.clock as Record<string, unknown>

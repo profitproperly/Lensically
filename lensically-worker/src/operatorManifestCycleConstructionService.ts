@@ -336,13 +336,22 @@ export async function constructOperatorManifestAutonomousCycle(
     accountPosition: persistedAccountPosition,
   });
 
-  let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
+    let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
+  const currentMissingSlotKeys = missingSlots.map((slot) => slot.key);
+  const planMatchesCurrentHorizon = (plan: JsonRecord[]) => {
+    const planSlotKeys = plan.map((row) => String(row.slot_key ?? ""));
+    return planSlotKeys.length === currentMissingSlotKeys.length
+      && planSlotKeys.every((slotKey, index) => slotKey === currentMissingSlotKeys[index]);
+  };
+  let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
   let sourceSelectionPlanStatus = missingSlots.length === 0
     ? "not_required"
-    : lockedSourceSelectionPlan.length > 0
+    : lockedPlanMatchesCurrentHorizon
       ? "locked"
-      : "pending";
-  if (missingSlots.length > 0 && lockedSourceSelectionPlan.length === 0) {
+      : lockedSourceSelectionPlan.length > 0
+        ? "pending_horizon_reconciliation"
+        : "pending";
+  if (missingSlots.length > 0 && !lockedPlanMatchesCurrentHorizon) {
     const [lockedSourceCards, sourceExclusions] = await Promise.all([
       dependencies.loadLockedSourceCards(brandKey, String(clock.effective_now_iso ?? "")),
       dependencies.loadSourceExclusions(brandKey),
@@ -354,7 +363,7 @@ export async function constructOperatorManifestAutonomousCycle(
     if (selectionCandidates.length > 0) {
       const backendSelection = dependencies.selectSourceLineup({
         candidates: selectionCandidates,
-        slot_keys: missingSlots.map((slot) => slot.key),
+        slot_keys: currentMissingSlotKeys,
         seed: `${brandKey}:${cycleId}:${operationId}`,
       });
       lockedSourceSelectionPlan = await dependencies.persistLockedSourceSelectionPlan({
@@ -362,6 +371,10 @@ export async function constructOperatorManifestAutonomousCycle(
         cycle_id: cycleId,
         receipts: backendSelection.receipts,
       });
+      lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
+      if (!lockedPlanMatchesCurrentHorizon) {
+        throw new Error("locked_source_selection_plan_incomplete_after_reconciliation");
+      }
       sourceSelectionPlanStatus = "locked";
     } else {
       sourceSelectionPlanStatus = "pending_locked_source_card_inventory";
