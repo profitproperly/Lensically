@@ -1160,13 +1160,22 @@ if (!source.includes('from "./operatorAccountStateService"')
     || !source.includes("listPerformanceScores: async (publishedPostId)")) {
   lifecycleErrors.push("operator_account_state_service_import_or_binding_missing");
 }
+const operatorPostResultsHandlerStart = source.indexOf('if (toolName === "get_post_results")');
+const operatorPostResultsHandlerEnd = source.indexOf(
+  'return operatorJsonResponse({ success: false, error: "unknown_operator_tool"',
+  operatorPostResultsHandlerStart,
+);
+const operatorPostResultsHandler = operatorPostResultsHandlerStart >= 0
+  && operatorPostResultsHandlerEnd > operatorPostResultsHandlerStart
+  ? source.slice(operatorPostResultsHandlerStart, operatorPostResultsHandlerEnd)
+  : "";
 if (source.includes("active_workflow_session: activeSession")
     || source.includes("latest_approved_drafts: approved")
     || source.includes("active_gates_count: gates.length")
-    || source.includes("const lineageRow = scheduled ?? draftFallback")
-    || source.includes('response_mode: "compact"')
-    || source.includes("follower_attribution_policy: {")
-    || source.includes("latestSnapshot?.metrics_json !== serializedMetrics")) {
+    || operatorPostResultsHandler.includes("const lineageRow = scheduled ?? draftFallback")
+    || operatorPostResultsHandler.includes('response_mode: "compact"')
+    || operatorPostResultsHandler.includes("follower_attribution_policy: {")
+    || operatorPostResultsHandler.includes("latestSnapshot?.metrics_json !== serializedMetrics")) {
   lifecycleErrors.push("operator_account_state_service_returned_to_index");
 }
 if (!operatorAccountStateService.includes("export async function readOperatorAccountState")
