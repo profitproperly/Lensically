@@ -132,7 +132,8 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     const wranglerConfig = readFileSync(resolve(root, "wrangler.jsonc"), "utf8");
   if (!wranglerConfig.includes('"migrations_dir": "database/migrations"')) errors.push("wrangler_migration_directory_missing");
   if (!wranglerConfig.includes('"migrations_table": "lensically_d1_migrations"')) errors.push("wrangler_migration_ledger_missing");
-  const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
+    const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
+  const fullValidationRunner = readFileSync(resolve(root, "scripts/run-full-validation.mjs"), "utf8");
     if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
     errors.push("release_migration_apply_missing");
   }
@@ -264,7 +265,9 @@ export function validateDatabaseAuthority(root = defaultRoot) {
   if (!migrationTests.includes("enforces parent-user guards and cascades cleanup through scheduling tables")) {
     errors.push("scheduling_migration_behavior_regression_missing");
   }
-  if (!releaseWorkflow.includes("test/databaseMigrations.spec.ts")) {
+    if (!releaseWorkflow.includes("node scripts/run-full-validation.mjs")
+      || !releaseWorkflow.includes("node scripts/run-full-validation.mjs --check")
+      || !fullValidationRunner.includes('"test/databaseMigrations.spec.ts"')) {
     errors.push("migration_regression_release_gate_missing");
   }
 
