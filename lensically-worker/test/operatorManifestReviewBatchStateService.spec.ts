@@ -127,7 +127,7 @@ function createClaimHarness() {
   let id = 0;
   let existingReview: { id: string } | null = null;
   const mocks = {
-    getActiveSession: vi.fn(async () => ({ id: "session-1" } as JsonRecord | null),
+        getActiveSession: vi.fn(async () => ({ id: "session-1" } as JsonRecord | null)),
     insertSession: vi.fn(async () => undefined),
     retireActiveReviewBatches: vi.fn(async () => undefined),
             findExistingReviewBatch: vi.fn(async () => existingReview),
