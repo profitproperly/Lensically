@@ -242,12 +242,114 @@ export async function admitOperatorRuntimeToolCall<TBrand>(
     return { kind: "response", response: dependencies.missingBrandResponse() };
   }
 
-  return {
+    return {
     kind: "context",
     toolName: scopedCall.tool_name,
     payload,
     brand,
   };
 }
+
+export type OperatorManifestRuntimeDispatch =
+  | { handled: false }
+  | {
+      handled: true;
+      body: Record<string, unknown>;
+      status: number;
+    };
+
+export async function dispatchOperatorManifestRuntimeTool(
+  input: {
+    toolName: string;
+    payload: Record<string, unknown>;
+  },
+  dependencies: {
+    isCycleServiceToolName(toolName: string): boolean;
+    handleCycleService(
+      toolName: string,
+      payload: Record<string, unknown>,
+    ): Promise<{ body: Record<string, unknown>; status: number }>;
+    prepare(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
+    persist(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
+    review(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
+    observe(
+      toolName: string,
+      payload: Record<string, unknown>,
+      result: Record<string, unknown>,
+    ): Promise<Record<string, unknown>>;
+  },
+): Promise<OperatorManifestRuntimeDispatch> {
+  const { toolName, payload } = input;
+
+  if (dependencies.isCycleServiceToolName(toolName)) {
+    const result = await dependencies.handleCycleService(toolName, payload);
+    return { handled: true, body: result.body, status: result.status };
+  }
+
+  if (toolName === "prepare_manifest_autonomous_cycle") {
+    try {
+      const result = await dependencies.prepare(payload);
+      return {
+        handled: true,
+        body: await dependencies.observe(toolName, payload, result),
+        status: 200,
+      };
+    } catch (error) {
+      const result = await dependencies.observe(toolName, payload, {
+        success: false,
+        cycle_id: payload.cycle_id ?? null,
+        stage: "preparation_exception",
+        error: error instanceof Error ? error.message : "manifest_autonomous_prepare_failed",
+      });
+      return { handled: true, body: result, status: 500 };
+    }
+  }
+
+  if (toolName === "commit_manifest_autonomous_runway") {
+    return {
+      handled: true,
+      status: 410,
+      body: {
+        success: false,
+        error: "retired_monolithic_autonomous_commit",
+        replacement_tool: "persist_manifest_autonomous_post",
+        retryable: false,
+      },
+    };
+  }
+
+  if (toolName === "persist_manifest_autonomous_post") {
+    try {
+      const result = await dependencies.persist(payload);
+      return {
+        handled: true,
+        body: await dependencies.observe(toolName, payload, result),
+        status: 200,
+      };
+    } catch (error) {
+      const result = await dependencies.observe(toolName, payload, {
+        success: false,
+        cycle_id: payload.cycle_id ?? null,
+        error: error instanceof Error ? error.message : "manifest_autonomous_persist_failed",
+        side_effect_state: "unknown",
+        retryable: true,
+      });
+      return { handled: true, body: result, status: 500 };
+    }
+  }
+
+  if (toolName === "review_manifest_scheduled_post") {
+    return {
+      handled: true,
+      body: await dependencies.review(payload),
+      status: 200,
+    };
+  }
+
+  return { handled: false };
+}
+
+
+
 
 

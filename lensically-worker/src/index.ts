@@ -91,6 +91,7 @@ import {
 import {
   admitOperatorRuntimeToolCall,
   createOperatorMcpRoutingPolicy,
+  dispatchOperatorManifestRuntimeTool,
 } from "./operatorMcpRoutingPolicy";
 import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
 import { dispatchOperatorMcpToolCall } from "./operatorMcpToolCallDispatcher";
@@ -11781,19 +11782,23 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   toolName = admission.toolName;
   const { payload, brand } = admission;
 
-        if (isOperatorManifestCycleServiceToolName(toolName)) {
-    const serviceResult = await handleOperatorManifestCycleServiceTool({
-      toolName,
+          const manifestRuntimeDispatch = await dispatchOperatorManifestRuntimeTool({
+    toolName,
+    payload,
+  }, {
+    isCycleServiceToolName: isOperatorManifestCycleServiceToolName,
+    handleCycleService: (serviceToolName, servicePayload) => handleOperatorManifestCycleServiceTool({
+      toolName: serviceToolName,
       brandKey: brand.brand_key,
-      payload,
+      payload: servicePayload,
     }, {
       db: env.DB,
       normalizeText: normalizeOperatorText,
-            observe: (serviceToolName, servicePayload, result) => observeManifestCycleToolResult(
+      observe: (observedToolName, observedPayload, result) => observeManifestCycleToolResult(
         env,
         brand,
-        serviceToolName,
-        servicePayload,
+        observedToolName,
+        observedPayload,
         result,
       ),
       readEvidencePage: (input) => readManifestEvidencePage(env.DB, input),
@@ -11806,8 +11811,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         env.DB,
         input as Parameters<typeof appendManifestCycleEvent>[1],
       ),
-            getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
-            buildCycleReceiptRead: (receipt, section, offset, limit) => buildManifestCycleReceiptRead(
+      getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
+      buildCycleReceiptRead: (receipt, section, offset, limit) => buildManifestCycleReceiptRead(
         receipt as Parameters<typeof buildManifestCycleReceiptRead>[0],
         section as Parameters<typeof buildManifestCycleReceiptRead>[1],
         offset as Parameters<typeof buildManifestCycleReceiptRead>[2],
@@ -11852,59 +11857,20 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ),
       sourceSelectionEngineVersion: SOURCE_SELECTION_ENGINE_VERSION,
       now: () => new Date().toISOString(),
-    });
-    return operatorJsonResponse(serviceResult.body, serviceResult.status);
-  }
-
-
-  
-
-  
-
-  
-
-    if (toolName === "prepare_manifest_autonomous_cycle") {
-    try {
-      const result = await prepareManifestAutonomousCycle(env, brand, payload);
-      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
-    } catch (error) {
-      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
-        success: false,
-        cycle_id: payload.cycle_id ?? null,
-        stage: "preparation_exception",
-        error: error instanceof Error ? error.message : "manifest_autonomous_prepare_failed",
-      });
-      return operatorJsonResponse(result, 500);
-    }
-  }
-
-    if (toolName === "commit_manifest_autonomous_runway") {
-    return operatorJsonResponse({
-      success: false,
-      error: "retired_monolithic_autonomous_commit",
-      replacement_tool: "persist_manifest_autonomous_post",
-      retryable: false,
-    }, 410);
-  }
-
-    if (toolName === "persist_manifest_autonomous_post") {
-    try {
-      const result = await persistManifestAutonomousPost(env, brand, payload);
-      return operatorJsonResponse(await observeManifestCycleToolResult(env, brand, toolName, payload, result));
-    } catch (error) {
-      const result = await observeManifestCycleToolResult(env, brand, toolName, payload, {
-        success: false,
-        cycle_id: payload.cycle_id ?? null,
-        error: error instanceof Error ? error.message : "manifest_autonomous_persist_failed",
-        side_effect_state: "unknown",
-        retryable: true,
-      });
-      return operatorJsonResponse(result, 500);
-    }
-  }
-
-  if (toolName === "review_manifest_scheduled_post") {
-    return operatorJsonResponse(await reviewManifestScheduledPost(env, brand, payload));
+    }),
+    prepare: (servicePayload) => prepareManifestAutonomousCycle(env, brand, servicePayload),
+    persist: (servicePayload) => persistManifestAutonomousPost(env, brand, servicePayload),
+    review: (servicePayload) => reviewManifestScheduledPost(env, brand, servicePayload),
+    observe: (observedToolName, observedPayload, result) => observeManifestCycleToolResult(
+      env,
+      brand,
+      observedToolName,
+      observedPayload,
+      result,
+    ),
+  });
+  if (manifestRuntimeDispatch.handled) {
+    return operatorJsonResponse(manifestRuntimeDispatch.body, manifestRuntimeDispatch.status);
   }
 
     if (toolName === "get_account_state") {

@@ -781,6 +781,30 @@ if (!operatorToolAdmissionShell.includes("admitOperatorRuntimeToolCall({ request
     || !operatorToolAdmissionShell.includes('if (admission.kind === "response") return admission.response')) {
   lifecycleErrors.push("operator_runtime_admission_cutover_incomplete");
 }
+const operatorAccountStateDispatchStart = source.indexOf(
+  'if (toolName === "get_account_state")',
+  operatorToolHandlerDispatchStart,
+);
+const operatorManifestRuntimeShell = operatorToolHandlerDispatchStart >= 0
+  && operatorAccountStateDispatchStart > operatorToolHandlerDispatchStart
+  ? source.slice(operatorToolHandlerDispatchStart, operatorAccountStateDispatchStart)
+  : "";
+if (!operatorManifestRuntimeShell.includes("dispatchOperatorManifestRuntimeTool({")
+    || !operatorManifestRuntimeShell.includes("isCycleServiceToolName: isOperatorManifestCycleServiceToolName")
+    || !operatorManifestRuntimeShell.includes("handleCycleService:")
+    || !operatorManifestRuntimeShell.includes("prepare: (servicePayload) => prepareManifestAutonomousCycle")
+    || !operatorManifestRuntimeShell.includes("persist: (servicePayload) => persistManifestAutonomousPost")
+    || !operatorManifestRuntimeShell.includes("review: (servicePayload) => reviewManifestScheduledPost")
+    || !operatorManifestRuntimeShell.includes("if (manifestRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_manifest_runtime_dispatch_cutover_incomplete");
+}
+if (operatorManifestRuntimeShell.includes("if (isOperatorManifestCycleServiceToolName(toolName))")
+    || operatorManifestRuntimeShell.includes('if (toolName === "prepare_manifest_autonomous_cycle")')
+    || operatorManifestRuntimeShell.includes('if (toolName === "commit_manifest_autonomous_runway")')
+    || operatorManifestRuntimeShell.includes('if (toolName === "persist_manifest_autonomous_post")')
+    || operatorManifestRuntimeShell.includes('if (toolName === "review_manifest_scheduled_post")')) {
+  lifecycleErrors.push("operator_manifest_runtime_dispatch_returned_to_index");
+}
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
     || operatorToolAdmissionShell.includes("RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)")
@@ -813,7 +837,11 @@ if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorM
     || !operatorMcpRoutingPolicy.includes("export function canonicalAutonomyToolName")
     || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
     || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")
-    || !operatorMcpRoutingPolicy.includes("export async function admitOperatorRuntimeToolCall")
+        || !operatorMcpRoutingPolicy.includes("export async function admitOperatorRuntimeToolCall")
+    || !operatorMcpRoutingPolicy.includes("export async function dispatchOperatorManifestRuntimeTool")
+    || !operatorMcpRoutingPolicy.includes('toolName === "prepare_manifest_autonomous_cycle"')
+    || !operatorMcpRoutingPolicy.includes('toolName === "persist_manifest_autonomous_post"')
+    || !operatorMcpRoutingPolicy.includes("side_effect_state: \"unknown\"")
     || !operatorMcpRoutingPolicy.includes("dependencies.retiredToolNames.has(canonicalToolName)")
     || !operatorMcpRoutingPolicy.includes('scopedCall.tool_name === "list_accounts"')
     || !operatorMcpRoutingPolicy.includes("dependencies.resolveBrand(payload)")) {
@@ -829,7 +857,13 @@ if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicali
     || !operatorMcpRoutingPolicyTests.includes("retires canonical tools before preparation or payload reads")
     || !operatorMcpRoutingPolicyTests.includes("preserves scoped payload admission and brand resolution order")
     || !operatorMcpRoutingPolicyTests.includes("serves the account directory without brand resolution")
-    || !operatorMcpRoutingPolicyTests.includes("returns the exact missing-brand response after scoped admission")) {
+        || !operatorMcpRoutingPolicyTests.includes("returns the exact missing-brand response after scoped admission")
+    || !operatorMcpRoutingPolicyTests.includes("routes cycle-service tools before autonomous branches")
+    || !operatorMcpRoutingPolicyTests.includes("observes successful autonomous preparation")
+    || !operatorMcpRoutingPolicyTests.includes("normalizes preparation exceptions through cycle observation")
+    || !operatorMcpRoutingPolicyTests.includes("preserves the retired monolithic commit response")
+    || !operatorMcpRoutingPolicyTests.includes("normalizes ambiguous persistence exceptions without retrying")
+    || !operatorMcpRoutingPolicyTests.includes("routes scheduled review and leaves unrelated tools unhandled")) {
   lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpTransport"')) {

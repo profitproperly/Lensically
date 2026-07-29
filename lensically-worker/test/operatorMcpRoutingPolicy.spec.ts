@@ -6,7 +6,8 @@ import {
   canonicalOperatorExecutionArgs,
   canonicalScopedOperatorMcpToolName,
   classifyOperatorMcpHandler,
-  createOperatorMcpRoutingPolicy,
+    createOperatorMcpRoutingPolicy,
+  dispatchOperatorManifestRuntimeTool,
   operatorMcpCallRequiresProceed,
   operatorMcpProceedConfirmed,
   requestedMcpBrandKey,
@@ -231,9 +232,9 @@ describe("Operator runtime admission", () => {
     expect(dependencies.resolveBrand).not.toHaveBeenCalled();
   });
 
-  it("returns the exact missing-brand response after scoped admission", async () => {
+    it("returns the exact missing-brand response after scoped admission", async () => {
     const { events, dependencies } = createRuntimeAdmissionDependencies();
-        dependencies.resolveBrand.mockImplementationOnce(async () => {
+    dependencies.resolveBrand.mockImplementationOnce(async () => {
       events.push("resolve_brand");
       return null;
     });
@@ -246,4 +247,132 @@ describe("Operator runtime admission", () => {
     expect(dependencies.missingBrandResponse).toHaveBeenCalledTimes(1);
   });
 });
+
+function createManifestRuntimeDependencies() {
+  const events: string[] = [];
+  const dependencies = {
+    isCycleServiceToolName: vi.fn((toolName: string) => toolName === "get_manifest_cycle_receipt"),
+    handleCycleService: vi.fn(async () => ({ body: { source: "cycle_service" }, status: 207 })),
+    prepare: vi.fn(async () => ({ success: true, source: "prepare" } as Record<string, unknown>)),
+    persist: vi.fn(async () => ({ success: true, source: "persist" } as Record<string, unknown>)),
+    review: vi.fn(async () => ({ success: true, source: "review" } as Record<string, unknown>)),
+    observe: vi.fn(async (toolName: string, _payload: Record<string, unknown>, result: Record<string, unknown>) => {
+      events.push(`observe:${toolName}`);
+      return { ...result, observed: true };
+    }),
+  };
+  return { events, dependencies };
+}
+
+describe("Operator Manifest runtime dispatch", () => {
+  it("routes cycle-service tools before autonomous branches", async () => {
+    const { dependencies } = createManifestRuntimeDependencies();
+    const result = await dispatchOperatorManifestRuntimeTool({
+      toolName: "get_manifest_cycle_receipt",
+      payload: { cycle_id: "cycle-1" },
+    }, dependencies);
+
+    expect(result).toEqual({ handled: true, body: { source: "cycle_service" }, status: 207 });
+    expect(dependencies.handleCycleService).toHaveBeenCalledTimes(1);
+    expect(dependencies.prepare).not.toHaveBeenCalled();
+  });
+
+  it("observes successful autonomous preparation", async () => {
+    const { events, dependencies } = createManifestRuntimeDependencies();
+    const result = await dispatchOperatorManifestRuntimeTool({
+      toolName: "prepare_manifest_autonomous_cycle",
+      payload: { cycle_id: "cycle-1" },
+    }, dependencies);
+
+    expect(result).toEqual({
+      handled: true,
+      body: { success: true, source: "prepare", observed: true },
+      status: 200,
+    });
+    expect(events).toEqual(["observe:prepare_manifest_autonomous_cycle"]);
+  });
+
+  it("normalizes preparation exceptions through cycle observation", async () => {
+    const { dependencies } = createManifestRuntimeDependencies();
+    dependencies.prepare.mockRejectedValueOnce(new Error("prepare exploded"));
+    const result = await dispatchOperatorManifestRuntimeTool({
+      toolName: "prepare_manifest_autonomous_cycle",
+      payload: { cycle_id: "cycle-2" },
+    }, dependencies);
+
+    expect(result).toMatchObject({
+      handled: true,
+      status: 500,
+      body: {
+        success: false,
+        cycle_id: "cycle-2",
+        stage: "preparation_exception",
+        error: "prepare exploded",
+        observed: true,
+      },
+    });
+  });
+
+  it("preserves the retired monolithic commit response", async () => {
+    const { dependencies } = createManifestRuntimeDependencies();
+    const result = await dispatchOperatorManifestRuntimeTool({
+      toolName: "commit_manifest_autonomous_runway",
+      payload: {},
+    }, dependencies);
+
+    expect(result).toEqual({
+      handled: true,
+      status: 410,
+      body: {
+        success: false,
+        error: "retired_monolithic_autonomous_commit",
+        replacement_tool: "persist_manifest_autonomous_post",
+        retryable: false,
+      },
+    });
+  });
+
+  it("normalizes ambiguous persistence exceptions without retrying", async () => {
+    const { dependencies } = createManifestRuntimeDependencies();
+    dependencies.persist.mockRejectedValueOnce(new Error("persist interrupted"));
+    const result = await dispatchOperatorManifestRuntimeTool({
+      toolName: "persist_manifest_autonomous_post",
+      payload: { cycle_id: "cycle-3" },
+    }, dependencies);
+
+    expect(result).toMatchObject({
+      handled: true,
+      status: 500,
+      body: {
+        success: false,
+        cycle_id: "cycle-3",
+        error: "persist interrupted",
+        side_effect_state: "unknown",
+        retryable: true,
+        observed: true,
+      },
+    });
+  });
+
+  it("routes scheduled review and leaves unrelated tools unhandled", async () => {
+    const { dependencies } = createManifestRuntimeDependencies();
+    const review = await dispatchOperatorManifestRuntimeTool({
+      toolName: "review_manifest_scheduled_post",
+      payload: { scheduled_post_id: 7 },
+    }, dependencies);
+    const unrelated = await dispatchOperatorManifestRuntimeTool({
+      toolName: "get_account_state",
+      payload: {},
+    }, dependencies);
+
+    expect(review).toEqual({
+      handled: true,
+      body: { success: true, source: "review" },
+      status: 200,
+    });
+    expect(unrelated).toEqual({ handled: false });
+  });
+});
+
+
 
