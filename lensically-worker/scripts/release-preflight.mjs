@@ -239,10 +239,16 @@ if (!workflowStructureValidator.includes("push_shared_full_validation_missing")
   errors.push("shared_full_validation_workflow_structure_enforcement_missing");
 }
 if (!testMigrationSetup.includes("async function hasExactMigrationLedger(")
+    || !testMigrationSetup.includes("async function waitForMigrationOwner(")
+    || !testMigrationSetup.includes("CREATE TABLE IF NOT EXISTS lensically_test_migration_lock")
+    || !testMigrationSetup.includes("INSERT OR IGNORE INTO lensically_test_migration_lock")
+    || !testMigrationSetup.includes("const ownsMigration = Number(claim.meta.changes ?? 0) === 1")
+    || !testMigrationSetup.includes("test_migration_owner_completed_without_exact_ledger")
+    || !testMigrationSetup.includes("test_migration_owner_failed")
+    || !testMigrationSetup.includes("test_migration_owner_timeout")
     || !testMigrationSetup.includes("SELECT name FROM lensically_test_migrations ORDER BY name ASC")
     || !testMigrationSetup.includes("test_migration_ledger_mismatch")
     || !testMigrationSetup.includes("no such table: lensically_test_migrations")
-    || !testMigrationSetup.includes("if (await hasExactMigrationLedger(testEnv.DB, migrationNames)) return;")
     || !testMigrationSetup.includes("test_migration_binding_empty")) {
   errors.push("idempotent_test_migration_setup_missing");
 }
