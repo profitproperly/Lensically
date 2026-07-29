@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-8c-migration-release-modernization
-repository_base_sha: 8931e04a39e8a7a5a724b73e8b71294135a87a64
-production_sha: 8931e04a39e8a7a5a724b73e8b71294135a87a64
+active_checkpoint: stage-8d-cron-release-modernization
+repository_base_sha: 1d2ce90c63318df034486c07e127e5a506cb3973
+production_sha: 1d2ce90c63318df034486c07e127e5a506cb3973
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 7A Operator runtime composition.
+- Current checkpoint: Stage 8D cron release modernization.
 - Remaining dependency chain: finish Stage 7 router/runtime composition, then Stage 8 test/release modernization and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1447,11 +1447,33 @@ Completed checkpoint — Stage 8B validated web artifact reuse:
 - The real validated web checkpoint completed inside the broad two-to-five-minute target: push validation began at `08:12:20Z`, and the artifact-reuse release was dispatched after success at `08:16:03Z`.
 - Live production independently confirmed exact SHA `8931e04a39e8a7a5a724b73e8b71294135a87a64` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 8C migration release modernization:
+Completed checkpoint — Stage 8C migration release modernization:
 
-Audit migration filenames, ordering, the authoritative migration ledger, local migration regression coverage, production release commands, and any data-bearing migrations or backfills. Add a source-controlled pre-release planner that validates deterministic ordering and safety, compares the exact repository migration set with production, and emits only the unapplied migration plan before any mutation.
+- Audited all 19 canonical migration files, Wrangler configuration, the production ledger contract, local migration setup, release commands, and data-bearing statements.
+- Found and repaired a real release-classification defect: push and release scope watched nonexistent `lensically-worker/migrations/*` instead of canonical `lensically-worker/database/migrations/*`. Workflow structure and release preflight now permanently reject the legacy path.
+- Added `scripts/d1-migration-release.mjs` as the source-controlled release planner. It enforces contiguous deterministic filenames, exact repository ordering, production-ledger prefix identity, known production entries, unchanged applied files, source/production SHA binding, safe statement classification, plan fingerprint stability, and fail-closed remote access.
+- Normal release now creates an exact production-relative plan, applies only that unchanged validated plan, and verifies the complete production ledger before Worker deployment. Direct unplanned Wrangler migration apply is structurally forbidden.
+- Added focused planner regressions for ordering gaps, duplicate or unknown ledger entries, schema/data classification, explicit backfill exclusion, unsafe statements, and Wrangler JSON parsing.
+- Added migration `0018_backfill_execution_receipts.sql` with durable run and batch receipts for measured data work.
+- Added `scripts/run-d1-backfill.mjs` and its regression contract. Large backfills require a source-controlled explicit-only plan, stable operation ID, exact confirmation, bounded integer-key batches, durable cursor and row-count progress, resumable paused runs, idempotent completion, and recorded failure state. The normal release workflow never invokes this lane.
+- Registered the new receipt tables under database authority and documented the explicit backfill operating contract under `database/backfills/README.md`.
+- Initial workflow validation exposed additive indentation inherited by repository line patches. The three malformed step markers and one block command were repaired from column-zero newline anchors, and raw lint now blocks both malformed step markers and misindented canonical gate commands before workflow execution.
+- A later focused gate exposed an obsolete database-authority requirement for the retired direct Wrangler command. Database authority now requires the planned plan/apply/verify architecture and permanently rejects unplanned mutation.
+- Dedicated workflow lint passed in run `30436233612`.
+- Push validation passed in run `30436328069`; planner tests, backfill tests, local migration audit, database authority, TypeScript, and the complete shared architecture suite all passed.
+- Exact-SHA typecheck and authority validation passed in run `30436479974`.
+- All eight Operator shards passed in run `30436489265`.
+- Exact-SHA release passed in run `30436590783`. The planner identified the unapplied production set, the plan-bound apply succeeded, the exact production ledger verified, unrelated web and cron work stayed skipped, and Worker plus full live verification passed.
+- Live production independently confirmed exact SHA `1d2ce90c63318df034486c07e127e5a506cb3973` with 75/75 public tools.
+- Live D1 probes confirmed `lensically_backfill_runs` and `lensically_backfill_batch_receipts` with every expected column.
+- GitHub retained a separate failed `Workers Builds: lensically-worker` Cloudflare app check without exposing actionable logs through available status surfaces. It is recorded as non-authoritative telemetry: the controlled exact-SHA release plane, live MCP, runtime, scheduler, retained website, migration ledger, and D1 schema all independently passed on the same commit.
 
-The normal small-migration release path must apply only the validated unapplied set and verify the production ledger afterward. Large data backfills must be explicitly classified out of the normal release command into a measured long-running lane with resumability, progress receipts, and no implicit execution. Preserve complete fallback validation and fail closed on missing access, ledger mismatch, ordering ambiguity, edited applied migrations, unknown production entries, or unsafe statements.
+ACTIVE checkpoint — Stage 8D cron release modernization:
+
+Audit Wrangler cron configuration, release classification, deployment behavior, and schedule verification. Establish one source-controlled expected-schedule contract and ensure schedule mutation and verification occur only when cron or relevant Wrangler configuration changed.
+
+The ordinary no-cron path must perform no schedule-specific network work. The cron path must compare the exact desired set with production, update only when needed through the controlled release plane, verify exact equality afterward, fail closed on missing access or ambiguous configuration, preserve complete fallback behavior, and benchmark the real clean path against the approximately one-to-two-minute target.
+
 
 
 
@@ -1504,7 +1526,7 @@ Remaining work after this checkpoint:
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
-8. Test and release modernization — ACTIVE at Stage 8C
+8. Test and release modernization — ACTIVE at Stage 8D
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
