@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-8d-cron-release-modernization
-repository_base_sha: 1d2ce90c63318df034486c07e127e5a506cb3973
-production_sha: 1d2ce90c63318df034486c07e127e5a506cb3973
+active_checkpoint: stage-8e-release-acceptance-consolidation
+repository_base_sha: 53863c243cf90e8370d2e49fe637b5f17e344909
+production_sha: 53863c243cf90e8370d2e49fe637b5f17e344909
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 8D cron release modernization.
+- Current checkpoint: Stage 8E release acceptance consolidation.
 - Remaining dependency chain: finish Stage 7 router/runtime composition, then Stage 8 test/release modernization and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1468,11 +1468,32 @@ Completed checkpoint — Stage 8C migration release modernization:
 - Live D1 probes confirmed `lensically_backfill_runs` and `lensically_backfill_batch_receipts` with every expected column.
 - GitHub retained a separate failed `Workers Builds: lensically-worker` Cloudflare app check without exposing actionable logs through available status surfaces. It is recorded as non-authoritative telemetry: the controlled exact-SHA release plane, live MCP, runtime, scheduler, retained website, migration ledger, and D1 schema all independently passed on the same commit.
 
-ACTIVE checkpoint — Stage 8D cron release modernization:
+Completed checkpoint — Stage 8D cron release modernization:
 
-Audit Wrangler cron configuration, release classification, deployment behavior, and schedule verification. Establish one source-controlled expected-schedule contract and ensure schedule mutation and verification occur only when cron or relevant Wrangler configuration changed.
+- Audited Wrangler cron configuration, release classification, Worker deployment behavior, schedule verification, and Cloudflare's replacement semantics.
+- Added `scripts/cron-release.mjs` as the source-controlled schedule contract. It parses JSONC safely, validates one exact unique cron set, creates a trigger-neutral deployment config, compares production through the schedules API, skips mutation when exact, conditionally updates only when different, and verifies exact equality afterward.
+- Added `scripts/test-cron-release.mjs` covering comments and trailing commas, invalid or duplicate schedules, trigger-neutral path preservation, same-directory output safety, exact-set equality, one-GET no-op reconciliation, GET/PUT/GET update reconciliation, and remote error handling.
+- Every Worker release now generates `wrangler.release.generated.json` without `triggers` and deploys from that file. Routine code releases therefore cannot silently rewrite production schedules.
+- Wrangler configuration changes alone activate `schedule_contract_changed`; only that path invokes explicit remote schedule reconciliation. The old inline curl/jq schedule check and the `cron_changed` output were removed.
+- Package scripts, `.gitignore`, workflow structure validation, and release preflight permanently enforce the trigger-neutral deployment and explicit reconciliation architecture.
+- The first workflow lint caught four additive-indentation artifacts before workflow execution. They were repaired with newline-rooted patches; workflow lint passed in run `30437405901`.
+- Push validation passed in run `30437407678`, and exact-SHA typecheck passed in run `30437594356`.
+- The first eight-shard run `30437604104` exposed an unrelated timing-sensitive Manifest foundation regression. The read-only test unnecessarily built a 48-hour runway to create one receipt. It now uses the minimum canonical one-hour cycle, and release preflight prevents the oversized setup from returning.
+- The bounded regression passed the complete push suite in run `30437770094`, exact-SHA typecheck in run `30437943535`, and all eight Operator shards in run `30437955111`.
+- Ordinary no-cron exact-SHA release `30438059467` passed on `c0d768f3cc728c746eb4f6cd6afa1c5a64de4b37`: trigger-neutral config generation and Worker deploy succeeded, schedule reconciliation stayed skipped, unrelated migrations and web stayed skipped, and live scheduler verification remained green.
+- Normalized and documented the Wrangler trigger block without changing the desired schedule set, creating an exact schedule-contract change for the second proof.
+- Push validation passed in run `30438165230`, exact-SHA typecheck in run `30438341493`, and all eight Operator shards in run `30438357881`.
+- Wrangler-change exact-SHA release `30438473242` passed on `53863c243cf90e8370d2e49fe637b5f17e344909`. Trigger-neutral Worker deployment succeeded, the reconciliation lane executed, returned `action: unchanged` for the exact four-schedule production set, and therefore issued no PUT.
+- The complete Wrangler-change release job ran from `09:09:35Z` to `09:09:56Z`, approximately 21 seconds and well inside the one-to-two-minute target.
+- Live production independently confirmed exact SHA `53863c243cf90e8370d2e49fe637b5f17e344909` with 75/75 public tools. Scheduler state remained enabled, healthy, operational, publishing-enabled, normal mode, fresh on cron, zero overdue, and error-free.
+- The separate failed Cloudflare automatic-build check remains non-authoritative telemetry; the controlled exact-SHA release and all live verification passed.
 
-The ordinary no-cron path must perform no schedule-specific network work. The cron path must compare the exact desired set with production, update only when needed through the controlled release plane, verify exact equality afterward, fail closed on missing access or ambiguous configuration, preserve complete fallback behavior, and benchmark the real clean path against the approximately one-to-two-minute target.
+ACTIVE checkpoint — Stage 8E release acceptance consolidation:
+
+Audit every Stage 8 requirement against source-controlled enforcement and real exact-SHA evidence. Eliminate any remaining duplicate validation, stale release paths, unbounded timing assumptions, or classifier ambiguity. Create one machine-readable release acceptance contract that verifies fast-path selection, complete fallback preservation, artifact reuse, planned migrations, trigger-neutral cron ownership, structural lint, and practical timing evidence.
+
+Benchmark representative routine Worker, web artifact, small migration, Wrangler cron, workflow-infrastructure, and broad architecture paths from durable run evidence. Stage 8 may close only when every requirement is either directly proven or explicitly governed by actual database work, and the acceptance contract fails closed if a future edit reintroduces unconditional rebuilds, direct migration application, routine cron mutation, duplicated broad suites, or unsupported timing claims.
+
 
 
 
@@ -1526,7 +1547,7 @@ Remaining work after this checkpoint:
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
-8. Test and release modernization — ACTIVE at Stage 8D
+8. Test and release modernization — ACTIVE at Stage 8E
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
