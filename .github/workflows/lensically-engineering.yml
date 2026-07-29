@@ -120,16 +120,16 @@ jobs:
             
 
       - name: Install web dependencies
-        if: steps.push_scope.outputs.web_changed == 'true' && steps.push_web_cache.outputs.cache-hit != 'true'
-        working-directory: lensically-web
-        run: npm ci
+  if: steps.push_scope.outputs.web_changed == 'true' && steps.push_web_cache.outputs.cache-hit != 'true'
+  working-directory: lensically-web
+  run: npm ci
 
-            - name: Build web product surface
-        if: steps.push_scope.outputs.web_changed == 'true'
-        working-directory: lensically-web
-        run: npm run build
+- name: Build web product surface
+  if: steps.push_scope.outputs.web_changed == 'true'
+  working-directory: lensically-web
+  run: npm run build
 
-      - name: Typecheck and lifecycle gate
+- name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
@@ -142,39 +142,39 @@ jobs:
             
 
       - name: Run fast mapped validation
-        if: steps.push_scope.outputs.full_validation != 'true'
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node scripts/run-operator-validation.mjs smoke
-          tests=()
-          while IFS= read -r path; do
-            case "${path}" in
-              lensically-worker/test/*.spec.ts|lensically-worker/*.test.ts)
-                tests+=("${path#lensically-worker/}")
-                ;;
-              lensically-worker/src/*.ts)
-                stem="$(basename "${path}" .ts)"
-                candidate="test/${stem}.spec.ts"
-                if [[ -f "${candidate}" ]]; then
-                  tests+=("${candidate}")
-                else
-                  echo "Missing direct regression test for ${path}" >&2
-                  exit 1
-                fi
-                ;;
-            esac
-          done < /tmp/lensically-changed-files.txt
-          if (( ${#tests[@]} > 0 )); then
-            mapfile -t unique_tests < <(printf '%s\n' "${tests[@]}" | sort -u)
-            npx vitest --run "${unique_tests[@]}" --reporter=dot --bail=1
+  if: steps.push_scope.outputs.full_validation != 'true'
+  working-directory: lensically-worker
+  run: |
+    set -euo pipefail
+    node scripts/run-operator-validation.mjs smoke
+    tests=()
+    while IFS= read -r path; do
+      case "${path}" in
+        lensically-worker/test/*.spec.ts|lensically-worker/*.test.ts)
+          tests+=("${path#lensically-worker/}")
+          ;;
+        lensically-worker/src/*.ts)
+          stem="$(basename "${path}" .ts)"
+          candidate="test/${stem}.spec.ts"
+          if [[ -f "${candidate}" ]]; then
+            tests+=("${candidate}")
+          else
+            echo "Missing direct regression test for ${path}" >&2
+            exit 1
           fi
+          ;;
+      esac
+    done < /tmp/lensically-changed-files.txt
+    if (( ${#tests[@]} > 0 )); then
+      mapfile -t unique_tests < <(printf '%s\n' "${tests[@]}" | sort -u)
+      npx vitest --run "${unique_tests[@]}" --reporter=dot --bail=1
+    fi
 
-                  - name: Run full push validation
-        if: steps.push_scope.outputs.full_validation == 'true'
-        working-directory: lensically-worker
-        run: |
-          node scripts/run-full-validation.mjs
+- name: Run full push validation
+  if: steps.push_scope.outputs.full_validation == 'true'
+  working-directory: lensically-worker
+  run: |
+    node scripts/run-full-validation.mjs
 
 
 
@@ -216,15 +216,15 @@ jobs:
           key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
 
       - name: Install worker dependencies
-        if: steps.worker_cache.outputs.cache-hit != 'true'
-        working-directory: lensically-worker
-        run: npm ci
+  if: steps.worker_cache.outputs.cache-hit != 'true'
+  working-directory: lensically-worker
+  run: npm ci
 
-            - name: Clear stale worker transforms
-        working-directory: lensically-worker
-        run: rm -rf node_modules/.vite node_modules/.cache
+- name: Clear stale worker transforms
+  working-directory: lensically-worker
+  run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Typecheck and lifecycle gate
+- name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
@@ -304,17 +304,17 @@ jobs:
         run: npm ci
 
       - name: Clear stale worker transforms
-        working-directory: lensically-worker
-        run: rm -rf node_modules/.vite node_modules/.cache
+  working-directory: lensically-worker
+  run: rm -rf node_modules/.vite node_modules/.cache
 
-                  - name: Verify lifecycle and run deterministic shard
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node scripts/validate-test-syntax.mjs
-          node scripts/run-full-validation.mjs --check
-          node scripts/release-preflight.mjs --capability-lifecycle-only
-          node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
+- name: Verify lifecycle and run deterministic shard
+  working-directory: lensically-worker
+  run: |
+    set -euo pipefail
+    node scripts/validate-test-syntax.mjs
+    node scripts/run-full-validation.mjs --check
+    node scripts/release-preflight.mjs --capability-lifecycle-only
+    node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
   worker-release:
     if: >-
@@ -420,21 +420,19 @@ jobs:
             
 
       - name: Build exact-head web product
-        if: steps.release_scope.outputs.web_changed == 'true'
-        working-directory: lensically-web
-        run: npm run build:cf
+  if: steps.release_scope.outputs.web_changed == 'true'
+  working-directory: lensically-web
+  run: npm run build:cf
 
-            
-
-                  - name: Run exact-head release gates
-        if: steps.release_scope.outputs.full_release == 'true'
-        working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node scripts/release-preflight.mjs
-          npx tsc --noEmit
-          node scripts/run-full-validation.mjs --check
-          node scripts/run-full-validation.mjs
+- name: Run exact-head release gates
+  if: steps.release_scope.outputs.full_release == 'true'
+  working-directory: lensically-worker
+  run: |
+    set -euo pipefail
+    node scripts/release-preflight.mjs
+    npx tsc --noEmit
+    node scripts/run-full-validation.mjs --check
+    node scripts/run-full-validation.mjs
 
                         
             
