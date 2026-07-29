@@ -65,7 +65,7 @@ export async function auditOperatorPublishedPostLineage(
     };
   });
 
-  return {
+    return {
     success: true,
     brand_key: input.brandKey,
     criteria: { minimum_likes: minimumLikes, days, limit },
@@ -75,3 +75,73 @@ export async function auditOperatorPublishedPostLineage(
     posts,
   };
 }
+
+export interface OperatorPublishedPostLineageRecoveryDependencies {
+  normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+  nowMillis(): number;
+  callTool(toolName: string, payload: JsonRecord): Promise<JsonRecord>;
+  recoverLineage(payload: JsonRecord, minimumVerifiedLikes: number): Promise<{
+    payload: JsonRecord;
+    status: number;
+  }>;
+}
+
+export async function recoverOperatorPublishedPostLineage(
+  input: {
+    brandKey: string;
+    payload: JsonRecord;
+    manifestBrandKey: string;
+    minimumVerifiedLikes: number;
+  },
+  dependencies: OperatorPublishedPostLineageRecoveryDependencies,
+): Promise<{ status: number; body: JsonRecord }> {
+  const compatibilityWorkflowSessionId = dependencies.normalizeText(
+    input.payload.workflow_session_id,
+    120,
+    true,
+  );
+  const compatibilitySourceCard = input.payload.source_card
+    && typeof input.payload.source_card === "object"
+    && !Array.isArray(input.payload.source_card)
+    ? input.payload.source_card as JsonRecord
+    : {};
+  const compatibilitySourceCardTitle = dependencies.normalizeText(
+    compatibilitySourceCard.title,
+    200,
+    true,
+  );
+
+  if (input.brandKey === input.manifestBrandKey && (
+    compatibilityWorkflowSessionId === "all_missing_manifest_source_cards"
+    || compatibilitySourceCardTitle === "all_missing_manifest_source_cards"
+  )) {
+    const bridgeOperationId = dependencies.normalizeText(input.payload.operation_id, 160, true)
+      ?? `manifest-source-card-backfill-recovery-bridge-${dependencies.nowMillis()}`;
+    const backfill = await dependencies.callTool("create_all_missing_manifest_source_cards", {
+      brand_key: input.brandKey,
+      limit: 4,
+      proceed_confirmed: true,
+      operation_id: `${bridgeOperationId}-batch`,
+    });
+    const backfillHttpStatus = Math.trunc(Number(backfill.http_status ?? 200));
+    return {
+      status: backfillHttpStatus >= 100 && backfillHttpStatus <= 599
+        ? backfillHttpStatus
+        : 200,
+      body: {
+        ...backfill,
+        compatibility_bridge: "recover_published_post_lineage.workflow_session_id",
+      },
+    };
+  }
+
+  const recovered = await dependencies.recoverLineage(
+    input.payload,
+    input.minimumVerifiedLikes,
+  );
+  return {
+    status: recovered.status,
+    body: recovered.payload,
+  };
+}
+

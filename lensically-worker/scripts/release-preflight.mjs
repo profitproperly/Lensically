@@ -1544,12 +1544,26 @@ if (!operatorManifestSourceDrawServiceTests.includes("rejects unsupported brands
 }
 if (!source.includes('from "./operatorPublishedPostLineageAuditService"')
     || !source.includes("auditOperatorPublishedPostLineage({")
-    || !source.includes("listRows: async ({ minimumLikes, days, limit })")) {
+    || !source.includes("recoverOperatorPublishedPostLineage({")
+    || !source.includes("listRows: async ({ minimumLikes, days, limit })")
+    || !source.includes("recoverLineage: async (recoveryPayload, minimumVerifiedLikes)")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_import_or_binding_missing");
 }
+const publishedLineageRecoveryHandlerStart = source.indexOf('if (toolName === "recover_published_post_lineage")');
+const publishedLineageRecoveryHandlerEnd = source.indexOf(
+  'if (toolName === "create_all_missing_manifest_source_cards")',
+  publishedLineageRecoveryHandlerStart,
+);
+const publishedLineageRecoveryHandler = publishedLineageRecoveryHandlerStart >= 0
+  && publishedLineageRecoveryHandlerEnd > publishedLineageRecoveryHandlerStart
+  ? source.slice(publishedLineageRecoveryHandlerStart, publishedLineageRecoveryHandlerEnd)
+  : "";
 if (source.includes("const minimumLikes = Math.max(1, Math.trunc(Number(payload.minimum_likes ?? 1000)))")
     || source.includes("const posts = (rows.results ?? []).map((row) =>")
-    || source.includes("if (!row.source_selection_id || !row.source_batch_id) missingStages.push(\"source\")")) {
+    || source.includes("if (!row.source_selection_id || !row.source_batch_id) missingStages.push(\"source\")")
+    || publishedLineageRecoveryHandler.includes("compatibilityWorkflowSessionId")
+    || publishedLineageRecoveryHandler.includes("bridgeOperationId")
+    || publishedLineageRecoveryHandler.includes("backfillHttpStatus")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_returned_to_index");
 }
 if (!operatorPublishedPostLineageAuditService.includes("export async function auditOperatorPublishedPostLineage")
@@ -1557,14 +1571,23 @@ if (!operatorPublishedPostLineageAuditService.includes("export async function au
     || !operatorPublishedPostLineageAuditService.includes('missingStages.push("source")')
     || !operatorPublishedPostLineageAuditService.includes('missingStages.push("metrics")')
     || !operatorPublishedPostLineageAuditService.includes("saved_pattern_id")
-    || !operatorPublishedPostLineageAuditService.includes("complete_count")
-    || !operatorPublishedPostLineageAuditService.includes("incomplete_count")) {
+        || !operatorPublishedPostLineageAuditService.includes("complete_count")
+    || !operatorPublishedPostLineageAuditService.includes("incomplete_count")
+    || !operatorPublishedPostLineageAuditService.includes("export async function recoverOperatorPublishedPostLineage")
+    || !operatorPublishedPostLineageAuditService.includes("compatibilityWorkflowSessionId")
+    || !operatorPublishedPostLineageAuditService.includes('"create_all_missing_manifest_source_cards"')
+    || !operatorPublishedPostLineageAuditService.includes("dependencies.recoverLineage")
+    || !operatorPublishedPostLineageAuditService.includes("backfillHttpStatus >= 100")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_module_incomplete");
 }
 if (!operatorPublishedPostLineageAuditServiceTests.includes("applies exact defaults and bounded criteria before row retrieval")
     || !operatorPublishedPostLineageAuditServiceTests.includes("serializes complete lineage with stable metrics and numeric identifiers")
-    || !operatorPublishedPostLineageAuditServiceTests.includes("classifies every missing lineage stage in deterministic order")
-    || !operatorPublishedPostLineageAuditServiceTests.includes("counts mixed results and omits saved-pattern identity for other source types")) {
+        || !operatorPublishedPostLineageAuditServiceTests.includes("classifies every missing lineage stage in deterministic order")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("counts mixed results and omits saved-pattern identity for other source types")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("routes the $label through the bounded Manifest backfill bridge")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("coerces an invalid compatibility bridge status to 200")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("delegates normal recovery with the canonical minimum verified likes")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("does not apply the Manifest compatibility bridge to another brand")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestSourceCardBackfillService"')

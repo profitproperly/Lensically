@@ -121,7 +121,10 @@ import { readOperatorProductionBoard } from "./operatorProductionBoardService";
 import { listOperatorSourceCandidates } from "./operatorSourceCandidateListService";
 import { excludeOperatorSavedPatternSource } from "./operatorSavedPatternSourceExclusionService";
 import { drawOperatorManifestSourceBatch } from "./operatorManifestSourceDrawService";
-import { auditOperatorPublishedPostLineage } from "./operatorPublishedPostLineageAuditService";
+import {
+  auditOperatorPublishedPostLineage,
+  recoverOperatorPublishedPostLineage,
+} from "./operatorPublishedPostLineageAuditService";
 import { createAllMissingManifestSourceCards } from "./operatorManifestSourceCardBackfillService";
 import { prepareOperatorManifestSourceCardBackfill } from "./operatorManifestSourceCardBackfillPreparationService";
 import { readOperatorSourceCandidateBatch } from "./operatorSourceCandidateBatchReadService";
@@ -13723,39 +13726,29 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-    if (toolName === "recover_published_post_lineage") {
-        const compatibilityWorkflowSessionId = normalizeOperatorText(payload.workflow_session_id, 120, true);
-    const compatibilitySourceCard = payload.source_card && typeof payload.source_card === "object" && !Array.isArray(payload.source_card)
-      ? payload.source_card as Record<string, unknown>
-      : {};
-    const compatibilitySourceCardTitle = normalizeOperatorText(compatibilitySourceCard.title, 200, true);
-    if (brand.brand_key === "manifest_mental" && (
-      compatibilityWorkflowSessionId === "all_missing_manifest_source_cards"
-      || compatibilitySourceCardTitle === "all_missing_manifest_source_cards"
-    )) {
-
-      const bridgeOperationId = normalizeOperatorText(payload.operation_id, 160, true)
-        ?? `manifest-source-card-backfill-recovery-bridge-${Date.now()}`;
-            const backfill = await callOperatorToolForMcp(request, env, "create_all_missing_manifest_source_cards", {
-        brand_key: brand.brand_key,
-        limit: 4,
-        proceed_confirmed: true,
-        operation_id: `${bridgeOperationId}-batch`,
-      });
-      const backfillHttpStatus = Math.trunc(Number(backfill.http_status ?? 200));
-      return operatorJsonResponse({
-        ...backfill,
-        compatibility_bridge: "recover_published_post_lineage.workflow_session_id",
-      }, backfillHttpStatus >= 100 && backfillHttpStatus <= 599 ? backfillHttpStatus : 200);
-    }
-    const recovered = await recoverPublishedPostLineage(
-
-      env,
-      brand,
+        if (toolName === "recover_published_post_lineage") {
+    const recovery = await recoverOperatorPublishedPostLineage({
+      brandKey: brand.brand_key,
       payload,
-      MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
-    );
-    return operatorJsonResponse(recovered.payload, recovered.status);
+      manifestBrandKey: "manifest_mental",
+      minimumVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+    }, {
+      normalizeText: normalizeOperatorText,
+      nowMillis: () => Date.now(),
+      callTool: async (internalToolName, internalPayload) => await callOperatorToolForMcp(
+        request,
+        env,
+        internalToolName,
+        internalPayload,
+      ),
+      recoverLineage: async (recoveryPayload, minimumVerifiedLikes) => await recoverPublishedPostLineage(
+        env,
+        brand,
+        recoveryPayload,
+        minimumVerifiedLikes,
+      ),
+    });
+    return operatorJsonResponse(recovery.body, recovery.status);
   }
 
           if (toolName === "create_all_missing_manifest_source_cards") {

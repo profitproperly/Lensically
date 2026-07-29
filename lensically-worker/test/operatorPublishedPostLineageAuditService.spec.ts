@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  auditOperatorPublishedPostLineage,
+    auditOperatorPublishedPostLineage,
+  recoverOperatorPublishedPostLineage,
   type OperatorPublishedPostLineageAuditDependencies,
+  type OperatorPublishedPostLineageRecoveryDependencies,
 } from "../src/operatorPublishedPostLineageAuditService";
 
 type JsonRecord = Record<string, unknown>;
@@ -194,7 +196,127 @@ describe("auditOperatorPublishedPostLineage", () => {
       complete_count: 1,
       incomplete_count: 1,
     });
-    expect(posts[1].lineage.saved_pattern_id).toBeNull();
+        expect(posts[1].lineage.saved_pattern_id).toBeNull();
     expect(posts[1].missing_stages).toEqual(["metrics"]);
   });
 });
+
+function createRecoveryDependencies(): {
+  mocks: OperatorPublishedPostLineageRecoveryDependencies;
+  dependencies: OperatorPublishedPostLineageRecoveryDependencies;
+} {
+  const mocks: OperatorPublishedPostLineageRecoveryDependencies = {
+    normalizeText: vi.fn((value: unknown, maxLength: number) => {
+      if (typeof value !== "string") return null;
+      const normalized = value.trim().slice(0, maxLength);
+      return normalized || null;
+    }),
+    nowMillis: vi.fn(() => 1722222222000),
+    callTool: vi.fn(async () => ({ success: true, http_status: 202, remaining_count: 4 })),
+    recoverLineage: vi.fn(async () => ({
+      payload: { success: true, recovered_count: 3 },
+      status: 201,
+    })),
+  };
+  return { mocks, dependencies: mocks };
+}
+
+describe("recoverOperatorPublishedPostLineage", () => {
+  it.each([
+    {
+      label: "workflow session compatibility identity",
+      payload: {
+        workflow_session_id: " all_missing_manifest_source_cards ",
+        operation_id: " bridge-op ",
+      },
+      expectedOperationId: "bridge-op-batch",
+    },
+    {
+      label: "source-card-title compatibility identity with deterministic fallback",
+      payload: {
+        source_card: { title: " all_missing_manifest_source_cards " },
+      },
+      expectedOperationId: "manifest-source-card-backfill-recovery-bridge-1722222222000-batch",
+    },
+  ])("routes the $label through the bounded Manifest backfill bridge", async ({ payload, expectedOperationId }) => {
+    const { mocks, dependencies } = createRecoveryDependencies();
+    const result = await recoverOperatorPublishedPostLineage({
+      brandKey: "manifest_mental",
+      payload,
+      manifestBrandKey: "manifest_mental",
+      minimumVerifiedLikes: 1000,
+    }, dependencies);
+
+    expect(mocks.callTool).toHaveBeenCalledWith("create_all_missing_manifest_source_cards", {
+      brand_key: "manifest_mental",
+      limit: 4,
+      proceed_confirmed: true,
+      operation_id: expectedOperationId,
+    });
+    expect(mocks.recoverLineage).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 202,
+      body: {
+        success: true,
+        http_status: 202,
+        remaining_count: 4,
+        compatibility_bridge: "recover_published_post_lineage.workflow_session_id",
+      },
+    });
+  });
+
+  it("coerces an invalid compatibility bridge status to 200", async () => {
+    const { mocks, dependencies } = createRecoveryDependencies();
+    vi.mocked(mocks.callTool).mockResolvedValue({ success: false, http_status: 900 });
+    const result = await recoverOperatorPublishedPostLineage({
+      brandKey: "manifest_mental",
+      payload: { workflow_session_id: "all_missing_manifest_source_cards" },
+      manifestBrandKey: "manifest_mental",
+      minimumVerifiedLikes: 1000,
+    }, dependencies);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      success: false,
+      http_status: 900,
+      compatibility_bridge: "recover_published_post_lineage.workflow_session_id",
+    });
+  });
+
+  it("delegates normal recovery with the canonical minimum verified likes", async () => {
+    const { mocks, dependencies } = createRecoveryDependencies();
+    const payload = {
+      workflow_session_id: "session-7",
+      saved_pattern_id: 91,
+      published_post_ids: ["post-1"],
+    };
+    const result = await recoverOperatorPublishedPostLineage({
+      brandKey: "manifest_mental",
+      payload,
+      manifestBrandKey: "manifest_mental",
+      minimumVerifiedLikes: 777,
+    }, dependencies);
+
+    expect(mocks.callTool).not.toHaveBeenCalled();
+    expect(mocks.recoverLineage).toHaveBeenCalledWith(payload, 777);
+    expect(result).toEqual({
+      status: 201,
+      body: { success: true, recovered_count: 3 },
+    });
+  });
+
+  it("does not apply the Manifest compatibility bridge to another brand", async () => {
+    const { mocks, dependencies } = createRecoveryDependencies();
+    const payload = { workflow_session_id: "all_missing_manifest_source_cards" };
+    await recoverOperatorPublishedPostLineage({
+      brandKey: "vectrix",
+      payload,
+      manifestBrandKey: "manifest_mental",
+      minimumVerifiedLikes: 1000,
+    }, dependencies);
+
+    expect(mocks.callTool).not.toHaveBeenCalled();
+    expect(mocks.recoverLineage).toHaveBeenCalledWith(payload, 1000);
+  });
+});
+
