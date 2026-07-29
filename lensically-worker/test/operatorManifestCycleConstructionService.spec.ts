@@ -376,6 +376,44 @@ describe("Operator Manifest cycle construction service", () => {
     });
   });
 
+      it("replaces a locked plan that contains a newly excluded source before strategy commit", async () => {
+    const { dependencies, mocks, slots } = createHarness();
+    mocks.readExistingCycle.mockResolvedValueOnce({ id: "cycle-existing" });
+    mocks.readLockedSourceSelectionPlan.mockResolvedValueOnce([
+      {
+        slot_key: slots[0].key,
+        source_identity_key: "excluded",
+        source_card_id: "card-excluded",
+      },
+      {
+        slot_key: slots[1].key,
+        source_identity_key: "allowed",
+        source_card_id: "card-allowed",
+      },
+    ]);
+    mocks.selectSourceLineup.mockReturnValueOnce({
+      receipts: slots.map((slot) => ({
+        slot_key: slot.key,
+        source_identity_key: "allowed",
+        source_card_id: "card-allowed",
+      })),
+    });
+    mocks.persistLockedSourceSelectionPlan.mockResolvedValueOnce(slots.map((slot) => ({
+      slot_key: slot.key,
+      source_identity_key: "allowed",
+      source_card_id: "card-allowed",
+    })));
+
+    await constructOperatorManifestAutonomousCycle(input, dependencies);
+
+    expect(mocks.loadSourceExclusions).toHaveBeenCalledWith("manifest_mental");
+    expect(mocks.loadLockedSourceCards).toHaveBeenCalled();
+    expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalledWith(expect.objectContaining({
+      brand_key: "manifest_mental",
+      cycle_id: "cycle-existing",
+    }));
+  });
+
     it("completes a fully occupied horizon without source-plan work", async () => {
     const { dependencies, mocks, slots } = createHarness();
     mocks.buildCoverage.mockResolvedValueOnce({

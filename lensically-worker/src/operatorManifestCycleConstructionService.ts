@@ -336,11 +336,19 @@ export async function constructOperatorManifestAutonomousCycle(
     accountPosition: persistedAccountPosition,
   });
 
-    let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
+      let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
   const currentMissingSlotKeys = missingSlots.map((slot) => slot.key);
+  const sourceExclusions = missingSlots.length > 0
+    ? await dependencies.loadSourceExclusions(brandKey)
+    : [];
+  const excludedIdentities = new Set(sourceExclusions.map(String));
   const planMatchesCurrentHorizon = (plan: JsonRecord[]) => {
     const planSlotKeys = plan.map((row) => String(row.slot_key ?? ""));
-    return planSlotKeys.length === currentMissingSlotKeys.length
+    const planUsesExcludedSource = plan.some((row) =>
+      excludedIdentities.has(String(row.source_identity_key ?? ""))
+    );
+    return !planUsesExcludedSource
+      && planSlotKeys.length === currentMissingSlotKeys.length
       && planSlotKeys.every((slotKey, index) => slotKey === currentMissingSlotKeys[index]);
   };
   let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
@@ -352,11 +360,11 @@ export async function constructOperatorManifestAutonomousCycle(
         ? "pending_horizon_reconciliation"
         : "pending";
   if (missingSlots.length > 0 && !lockedPlanMatchesCurrentHorizon) {
-    const [lockedSourceCards, sourceExclusions] = await Promise.all([
-      dependencies.loadLockedSourceCards(brandKey, String(clock.effective_now_iso ?? "")),
-      dependencies.loadSourceExclusions(brandKey),
-    ]);
-    const excludedIdentities = new Set(sourceExclusions.map(String));
+    const lockedSourceCards = await dependencies.loadLockedSourceCards(
+      brandKey,
+      String(clock.effective_now_iso ?? ""),
+    );
+
     const selectionCandidates = lockedSourceCards
       .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
       .filter((candidate) => candidate.lifetime_label !== "disproven");

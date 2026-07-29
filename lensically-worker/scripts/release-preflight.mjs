@@ -3495,7 +3495,10 @@ if (!source.includes("locked_source_selection_plan: lockedSourceSelectionPlan")
 }
 if (!operatorManifestCycleConstructionService.includes("pending_horizon_reconciliation")
     || !operatorManifestCycleConstructionService.includes("locked_source_selection_plan_incomplete_after_reconciliation")
+    || !operatorManifestCycleConstructionService.includes("planUsesExcludedSource")
     || !operatorManifestCycleConstructionServiceTests.includes("replaces a stale locked source plan before strategy commit")
+    || !operatorManifestCycleConstructionServiceTests.includes("replaces a locked plan that contains a newly excluded source before strategy commit")
+
     || !sourceFamilySelection.includes("locked_source_selection_plan_conflict_after_strategy_commit")
     || !sourceFamilySelection.includes("DELETE FROM operator_source_selection_receipts")) {
   errors.push("manifest_locked_source_plan_horizon_reconciliation_missing");
