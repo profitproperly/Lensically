@@ -148,6 +148,7 @@ import {
 } from "./operatorStrategyMemorySaveService";
 import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadService";
 import { deleteOperatorScheduledPost } from "./operatorScheduledPostDeletionService";
+import { retryOperatorScheduledPost } from "./operatorScheduledPostRetryService";
 
 
 
@@ -14709,50 +14710,38 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
       return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
     }
-        if (payload.retry_now === true) {
-      const retryable = await env.DB.prepare(
-        `SELECT id, user_id, threads_user_id, post_text, spoiler_all_text, spoiler_phrases_json,
-                status, scheduled_time, published_post_id, publish_error_message
-         FROM scheduled_posts
-         WHERE id = ?
-           AND user_id = ?
-           AND threads_user_id = ?
-         LIMIT 1`,
-      ).bind(scheduledPostId, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id).first<DueScheduledPost & {
-        status: string;
-        scheduled_time: string;
-        published_post_id: string | null;
-        publish_error_message: string | null;
-      }>();
-      if (!retryable) {
-        return operatorJsonResponse({ success: false, error: "scheduled_post_not_found" }, 404);
-      }
-      if (retryable.published_post_id || retryable.status === SCHEDULED_POST_STATUS_POSTED) {
-        return operatorJsonResponse({ success: false, error: "scheduled_post_already_published" }, 409);
-      }
-      if (retryable.status !== SCHEDULED_POST_STATUS_APPROVED) {
-        return operatorJsonResponse({ success: false, error: "scheduled_post_not_retryable", status: retryable.status }, 409);
-      }
-      if (Date.parse(retryable.scheduled_time) > Date.now()) {
-        return operatorJsonResponse({ success: false, error: "scheduled_post_not_due", scheduled_time: retryable.scheduled_time }, 409);
-      }
-
-      await processScheduledPost(env, retryable);
-      const refreshed = await env.DB.prepare(
-        `SELECT id, status, scheduled_time, published_post_id, published_at, publish_error_message
-         FROM scheduled_posts
-         WHERE id = ?
-           AND user_id = ?
-           AND threads_user_id = ?
-         LIMIT 1`,
-      ).bind(scheduledPostId, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id).first<Record<string, unknown>>();
-      const published = refreshed?.status === SCHEDULED_POST_STATUS_POSTED && Boolean(refreshed?.published_post_id);
-      return operatorJsonResponse({
-        success: published,
-        retry_attempted: true,
-        scheduled_post: refreshed ?? null,
-        error: published ? null : refreshed?.publish_error_message ?? "scheduled_post_retry_failed",
-      }, published ? 200 : 502);
+                if (payload.retry_now === true) {
+      const scheduledPostRetry = await retryOperatorScheduledPost({ scheduledPostId }, {
+        approvedStatus: SCHEDULED_POST_STATUS_APPROVED,
+        postedStatus: SCHEDULED_POST_STATUS_POSTED,
+        nowMs: Date.now(),
+        getRetryable: async (id) => await env.DB.prepare(
+          `SELECT id, user_id, threads_user_id, post_text, spoiler_all_text, spoiler_phrases_json,
+                  status, scheduled_time, published_post_id, publish_error_message
+           FROM scheduled_posts
+           WHERE id = ?
+             AND user_id = ?
+             AND threads_user_id = ?
+           LIMIT 1`,
+        ).bind(id, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id).first<DueScheduledPost & {
+          status: string;
+          scheduled_time: string;
+          published_post_id: string | null;
+          publish_error_message: string | null;
+        }>(),
+        processScheduledPost: async (scheduledPost) => {
+          await processScheduledPost(env, scheduledPost);
+        },
+        getRefreshed: async (id) => await env.DB.prepare(
+          `SELECT id, status, scheduled_time, published_post_id, published_at, publish_error_message
+           FROM scheduled_posts
+           WHERE id = ?
+             AND user_id = ?
+             AND threads_user_id = ?
+           LIMIT 1`,
+        ).bind(id, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id).first<Record<string, unknown>>(),
+      });
+      return operatorJsonResponse(scheduledPostRetry.body, scheduledPostRetry.statusCode);
     }
 
     const hasText = Object.prototype.hasOwnProperty.call(payload, "text");

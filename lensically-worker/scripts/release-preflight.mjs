@@ -127,6 +127,8 @@ const operatorScheduledPostListReadService = read("src/operatorScheduledPostList
 const operatorScheduledPostListReadServiceTests = read("test/operatorScheduledPostListReadService.spec.ts");
 const operatorScheduledPostDeletionService = read("src/operatorScheduledPostDeletionService.ts");
 const operatorScheduledPostDeletionServiceTests = read("test/operatorScheduledPostDeletionService.spec.ts");
+const operatorScheduledPostRetryService = read("src/operatorScheduledPostRetryService.ts");
+const operatorScheduledPostRetryServiceTests = read("test/operatorScheduledPostRetryService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -372,6 +374,9 @@ if (!workflow.includes("test/operatorScheduledPostListReadService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorScheduledPostDeletionService.spec.ts")) {
   errors.push("operator_scheduled_post_deletion_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorScheduledPostRetryService.spec.ts")) {
+  errors.push("operator_scheduled_post_retry_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -2119,6 +2124,52 @@ if (!operatorScheduledPostDeletionServiceTests.includes("rejects a missing sched
     || !operatorScheduledPostDeletionServiceTests.includes("returns null deletion and false replay for a fresh helper result")) {
   lifecycleErrors.push("operator_scheduled_post_deletion_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorScheduledPostRetryService"')
+    || !source.includes("retryOperatorScheduledPost({ scheduledPostId }")
+    || !source.includes("approvedStatus: SCHEDULED_POST_STATUS_APPROVED")
+    || !source.includes("postedStatus: SCHEDULED_POST_STATUS_POSTED")
+    || !source.includes("nowMs: Date.now()")
+    || !source.includes("getRetryable: async (id)")
+    || !source.includes("processScheduledPost: async (scheduledPost)")
+    || !source.includes("getRefreshed: async (id)")
+    || !source.includes("return operatorJsonResponse(scheduledPostRetry.body, scheduledPostRetry.statusCode)")) {
+  lifecycleErrors.push("operator_scheduled_post_retry_service_import_or_binding_missing");
+}
+const scheduledPostEditHandlerStart = source.indexOf('if (toolName === "edit_scheduled_post")');
+const scheduledPostEditMutationStart = source.indexOf("const hasText = Object.prototype.hasOwnProperty.call(payload, \"text\")", scheduledPostEditHandlerStart);
+const scheduledPostRetryHandler = scheduledPostEditHandlerStart >= 0 && scheduledPostEditMutationStart > scheduledPostEditHandlerStart
+  ? source.slice(scheduledPostEditHandlerStart, scheduledPostEditMutationStart)
+  : "";
+if (scheduledPostRetryHandler.includes("const retryable = await env.DB.prepare")
+    || scheduledPostRetryHandler.includes('retryable.status !== SCHEDULED_POST_STATUS_APPROVED')
+    || scheduledPostRetryHandler.includes("const published = refreshed?.status === SCHEDULED_POST_STATUS_POSTED")) {
+  lifecycleErrors.push("operator_scheduled_post_retry_service_returned_to_index");
+}
+if (!operatorScheduledPostRetryService.includes("export async function retryOperatorScheduledPost")
+    || !operatorScheduledPostRetryService.includes("dependencies.getRetryable")
+    || !operatorScheduledPostRetryService.includes("scheduled_post_already_published")
+    || !operatorScheduledPostRetryService.includes("scheduled_post_not_retryable")
+    || !operatorScheduledPostRetryService.includes("dependencies.nowMs")
+    || !operatorScheduledPostRetryService.includes("dependencies.processScheduledPost")
+    || !operatorScheduledPostRetryService.includes("dependencies.getRefreshed")
+    || !operatorScheduledPostRetryService.includes("statusCode: published ? 200 : 502")
+    || !operatorScheduledPostRetryService.includes("scheduled_post_retry_failed")) {
+  lifecycleErrors.push("operator_scheduled_post_retry_service_module_incomplete");
+}
+if (!operatorScheduledPostRetryServiceTests.includes("returns the exact not-found response before processing")
+    || !operatorScheduledPostRetryServiceTests.includes("rejects an already-published record")
+    || !operatorScheduledPostRetryServiceTests.includes("rejects a non-approved record with its current status")
+    || !operatorScheduledPostRetryServiceTests.includes("uses the injected clock to reject a future approved record")
+    || !operatorScheduledPostRetryServiceTests.includes("processes once and returns exact refreshed publication success")
+    || !operatorScheduledPostRetryServiceTests.includes("returns the refreshed publish error with a 502 response")
+    || !operatorScheduledPostRetryServiceTests.includes("uses the exact fallback when refreshed state is unavailable")) {
+  lifecycleErrors.push("operator_scheduled_post_retry_service_tests_incomplete");
+}
+
+
+
+
+
 
 
 
