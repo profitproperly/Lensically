@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d3-source-card-generation-routing
-repository_base_sha: 50a624006063df0ca4a9706db278de259a640742
-production_sha: 50a624006063df0ca4a9706db278de259a640742
+active_checkpoint: stage-7d4-gate-draft-execution-routing
+repository_base_sha: bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0
+production_sha: bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0
 
 
 
@@ -1355,11 +1355,22 @@ Completed checkpoint — Stage 7D2 source draw, lineage, and backfill routing:
 - Exact-SHA release passed in run `30427709680`.
 - Live production independently confirmed exact SHA `50a624006063df0ca4a9706db278de259a640742` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7D3 source-card and generation-run routing:
+Completed checkpoint — Stage 7D3 source-card and generation-run routing:
 
-Route `create_source_card`, `lock_source_card`, `get_source_card`, and `create_generation_run` through the reusable keyed runtime dispatcher. Preserve all admission, family-resolution, persistence, locking, read, and generation-run service ownership; keep explicit D1 and platform adapters exact.
+- Added `dispatchOperatorKeyedResponseTool` for complex runtime handlers that must preserve exact early HTTP exits.
+- Routed `create_source_card`, `lock_source_card`, `get_source_card`, and `create_generation_run` through the keyed response dispatcher without rewriting their admission, family-resolution, persistence, lock/read, or generation-run logic.
+- Added direct regressions proving exact Response preservation, single-handler execution, and unknown-tool fallthrough.
+- Added permanent lifecycle enforcement requiring all four response handlers and preventing direct branches from returning.
+- Push validation passed in run `30427963849`.
+- All eight Operator shards passed in run `30427984752`.
+- Exact-SHA release passed in run `30428253323`.
+- Live production independently confirmed exact SHA `bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0` with 75/75 public tools.
 
-Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
+ACTIVE checkpoint — Stage 7D4 gate and draft execution routing:
+
+Route `run_gates`, `submit_candidate_draft`, `save_self_rejected_draft`, `mark_draft_shown`, `approve_draft`, and `reject_draft` through the keyed response dispatcher. Preserve gate evaluation, draft admission and persistence, shown-state inventory, decision transitions, claim updates, strategy-memory learning, and exact early responses.
+
+Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to gate-management and strategy/scheduling routing.
 
 
 
