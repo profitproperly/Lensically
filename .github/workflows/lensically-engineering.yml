@@ -49,21 +49,30 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pushed head
+            - name: Checkout pushed head
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Classify pushed change
         id: push_scope
         shell: bash
         run: |
           set -euo pipefail
-          before="${{ github.event.before }}"
-          if [[ -z "${before}" || "${before}" =~ ^0+$ ]] || ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
-            before="$(git rev-parse HEAD^)"
+                    deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty' || true)"
+          if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+            validation_base="${deployed_sha}"
+            validation_scope=deployed_production
+          else
+            validation_base="${{ github.event.before }}"
+            validation_scope=event_before_fallback
+            if [[ -z "${validation_base}" || "${validation_base}" =~ ^0+$ ]] || ! git cat-file -e "${validation_base}^{commit}" 2>/dev/null; then
+              validation_base="$(git rev-parse HEAD^)"
+              validation_scope=parent_fallback
+            fi
           fi
-          git diff --name-only "${before}" HEAD > /tmp/lensically-changed-files.txt
+          git diff --name-only "${validation_base}" HEAD > /tmp/lensically-changed-files.txt
+          echo "validation_scope=${validation_scope} base=${validation_base} head=$(git rev-parse HEAD)"
           full_validation=false
           web_changed=false
           while IFS= read -r path; do
