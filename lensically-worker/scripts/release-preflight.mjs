@@ -944,7 +944,7 @@ if (operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "create_
   lifecycleErrors.push("operator_source_card_generation_runtime_dispatch_returned_to_index");
 }
 const operatorActiveGateDispatchStart = source.indexOf(
-  'if (toolName === "list_active_gates")',
+  "const listActiveGatesHandler = async (): Promise<Response> =>",
   operatorRunGatesDispatchStart,
 );
 const operatorGateDraftExecutionRuntimeShell = operatorRunGatesDispatchStart >= 0
@@ -966,6 +966,29 @@ if (operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "run_gates
     || operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "mark_draft_shown")')
     || operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "approve_draft"')) {
   lifecycleErrors.push("operator_gate_draft_execution_runtime_dispatch_returned_to_index");
+}
+const operatorScheduledListDispatchStart = source.indexOf(
+  'if (toolName === "list_scheduled_posts")',
+  operatorActiveGateDispatchStart,
+);
+const operatorGateMemoryRuntimeShell = operatorActiveGateDispatchStart >= 0
+  && operatorScheduledListDispatchStart > operatorActiveGateDispatchStart
+  ? source.slice(operatorActiveGateDispatchStart, operatorScheduledListDispatchStart)
+  : "";
+if (!operatorGateMemoryRuntimeShell.includes("const listActiveGatesHandler = async")
+    || !operatorGateMemoryRuntimeShell.includes("const gateMutationHandler = async")
+    || !operatorGateMemoryRuntimeShell.includes("const listStrategyMemoryHandler = async")
+    || !operatorGateMemoryRuntimeShell.includes("const saveStrategyMemoryHandler = async")
+    || !operatorGateMemoryRuntimeShell.includes("dispatchOperatorKeyedResponseTool(toolName, {")
+    || !operatorGateMemoryRuntimeShell.includes("promote_memory_to_gate: gateMutationHandler")
+    || !operatorGateMemoryRuntimeShell.includes("if (gateMemoryRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_gate_memory_runtime_dispatch_cutover_incomplete");
+}
+if (operatorGateMemoryRuntimeShell.includes('if (toolName === "list_active_gates")')
+    || operatorGateMemoryRuntimeShell.includes('if (toolName === "create_or_update_gate"')
+    || operatorGateMemoryRuntimeShell.includes('if (toolName === "list_strategy_memory")')
+    || operatorGateMemoryRuntimeShell.includes('if (toolName === "save_strategy_memory")')) {
+  lifecycleErrors.push("operator_gate_memory_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -2314,6 +2337,7 @@ if (!operatorDraftDecisionServiceTests.includes("returns the exact required-ID r
   lifecycleErrors.push("operator_draft_decision_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorActiveGateReadService"')
+    || !source.includes("const listActiveGatesHandler = async")
     || !source.includes("readOperatorActiveGates({")
         || !source.includes("listGates: async ({ stageScope, laneKey, contentType })")
     || !source.includes("brand.brand_key,\n        stageScope")
@@ -2348,6 +2372,7 @@ const operatorGateEvaluationHandler = operatorGateEvaluationHandlerStart >= 0
   ? source.slice(operatorGateEvaluationHandlerStart, operatorGateEvaluationHandlerEnd)
   : "";
 if (!source.includes('from "./operatorGateMutationPlanningService"')
+    || !source.includes("const gateMutationHandler = async")
     || !source.includes("planOperatorGateMutation({")
     || !source.includes("evaluateOperatorGates({ payload }, {")
     || !source.includes("loadMemory: async (memoryId)")
@@ -2427,6 +2452,7 @@ if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found
   lifecycleErrors.push("operator_gate_mutation_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorStrategyMemoryListReadService"')
+    || !source.includes("const listStrategyMemoryHandler = async")
     || !source.includes("readOperatorStrategyMemoryList({ payload }")
     || !source.includes("listActiveMemory: async ({ kinds, limit, offset, status })")
     || !source.includes("countActiveMemory: async ({ kinds, status })")
@@ -2455,6 +2481,7 @@ if (!operatorStrategyMemoryListReadServiceTests.includes("uses unfiltered active
   lifecycleErrors.push("operator_strategy_memory_list_read_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorStrategyMemorySaveService"')
+    || !source.includes("const saveStrategyMemoryHandler = async")
     || !source.includes("planOperatorStrategyMemorySave(payload")
     || !source.includes("normalizeKind: normalizeGptStrategyMemoryKind")
     || !source.includes("allowedKinds: Array.from(GPT_STRATEGY_MEMORY_KINDS)")

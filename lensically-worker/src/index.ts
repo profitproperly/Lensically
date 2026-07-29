@@ -13821,7 +13821,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return gateDraftExecutionRuntimeDispatch.response;
   }
 
-    if (toolName === "list_active_gates") {
+      const listActiveGatesHandler = async (): Promise<Response> => {
     const activeGateRead = await readOperatorActiveGates({
       brandKey: brand.brand_key,
       payload,
@@ -13836,12 +13836,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         contentType,
       ),
     });
-    return operatorJsonResponse(activeGateRead);
-  }
+        return operatorJsonResponse(activeGateRead);
+  };
 
-    if (toolName === "create_or_update_gate" || toolName === "promote_memory_to_gate") {
-    const gateMutation = await planOperatorGateMutation({
-      toolName,
+  const gateMutationHandler = async (): Promise<Response> => {
+    const gateMutationToolName = toolName === "promote_memory_to_gate"
+      ? "promote_memory_to_gate"
+      : "create_or_update_gate";
+        const gateMutation = await planOperatorGateMutation({
+      toolName: gateMutationToolName,
       payload,
       accountBrandKey: brand.brand_key,
     }, {
@@ -13919,11 +13922,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         )
         .run();
     }
-    return operatorJsonResponse(gateMutation.body);
-  }
+        return operatorJsonResponse(gateMutation.body);
+  };
 
-
-    if (toolName === "list_strategy_memory") {
+  const listStrategyMemoryHandler = async (): Promise<Response> => {
     const memoryList = await readOperatorStrategyMemoryList({ payload }, {
       normalizeMachineKey: normalizeOperatorMachineKey,
       listActiveMemory: async ({ kinds, limit, offset, status }) => await listGptStrategyMemory(
@@ -13941,11 +13943,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         status,
       ),
     });
-    return operatorJsonResponse(memoryList);
-  }
+        return operatorJsonResponse(memoryList);
+  };
 
-
-      if (toolName === "save_strategy_memory") {
+  const saveStrategyMemoryHandler = async (): Promise<Response> => {
     const memorySave = planOperatorStrategyMemorySave(payload, {
       normalizeKind: normalizeGptStrategyMemoryKind,
       allowedKinds: Array.from(GPT_STRATEGY_MEMORY_KINDS),
@@ -13963,9 +13964,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       body: memorySave.values.body,
       metadataJson: memorySave.values.metadataJson,
     });
-    return operatorJsonResponse(composeOperatorStrategyMemorySaveResponse(memory));
-  }
+        return operatorJsonResponse(composeOperatorStrategyMemorySaveResponse(memory));
+  };
 
+  const gateMemoryRuntimeDispatch = await dispatchOperatorKeyedResponseTool(toolName, {
+    list_active_gates: listActiveGatesHandler,
+    create_or_update_gate: gateMutationHandler,
+    promote_memory_to_gate: gateMutationHandler,
+    list_strategy_memory: listStrategyMemoryHandler,
+    save_strategy_memory: saveStrategyMemoryHandler,
+  });
+  if (gateMemoryRuntimeDispatch.handled) {
+    return gateMemoryRuntimeDispatch.response;
+  }
 
                 if (toolName === "list_scheduled_posts") {
     const scheduledPostList = await readOperatorScheduledPostList({ payload }, {
