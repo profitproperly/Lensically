@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6am-scheduled-post-list-read-service
-repository_base_sha: 2b4f3b004f016285a51d93a736fb2b503261caf7
-production_sha: 2b4f3b004f016285a51d93a736fb2b503261caf7
+active_checkpoint: stage-6an-scheduled-post-deletion-service
+repository_base_sha: 56bb17438effd616db0851050fc36ffe09716ff9
+production_sha: 56bb17438effd616db0851050fc36ffe09716ff9
 
 
 
@@ -1093,18 +1093,31 @@ Completed checkpoint — Stage 6AL strategy-memory save service extraction:
 - Hardened exact-SHA release and live verification passed in run `30411087939`.
 - Live production independently confirmed exact SHA `2b4f3b004f016285a51d93a736fb2b503261caf7` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AM scheduled-post list read service extraction:
+Completed checkpoint — Stage 6AM scheduled-post list read service extraction:
 
-Extract the deterministic `list_scheduled_posts` workflow into a focused dependency-injected service while preserving:
+- Added `src/operatorScheduledPostListReadService.ts` as the dependency-injected authority for optional date normalization, workspace-timezone fallback, ISO-date admission, local-date retrieval, empty invalid-date behavior, and exact response composition.
+- Reduced `list_scheduled_posts` in `src/index.ts` to canonical Threads identity, shared text and date validation, the scheduled-post local-date list helper, workspace timezone default, and HTTP transport.
+- Added `test/operatorScheduledPostListReadService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Initial lifecycle validation in runs `30411419203` and `30411482466` exposed an ownership-gate design defect: global substring checks collided with shared response and timezone-normalization fields in unrelated handlers.
+- Repaired the gate by scoping returned-inline detection to the exact `list_scheduled_posts` handler body and permanently required handler-scoped or repository-verified unique ownership fragments.
+- Focused validation passed in run `30411557651`.
+- Push validation passed in run `30411548606`.
+- All eight Operator shards passed in run `30411809737`; an older identical duplicate dispatch was safely cancelled by the existing exact-task concurrency guard.
+- Hardened exact-SHA release and live verification passed in run `30411876286`.
+- Live production independently confirmed exact SHA `56bb17438effd616db0851050fc36ffe09716ff9` with 75/75 public tools.
 
-- optional date normalization
-- timezone normalization with the workspace default fallback
-- exact ISO-date admission before account-scoped retrieval
-- empty results when the date is absent or invalid
-- canonical Threads-account scheduled-post retrieval for one local date
-- exact response composition for items, returned count, total count, `has_more: false`, and `deletion_history_exposed_to_model: false`
+ACTIVE checkpoint — Stage 6AN scheduled-post deletion service extraction:
 
-Keep the scheduled-post local-date list helper, canonical Threads identity, shared text normalization, ISO-date validation, workspace timezone default, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the deterministic `delete_scheduled_post` orchestration into a focused dependency-injected service while preserving:
+
+- scheduled-post ID truncation and positive-integer admission with the exact required-ID response
+- canonical deletion-reason normalization with the exact allowed-reasons response
+- optional reason-detail and operation-ID normalization
+- protected deletion invocation with canonical app and Threads identity, `deletedBy: model`, and `deletionSource: mcp`
+- exact outcome mapping for not found, not deletable, and reason required
+- exact success response for deletion record, replay state, and `strategy_memory_written: false`
+
+Keep the protected scheduled-post deletion helper, canonical app and Threads identity, reason-code and text normalizers, allowed reason constants, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
 
 
 
@@ -1144,7 +1157,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AM
+6. Product-service extraction — ACTIVE at Stage 6AN
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
