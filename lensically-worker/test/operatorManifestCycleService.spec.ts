@@ -32,7 +32,12 @@ function createHarness() {
     validateLockedLineup: vi.fn(async () => [{ id: "plan-1" }] as JsonRecord[]),
     commitStrategy: vi.fn(async () => ({ id: "strategy-1" } as JsonRecord)),
     appendCycleEvent: vi.fn(async () => undefined),
-    getCycleReceipt: vi.fn(async () => ({ id: "receipt-1" } as JsonRecord)),
+        getCycleReceipt: vi.fn(async () => ({ id: "receipt-1" } as JsonRecord)),
+    buildCycleReceiptRead: vi.fn(() => ({
+      summary: { id: "receipt-summary" },
+      section: "events",
+      items: [{ id: "event-1" }],
+    } as JsonRecord)),
     recordCycleDefect: vi.fn(async () => ({ id: "defect-1" })),
     resolveCycleDefect: vi.fn(async () => ({ id: "defect-1", status: "resolved" })),
     finalizeCycleReceipt: vi.fn(async () => ({ completed: true } as JsonRecord)),
@@ -47,7 +52,8 @@ function createHarness() {
     validateLockedLineup: mocks.validateLockedLineup,
     commitStrategy: mocks.commitStrategy,
     appendCycleEvent: mocks.appendCycleEvent,
-    getCycleReceipt: mocks.getCycleReceipt,
+        getCycleReceipt: mocks.getCycleReceipt,
+    buildCycleReceiptRead: mocks.buildCycleReceiptRead,
     recordCycleDefect: mocks.recordCycleDefect,
     resolveCycleDefect: mocks.resolveCycleDefect,
     finalizeCycleReceipt: mocks.finalizeCycleReceipt,
@@ -89,6 +95,64 @@ describe("Operator Manifest cycle product service", () => {
       snapshotId: "snapshot-1",
       pageIndex: 0,
     });
+  });
+
+    it("preserves bounded cycle receipt reads and exact unavailable state", async () => {
+    const { dependencies, mocks } = createHarness();
+    const available = await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_cycle_receipt",
+      brandKey: "manifest_mental",
+      payload: {
+        cycle_id: " cycle-1 ",
+        cycle_operation_id: " operation-1 ",
+        receipt_section: "events",
+        offset: 10,
+        limit: 5,
+      },
+    }, dependencies);
+
+    expect(mocks.getCycleReceipt).toHaveBeenCalledWith({
+      brandKey: "manifest_mental",
+      cycleId: "cycle-1",
+      operationId: "operation-1",
+    });
+    expect(mocks.buildCycleReceiptRead).toHaveBeenCalledWith(
+      { id: "receipt-1" },
+      "events",
+      10,
+      5,
+    );
+    expect(available).toEqual({
+      status: 200,
+      body: {
+        success: true,
+        brand_key: "manifest_mental",
+        available: true,
+        cycle_receipt: { id: "receipt-summary" },
+        receipt_section: {
+          section: "events",
+          items: [{ id: "event-1" }],
+        },
+      },
+    });
+
+    mocks.getCycleReceipt.mockResolvedValueOnce(null);
+    const unavailable = await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_cycle_receipt",
+      brandKey: "manifest_mental",
+      payload: {},
+    }, dependencies);
+    expect(unavailable).toEqual({
+      status: 200,
+      body: {
+        success: true,
+        brand_key: "manifest_mental",
+        available: false,
+        cycle_receipt: null,
+        receipt_section: null,
+      },
+    });
+    expect(mocks.buildCycleReceiptRead).toHaveBeenCalledOnce();
   });
 
   it("preserves complete strategy locking and source-selection metadata", async () => {

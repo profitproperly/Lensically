@@ -12470,7 +12470,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         env.DB,
         input as Parameters<typeof appendManifestCycleEvent>[1],
       ),
-      getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
+            getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
+      buildCycleReceiptRead: (receipt, section, offset, limit) => buildManifestCycleReceiptRead(
+        receipt as Parameters<typeof buildManifestCycleReceiptRead>[0],
+        section as Parameters<typeof buildManifestCycleReceiptRead>[1],
+        offset as Parameters<typeof buildManifestCycleReceiptRead>[2],
+        limit as Parameters<typeof buildManifestCycleReceiptRead>[3],
+      ) as unknown as Record<string, unknown>,
       recordCycleDefect: (input) => recordManifestCycleDefect(
         env.DB,
         input as Parameters<typeof recordManifestCycleDefect>[1],
@@ -14918,27 +14924,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(approvedDraftSchedule.body, approvedDraftSchedule.statusCode);
   }
 
-                                if (toolName === "get_manifest_cycle_receipt") {
-    const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
-    const operationId = normalizeOperatorText(payload.cycle_operation_id, 240, true);
-    const receipt = await getManifestCycleReceipt(env.DB, {
-      brandKey: brand.brand_key,
-      cycleId,
-      operationId,
-    });
-    const receiptRead = receipt
-      ? buildManifestCycleReceiptRead(receipt, payload.receipt_section, payload.offset, payload.limit)
-      : null;
-    const receiptSection = receiptRead ? { ...receiptRead } : null;
-    if (receiptSection) delete receiptSection.summary;
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      available: Boolean(receipt),
-      cycle_receipt: receiptRead?.summary ?? null,
-      receipt_section: receiptSection,
-    });
-  }
+                                
 
   if (toolName === "get_manifest_intelligence_foundation") {
     return operatorJsonResponse({

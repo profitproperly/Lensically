@@ -4,6 +4,7 @@ type JsonRecord = Record<string, unknown>;
 
 export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES = [
   "get_manifest_cycle_analysis_page",
+  "get_manifest_cycle_receipt",
   "commit_manifest_cycle_strategy",
   "record_manifest_cycle_defect",
   "resolve_manifest_cycle_defect",
@@ -45,7 +46,17 @@ export interface OperatorManifestCycleServiceDependencies {
   }): Promise<JsonRecord[]>;
   commitStrategy(input: JsonRecord): Promise<JsonRecord>;
   appendCycleEvent(input: JsonRecord): Promise<unknown>;
-  getCycleReceipt(input: { brandKey: string; cycleId: string }): Promise<JsonRecord | null>;
+    getCycleReceipt(input: {
+    brandKey: string;
+    cycleId?: string | null;
+    operationId?: string | null;
+  }): Promise<JsonRecord | null>;
+  buildCycleReceiptRead(
+    receipt: JsonRecord,
+    section: unknown,
+    offset: unknown,
+    limit: unknown,
+  ): JsonRecord;
   recordCycleDefect(input: JsonRecord): Promise<unknown>;
   resolveCycleDefect(input: JsonRecord): Promise<unknown>;
   finalizeCycleReceipt(input: JsonRecord): Promise<JsonRecord>;
@@ -103,6 +114,33 @@ export async function handleOperatorManifestCycleServiceTool(
       });
       return result(observed, 400);
     }
+  }
+
+    if (toolName === "get_manifest_cycle_receipt") {
+    const cycleId = normalizeText(payload.cycle_id, 160, true);
+    const operationId = normalizeText(payload.cycle_operation_id, 240, true);
+    const receipt = await dependencies.getCycleReceipt({
+      brandKey,
+      cycleId,
+      operationId,
+    });
+    const receiptRead = receipt
+      ? dependencies.buildCycleReceiptRead(
+        receipt,
+        payload.receipt_section,
+        payload.offset,
+        payload.limit,
+      )
+      : null;
+    const receiptSection = receiptRead ? { ...receiptRead } : null;
+    if (receiptSection) delete receiptSection.summary;
+    return result({
+      success: true,
+      brand_key: brandKey,
+      available: Boolean(receipt),
+      cycle_receipt: receiptRead?.summary ?? null,
+      receipt_section: receiptSection,
+    });
   }
 
   if (toolName === "commit_manifest_cycle_strategy") {
