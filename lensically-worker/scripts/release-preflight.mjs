@@ -404,6 +404,11 @@ if (!tests.includes("const MONTHLY_GROWTH_ANALYTICS_TIMEOUT_MS = 60000;")
     || monthlyGrowthAnalyticsTimeoutUsages.length < 2) {
   errors.push("monthly_growth_analytics_timeout_guard_missing");
 }
+const manifestMeasurementAuditTimeoutUsages = tests.match(/MANIFEST_MEASUREMENT_AUDIT_TIMEOUT_MS/g) ?? [];
+if (!tests.includes("const MANIFEST_MEASUREMENT_AUDIT_TIMEOUT_MS = 60000;")
+    || manifestMeasurementAuditTimeoutUsages.length < 2) {
+  errors.push("manifest_measurement_audit_timeout_guard_missing");
+}
 if (!workflow.includes("test/operatorMcpProtocol.spec.ts")) {
   errors.push("operator_mcp_protocol_workflow_gate_missing");
 }

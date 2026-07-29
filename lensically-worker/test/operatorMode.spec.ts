@@ -293,6 +293,7 @@ type ManifestSourceBackedCycleTestFixture = {
 };
 
 const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;
+const MANIFEST_MEASUREMENT_AUDIT_TIMEOUT_MS = 60000;
 const MONTHLY_GROWTH_ANALYTICS_TIMEOUT_MS = 60000;
 
 async function prepareManifestSourceBackedCycleForTest(
@@ -1433,8 +1434,8 @@ describe("operator mode backend spine", () => {
 
     const afterScheduled = await env.DB.prepare(`SELECT COUNT(*) AS total FROM scheduled_posts`).first<{ total: number }>();
     expect(Number(afterScheduled?.total ?? 0)).toBe(Number(beforeScheduled?.total ?? 0));
-    expect(JSON.stringify(summary.structuredContent.intelligence_audit.summary.follower_checkpoint)).not.toContain("published_post_id");
-  }, 30000);
+        expect(JSON.stringify(summary.structuredContent.intelligence_audit.summary.follower_checkpoint)).not.toContain("published_post_id");
+  }, MANIFEST_MEASUREMENT_AUDIT_TIMEOUT_MS);
 
   it("reads Content Focus through a direct typed Main tool after Proceed", async () => {
     await ensureMcpAccountOpen("manifest_mental");
@@ -3710,8 +3711,14 @@ describe("operator mode MCP endpoint", () => {
             expect(databaseSchemaTool?.description).toContain("expected D1 table");
     expect(databaseSchemaTool?.inputSchema?.required).toContain("table_name");
         expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
-    expect(engineeringContinuationTool?.description).toContain("sole canonical");
-    expect(engineeringContinuationTool?.inputSchema?.properties).toEqual({});
+        expect(engineeringContinuationTool?.description).toContain("sole canonical");
+    expect(engineeringContinuationTool?.inputSchema?.properties).toMatchObject({
+      governing_standards_ack: {
+        type: "string",
+        const: "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.",
+      },
+    });
+    expect(engineeringContinuationTool?.inputSchema?.required).toContain("governing_standards_ack");
         const parsedContinuation = parseCanonicalContinuationMetadata(`status: active
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
