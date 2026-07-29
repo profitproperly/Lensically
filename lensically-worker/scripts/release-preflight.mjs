@@ -2023,6 +2023,7 @@ if (source.includes("const kind = normalizeGptStrategyMemoryKind(payload.kind)")
 }
 if (!operatorStrategyMemorySaveService.includes("export function planOperatorStrategyMemorySave")
     || !operatorStrategyMemorySaveService.includes("export function composeOperatorStrategyMemorySaveResponse")
+    || !operatorStrategyMemorySaveService.includes("allowedKinds: readonly unknown[]")
     || !operatorStrategyMemorySaveService.includes("dependencies.normalizeKind")
     || !operatorStrategyMemorySaveService.includes("invalid_strategy_memory_kind")
     || !operatorStrategyMemorySaveService.includes("Array.from(dependencies.allowedKinds)")

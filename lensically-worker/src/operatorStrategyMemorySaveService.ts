@@ -18,7 +18,7 @@ export function planOperatorStrategyMemorySave<TKind>(
   payload: Record<string, unknown>,
   dependencies: {
     normalizeKind: (value: unknown) => TKind | null;
-    allowedKinds: readonly TKind[];
+        allowedKinds: readonly unknown[];
     normalizeText: (value: unknown, maxLength: number, allowEmpty?: boolean) => string | null;
     normalizeJson: (value: unknown, fallback: unknown) => string;
   },
