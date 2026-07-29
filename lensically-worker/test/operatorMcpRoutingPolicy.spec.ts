@@ -13,6 +13,7 @@ import {
   requestedMcpBrandKey,
   scopeOperatorMcpToolCall,
 } from "../src/operatorMcpRoutingPolicy";
+import type { OperatorManifestCycleServiceToolName } from "../src/operatorManifestCycleService";
 import type { OperatorMcpBrandKey } from "../src/operatorMcpProtocol";
 
 const normalizeBrandKey = (value: unknown): OperatorMcpBrandKey | null => {
@@ -251,7 +252,9 @@ describe("Operator runtime admission", () => {
 function createManifestRuntimeDependencies() {
   const events: string[] = [];
   const dependencies = {
-    isCycleServiceToolName: vi.fn((toolName: string) => toolName === "get_manifest_cycle_receipt"),
+        isCycleServiceToolName: vi.fn((
+      toolName: string,
+    ): toolName is OperatorManifestCycleServiceToolName => toolName === "get_manifest_cycle_receipt"),
     handleCycleService: vi.fn(async () => ({ body: { source: "cycle_service" }, status: 207 })),
     prepare: vi.fn(async () => ({ success: true, source: "prepare" } as Record<string, unknown>)),
     persist: vi.fn(async () => ({ success: true, source: "persist" } as Record<string, unknown>)),

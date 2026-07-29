@@ -1,3 +1,4 @@
+import type { OperatorManifestCycleServiceToolName } from "./operatorManifestCycleService";
 import type { OperatorMcpBrandKey } from "./operatorMcpProtocol";
 import {
   isOperatorMcpAdminToolName,
@@ -264,9 +265,11 @@ export async function dispatchOperatorManifestRuntimeTool(
     payload: Record<string, unknown>;
   },
   dependencies: {
-    isCycleServiceToolName(toolName: string): boolean;
-    handleCycleService(
+        isCycleServiceToolName(
       toolName: string,
+    ): toolName is OperatorManifestCycleServiceToolName;
+    handleCycleService(
+      toolName: OperatorManifestCycleServiceToolName,
       payload: Record<string, unknown>,
     ): Promise<{ body: Record<string, unknown>; status: number }>;
     prepare(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
