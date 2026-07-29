@@ -1616,12 +1616,21 @@ function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<
     }
   }
 
-  return {
+    return {
     ok: payload.ok !== false,
     error: payload.error ?? null,
     status: payload.status ?? null,
-        brand_key: payload.brand_key ?? null,
+    brand_key: payload.brand_key ?? null,
+    run_id: payload.run_id ?? null,
+    source_card_id: payload.source_card_id ?? null,
+    source_card_family_id: payload.source_card_family_id ?? null,
+    source_card_version_number: payload.source_card_version_number ?? null,
+    showable: payload.showable ?? null,
+    draft_id: payload.draft_id ?? null,
+    draft_text: typeof payload.draft_text === "string" ? payload.draft_text.slice(0, 4000) : null,
+    next_action: payload.next_action ?? null,
     continuity_capsule: continuityCapsule && typeof continuityCapsule === "object" && !Array.isArray(continuityCapsule)
+
       ? compactOperatorPayloadValue(compactOperatorContinuityCapsule(continuityCapsule), "continuity_capsule", { arrayItems: MANIFEST_REVIEW_BATCH_SIZE, stringChars: 120, objectKeys: 32, maxDepth: 6 }, [])
       : null,
     payload_contract: {

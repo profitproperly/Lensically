@@ -3529,7 +3529,14 @@ if (!source.includes('post_level_attribution: "forbidden"') || !source.includes(
   errors.push("performance_evaluator_follower_policy_missing");
 }
 
+if (!source.includes("run_id: payload.run_id ?? null")
+    || !source.includes("source_card_id: payload.source_card_id ?? null")
+    || !source.includes("draft_text: typeof payload.draft_text === \"string\"")) {
+  errors.push("operator_fallback_generation_receipt_identity_missing");
+}
+
 if (errors.length > 0) {
+
   for (const error of errors) console.error(`[release-preflight] ${error}`);
   process.exit(1);
 }
