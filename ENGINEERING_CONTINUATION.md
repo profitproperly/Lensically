@@ -36,24 +36,24 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 9 final comparison, cleanup, validation, and production release.
-- Remaining dependency chain: Stages 1–8 are complete and deployed. Execute Stage 9 only, then advance the queued CHL foundation in canonical order.
-- Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
+- Current checkpoint: Stage 9 final comparison, verified-residue cleanup, narrow normal-path Recovery-dependency verification, proportional final validation, exact-SHA production release, and independent live verification.
+- Remaining dependency chain: Stages 1–8 are complete and deployed. Execute Stage 9 only.
+- Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, no normal engineering path depends on Recovery, and this ledger advances autonomous posting restoration.
 
-### 20 — QUEUED — `chl_autonomous_operator_foundation_v1`
+### 20 — QUEUED — `manifest_autonomous_posting_restoration`
 
-- Starts immediately after `worker-monolith-refactor` completes unless a verified P0/P1 interrupt is recorded here.
-- Completed prerequisites: `github_transient_retry_wiring` and `github_ref_reconciliation`.
-- Required remaining order: `atomic_write_reconciliation`, `repository_control_error_policy`, `hardening_regression_completion`, `canonical_operator_documentation`, `full_blocker_acceptance_campaign`.
-- Completion condition: every required item has focused regression evidence, one exact tested and released SHA, live verification, reconciled repository/production state, and a completed foundation outcome.
+- Starts immediately after `worker-monolith-refactor` closes unless a verified P0/P1 interrupt is recorded here.
+- Objective: run one complete Manifest autonomous cycle against live state, restore the required hourly runway without duplicates or backfill, verify scheduler normal mode and posting enablement, and resume normal autonomous publishing.
+- Current checkpoint: `full_manifest_cycle_test_and_posting_resume`.
+- Completion condition: the full cycle succeeds, authoritative schedule and lineage are verified, required upcoming hourly slots are populated safely, the scheduler is healthy in normal mode, and posting is live again.
 
-### Visible follow-on queue
+### Superseded queue disposition
 
-- 100 — CAPTURED — `remove_normal_recovery_dependencies`; revalidate after the two primary jobs.
-- 110 — CAPTURED — `content_lineage_repair`; revalidate against the completed Stage 6T lineage authority.
-- 120 — CAPTURED — `scheduled_autonomous_runs`; execute only after the foundation is live-verified.
-- 130 — CAPTURED — `human_gate_retirement`; execute only with explicit retirement evidence for each gate.
-- 140 — CAPTURED — `manifest_tomorrow_posting_continuity`; stale time-sensitive wording must be revalidated before acceptance or execution.
+- `chl_autonomous_operator_foundation_v1` is retired because the refactor-era Execution Kernel, atomic repository controls, continuous-hardening loop, source-controlled documentation, lifecycle gates, and acceptance coverage supersede all five items.
+- `remove_normal_recovery_dependencies` is reduced to the narrow Stage 9 verification above rather than a separate project.
+- `content_lineage_repair` and `human_gate_retirement` are retired because current production architecture already provides complete lineage and optional nonblocking review.
+- `scheduled_autonomous_runs` is absorbed into `manifest_autonomous_posting_restoration`.
+- `manifest_tomorrow_posting_continuity` is retired as stale; live state governs restoration.
 
 ## Active Job Objective
 
@@ -75,7 +75,7 @@ Stage 3 production evidence:
 
 ## Current Action
 
-Execute Stage 9 of `worker-monolith-refactor`: perform the final comparison, remove only verified remaining residue, run proportional final validation, release the exact SHA, independently verify production, close the refactor, and advance `chl_autonomous_operator_foundation_v1` to `atomic_write_reconciliation`.
+Execute Stage 9 of `worker-monolith-refactor`: perform the final comparison, remove only verified remaining residue, verify no normal engineering path depends on Recovery, run proportional final validation, release the exact SHA, independently verify production, close the refactor, and advance `manifest_autonomous_posting_restoration` to `full_manifest_cycle_test_and_posting_resume`.
 
 ### Canonical steering rule — immediate scope reduction
 
@@ -1540,29 +1540,14 @@ Post-closure defect resolution — client-side mutation block handling:
 
 Remaining work after this checkpoint:
 
-- Complete Stage 7 router and runtime composition in bounded clusters.
-- Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
-- After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
+- Complete Stage 9 final comparison, cleanup, narrow Recovery-dependency verification, proportional validation, exact-SHA release, and live verification.
+- Then activate `manifest_autonomous_posting_restoration` and run the full Manifest cycle test before normal posting resumes.
 
 
 
 
 
-- Stage 7 router and runtime composition.
-- Stage 8 test and release modernization.
-
-  Stage 8 must complete the remaining release-efficiency modernization agreed by the owner before Stage 9 begins:
-
-  - Build web artifacts once during validation and deploy that exact validated artifact without reinstalling dependencies or rebuilding during release.
-  - Validate migration ordering and safety before release, then apply only unapplied production migrations; keep large data backfills on an explicitly measured long-running path.
-  - Update and verify Wrangler cron schedules only when cron or Wrangler configuration changed.
-  - Add fast workflow YAML, schema, indentation, and structural validation before exercising the complete engineering workflow.
-  - Parallelize and deduplicate broad architecture validation, reuse exact-SHA validation evidence and artifacts, and reserve the full suite for affected high-risk surfaces and milestone boundaries.
-  - Preserve complete fallback validation and release behavior whenever exact-SHA validation evidence is missing, a classifier cannot prove the affected surface, or a genuinely high-risk change requires it.
-  - Establish and verify practical timing targets: routine Worker validation and deployment under one minute each; ordinary web, cron, and small-migration paths approximately one to two minutes; workflow infrastructure approximately one to two minutes when clean; broad architecture milestones approximately two to five minutes; large migrations governed by actual database work.
-
-  Stage 8 is incomplete until these paths are source-controlled, regression-protected, benchmarked on real exact-SHA runs, and reflected in the release workflow without weakening production safety.
-- Stage 9 final comparison, cleanup, validation, and production release.
+- Stage 9 final comparison, verified-residue cleanup, narrow Recovery-dependency verification, proportional validation, exact-SHA production release, and independent live verification.
 
 ## Remaining
 
@@ -1574,15 +1559,14 @@ Remaining work after this checkpoint:
 8. Test and release modernization — COMPLETE AND DEPLOYED
 9. Final comparison and production release — ACTIVE
 
-### Next job — `chl_autonomous_operator_foundation_v1`
+### Next job — `manifest_autonomous_posting_restoration`
 
-1. `atomic_write_reconciliation`
-2. `repository_control_error_policy`
-3. `hardening_regression_completion`
-4. `canonical_operator_documentation`
-5. `full_blocker_acceptance_campaign`
+1. Run one complete Manifest autonomous cycle against live state.
+2. Restore the required hourly runway without duplicates or backfill.
+3. Verify source lineage, scheduled-slot ownership, scheduler normal mode, and posting enablement.
+4. Resume normal autonomous publishing.
 
-The visible follow-on queue remains captured under `Unified Job Queue` and may not preempt either primary job without a verified P0/P1 incident or an owner-authored precedence change recorded in this file.
+No pre-refactor foundation or stale captured job remains executable. The superseded disposition is recorded under `Unified Job Queue`.
 
 ## Completion Gates
 
