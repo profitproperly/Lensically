@@ -125,10 +125,33 @@ jobs:
         working-directory: lensically-web
         run: npm ci
 
-      - name: Build web product surface
+      
+      - name: Test validated web artifact contract
         if: steps.push_scope.outputs.web_changed == 'true'
         working-directory: lensically-web
-        run: npm run build
+        run: npm run test:validated-artifact
+
+      - name: Build exact validated web artifact
+        if: steps.push_scope.outputs.web_changed == 'true'
+        working-directory: lensically-web
+        run: npm run build:cf
+
+      - name: Package exact validated web artifact
+        if: steps.push_scope.outputs.web_changed == 'true'
+        working-directory: lensically-web
+        env:
+          VALIDATED_SHA: ${{ github.sha }}
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/lensically-web-${{ github.sha }}
+        run: node scripts/validated-web-artifact.mjs package --sha "${VALIDATED_SHA}" --directory "${ARTIFACT_DIRECTORY}"
+
+      - name: Upload exact validated web artifact
+        if: steps.push_scope.outputs.web_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lensically-web-${{ github.sha }}
+          path: ${{ runner.temp }}/lensically-web-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
