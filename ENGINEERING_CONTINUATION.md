@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6aq-owner-approved-batch-scheduling-service
-repository_base_sha: faddce8ece7915044916eb5d9ae5ad24e4b59b6c
-production_sha: faddce8ece7915044916eb5d9ae5ad24e4b59b6c
+active_checkpoint: stage-6ar-approved-draft-scheduling-service
+repository_base_sha: 337f3eabd14977014e60d351544612e31711f146
+production_sha: 337f3eabd14977014e60d351544612e31711f146
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AQ owner-approved batch scheduling service extraction.
+- Current checkpoint: Stage 6AR approved-draft scheduling service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1143,19 +1143,33 @@ Completed checkpoint — Stage 6AP scheduled-post edit mutation service extracti
 - Hardened exact-SHA release and live verification passed in run `30414551045`.
 - Live production independently confirmed exact SHA `faddce8ece7915044916eb5d9ae5ad24e4b59b6c` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AQ owner-approved batch scheduling service extraction:
+Completed checkpoint — Stage 6AQ owner-approved batch scheduling service extraction:
 
-Extract the deterministic `schedule_owner_approved_batch` planning and orchestration logic into a focused dependency-injected service while preserving:
+- Extended `src/operatorScheduledPostEditMutationService.ts` as the scheduled-post mutation cluster authority for owner-approval and timezone normalization, bounded post admission, Manifest lineage protection, item validation, sequential scheduling, partial-progress failure mapping, scheduled-item accumulation, strategy-memory intent, and exact response composition.
+- Reduced `schedule_owner_approved_batch` in `src/index.ts` to canonical app/account/Threads/brand identity, scheduled-post creation, strategy-memory persistence, shared normalizers and validators, workspace timezone, and HTTP transport.
+- Extended `test/operatorScheduledPostEditMutationService.spec.ts` in the same atomic commit with missing-input, Manifest prohibition, invalid-item partial-progress, scheduling-failure partial-progress, normalized success, and exact memory regressions.
+- Added permanent handler-scoped ownership gates without introducing a service-only intermediate head.
+- Focused validation passed in run `30414901679`.
+- Push validation passed in run `30414893428`.
+- All eight Operator shards passed in run `30415136565`.
+- Hardened exact-SHA release and live verification passed in run `30415186350`.
+- Live production independently confirmed exact SHA `337f3eabd14977014e60d351544612e31711f146` with 75/75 public tools.
 
-- owner-approval, timezone, and bounded-post-list normalization
+ACTIVE checkpoint — Stage 6AR approved-draft scheduling service extraction:
+
+Extract the deterministic `schedule_approved_draft` orchestration into the scheduled-post mutation service cluster while preserving:
+
+- draft ID, date, time, and timezone normalization
 - exact missing-input admission response
-- the Manifest lineage-preserving scheduling prohibition and exact response contract
-- per-item object admission, text/date/time normalization, ISO-date and 24-hour-time validation
-- sequential scheduling with exact partial-progress failure responses
-- exact scheduled-item accumulation and response composition
-- strategy-memory persistence intent using canonical batch metadata and scheduled-post IDs
+- existing scheduled or published draft idempotency and exact reused response
+- scheduling gate orchestration and exact gate-failure response
+- one scheduled-post creation attempt and exact scheduling failure mapping
+- draft and daily-source-claim transition intent after scheduling
+- strategy-tag and scheduled inventory persistence intent
+- exact success response with scheduled-post and draft identity
 
-Keep canonical app/account/Threads/brand identity, the scheduled-post creation helper, strategy-memory persistence, shared text and JSON normalizers, date/time validators, workspace timezone, and HTTP transport explicit at the `index.ts` boundary. Add the service and its direct regression test atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Keep canonical app/account/Threads/brand identity, draft retrieval, existing scheduled-post D1 read, gate execution, scheduled-post creation, D1 transition writes, strategy-tag persistence, inventory persistence, shared normalizers, workspace timezone, and HTTP transport explicit at the `index.ts` boundary. Extend the service and direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1197,7 +1211,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AQ
+6. Product-service extraction — ACTIVE at Stage 6AR
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
