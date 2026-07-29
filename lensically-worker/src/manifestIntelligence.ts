@@ -133,7 +133,7 @@ const MANIFEST_EVIDENCE_METADATA_PRIORITY = new Map<string, number>(
   MANIFEST_EVIDENCE_METADATA_PRIORITY_KEYS.map((key, index) => [key, index]),
 );
 
-function manifestEvidenceJsonBytes(value: unknown): number {
+function manifestEvidenceMetadataJsonBytes(value: unknown): number {
   return new TextEncoder().encode(stableManifestJson(value)).byteLength;
 }
 
@@ -186,7 +186,7 @@ export function stableManifestEvidenceSnapshotMetadataJson(
   ];
   for (const limits of attempts) {
     const compacted = compactManifestEvidenceMetadataValue(value, limits);
-    if (manifestEvidenceJsonBytes(compacted) <= boundedBytes) return stableManifestJson(compacted);
+        if (manifestEvidenceMetadataJsonBytes(compacted) <= boundedBytes) return stableManifestJson(compacted);
   }
   if (Array.isArray(value)) return "[]";
   const source = value && typeof value === "object" ? value as JsonRecord : {};
