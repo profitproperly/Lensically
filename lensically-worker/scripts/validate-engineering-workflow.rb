@@ -9,8 +9,10 @@ abort("misindented_step_markers:#{misindented_step_lines.join(",")}") unless mis
 canonical_gate_commands = [
   "node scripts/release-preflight.mjs",
   "node scripts/test-d1-migration-release.mjs",
-  "node scripts/test-d1-backfill-runner.mjs",
+    "node scripts/test-d1-backfill-runner.mjs",
   "node scripts/d1-migration-release.mjs --check",
+  "node scripts/test-cron-release.mjs",
+  "node scripts/cron-release.mjs --check --config wrangler.jsonc",
 ]
 misindented_gate_commands = source.lines.each_with_index.filter_map do |line, index|
   stripped = line.strip
@@ -81,7 +83,9 @@ abort("fast_validation_upload_step_missing") unless fast_step_names.include?("Up
 
 worker_release_step_names = jobs.fetch("worker-release").fetch("steps").map { |step| step["name"] }
 required_worker_release_steps = [
+  "Prepare trigger-neutral Worker deploy config",
   "Deploy exact validated Worker head",
+  "Reconcile exact Wrangler cron schedule",
   "Verify production runtime, scheduler, retained website, and retired legacy surfaces",
 ]
 missing_worker_release_steps = required_worker_release_steps.reject { |name| worker_release_step_names.include?(name) }
@@ -96,6 +100,7 @@ abort("release_shared_full_validation_execution_missing") unless release_gate_ru
 abort("release_fallback_preflight_missing") unless release_gate_run.include?("node scripts/release-preflight.mjs")
 abort("release_fallback_typecheck_missing") unless release_gate_run.include?("npx tsc --noEmit")
 abort("release_migration_contract_tests_missing") unless release_gate_run.include?("node scripts/test-d1-migration-release.mjs") && release_gate_run.include?("node scripts/test-d1-backfill-runner.mjs") && release_gate_run.include?("node scripts/d1-migration-release.mjs --check")
+abort("release_cron_contract_tests_missing") unless release_gate_run.include?("node scripts/test-cron-release.mjs") && release_gate_run.include?("node scripts/cron-release.mjs --check --config wrangler.jsonc")
 
 migration_plan_step = step_for(jobs, "worker-release", "Plan exact-head database migrations")
 migration_plan = migration_plan_step["run"].to_s
@@ -115,6 +120,17 @@ abort("direct_unplanned_migration_apply_returned") if source.include?("run: npx 
 abort("canonical_migration_path_missing") unless source.include?("lensically-worker/database/migrations/*")
 abort("legacy_migration_path_classifier_returned") if source.include?("lensically-worker/migrations/*")
 
+cron_prepare = step_run(jobs, "worker-release", "Prepare trigger-neutral Worker deploy config")
+abort("trigger_neutral_worker_config_missing") unless cron_prepare.include?("cron-release.mjs --write-deploy-config") && cron_prepare.include?("--config wrangler.jsonc") && cron_prepare.include?("--output wrangler.release.generated.json")
+worker_deploy = step_run(jobs, "worker-release", "Deploy exact validated Worker head")
+abort("worker_deploy_not_trigger_neutral") unless worker_deploy.include?("--config wrangler.release.generated.json")
+abort("raw_wrangler_worker_deploy_returned") if worker_deploy.include?("--config wrangler.jsonc")
+cron_reconcile_step = step_for(jobs, "worker-release", "Reconcile exact Wrangler cron schedule")
+abort("cron_reconcile_condition_missing") unless cron_reconcile_step["if"].to_s.include?("schedule_contract_changed == 'true'")
+abort("cron_reconcile_command_missing") unless cron_reconcile_step["run"].to_s.include?("cron-release.mjs --reconcile-remote --config wrangler.jsonc")
+abort("inline_cron_schedule_api_returned") if source.include?("workers/scripts/lensically-worker/schedules")
+abort("schedule_contract_classifier_missing") unless release_scope.include?("schedule_contract_changed") && release_scope.include?("lensically-worker/wrangler*")
+
 [
   ["push-validation", "Typecheck and lifecycle gate"],
   ["fast-validation", "Typecheck and lifecycle gate"],
@@ -122,7 +138,8 @@ abort("legacy_migration_path_classifier_returned") if source.include?("lensicall
 ].each do |job_name, step_name|
     run = step_run(jobs, job_name, step_name)
   abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
-  abort("migration_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-d1-migration-release.mjs") && run.include?("node scripts/test-d1-backfill-runner.mjs") && run.include?("node scripts/d1-migration-release.mjs --check")
+    abort("migration_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-d1-migration-release.mjs") && run.include?("node scripts/test-d1-backfill-runner.mjs") && run.include?("node scripts/d1-migration-release.mjs --check")
+  abort("cron_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-cron-release.mjs") && run.include?("node scripts/cron-release.mjs --check --config wrangler.jsonc")
 end
 
 push_checkout = step_for(jobs, "push-validation", "Checkout pushed head")

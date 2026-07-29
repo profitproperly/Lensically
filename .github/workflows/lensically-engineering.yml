@@ -171,8 +171,10 @@ jobs:
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
           node scripts/test-d1-migration-release.mjs
-          node scripts/test-d1-backfill-runner.mjs
+                    node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
@@ -269,8 +271,10 @@ jobs:
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
           node scripts/test-d1-migration-release.mjs
-          node scripts/test-d1-backfill-runner.mjs
+                    node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/release-preflight.mjs --capability-lifecycle-only
 
       - name: Run selected fast validation
@@ -356,8 +360,10 @@ jobs:
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
           node scripts/test-d1-migration-release.mjs
-          node scripts/test-d1-backfill-runner.mjs
+                    node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
@@ -420,22 +426,22 @@ jobs:
             git show --pretty='' --name-only "${RELEASE_SHA}" > /tmp/lensically-release-files.txt
             full_release=true
           fi
-          web_changed=false
+                    web_changed=false
           migrations_changed=false
-          cron_changed=false
+          schedule_contract_changed=false
           while IFS= read -r path; do
             case "${path}" in
               lensically-web/*) web_changed=true ;;
-                            lensically-worker/database/migrations/*) migrations_changed=true ;;
-              lensically-worker/wrangler*) cron_changed=true ;;
+              lensically-worker/database/migrations/*) migrations_changed=true ;;
+              lensically-worker/wrangler*) schedule_contract_changed=true ;;
             esac
           done < /tmp/lensically-release-files.txt
-                    echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
+          echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
           echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
           echo "migrations_changed=${migrations_changed}" >> "${GITHUB_OUTPUT}"
-          echo "cron_changed=${cron_changed}" >> "${GITHUB_OUTPUT}"
+          echo "schedule_contract_changed=${schedule_contract_changed}" >> "${GITHUB_OUTPUT}"
           echo "validated_run_id=${validated_run_id}" >> "${GITHUB_OUTPUT}"
-                    echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
+          echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
           echo "deployed_sha=${deployed_sha}" >> "${GITHUB_OUTPUT}"
           cat /tmp/lensically-release-files.txt
 
@@ -557,8 +563,10 @@ jobs:
           npx tsc --noEmit
           node scripts/run-full-validation.mjs --check
           node scripts/test-d1-migration-release.mjs
-          node scripts/test-d1-backfill-runner.mjs
+                    node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/run-full-validation.mjs
 
       - name: Plan exact-head database migrations
@@ -587,12 +595,18 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/d1-migration-release.mjs --verify-remote
 
+      
+      - name: Prepare trigger-neutral Worker deploy config
+        working-directory: lensically-worker
+        run: node scripts/cron-release.mjs --write-deploy-config --config wrangler.jsonc --output wrangler.release.generated.json
+
       - name: Deploy exact validated Worker head
         working-directory: lensically-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+        run: node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.release.generated.json --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+
 
 
             
@@ -607,20 +621,15 @@ jobs:
 
             
 
-      - name: Verify Wrangler-managed cron triggers
-        if: steps.release_scope.outputs.cron_changed == 'true'
+      
+      - name: Reconcile exact Wrangler cron schedule
+        if: steps.release_scope.outputs.schedule_contract_changed == 'true'
         working-directory: lensically-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          schedules_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/lensically-worker/schedules"
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${schedules_url}" > /tmp/lensically-cron-get.json
-          jq -e '.success == true' /tmp/lensically-cron-get.json > /dev/null
-          expected_crons=$(node scripts/release-preflight.mjs --print-crons | sort)
-          actual_crons=$(jq -r '.result.schedules[].cron' /tmp/lensically-cron-get.json | sort)
-          test "${actual_crons}" = "${expected_crons}"
+        run: node scripts/cron-release.mjs --reconcile-remote --config wrangler.jsonc
+
 
       - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
         run: |

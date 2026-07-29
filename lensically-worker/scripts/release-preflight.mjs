@@ -186,6 +186,9 @@ const d1MigrationReleaseTests = read("scripts/test-d1-migration-release.mjs");
 const d1BackfillRunner = read("scripts/run-d1-backfill.mjs");
 const d1BackfillRunnerTests = read("scripts/test-d1-backfill-runner.mjs");
 const d1BackfillReceiptMigration = read("database/migrations/0018_backfill_execution_receipts.sql");
+const cronRelease = read("scripts/cron-release.mjs");
+const cronReleaseTests = read("scripts/test-cron-release.mjs");
+const workerGitignore = read(".gitignore");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
@@ -297,6 +300,29 @@ if (!workflowStructureValidator.includes("release_migration_plan_missing")
     || !workflowStructureValidator.includes("direct_unplanned_migration_apply_returned")
     || !workflowStructureValidator.includes("legacy_migration_path_classifier_returned")) {
   errors.push("planned_d1_release_structure_enforcement_missing");
+}
+if (!workerPackage.includes('"cron:release:check": "node scripts/cron-release.mjs --check --config wrangler.jsonc"')
+    || !workerPackage.includes('"cron:release:test": "node scripts/test-cron-release.mjs"')
+    || !workerGitignore.includes("wrangler.release.generated.json")
+    || !cronRelease.includes('CONTRACT_VERSION = "lensically-cron-release-v1"')
+    || !cronRelease.includes("delete clone.triggers")
+    || !cronRelease.includes("cron_remote_verification_mismatch")
+    || !cronRelease.includes('action: "unchanged"')
+    || !cronRelease.includes('method: "PUT"')
+    || !cronReleaseTests.includes("cron_release_contract_valid")
+    || !workflow.includes("Prepare trigger-neutral Worker deploy config")
+    || !workflow.includes("--config wrangler.release.generated.json")
+    || !workflow.includes("Reconcile exact Wrangler cron schedule")
+    || !workflow.includes("schedule_contract_changed == 'true'")
+    || workflow.includes("workers/scripts/lensically-worker/schedules")
+    || workflow.includes("outputs.cron_changed")) {
+  errors.push("trigger_neutral_cron_release_contract_incomplete");
+}
+if (!workflowStructureValidator.includes("trigger_neutral_worker_config_missing")
+    || !workflowStructureValidator.includes("worker_deploy_not_trigger_neutral")
+    || !workflowStructureValidator.includes("inline_cron_schedule_api_returned")
+    || !workflowStructureValidator.includes("schedule_contract_classifier_missing")) {
+  errors.push("trigger_neutral_cron_release_structure_enforcement_missing");
 }
 if (!webPackage.includes('"test:validated-artifact": "node scripts/test-validated-web-artifact.mjs"')
     || !validatedWebArtifact.includes('WEB_ARTIFACT_CONTRACT = "lensically-validated-web-artifact-v1"')
