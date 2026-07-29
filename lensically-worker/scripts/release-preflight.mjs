@@ -3450,6 +3450,31 @@ if (!tests.includes("routes operational status and engineering intents determini
   errors.push("static_router_engineering_regression_missing");
 }
 
+if (!source.includes('const OPERATOR_ACTIVE_OUTCOME_KEY = "manifest_autonomous_posting_restoration";')) {
+  errors.push("operator_active_outcome_not_posting_restoration");
+}
+const supersededDefaultWorkItems = [
+  "atomic_write_reconciliation",
+  "repository_control_error_policy",
+  "hardening_regression_completion",
+  "canonical_operator_documentation",
+  "full_blocker_acceptance_campaign",
+  "remove_normal_recovery_dependencies",
+  "content_lineage_repair",
+  "scheduled_autonomous_runs",
+  "human_gate_retirement",
+  "manifest_tomorrow_posting_continuity",
+];
+for (const workKey of supersededDefaultWorkItems) {
+  if (source.includes(`{ work_key: "${workKey}"`)) {
+    errors.push(`superseded_operator_work_default_present:${workKey}`);
+  }
+}
+if (!source.includes('work_key: "manifest_autonomous_posting_restoration"')) {
+  errors.push("manifest_posting_restoration_default_missing");
+}
+
+
 if (tests.includes(".only(") || /operatorMode\.spec\.ts[^\n]*\s-t\s/.test(workflow)) {
   errors.push("focused_operator_test_filter_forbidden");
 }

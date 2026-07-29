@@ -6162,17 +6162,13 @@ const DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS: Array<{
 
 type OperatorWorkItemStatus = "queued" | "deferred" | "interrupting" | "completed" | "merged" | "rejected";
 
-const OPERATOR_ACTIVE_OUTCOME_KEY = "chl_autonomous_operator_foundation_v1";
-const OPERATOR_ACTIVE_OUTCOME_TITLE = "Complete, validate, release, and live-verify the Continuous Hardening Loop and Autonomous Business Operator foundation.";
+const OPERATOR_ACTIVE_OUTCOME_KEY = "manifest_autonomous_posting_restoration";
+const OPERATOR_ACTIVE_OUTCOME_TITLE = "Restore and verify Manifest autonomous posting after the completed Worker monolith refactor.";
 const OPERATOR_ACTIVE_OUTCOME_SCOPE = [
-  "continuous hardening controller and prevention gates",
-  "agent-native operating contract",
-  "action-closure guard",
-  "single-active-outcome work intake",
-  "durable deferred-work ledger",
-  "required regression coverage",
-  "exact-head Cloudflare validation and gated release",
-  "live verification and repository-production reconciliation",
+  "one complete live-state Manifest autonomous cycle",
+  "safe hourly runway restoration without duplicates or backfill",
+  "authoritative schedule and lineage verification",
+  "scheduler normal-mode and posting-enablement verification",
 ];
 
 let operatorExpectedControlIncidentCleanupApplied = false;
@@ -6186,18 +6182,15 @@ const DEFAULT_OPERATOR_WORK_LEDGER: ReadonlyArray<{
   completion_condition: string;
   execution_order: number;
 }> = [
-  { work_key: "github_transient_retry_wiring", title: "Wire bounded GitHub transient handling", summary: "Apply the existing retry helper only to safe GitHub 502/503/504 phases.", priority: "P1", required_for_active_outcome: true, completion_condition: "Focused regressions prove one bounded retry with no blind repetition.", execution_order: 10 },
-  { work_key: "github_ref_reconciliation", title: "Reconcile uncertain branch reference writes", summary: "After an uncertain ref update, reread the ref and distinguish committed, unchanged, and conflict states.", priority: "P1", required_for_active_outcome: true, completion_condition: "Exact-head tests prove committed, retryable, and conflict outcomes.", execution_order: 20 },
-  { work_key: "atomic_write_reconciliation", title: "Extend reconciliation to atomic writes", summary: "Apply the same uncertainty rules to coherent multi-file repository mutations.", priority: "P1", required_for_active_outcome: true, completion_condition: "Atomic write regressions prove zero partial commits and deterministic reconciliation.", execution_order: 30 },
-  { work_key: "repository_control_error_policy", title: "Classify expected repository control errors", summary: "Keep deliberate no-change, chunking, and authorization controls from opening false incidents.", priority: "P2", required_for_active_outcome: true, completion_condition: "Expected controls remain visible but do not create P0/P1 incidents.", execution_order: 40 },
-  { work_key: "hardening_regression_completion", title: "Complete hardening regressions", summary: "Cover no-op writes, exact capability resolution, chunking, workflow diagnostics, fail-closed gates, efficiency observations, and transient reconciliation.", priority: "P1", required_for_active_outcome: true, completion_condition: "Cloudflare validation passes every focused regression on one exact SHA.", execution_order: 50 },
-  { work_key: "canonical_operator_documentation", title: "Update canonical operator documents", summary: "Record only the active CHL, autonomous operator, WIP, release, and scheduled-run contracts.", priority: "P2", required_for_active_outcome: true, completion_condition: "AGENTS, CURRENT_STATE, and OPERATING_MEMORY agree with the live architecture.", execution_order: 60 },
-  { work_key: "full_blocker_acceptance_campaign", title: "Run complete blocker acceptance campaign", summary: "Execute the registered capability, live read, mutation preflight, replay, search, client-block, zero-result, and Recovery-dependence checks.", priority: "P1", required_for_active_outcome: true, completion_condition: "Every segment passes with a detailed evidence log against the released head.", execution_order: 70 },
-  { work_key: "remove_normal_recovery_dependencies", title: "Remove normal-path Recovery dependencies", summary: "Move ordinary engineering reads and controls behind registered Main profiles after live validation.", priority: "P2", required_for_active_outcome: false, completion_condition: "Normal operations complete through Main; Recovery remains break-glass only.", execution_order: 100 },
-  { work_key: "content_lineage_repair", title: "Repair content and source lineage", summary: "Restore source-card, generation, post, and metric lineage before cleanup or scale work.", priority: "P2", required_for_active_outcome: false, completion_condition: "Winning posts trace to canonical source cards and performance evidence.", execution_order: 110 },
-  { work_key: "scheduled_autonomous_runs", title: "Commission scheduled autonomous business runs", summary: "Restore durable state, select priorities, execute, verify, record, checkpoint, and exit without chat memory.", priority: "P2", required_for_active_outcome: false, completion_condition: "Repeated scheduled runs operate safely without owner monitoring.", execution_order: 120 },
-  { work_key: "human_gate_retirement", title: "Retire temporary human gates", summary: "Track each gate, its restricted authority, evidence threshold, autonomous replacement, and retirement status.", priority: "P3", required_for_active_outcome: false, completion_condition: "Routine owner intervention is unnecessary and each remaining gate has a justified retirement condition.", execution_order: 130 },
-  { work_key: "manifest_tomorrow_posting_continuity", title: "Restore tomorrow's Manifest posting coverage", summary: "Manifest Mental is at 499 followers with positive growth signals and currently has no posts scheduled for tomorrow; preserve momentum after higher-priority internals are safe.", priority: "P3", required_for_active_outcome: false, completion_condition: "Owner-approved posts cover tomorrow without destabilizing the infrastructure release.", execution_order: 140 },
+  {
+    work_key: "manifest_autonomous_posting_restoration",
+    title: "Restore Manifest autonomous posting",
+    summary: "Run one complete Manifest autonomous cycle against live state, restore the required hourly runway without duplicates or backfill, verify authoritative schedule and lineage, and confirm scheduler normal mode and posting enablement.",
+    priority: "P1",
+    required_for_active_outcome: true,
+    completion_condition: "The full cycle succeeds, required upcoming hourly slots are populated safely, lineage is verified, the scheduler is healthy in normal mode, and posting is live again.",
+    execution_order: 10,
+  },
 ];
 
 async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
@@ -6644,14 +6637,26 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       policy_version = excluded.policy_version,
       role = excluded.role,
       updated_at = CURRENT_TIMESTAMP`,
-  ).bind(
+    ).bind(
     AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
     SINGLE_ACTIVE_OUTCOME_POLICY_VERSION,
     AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
     OPERATOR_ACTIVE_OUTCOME_KEY,
     OPERATOR_ACTIVE_OUTCOME_TITLE,
     JSON.stringify(OPERATOR_ACTIVE_OUTCOME_SCOPE),
-    "Complete the frozen CHL release prerequisites, validate one exact head, and release only after proof.",
+    "Run the full Manifest autonomous cycle with the owner, verify the restored runway and scheduler, and resume posting only after proof.",
+  ).run();
+  await env.DB.prepare(
+    `UPDATE operator_work_state SET
+      active_outcome_key = ?, active_outcome_title = ?, active_scope_json = ?,
+      status = 'active', scope_frozen = 1, active_interrupt_key = NULL,
+      completion_evidence_json = '[]', next_action = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = 'singleton' AND active_outcome_key = 'chl_autonomous_operator_foundation_v1'`,
+  ).bind(
+    OPERATOR_ACTIVE_OUTCOME_KEY,
+    OPERATOR_ACTIVE_OUTCOME_TITLE,
+    JSON.stringify(OPERATOR_ACTIVE_OUTCOME_SCOPE),
+    "Run the full Manifest autonomous cycle with the owner, verify the restored runway and scheduler, and resume posting only after proof.",
   ).run();
   for (const item of DEFAULT_OPERATOR_WORK_LEDGER) {
     await env.DB.prepare(
@@ -6676,7 +6681,30 @@ async function ensureOperatorMcpAdminTables(env: Env): Promise<void> {
       item.completion_condition,
       item.execution_order,
     ).run();
-  }
+    }
+  await env.DB.prepare(
+    `UPDATE operator_work_ledger SET
+      status = CASE
+        WHEN work_key = 'scheduled_autonomous_runs' THEN 'merged'
+        WHEN work_key = 'manifest_tomorrow_posting_continuity' THEN 'rejected'
+        ELSE 'completed'
+      END,
+      intake_decision = CASE
+        WHEN work_key = 'scheduled_autonomous_runs' THEN 'merge'
+        WHEN work_key = 'manifest_tomorrow_posting_continuity' THEN 'reject'
+        ELSE 'activate'
+      END,
+      intake_reason = 'superseded_or_completed_by_monolith_refactor',
+      required_for_active_outcome = 0,
+      merged_into_work_key = CASE WHEN work_key = 'scheduled_autonomous_runs' THEN ? ELSE NULL END,
+      updated_at = CURRENT_TIMESTAMP
+     WHERE work_key IN (
+       'github_transient_retry_wiring', 'github_ref_reconciliation', 'atomic_write_reconciliation',
+       'repository_control_error_policy', 'hardening_regression_completion', 'canonical_operator_documentation',
+       'full_blocker_acceptance_campaign', 'remove_normal_recovery_dependencies', 'content_lineage_repair',
+       'scheduled_autonomous_runs', 'human_gate_retirement', 'manifest_tomorrow_posting_continuity'
+     ) AND status NOT IN ('completed', 'merged', 'rejected')`,
+  ).bind(OPERATOR_ACTIVE_OUTCOME_KEY).run();
 
     await assertDatabaseIntegrity(env.DB, {
     table: "operator_repo_write_sessions",
