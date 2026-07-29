@@ -149,6 +149,7 @@ import {
 import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadService";
 import { deleteOperatorScheduledPost } from "./operatorScheduledPostDeletionService";
 import { retryOperatorScheduledPost } from "./operatorScheduledPostRetryService";
+import { editOperatorScheduledPost } from "./operatorScheduledPostEditMutationService";
 
 
 
@@ -14744,60 +14745,61 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       return operatorJsonResponse(scheduledPostRetry.body, scheduledPostRetry.statusCode);
     }
 
-    const hasText = Object.prototype.hasOwnProperty.call(payload, "text");
-    const hasDate = Object.prototype.hasOwnProperty.call(payload, "date");
-    const hasTime = Object.prototype.hasOwnProperty.call(payload, "time");
-    const hasSpoilerAllText = Object.prototype.hasOwnProperty.call(payload, "spoiler_all_text");
-    const hasSpoilerPhrases = Object.prototype.hasOwnProperty.call(payload, "spoiler_phrases");
-    const updated = await updateScheduledPostForAppUser(env, {
-      appUserId: WORKSPACE_APP_USER_ID,
+        const scheduledPostEdit = await editOperatorScheduledPost({
+      payload,
       scheduledPostId,
-      expectedThreadsUserId: brand.profile.threads_user_id,
-      text: hasText ? normalizeOperatorText(payload.text, 20000) ?? "" : undefined,
-      date: hasDate ? normalizeOperatorText(payload.date, 20) ?? "" : undefined,
-      time: hasTime ? normalizeOperatorText(payload.time, 20) ?? "" : undefined,
-      timeZone: normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE,
-      spoilerAllText: hasSpoilerAllText ? payload.spoiler_all_text === true : undefined,
-      spoilerPhrases: hasSpoilerPhrases ? normalizeSpoilerPhrasesInput(payload.spoiler_phrases) : undefined,
-    });
-    if (!updated.success || !updated.scheduledPost) {
-      return operatorJsonResponse({ success: false, error: updated.error ?? "scheduled_post_update_failed" }, updated.statusCode);
-    }
-
-    const linkedDraft = await env.DB.prepare(
-      `SELECT id, source_card_id, strategy_json
-       FROM gpt_generation_drafts
-       WHERE scheduled_post_id = ?
-         AND account_id = ?
-         AND threads_user_id = ?
-       ORDER BY datetime(updated_at) DESC
-       LIMIT 1`,
-    ).bind(scheduledPostId, brand.account_id, brand.profile.threads_user_id).first<{
-      id: string;
-      source_card_id: string | null;
-      strategy_json: string | null;
-    }>();
-    await insertOperatorInventory(env, {
       brandKey: brand.brand_key,
-      sourceType: "scheduled_post",
-      sourceId: String(scheduledPostId),
-      text: updated.scheduledPost.text,
-      sourceCardId: linkedDraft?.source_card_id ?? null,
-      status: "scheduled",
-      strategy: linkedDraft?.strategy_json
-        ? safeParseJsonString(linkedDraft.strategy_json) as Record<string, unknown> | null
-        : null,
-      analysis: {
-        edit_source: "edit_scheduled_post",
-        linked_draft_id: linkedDraft?.id ?? null,
+      defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    }, {
+      normalizeText: normalizeOperatorText,
+      normalizeSpoilerPhrases: normalizeSpoilerPhrasesInput,
+      updateScheduledPost: async ({
+        scheduledPostId: id,
+        text,
+        date,
+        time,
+        timeZone,
+        spoilerAllText,
+        spoilerPhrases,
+      }) => {
+        const result = await updateScheduledPostForAppUser(env, {
+          appUserId: WORKSPACE_APP_USER_ID,
+          scheduledPostId: id,
+          expectedThreadsUserId: brand.profile.threads_user_id,
+          text,
+          date,
+          time,
+          timeZone,
+          spoilerAllText,
+          spoilerPhrases,
+        });
+        return {
+          success: result.success,
+          scheduledPost: result.scheduledPost ?? null,
+          linkedDraftsUpdated: result.linkedDraftsUpdated,
+          error: result.error ?? null,
+          statusCode: result.statusCode,
+        };
+      },
+      loadLinkedDraft: async (id) => await env.DB.prepare(
+        `SELECT id, source_card_id, strategy_json
+         FROM gpt_generation_drafts
+         WHERE scheduled_post_id = ?
+           AND account_id = ?
+           AND threads_user_id = ?
+         ORDER BY datetime(updated_at) DESC
+         LIMIT 1`,
+      ).bind(id, brand.account_id, brand.profile.threads_user_id).first<{
+        id: string;
+        source_card_id: string | null;
+        strategy_json: string | null;
+      }>(),
+      parseStrategyJson: (value) => safeParseJsonString(value) as Record<string, unknown> | null,
+      persistInventory: async (inventory) => {
+        await insertOperatorInventory(env, inventory);
       },
     });
-    return operatorJsonResponse({
-      success: true,
-      scheduled_post: updated.scheduledPost,
-      linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
-      linked_draft_id: linkedDraft?.id ?? null,
-    });
+    return operatorJsonResponse(scheduledPostEdit.body, scheduledPostEdit.statusCode);
   }
 
   if (toolName === "schedule_owner_approved_batch") {

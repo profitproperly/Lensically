@@ -129,6 +129,8 @@ const operatorScheduledPostDeletionService = read("src/operatorScheduledPostDele
 const operatorScheduledPostDeletionServiceTests = read("test/operatorScheduledPostDeletionService.spec.ts");
 const operatorScheduledPostRetryService = read("src/operatorScheduledPostRetryService.ts");
 const operatorScheduledPostRetryServiceTests = read("test/operatorScheduledPostRetryService.spec.ts");
+const operatorScheduledPostEditMutationService = read("src/operatorScheduledPostEditMutationService.ts");
+const operatorScheduledPostEditMutationServiceTests = read("test/operatorScheduledPostEditMutationService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -377,6 +379,9 @@ if (!workflow.includes("test/operatorScheduledPostDeletionService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorScheduledPostRetryService.spec.ts")) {
   errors.push("operator_scheduled_post_retry_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorScheduledPostEditMutationService.spec.ts")) {
+  errors.push("operator_scheduled_post_edit_mutation_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -2229,6 +2234,46 @@ if (!operatorScheduledPostRetryServiceTests.includes("returns the exact not-foun
 
 
 
+
+
+if (!source.includes('from "./operatorScheduledPostEditMutationService"')
+    || !source.includes("editOperatorScheduledPost({")
+    || !source.includes("brandKey: brand.brand_key")
+    || !source.includes("defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE")
+    || !source.includes("normalizeSpoilerPhrases: normalizeSpoilerPhrasesInput")
+    || !source.includes("updateScheduledPost: async ({")
+    || !source.includes("loadLinkedDraft: async (id) => await env.DB.prepare")
+    || !source.includes("parseStrategyJson: (value) => safeParseJsonString(value)")
+    || !source.includes("persistInventory: async (inventory)")
+    || !source.includes("return operatorJsonResponse(scheduledPostEdit.body, scheduledPostEdit.statusCode)")) {
+  lifecycleErrors.push("operator_scheduled_post_edit_mutation_service_import_or_binding_missing");
+}
+const scheduledPostEditMutationEnd = source.indexOf('if (toolName === "schedule_owner_approved_batch")', scheduledPostEditHandlerStart);
+const scheduledPostEditMutationHandler = scheduledPostEditHandlerStart >= 0 && scheduledPostEditMutationEnd > scheduledPostEditHandlerStart
+  ? source.slice(scheduledPostEditHandlerStart, scheduledPostEditMutationEnd)
+  : "";
+if (scheduledPostEditMutationHandler.includes('const hasText = Object.prototype.hasOwnProperty.call(payload, "text")')
+    || scheduledPostEditMutationHandler.includes("if (!updated.success || !updated.scheduledPost)")
+    || scheduledPostEditMutationHandler.includes("linked_drafts_updated: updated.linkedDraftsUpdated ?? 0")) {
+  lifecycleErrors.push("operator_scheduled_post_edit_mutation_service_returned_to_index");
+}
+if (!operatorScheduledPostEditMutationService.includes("export async function editOperatorScheduledPost")
+    || !operatorScheduledPostEditMutationService.includes('Object.prototype.hasOwnProperty.call(payload, "text")')
+    || !operatorScheduledPostEditMutationService.includes('Object.prototype.hasOwnProperty.call(payload, "spoiler_phrases")')
+    || !operatorScheduledPostEditMutationService.includes("dependencies.updateScheduledPost")
+    || !operatorScheduledPostEditMutationService.includes("scheduled_post_update_failed")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.loadLinkedDraft")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.persistInventory")
+    || !operatorScheduledPostEditMutationService.includes('edit_source: "edit_scheduled_post"')
+    || !operatorScheduledPostEditMutationService.includes("linked_drafts_updated: updated.linkedDraftsUpdated ?? 0")) {
+  lifecycleErrors.push("operator_scheduled_post_edit_mutation_service_module_incomplete");
+}
+if (!operatorScheduledPostEditMutationServiceTests.includes("preserves omitted edit fields and writes exact unlinked inventory")
+    || !operatorScheduledPostEditMutationServiceTests.includes("normalizes every supplied edit and preserves linked-draft inventory lineage")
+    || !operatorScheduledPostEditMutationServiceTests.includes("maps an exact protected update failure without draft or inventory work")
+    || !operatorScheduledPostEditMutationServiceTests.includes("uses the exact update-failure fallback and zero linked-draft count")) {
+  lifecycleErrors.push("operator_scheduled_post_edit_mutation_service_tests_incomplete");
+}
 
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);

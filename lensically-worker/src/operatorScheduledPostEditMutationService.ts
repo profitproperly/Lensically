@@ -5,7 +5,7 @@ type ScheduledPostEditUpdateInput = {
   time?: string;
   timeZone: string;
   spoilerAllText?: boolean;
-  spoilerPhrases?: unknown;
+    spoilerPhrases?: string[];
 };
 
 type ScheduledPostEditUpdateResult<TScheduledPost> = {
@@ -31,7 +31,7 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
   },
   dependencies: {
     normalizeText: (value: unknown, maxLength: number, allowEmpty?: boolean) => string | null;
-    normalizeSpoilerPhrases: (value: unknown) => unknown;
+        normalizeSpoilerPhrases: (value: unknown) => string[];
     updateScheduledPost: (
       update: ScheduledPostEditUpdateInput,
     ) => Promise<ScheduledPostEditUpdateResult<TScheduledPost>>;
