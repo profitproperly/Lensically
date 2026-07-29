@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7c2-review-batch-runtime-dispatch
-repository_base_sha: 99cfef9f1fe5a322f15810340cfb9e241a05277e
-production_sha: 99cfef9f1fe5a322f15810340cfb9e241a05277e
+active_checkpoint: stage-7c3-review-batch-claim-extraction
+repository_base_sha: db0afb7e284fcdc26ef4e96ea049838253f50737
+production_sha: db0afb7e284fcdc26ef4e96ea049838253f50737
 
 
 
@@ -1308,11 +1308,21 @@ Completed subcheckpoint — Stage 7C1 account and coverage keyed routing:
 - Exact-SHA release passed in run `30425505502`.
 - Live production independently confirmed exact SHA `99cfef9f1fe5a322f15810340cfb9e241a05277e` with 75/75 public tools.
 
-ACTIVE subcheckpoint — Stage 7C2 review-batch operations routing:
+Completed subcheckpoint — Stage 7C2 review-batch operations routing:
 
-Route `get_manifest_review_batch`, `attach_manifest_review_draft`, `skip_manifest_review_source`, and `schedule_manifest_review_batch` through the reusable keyed runtime dispatcher while preserving their existing services, D1 adapters, ordering, status codes, and scheduling gates.
+- Routed `get_manifest_review_batch`, `attach_manifest_review_draft`, `skip_manifest_review_source`, and `schedule_manifest_review_batch` through the reusable keyed runtime dispatcher.
+- Preserved all existing service calls, D1 adapters, response status codes, scheduling gates, and ordered fallthrough behavior.
+- Added permanent lifecycle enforcement requiring all four keyed handlers and forbidding the direct branches from returning.
+- Push validation passed in run `30425685585`.
+- All eight Operator shards passed in run `30425707197`.
+- Exact-SHA release passed in run `30425989497`.
+- Live production independently confirmed exact SHA `db0afb7e284fcdc26ef4e96ea049838253f50737` with 75/75 public tools.
 
-Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, and independent live verification. Then extract the remaining inline `claim_manifest_review_batch` workflow as Stage 7C3.
+ACTIVE subcheckpoint — Stage 7C3 review-batch claim extraction:
+
+Move the complete inline `claim_manifest_review_batch` workflow into the review-batch state service behind explicit dependencies. Preserve Manifest-only admission, production-date validation, session creation, active-batch reuse and terminal retirement, source-batch draw and rollover, daily claim uniqueness, selection disposition, empty-batch behavior, workflow-stage progression, and serialized response metadata.
+
+Add direct service regressions and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, and independent live verification. Stage 7C closes only after this extraction is released.
 
 
 
