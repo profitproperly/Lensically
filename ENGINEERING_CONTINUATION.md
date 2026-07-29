@@ -1494,11 +1494,20 @@ Completed checkpoint — Stage 8D cron release modernization:
 - Live production independently confirmed exact SHA `53863c243cf90e8370d2e49fe637b5f17e344909` with 75/75 public tools. Scheduler state remained enabled, healthy, operational, publishing-enabled, normal mode, fresh on cron, zero overdue, and error-free.
 - The separate failed Cloudflare automatic-build check remains non-authoritative telemetry; the controlled exact-SHA release and all live verification passed.
 
-ACTIVE checkpoint — Stage 8E release acceptance consolidation:
+Completed checkpoint — Stage 8E release acceptance consolidation:
 
-Audit every Stage 8 requirement against source-controlled enforcement and real exact-SHA evidence. Eliminate any remaining duplicate validation, stale release paths, unbounded timing assumptions, or classifier ambiguity. Create one machine-readable release acceptance contract that verifies fast-path selection, complete fallback preservation, artifact reuse, planned migrations, trigger-neutral cron ownership, structural lint, and practical timing evidence.
-
-Benchmark representative routine Worker, web artifact, small migration, Wrangler cron, workflow-infrastructure, and broad architecture paths from durable run evidence. Stage 8 may close only when every requirement is either directly proven or explicitly governed by actual database work, and the acceptance contract fails closed if a future edit reintroduces unconditional rebuilds, direct migration application, routine cron mutation, duplicated broad suites, or unsupported timing claims.
+- Added the machine-readable `lensically-worker/release-acceptance.json` contract and fail-closed validator/regression suite.
+- Enforced fast-path selection, complete fallback preservation, validated web artifact reuse, planned migration ownership, trigger-neutral cron ownership, workflow structural lint, deduplicated broad validation, and evidence-backed timing targets across push, fast, shard, and fallback release lanes.
+- Retired the duplicate migration planner authority and replaced stale callers with an explicit fail-fast tombstone pointing to the canonical `d1-migration-release.mjs` contract.
+- Representative verified timings met every Stage 8 target: routine validation 14 seconds, routine Worker release 26 seconds, validated web release 49 seconds, small migration release 42 seconds, cron release 22 seconds, workflow lint 4 seconds, and broad architecture validation 115 seconds.
+- Workflow lint passed in run `30439530838`.
+- Push validation passed in run `30439530826`.
+- Exact-SHA typecheck and lifecycle validation passed in run `30439720420`.
+- All eight Operator shards passed in run `30439734902`.
+- Final Stage 8 exact-SHA release passed in run `30439800827` on `bf2f93636eeb88ac64b92f0888c23e44672ec31b`.
+- Live MCP independently confirmed exact production SHA with 75/75 tools. Scheduler remained healthy, operational, publishing-enabled, in normal mode, fresh on alarm and cron, zero overdue, and error-free.
+- Stage 8 test and release modernization is COMPLETE AND DEPLOYED.
+- Owner-directed stop: Stage 9 has not started and remains queued until the owner explicitly resumes it.
 
 
 
