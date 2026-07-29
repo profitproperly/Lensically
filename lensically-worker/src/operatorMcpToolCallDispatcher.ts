@@ -162,8 +162,8 @@ export async function dispatchOperatorMcpToolCall(
     }, "Lensically accepts only advertised direct typed Main tools.", true);
   }
 
-  let toolName = requestedToolName;
-    let rawArgs: JsonRecord = directPublicEntry
+    let toolName = requestedToolName;
+  let rawArgs: JsonRecord = directPublicEntry
     ? {
         ...governedRequestedArgs,
         execution_guard: await dependencies.createExecutionGuard(requestedToolName, governedRequestedArgs),
@@ -181,7 +181,14 @@ export async function dispatchOperatorMcpToolCall(
         freehand_gateway_payload_allowed: false,
       }, `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.`, true);
     }
-    const prepared = await dependencies.prepareRoutedGatewayCall(compiledProfile.request);
+        const governedCompiledRequest: JsonRecord = {
+      ...compiledProfile.request,
+      inputs: {
+        governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK,
+        ...(asRecord(compiledProfile.request.inputs) ?? {}),
+      },
+    };
+    const prepared = await dependencies.prepareRoutedGatewayCall(governedCompiledRequest);
     if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
       return mcpToolResultResponse(id, {
         ...prepared,
@@ -190,15 +197,17 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
     }
-    toolName = prepared.tool_name;
+        toolName = prepared.tool_name;
+    const governedPreparedArguments = { ...prepared.arguments };
+    delete governedPreparedArguments.governing_standards_ack;
     rawArgs = {
-      ...prepared.arguments,
-      execution_guard: await dependencies.createExecutionGuard(toolName, prepared.arguments),
+      ...governedPreparedArguments,
+      execution_guard: await dependencies.createExecutionGuard(toolName, governedPreparedArguments),
     };
     routedGatewayMetadata = {
       version: dependencies.mandatoryExecutionMapVersion,
       profile_id: compiledProfile.profile_id,
-      action_intent: compiledProfile.request.intent ?? null,
+      action_intent: governedCompiledRequest.intent ?? null,
       action_key: prepared.map_execution?.action_key ?? null,
       map_state: prepared.map_state ?? null,
       map_entry: prepared.map_entry ?? null,
