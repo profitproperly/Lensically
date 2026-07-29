@@ -14,6 +14,12 @@ The older `/api/gpt/*` Custom GPT action loop remains available as a manual comp
 
 It replaces Hermes for generation. Hermes can remain bypassed for this workflow.
 
+## Governing Startup Gate
+
+Every Lensically Operator Mode action is governed first by **Autonomy, Efficiency, Prevention**. Every advertised MCP tool schema requires the exact source-controlled `governing_standards_ack`, and the dispatcher rejects a missing or altered acknowledgment before routing, account loading, idempotency, authorization, or execution. This applies universally to engineering, administration, repository work, workflows, deployment, account operation, strategy, content, scheduling, measurement, recovery, and read-only inspection. The acknowledgment is transport governance metadata and is stripped before the internal business handler.
+
+On any blocker, stop the original objective, identify and repair the exact root cause, durably record the failure and solution, generalize it, add permanent prevention or regression coverage, verify the repair, and only then resume. Retrying, decomposing, rephrasing, changing tools, or continuing around an unresolved block is forbidden.
+
 ## Operating Loop
 
 For generation, scheduling, growth review, or strategy work:

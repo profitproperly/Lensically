@@ -8,6 +8,7 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Autonomy means every action reduces human dependence and moves diagnosis, decisions, execution, verification, recovery, continuity, and continuation into the Operator.
 - Efficiency means the fastest complete and correct route: no wasted inspection, duplicate work, repeated searches, unnecessary calls, avoidable waiting, redundant validation, needless complexity, rushed work, skipped requirements, bypassed controls, bypassed fixes, unresolved root causes, or workaround substitution.
 - Prevention means one failure is evidence and the same failure twice is unacceptable. Every failure is root-caused, fixed, recorded with its solution, generalized, permanently enforced or regression-tested, and made non-repeatable for future models and chats before the original objective resumes.
+- Before every Lensically Operator Mode tool action—not only startup or engineering—the caller must supply the exact source-controlled `governing_standards_ack`. The closed public schema and dispatcher enforce it before any routing or state access. Missing or altered acknowledgment means the action does not start. Never remove, weaken, infer, or silently supply a different acknowledgment path.
 
 ## Execution Architecture
 
