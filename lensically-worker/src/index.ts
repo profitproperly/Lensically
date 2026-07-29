@@ -13743,9 +13743,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         return operatorJsonResponse(shownPlan.body);
   };
 
-  const draftDecisionHandler = async (): Promise<Response> => {
+    const draftDecisionHandler = async (): Promise<Response> => {
+    const draftDecisionToolName = toolName === "approve_draft"
+      ? "approve_draft"
+      : "reject_draft";
     const decisionPlanning = await planOperatorDraftDecision({
-      toolName,
+      toolName: draftDecisionToolName,
       accountId: brand.account_id,
       threadsUserId: brand.profile.threads_user_id,
       brandKey: brand.brand_key,
