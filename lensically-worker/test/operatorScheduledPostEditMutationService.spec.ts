@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  editOperatorScheduledPost,
+    editOperatorScheduledPost,
+  scheduleOperatorApprovedDraft,
   scheduleOperatorOwnerApprovedBatch,
 } from "../src/operatorScheduledPostEditMutationService";
 
@@ -345,7 +346,7 @@ describe("operator owner-approved batch scheduling", () => {
         timezone: "America/Chicago",
       },
     });
-    expect(result).toEqual({
+        expect(result).toEqual({
       statusCode: 200,
       body: {
         success: true,
@@ -359,4 +360,178 @@ describe("operator owner-approved batch scheduling", () => {
     });
   });
 });
+
+describe("operator approved-draft scheduling", () => {
+  function createApprovedDraftDependencies() {
+    return {
+      normalizeText: vi.fn((value: unknown, _maxLength: number) => {
+        if (typeof value !== "string") return null;
+        const normalized = value.trim();
+        return normalized || null;
+      }),
+      loadDraft: vi.fn(async (): Promise<{
+        status: string;
+        scheduled_post_id: number | string | null;
+        source_card_id: string | null;
+        text: string;
+      }> => ({
+        status: "approved",
+        scheduled_post_id: null,
+        source_card_id: "card-7",
+        text: "Approved draft",
+      })),
+      loadExistingScheduled: vi.fn(async (): Promise<Record<string, unknown> | null> => ({
+        id: 77,
+        status: "approved",
+      })),
+      runSchedulingGates: vi.fn(async (): Promise<{ showable: boolean; [key: string]: unknown }> => ({
+        showable: true,
+        gate_receipt_id: "gate-7",
+      })),
+      createScheduledPost: vi.fn(async (): Promise<{
+        success: boolean;
+        scheduledPostId: number | null;
+        error?: string | null;
+      }> => ({ success: true, scheduledPostId: 77 })),
+      updateDraftScheduled: vi.fn(async () => undefined),
+      updateDailySourceClaim: vi.fn(async () => undefined),
+      persistStrategyTag: vi.fn(async () => undefined),
+      persistInventory: vi.fn(async () => undefined),
+    };
+  }
+
+  it("rejects missing draft or schedule fields before orchestration", async () => {
+    const dependencies = createApprovedDraftDependencies();
+    const result = await scheduleOperatorApprovedDraft({
+      payload: { draft_id: "draft-7", date: "2026-07-30" },
+      defaultTimezone: "America/New_York",
+    }, dependencies);
+
+    expect(result).toEqual({
+      statusCode: 400,
+      body: { success: false, error: "draft_id, date, and time are required" },
+    });
+    expect(dependencies.runSchedulingGates).not.toHaveBeenCalled();
+    expect(dependencies.createScheduledPost).not.toHaveBeenCalled();
+  });
+
+  it("reuses an already scheduled draft with the exact idempotency response", async () => {
+    const dependencies = createApprovedDraftDependencies();
+    dependencies.loadDraft.mockResolvedValue({
+      status: "scheduled",
+      scheduled_post_id: "77",
+      source_card_id: "card-7",
+      text: "Approved draft",
+    });
+
+    const result = await scheduleOperatorApprovedDraft({
+      payload: { draft_id: " draft-7 ", date: " 2026-07-30 ", time: " 10:00 " },
+      defaultTimezone: "America/New_York",
+    }, dependencies);
+
+    expect(dependencies.loadExistingScheduled).toHaveBeenCalledWith(77);
+    expect(result).toEqual({
+      statusCode: 200,
+      body: {
+        scheduled_post_id: 77,
+        draft_id: "draft-7",
+        status: "scheduled",
+        scheduled_post: { id: 77, status: "approved" },
+        reused_existing: true,
+        idempotency_reason: "draft_already_scheduled",
+      },
+    });
+    expect(dependencies.runSchedulingGates).not.toHaveBeenCalled();
+  });
+
+  it("returns the exact scheduling gate failure", async () => {
+    const dependencies = createApprovedDraftDependencies();
+    dependencies.runSchedulingGates.mockResolvedValue({
+      showable: false,
+      gate_receipt_id: "gate-failed",
+      failed_gate: "source_fidelity",
+    });
+
+    const result = await scheduleOperatorApprovedDraft({
+      payload: { draft_id: "draft-7", date: "2026-07-30", time: "10:00" },
+      defaultTimezone: "America/New_York",
+    }, dependencies);
+
+    expect(result).toEqual({
+      statusCode: 400,
+      body: {
+        success: false,
+        error: "scheduling_gates_failed",
+        showable: false,
+        gate_receipt_id: "gate-failed",
+        failed_gate: "source_fidelity",
+      },
+    });
+    expect(dependencies.createScheduledPost).not.toHaveBeenCalled();
+  });
+
+  it("maps one scheduled-post creation failure without persistence", async () => {
+    const dependencies = createApprovedDraftDependencies();
+    dependencies.createScheduledPost.mockResolvedValue({
+      success: false,
+      scheduledPostId: null,
+      error: "slot_conflict",
+    });
+
+    const result = await scheduleOperatorApprovedDraft({
+      payload: { draft_id: "draft-7", date: "2026-07-30", time: "10:00" },
+      defaultTimezone: "America/New_York",
+    }, dependencies);
+
+    expect(result).toEqual({
+      statusCode: 400,
+      body: { success: false, error: "slot_conflict" },
+    });
+    expect(dependencies.updateDraftScheduled).not.toHaveBeenCalled();
+    expect(dependencies.persistInventory).not.toHaveBeenCalled();
+  });
+
+  it("normalizes, gates, schedules, persists lineage, and returns exact success", async () => {
+    const dependencies = createApprovedDraftDependencies();
+    const result = await scheduleOperatorApprovedDraft({
+      payload: {
+        draft_id: " draft-7 ",
+        date: " 2026-07-30 ",
+        time: " 10:00 ",
+        timezone: " America/Chicago ",
+        strategy: { pillar: "money" },
+      },
+      defaultTimezone: "America/New_York",
+    }, dependencies);
+
+    expect(dependencies.runSchedulingGates).toHaveBeenCalledWith({
+      draftId: "draft-7",
+      sourceCardId: "card-7",
+      draftText: "Approved draft",
+      date: "2026-07-30",
+      time: "10:00",
+      timezone: "America/Chicago",
+    });
+    expect(dependencies.createScheduledPost).toHaveBeenCalledWith({
+      text: "Approved draft",
+      date: "2026-07-30",
+      time: "10:00",
+      timezone: "America/Chicago",
+    });
+    expect(dependencies.updateDraftScheduled).toHaveBeenCalledWith({ scheduledPostId: 77, draftId: "draft-7" });
+    expect(dependencies.updateDailySourceClaim).toHaveBeenCalledWith({ scheduledPostId: 77, draftId: "draft-7" });
+    expect(dependencies.persistStrategyTag).toHaveBeenCalledWith({ scheduledPostId: 77, strategy: { pillar: "money" } });
+    expect(dependencies.persistInventory).toHaveBeenCalledWith({
+      scheduledPostId: 77,
+      text: "Approved draft",
+      sourceCardId: "card-7",
+      strategy: { pillar: "money" },
+    });
+    expect(result).toEqual({
+      statusCode: 200,
+      body: { scheduled_post_id: 77, draft_id: "draft-7", status: "scheduled" },
+    });
+  });
+});
+
 

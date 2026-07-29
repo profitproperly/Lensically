@@ -2308,6 +2308,46 @@ if (!operatorScheduledPostEditMutationServiceTests.includes("rejects missing app
     || !operatorScheduledPostEditMutationServiceTests.includes("normalizes, schedules sequentially, saves exact memory, and returns success")) {
   lifecycleErrors.push("operator_owner_approved_batch_scheduling_service_tests_incomplete");
 }
+if (!source.includes("scheduleOperatorApprovedDraft({")
+    || !source.includes("loadDraft: async (draftId) =>")
+    || !source.includes("loadExistingScheduled: async (scheduledPostId)")
+    || !source.includes("runSchedulingGates: async ({ draftId, sourceCardId, draftText, date, time, timezone })")
+    || !source.includes("updateDraftScheduled: async ({ scheduledPostId, draftId })")
+    || !source.includes("updateDailySourceClaim: async ({ scheduledPostId, draftId })")
+    || !source.includes("persistStrategyTag: async ({ scheduledPostId, strategy })")
+    || !source.includes("persistInventory: async ({ scheduledPostId, text, sourceCardId, strategy })")
+    || !source.includes("return operatorJsonResponse(approvedDraftSchedule.body, approvedDraftSchedule.statusCode)")) {
+  lifecycleErrors.push("operator_approved_draft_scheduling_service_import_or_binding_missing");
+}
+const approvedDraftScheduleHandlerStart = source.indexOf('if (toolName === "schedule_approved_draft")');
+const approvedDraftScheduleHandlerEnd = source.indexOf('if (toolName === "get_manifest_cycle_receipt")', approvedDraftScheduleHandlerStart);
+const approvedDraftScheduleHandler = approvedDraftScheduleHandlerStart >= 0 && approvedDraftScheduleHandlerEnd > approvedDraftScheduleHandlerStart
+  ? source.slice(approvedDraftScheduleHandlerStart, approvedDraftScheduleHandlerEnd)
+  : "";
+if (approvedDraftScheduleHandler.includes("const draftId = normalizeOperatorText(payload.draft_id")
+    || approvedDraftScheduleHandler.includes("if ((draft.status === \"scheduled\" || draft.status === \"published\")")
+    || approvedDraftScheduleHandler.includes("return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId")) {
+  lifecycleErrors.push("operator_approved_draft_scheduling_service_returned_to_index");
+}
+if (!operatorScheduledPostEditMutationService.includes("export async function scheduleOperatorApprovedDraft")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.loadDraft")
+    || !operatorScheduledPostEditMutationService.includes("draft_already_scheduled")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.runSchedulingGates")
+    || !operatorScheduledPostEditMutationService.includes("scheduling_gates_failed")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.updateDraftScheduled")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.updateDailySourceClaim")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.persistStrategyTag")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.persistInventory")) {
+  lifecycleErrors.push("operator_approved_draft_scheduling_service_module_incomplete");
+}
+if (!operatorScheduledPostEditMutationServiceTests.includes("rejects missing draft or schedule fields before orchestration")
+    || !operatorScheduledPostEditMutationServiceTests.includes("reuses an already scheduled draft with the exact idempotency response")
+    || !operatorScheduledPostEditMutationServiceTests.includes("returns the exact scheduling gate failure")
+    || !operatorScheduledPostEditMutationServiceTests.includes("maps one scheduled-post creation failure without persistence")
+    || !operatorScheduledPostEditMutationServiceTests.includes("normalizes, gates, schedules, persists lineage, and returns exact success")) {
+  lifecycleErrors.push("operator_approved_draft_scheduling_service_tests_incomplete");
+}
+
 
 
 if (literalVersionAssertionEntries.length > 0) {

@@ -234,7 +234,7 @@ export async function scheduleOperatorOwnerApprovedBatch<TBrand>(
     },
   });
 
-  return {
+    return {
     statusCode: 200,
     body: {
       success: true,
@@ -244,4 +244,135 @@ export async function scheduleOperatorOwnerApprovedBatch<TBrand>(
     },
   };
 }
+
+type ApprovedDraftSchedulingRecord = {
+  status: string;
+  scheduled_post_id: number | string | null;
+  source_card_id: string | null;
+  text: string;
+};
+
+export async function scheduleOperatorApprovedDraft(
+  input: {
+    payload: Record<string, unknown>;
+    defaultTimezone: string;
+  },
+  dependencies: {
+    normalizeText: (value: unknown, maxLength: number, allowEmpty?: boolean) => string | null;
+    loadDraft: (draftId: string) => Promise<ApprovedDraftSchedulingRecord | null>;
+    loadExistingScheduled: (scheduledPostId: number) => Promise<Record<string, unknown> | null>;
+    runSchedulingGates: (gateInput: {
+      draftId: string;
+      sourceCardId: string | null;
+      draftText: string;
+      date: string;
+      time: string;
+      timezone: string;
+    }) => Promise<{ showable: boolean; [key: string]: unknown }>;
+    createScheduledPost: (post: {
+      text: string;
+      date: string;
+      time: string;
+      timezone: string;
+    }) => Promise<{
+      success: boolean;
+      scheduledPostId: number | null;
+      error?: string | null;
+    }>;
+    updateDraftScheduled: (update: { scheduledPostId: number; draftId: string }) => Promise<void>;
+    updateDailySourceClaim: (update: { scheduledPostId: number; draftId: string }) => Promise<void>;
+    persistStrategyTag: (input: { scheduledPostId: number; strategy: unknown }) => Promise<void>;
+    persistInventory: (inventory: {
+      scheduledPostId: number;
+      text: string;
+      sourceCardId: string | null;
+      strategy: Record<string, unknown> | null;
+    }) => Promise<void>;
+  },
+): Promise<{
+  statusCode: number;
+  body: Record<string, unknown>;
+}> {
+  const draftId = dependencies.normalizeText(input.payload.draft_id, 120);
+  const draft = draftId ? await dependencies.loadDraft(draftId) : null;
+  const date = dependencies.normalizeText(input.payload.date, 20);
+  const time = dependencies.normalizeText(input.payload.time, 20);
+  const timezone = dependencies.normalizeText(input.payload.timezone, 100, true) ?? input.defaultTimezone;
+
+  if (!draftId || !draft || !date || !time) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "draft_id, date, and time are required" },
+    };
+  }
+
+  if ((draft.status === "scheduled" || draft.status === "published") && draft.scheduled_post_id) {
+    const scheduledPostId = Number(draft.scheduled_post_id);
+    const existingScheduled = await dependencies.loadExistingScheduled(scheduledPostId);
+    return {
+      statusCode: 200,
+      body: {
+        scheduled_post_id: scheduledPostId,
+        draft_id: draftId,
+        status: draft.status,
+        scheduled_post: existingScheduled,
+        reused_existing: true,
+        idempotency_reason: "draft_already_scheduled",
+      },
+    };
+  }
+
+  const gateRun = await dependencies.runSchedulingGates({
+    draftId,
+    sourceCardId: draft.source_card_id,
+    draftText: draft.text,
+    date,
+    time,
+    timezone,
+  });
+  if (!gateRun.showable) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "scheduling_gates_failed", ...gateRun },
+    };
+  }
+
+  const scheduled = await dependencies.createScheduledPost({
+    text: draft.text,
+    date,
+    time,
+    timezone,
+  });
+  if (!scheduled.success || !scheduled.scheduledPostId) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: scheduled.error ?? "schedule_failed" },
+    };
+  }
+
+  await dependencies.updateDraftScheduled({ scheduledPostId: scheduled.scheduledPostId, draftId });
+  await dependencies.updateDailySourceClaim({ scheduledPostId: scheduled.scheduledPostId, draftId });
+  await dependencies.persistStrategyTag({
+    scheduledPostId: scheduled.scheduledPostId,
+    strategy: input.payload.strategy,
+  });
+  await dependencies.persistInventory({
+    scheduledPostId: scheduled.scheduledPostId,
+    text: draft.text,
+    sourceCardId: draft.source_card_id,
+    strategy: input.payload.strategy && typeof input.payload.strategy === "object" && !Array.isArray(input.payload.strategy)
+      ? input.payload.strategy as Record<string, unknown>
+      : null,
+  });
+
+  return {
+    statusCode: 200,
+    body: {
+      scheduled_post_id: scheduled.scheduledPostId,
+      draft_id: draftId,
+      status: "scheduled",
+    },
+  };
+}
+
 

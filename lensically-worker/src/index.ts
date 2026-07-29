@@ -150,7 +150,8 @@ import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadSe
 import { deleteOperatorScheduledPost } from "./operatorScheduledPostDeletionService";
 import { retryOperatorScheduledPost } from "./operatorScheduledPostRetryService";
 import {
-  editOperatorScheduledPost,
+    editOperatorScheduledPost,
+  scheduleOperatorApprovedDraft,
   scheduleOperatorOwnerApprovedBatch,
 } from "./operatorScheduledPostEditMutationService";
 
@@ -14845,70 +14846,76 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
   if (toolName === "schedule_approved_draft") {
-    const draftId = normalizeOperatorText(payload.draft_id, 120);
-    const draft = draftId ? await getOperatorDraft(env, brand, draftId) : null;
-    const date = normalizeOperatorText(payload.date, 20);
-    const time = normalizeOperatorText(payload.time, 20);
-    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-    if (!draft || !date || !time) {
-      return operatorJsonResponse({ success: false, error: "draft_id, date, and time are required" }, 400);
-    }
-    if ((draft.status === "scheduled" || draft.status === "published") && draft.scheduled_post_id) {
-      const existingScheduled = await env.DB.prepare(
+        const approvedDraftSchedule = await scheduleOperatorApprovedDraft({
+      payload,
+      defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    }, {
+      normalizeText: normalizeOperatorText,
+      loadDraft: async (draftId) => await getOperatorDraft(env, brand, draftId),
+      loadExistingScheduled: async (scheduledPostId) => await env.DB.prepare(
         `SELECT id, post_text, status, scheduled_time, published_post_id
          FROM scheduled_posts WHERE id = ? AND threads_user_id = ? LIMIT 1`,
-      ).bind(Number(draft.scheduled_post_id), brand.profile.threads_user_id).first<Record<string, unknown>>();
-      return operatorJsonResponse({
-        scheduled_post_id: Number(draft.scheduled_post_id),
-        draft_id: draftId,
-        status: draft.status,
-        scheduled_post: existingScheduled,
-        reused_existing: true,
-        idempotency_reason: "draft_already_scheduled",
-      });
-    }
-    const gateRun = await runOperatorGates(env, {
-      brand,
-      draftId,
-      sourceCardId: draft.source_card_id,
-      draftText: draft.text,
-      stageScope: "scheduling",
-      scheduling: { date, time, timezone },
-    });
-    if (!gateRun.showable) {
-      return operatorJsonResponse({ success: false, error: "scheduling_gates_failed", ...gateRun }, 400);
-    }
-    const scheduled = await createScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, brand.profile.threads_user_id, draft.text, date, time, timezone);
-    if (!scheduled.success || !scheduled.scheduledPostId) {
-      return operatorJsonResponse({ success: false, error: scheduled.error ?? "schedule_failed" }, 400);
-    }
+      ).bind(scheduledPostId, brand.profile.threads_user_id).first<Record<string, unknown>>(),
+      runSchedulingGates: async ({ draftId, sourceCardId, draftText, date, time, timezone }) => await runOperatorGates(env, {
+        brand,
+        draftId,
+        sourceCardId,
+        draftText,
+        stageScope: "scheduling",
+        scheduling: { date, time, timezone },
+      }),
+      createScheduledPost: async ({ text, date, time, timezone }) => {
+        const scheduled = await createScheduledPostForAppUser(
+          env,
+          WORKSPACE_APP_USER_ID,
+          brand.profile.threads_user_id,
+          text,
+          date,
+          time,
+          timezone,
+        );
+        return {
+          success: scheduled.success,
+          scheduledPostId: scheduled.scheduledPostId ?? null,
+          error: scheduled.error ?? null,
+        };
+      },
+      updateDraftScheduled: async ({ scheduledPostId, draftId }) => {
         await env.DB.prepare(
-      `UPDATE gpt_generation_drafts
-       SET status = 'scheduled', scheduled_post_id = ?
-       WHERE id = ?
-         AND account_id = ?`,
-    ).bind(scheduled.scheduledPostId, draftId, brand.account_id).run();
-    await env.DB.prepare(
-      `UPDATE operator_daily_source_claims
-       SET status = 'scheduled', scheduled_post_id = ?
-       WHERE brand_key = ? AND draft_id = ?`,
-    ).bind(scheduled.scheduledPostId, brand.brand_key, draftId).run();
-    await upsertGptPostStrategyTag(env, {
-      scheduledPostId: scheduled.scheduledPostId,
-      accountId: brand.account_id,
-      threadsUserId: brand.profile.threads_user_id,
-      strategy: normalizeGptPostStrategyInput(payload.strategy),
+          `UPDATE gpt_generation_drafts
+           SET status = 'scheduled', scheduled_post_id = ?
+           WHERE id = ?
+             AND account_id = ?`,
+        ).bind(scheduledPostId, draftId, brand.account_id).run();
+      },
+      updateDailySourceClaim: async ({ scheduledPostId, draftId }) => {
+        await env.DB.prepare(
+          `UPDATE operator_daily_source_claims
+           SET status = 'scheduled', scheduled_post_id = ?
+           WHERE brand_key = ? AND draft_id = ?`,
+        ).bind(scheduledPostId, brand.brand_key, draftId).run();
+      },
+      persistStrategyTag: async ({ scheduledPostId, strategy }) => {
+        await upsertGptPostStrategyTag(env, {
+          scheduledPostId,
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          strategy: normalizeGptPostStrategyInput(strategy),
+        });
+      },
+      persistInventory: async ({ scheduledPostId, text, sourceCardId, strategy }) => {
+        await insertOperatorInventory(env, {
+          brandKey: brand.brand_key,
+          sourceType: "scheduled_post",
+          sourceId: String(scheduledPostId),
+          text,
+          sourceCardId,
+          status: "scheduled",
+          strategy,
+        });
+      },
     });
-    await insertOperatorInventory(env, {
-      brandKey: brand.brand_key,
-      sourceType: "scheduled_post",
-      sourceId: String(scheduled.scheduledPostId),
-      text: draft.text,
-      sourceCardId: draft.source_card_id,
-      status: "scheduled",
-      strategy: payload.strategy && typeof payload.strategy === "object" ? payload.strategy as Record<string, unknown> : null,
-    });
-    return operatorJsonResponse({ scheduled_post_id: scheduled.scheduledPostId, draft_id: draftId, status: "scheduled" });
+    return operatorJsonResponse(approvedDraftSchedule.body, approvedDraftSchedule.statusCode);
   }
 
                                 if (toolName === "get_manifest_cycle_receipt") {
