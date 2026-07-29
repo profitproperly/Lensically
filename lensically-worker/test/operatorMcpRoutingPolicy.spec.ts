@@ -233,7 +233,10 @@ describe("Operator runtime admission", () => {
 
   it("returns the exact missing-brand response after scoped admission", async () => {
     const { events, dependencies } = createRuntimeAdmissionDependencies();
-    dependencies.resolveBrand.mockResolvedValue(null);
+        dependencies.resolveBrand.mockImplementationOnce(async () => {
+      events.push("resolve_brand");
+      return null;
+    });
 
     const result = await admitOperatorRuntimeToolCall({ request, toolName: "get_account_state" }, dependencies);
 
