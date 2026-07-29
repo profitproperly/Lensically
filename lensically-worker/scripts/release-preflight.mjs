@@ -828,6 +828,32 @@ if (operatorAccountCoverageRuntimeShell.includes('if (toolName === "get_account_
     || operatorAccountCoverageRuntimeShell.includes('if (toolName === "get_hourly_coverage")')) {
   lifecycleErrors.push("operator_account_coverage_runtime_dispatch_returned_to_index");
 }
+const operatorReviewOperationsDispatchStart = source.indexOf(
+  "const reviewOperationsRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
+  operatorClaimReviewDispatchStart,
+);
+const operatorWorkflowSessionDispatchStart = source.indexOf(
+  'if (toolName === "start_workflow_session")',
+  operatorReviewOperationsDispatchStart,
+);
+const operatorReviewOperationsRuntimeShell = operatorReviewOperationsDispatchStart >= 0
+  && operatorWorkflowSessionDispatchStart > operatorReviewOperationsDispatchStart
+  ? source.slice(operatorReviewOperationsDispatchStart, operatorWorkflowSessionDispatchStart)
+  : "";
+if (!operatorReviewOperationsRuntimeShell.includes("dispatchOperatorKeyedRuntimeTool(toolName, {")
+    || !operatorReviewOperationsRuntimeShell.includes("get_manifest_review_batch: async () =>")
+    || !operatorReviewOperationsRuntimeShell.includes("attach_manifest_review_draft: async () =>")
+    || !operatorReviewOperationsRuntimeShell.includes("skip_manifest_review_source: async () =>")
+    || !operatorReviewOperationsRuntimeShell.includes("schedule_manifest_review_batch: async () =>")
+    || !operatorReviewOperationsRuntimeShell.includes("if (reviewOperationsRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_review_operations_runtime_dispatch_cutover_incomplete");
+}
+if (operatorReviewOperationsRuntimeShell.includes('if (toolName === "get_manifest_review_batch")')
+    || operatorReviewOperationsRuntimeShell.includes('if (toolName === "attach_manifest_review_draft")')
+    || operatorReviewOperationsRuntimeShell.includes('if (toolName === "skip_manifest_review_source")')
+    || operatorReviewOperationsRuntimeShell.includes('if (toolName === "schedule_manifest_review_batch")')) {
+  lifecycleErrors.push("operator_review_operations_runtime_dispatch_returned_to_index");
+}
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
     || operatorToolAdmissionShell.includes("RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)")
@@ -1377,6 +1403,7 @@ if (!operatorManifestReviewBatchRetirementServiceTests.includes("admits only Man
     lifecycleErrors.push("operator_manifest_review_batch_retirement_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewBatchStateService"')
+    || !source.includes("get_manifest_review_batch: async () =>")
     || !source.includes("readOperatorManifestReviewBatchState({")
     || !source.includes("findActiveReviewBatchId: async")
     || !source.includes("findActiveAutonomousCycle: (brandKey)")) {
@@ -1404,6 +1431,7 @@ if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow rea
     lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewDraftAttachmentService"')
+    || !source.includes("attach_manifest_review_draft: async () =>")
     || !source.includes("attachOperatorManifestReviewDraft({")
     || !source.includes("findDuplicateClaim: async")
     || !source.includes("applyAttachment: async")) {
@@ -1433,6 +1461,7 @@ if (!operatorManifestReviewDraftAttachmentServiceTests.includes("rejects incompl
     lifecycleErrors.push("operator_manifest_review_draft_attachment_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewSourceResolutionService"')
+    || !source.includes("skip_manifest_review_source: async () =>")
     || !source.includes("resolveOperatorManifestReviewSource({")
     || !source.includes("upsertSourceExclusion: async")
     || !source.includes("updateSourceSelection: async")) {
@@ -1461,6 +1490,7 @@ if (!operatorManifestReviewSourceResolutionServiceTests.includes("returns the ex
     lifecycleErrors.push("operator_manifest_review_source_resolution_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewBatchSchedulingService"')
+    || !source.includes("schedule_manifest_review_batch: async () =>")
     || !source.includes("scheduleOperatorManifestReviewBatch({")
     || !source.includes("listApprovedClaims: async")
     || !source.includes("runSchedulingGates: async")

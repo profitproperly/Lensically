@@ -12275,7 +12275,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     });
   }
 
-        if (toolName === "get_manifest_review_batch") {
+          const reviewOperationsRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
+    get_manifest_review_batch: async () => {
     const reviewState = await readOperatorManifestReviewBatchState({
       brandKey: brand.brand_key,
       payload,
@@ -12305,11 +12306,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(brandKey).first<Record<string, unknown>>(),
       serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
-    return operatorJsonResponse(reviewState.body, reviewState.status);
-  }
-
-
-        if (toolName === "attach_manifest_review_draft") {
+          return { body: reviewState.body, status: reviewState.status };
+    },
+    attach_manifest_review_draft: async () => {
     const attachment = await attachOperatorManifestReviewDraft({
       brandKey: brand.brand_key,
       payload,
@@ -12432,11 +12431,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(status, reviewBatchId).run(),
       serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
-    return operatorJsonResponse(attachment.body, attachment.status);
-  }
-
-
-    if (toolName === "skip_manifest_review_source") {
+          return { body: attachment.body, status: attachment.status };
+    },
+    skip_manifest_review_source: async () => {
     const resolution = await resolveOperatorManifestReviewSource({
       brandKey: brand.brand_key,
       payload,
@@ -12482,10 +12479,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(status, reviewBatchId).run(),
       serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
-    return operatorJsonResponse(resolution.body, resolution.status);
-  }
-
-    if (toolName === "schedule_manifest_review_batch") {
+          return { body: resolution.body, status: resolution.status };
+    },
+    schedule_manifest_review_batch: async () => {
     const schedulingResult = await scheduleOperatorManifestReviewBatch({
       brandKey: brand.brand_key,
       accountId: brand.account_id,
@@ -12577,7 +12573,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).bind(status, reviewBatchId).run(),
       serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
-    return operatorJsonResponse(schedulingResult.body, schedulingResult.status);
+          return { body: schedulingResult.body, status: schedulingResult.status };
+    },
+  });
+  if (reviewOperationsRuntimeDispatch.handled) {
+    return operatorJsonResponse(reviewOperationsRuntimeDispatch.body, reviewOperationsRuntimeDispatch.status);
   }
 
     if (toolName === "start_workflow_session") {
