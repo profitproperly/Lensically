@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d2-source-lineage-backfill-routing
-repository_base_sha: b5572cbbd538b09cd5a60cf89fa95d481df8e254
-production_sha: b5572cbbd538b09cd5a60cf89fa95d481df8e254
+active_checkpoint: stage-7d3-source-card-generation-routing
+repository_base_sha: 50a624006063df0ca4a9706db278de259a640742
+production_sha: 50a624006063df0ca4a9706db278de259a640742
 
 
 
@@ -1345,9 +1345,19 @@ Completed checkpoint — Stage 7D1 workflow, context, board, and source-list rou
 - Exact-SHA release passed in run `30427252507`.
 - Live production independently confirmed exact SHA `b5572cbbd538b09cd5a60cf89fa95d481df8e254` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7D2 source draw, lineage, and backfill routing:
+Completed checkpoint — Stage 7D2 source draw, lineage, and backfill routing:
 
-Route `draw_source_candidate_batch`, `audit_published_post_lineage`, `recover_published_post_lineage`, `create_all_missing_manifest_source_cards`, `prepare_manifest_source_card_backfill`, and `get_source_candidate_batch` through the reusable keyed runtime dispatcher. Preserve existing service ownership, recovery ordering, continuation contracts, D1 adapters, and status codes.
+- Routed `draw_source_candidate_batch`, `audit_published_post_lineage`, `recover_published_post_lineage`, `create_all_missing_manifest_source_cards`, `prepare_manifest_source_card_backfill`, and `get_source_candidate_batch` through one lazy keyed dispatcher.
+- Preserved existing service owners, lineage recovery ordering, compatibility bridges, continuation contracts, D1 adapters, and status behavior.
+- Added permanent lifecycle enforcement requiring the six keyed handlers and preventing their direct branches from returning.
+- Push validation passed in run `30427413649`.
+- All eight Operator shards passed in run `30427441963`.
+- Exact-SHA release passed in run `30427709680`.
+- Live production independently confirmed exact SHA `50a624006063df0ca4a9706db278de259a640742` with 75/75 public tools.
+
+ACTIVE checkpoint — Stage 7D3 source-card and generation-run routing:
+
+Route `create_source_card`, `lock_source_card`, `get_source_card`, and `create_generation_run` through the reusable keyed runtime dispatcher. Preserve all admission, family-resolution, persistence, locking, read, and generation-run service ownership; keep explicit D1 and platform adapters exact.
 
 Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
 
