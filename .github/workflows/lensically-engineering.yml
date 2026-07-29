@@ -169,76 +169,10 @@ jobs:
             npx vitest --run "${unique_tests[@]}" --reporter=dot --bail=1
           fi
 
-      - name: Run full push validation
+            - name: Run full push validation
         if: steps.push_scope.outputs.full_validation == 'true'
         working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-                    node scripts/run-operator-validation.mjs smoke
-                    npm run test -- --run test/databaseMigrations.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpProtocol.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpToolDefinitions.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpToolDirectory.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpEngineeringRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpAdminRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpAccountFoundationRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpSourceDraftRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpStrategyScheduleRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpManifestCycleRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpAutonomousExecutionRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpAccountAnalyticsRegistry.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpRegistryComposition.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpRoutingPolicy.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpTransport.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpDispatcher.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorMcpToolCallDispatcher.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestCycleService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorHourlyCoverageService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestPrepareCheckpointService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestCycleConstructionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestPersistenceAdmissionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestPersistenceService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestScheduledReviewService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestCycleObservationService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorAccountStateService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorLensicallyUiSurfaceService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestReviewBatchRetirementService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestReviewBatchStateService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestReviewDraftAttachmentService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestReviewSourceResolutionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestReviewBatchSchedulingService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorWorkflowSessionStartService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorContextAdmissionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorProductionBoardService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCandidateListService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSavedPatternSourceExclusionService.spec.ts --reporter=dot --bail=1
-                              npm run test -- --run test/operatorManifestSourceDrawService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/operatorPublishedPostLineageAuditService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestSourceCardBackfillService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorManifestSourceCardBackfillPreparationService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCandidateBatchReadService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCardAdmissionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCardFamilyResolutionService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCardPersistencePlanningService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCardLockService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorSourceCardReadService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorGenerationRunAdmissionService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorGenerationRunPersistencePlanningService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorGenerationDraftAdmissionService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorGenerationDraftPersistencePlanningService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorDraftShownTransitionService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorDraftDecisionService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorActiveGateReadService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorGateMutationPlanningService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorStrategyMemoryListReadService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorStrategyMemorySaveService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorScheduledPostListReadService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorScheduledPostDeletionService.spec.ts --reporter=dot --bail=1
-                                        npm run test -- --run test/operatorScheduledPostRetryService.spec.ts --reporter=dot --bail=1
-                    npm run test -- --run test/operatorScheduledPostEditMutationService.spec.ts --reporter=dot --bail=1
-          npm run test -- --run test/wranglerDeployRetry.spec.ts --reporter=dot --bail=1
-          npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
-          npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+        run: node scripts/run-full-validation.mjs
 
 
 
