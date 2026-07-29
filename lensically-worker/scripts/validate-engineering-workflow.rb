@@ -44,6 +44,14 @@ jobs.each do |name, job|
   end
 end
 
+def step_run(jobs, job_name, step_name)
+  step = jobs.fetch(job_name).fetch("steps").find { |candidate| candidate["name"] == step_name }
+  abort("required_step_missing:#{job_name}:#{step_name}") unless step
+  run = step["run"]
+  abort("required_step_run_missing:#{job_name}:#{step_name}") unless run.is_a?(String)
+  run
+end
+
 fast_step_names = jobs.fetch("fast-validation").fetch("steps").map { |step| step["name"] }
 abort("fast_validation_upload_step_missing") unless fast_step_names.include?("Upload architecture baseline")
 
@@ -54,6 +62,33 @@ required_worker_release_steps = [
 ]
 missing_worker_release_steps = required_worker_release_steps.reject { |name| worker_release_step_names.include?(name) }
 abort("worker_release_steps_missing:#{missing_worker_release_steps.join(",")}") unless missing_worker_release_steps.empty?
+
+push_full_run = step_run(jobs, "push-validation", "Run full push validation")
+abort("push_shared_full_validation_missing") unless push_full_run.strip == "node scripts/run-full-validation.mjs"
+
+release_gate_run = step_run(jobs, "worker-release", "Run exact-head release gates")
+abort("release_shared_full_validation_missing") unless release_gate_run.include?("node scripts/run-full-validation.mjs --check")
+abort("release_shared_full_validation_execution_missing") unless release_gate_run.lines.count { |line| line.strip == "node scripts/run-full-validation.mjs" } == 1
+abort("release_fallback_preflight_missing") unless release_gate_run.include?("node scripts/release-preflight.mjs")
+abort("release_fallback_typecheck_missing") unless release_gate_run.include?("npx tsc --noEmit")
+
+[
+  ["push-validation", "Typecheck and lifecycle gate"],
+  ["fast-validation", "Typecheck and lifecycle gate"],
+  ["operator-test-shards", "Verify lifecycle and run deterministic shard"],
+].each do |job_name, step_name|
+  run = step_run(jobs, job_name, step_name)
+  abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
+end
+
+all_run_scripts = jobs.values.flat_map { |job| job.fetch("steps").filter_map { |step| step["run"] if step["run"].is_a?(String) } }.join("\n")
+legacy_broad_markers = [
+  "npm run test -- --run test/operatorMcpProtocol.spec.ts",
+  "npm run test -- --run test/operatorManifestPersistenceService.spec.ts",
+  "npm run test -- --run test/operatorScheduledPostEditMutationService.spec.ts",
+]
+returned_legacy_markers = legacy_broad_markers.select { |marker| all_run_scripts.include?(marker) }
+abort("duplicated_broad_validation_commands_returned:#{returned_legacy_markers.join(",")}") unless returned_legacy_markers.empty?
 
 puts "workflow_structure_valid"
 
