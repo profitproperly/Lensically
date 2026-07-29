@@ -52,9 +52,14 @@ jobs.each do |name, job|
   end
 end
 
-def step_run(jobs, job_name, step_name)
+def step_for(jobs, job_name, step_name)
   step = jobs.fetch(job_name).fetch("steps").find { |candidate| candidate["name"] == step_name }
   abort("required_step_missing:#{job_name}:#{step_name}") unless step
+  step
+end
+
+def step_run(jobs, job_name, step_name)
+  step = step_for(jobs, job_name, step_name)
   run = step["run"]
   abort("required_step_run_missing:#{job_name}:#{step_name}") unless run.is_a?(String)
   run
@@ -88,6 +93,32 @@ abort("release_fallback_typecheck_missing") unless release_gate_run.include?("np
   run = step_run(jobs, job_name, step_name)
   abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
 end
+
+push_artifact_test = step_run(jobs, "push-validation", "Test validated web artifact contract")
+abort("push_web_artifact_test_missing") unless push_artifact_test.include?("npm run test:validated-artifact")
+push_web_build = step_run(jobs, "push-validation", "Build exact validated web artifact")
+abort("push_web_cloudflare_build_missing") unless push_web_build.include?("npm run build:cf")
+push_web_package = step_run(jobs, "push-validation", "Package exact validated web artifact")
+abort("push_web_artifact_package_missing") unless push_web_package.include?("validated-web-artifact.mjs package")
+push_upload = step_for(jobs, "push-validation", "Upload exact validated web artifact")
+abort("push_web_artifact_upload_action_missing") unless push_upload["uses"] == "actions/upload-artifact@v4"
+abort("push_web_artifact_upload_name_missing") unless push_upload.dig("with", "name").to_s.include?("lensically-web-")
+
+release_download = step_for(jobs, "worker-release", "Download exact validated web artifact")
+abort("release_web_artifact_download_action_missing") unless release_download["uses"] == "actions/download-artifact@v4"
+abort("release_web_artifact_download_not_fallback_safe") unless release_download["continue-on-error"] == true
+abort("release_web_artifact_cross_run_missing") unless release_download.dig("with", "run-id").to_s.include?("validated_run_id")
+release_restore = step_for(jobs, "worker-release", "Restore exact validated web artifact")
+abort("release_web_artifact_restore_not_fallback_safe") unless release_restore["continue-on-error"] == true
+abort("release_web_artifact_restore_missing") unless release_restore["run"].to_s.include?("validated-web-artifact.mjs restore")
+release_path = step_run(jobs, "worker-release", "Resolve validated web release path")
+abort("release_web_artifact_path_resolution_incomplete") unless release_path.include?("use_validated_artifact") && release_path.include?("fallback_reason")
+fallback_build = step_for(jobs, "worker-release", "Build fallback exact-head web product")
+abort("release_web_fallback_build_condition_missing") unless fallback_build["if"].to_s.include?("use_validated_artifact != 'true'")
+abort("release_web_fallback_build_missing") unless fallback_build["run"].to_s.include?("npm run build:cf")
+release_gate_step = step_for(jobs, "worker-release", "Run exact-head release gates")
+abort("release_web_fallback_full_gates_missing") unless release_gate_step["if"].to_s.include?("use_validated_artifact != 'true'")
+abort("unconditional_release_web_rebuild_returned") if jobs.fetch("worker-release").fetch("steps").any? { |step| step["name"] == "Build exact-head web product" }
 
 all_run_scripts = jobs.values.flat_map { |job| job.fetch("steps").filter_map { |step| step["run"] if step["run"].is_a?(String) } }.join("\n")
 legacy_broad_markers = [
