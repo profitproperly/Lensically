@@ -20151,30 +20151,14 @@ async function handleOperatorMcpEngineeringTool(
         payload: await readJsonSafe(liveResponse) as Record<string, unknown> | null,
       };
     };
-        const structured = (result: Record<string, unknown> | null): Record<string, unknown> => {
-      const rpcResult = result?.result && typeof result.result === "object" && !Array.isArray(result.result)
-        ? result.result as Record<string, unknown>
-        : {};
-      return rpcResult.structuredContent && typeof rpcResult.structuredContent === "object" && !Array.isArray(rpcResult.structuredContent)
-        ? rpcResult.structuredContent as Record<string, unknown>
-        : {};
-    };
-    let nextLiveId = 3;
-    const callDirectLiveTool = async (toolName: string, args: Record<string, unknown>) =>
-      callLiveMcp(nextLiveId++, "tools/call", {
-        name: toolName,
-        arguments: args,
-      });
-
-        const listed = await callLiveMcp(2, "tools/list", {});
+                const listed = await callLiveMcp(2, "tools/list", {});
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
-    const listedToolRows = Array.isArray(listedTools)
+        const listedToolRows = Array.isArray(listedTools)
       ? listedTools.filter((tool): tool is Record<string, unknown> => Boolean(tool) && typeof tool === "object" && !Array.isArray(tool))
       : [];
-            const startup = await callDirectLiveTool("getOperatorStartupContext", {});
-    const startupContent = structured(startup.payload);
+    const startupTool = listedToolRows.find((tool) => tool.name === "getOperatorStartupContext") ?? null;
         const autonomousPersistTool = listedToolRows.find((tool) => tool.name === "persist_manifest_autonomous_post") ?? null;
     const retiredCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
     const autonomousPersistSchema = autonomousPersistTool?.inputSchema && typeof autonomousPersistTool.inputSchema === "object" && !Array.isArray(autonomousPersistTool.inputSchema)
@@ -20183,8 +20167,8 @@ async function handleOperatorMcpEngineeringTool(
     const autonomousPersistProperties = autonomousPersistSchema.properties && typeof autonomousPersistSchema.properties === "object" && !Array.isArray(autonomousPersistSchema.properties)
       ? autonomousPersistSchema.properties as Record<string, unknown>
       : {};
-    const boundaryTest = {
-      startup_direct: startupContent.ok === true && startupContent.bootstrap_version !== undefined,
+        const boundaryTest = {
+      startup_tool_advertised: startupTool !== null,
       persist_tool_advertised: autonomousPersistTool !== null,
       retired_commit_hidden: retiredCommitTool === null,
       one_post_per_call: Boolean(autonomousPersistProperties.post) && !autonomousPersistProperties.posts,
@@ -20194,11 +20178,10 @@ async function handleOperatorMcpEngineeringTool(
       account_state_mutated: false,
     };
     return {
-      ok: response.ok
+            ok: response.ok
         && Boolean(liveSessionId)
         && listed.status < 400
-        && startup.status < 400
-                && boundaryTest.startup_direct
+        && boundaryTest.startup_tool_advertised
         && boundaryTest.persist_tool_advertised
         && boundaryTest.retired_commit_hidden
         && boundaryTest.one_post_per_call

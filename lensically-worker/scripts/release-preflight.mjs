@@ -3473,6 +3473,13 @@ for (const workKey of supersededDefaultWorkItems) {
 if (!source.includes('work_key: "manifest_autonomous_posting_restoration"')) {
   errors.push("manifest_posting_restoration_default_missing");
 }
+if (source.includes('callDirectLiveTool("getOperatorStartupContext"')) {
+  errors.push("self_referential_live_startup_probe_forbidden");
+}
+if (!source.includes("startup_tool_advertised: startupTool !== null")) {
+  errors.push("live_startup_tool_advertisement_check_missing");
+}
+
 
 
 if (tests.includes(".only(") || /operatorMode\.spec\.ts[^\n]*\s-t\s/.test(workflow)) {
