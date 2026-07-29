@@ -872,7 +872,7 @@ if (operatorReviewOperationsRuntimeShell.includes('if (toolName === "get_manifes
   lifecycleErrors.push("operator_review_operations_runtime_dispatch_returned_to_index");
 }
 const operatorSourceDrawDispatchStart = source.indexOf(
-  'if (toolName === "draw_source_candidate_batch")',
+  "const sourceLineageBackfillRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
   operatorWorkflowSessionDispatchStart,
 );
 const operatorWorkflowContextSourceRuntimeShell = operatorWorkflowSessionDispatchStart >= 0
@@ -894,6 +894,32 @@ if (operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "start_
     || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "list_source_candidates")')
     || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "delete_saved_pattern_source")')) {
   lifecycleErrors.push("operator_workflow_context_source_runtime_dispatch_returned_to_index");
+}
+const operatorCreateSourceCardDispatchStart = source.indexOf(
+  'if (toolName === "create_source_card")',
+  operatorSourceDrawDispatchStart,
+);
+const operatorSourceLineageBackfillRuntimeShell = operatorSourceDrawDispatchStart >= 0
+  && operatorCreateSourceCardDispatchStart > operatorSourceDrawDispatchStart
+  ? source.slice(operatorSourceDrawDispatchStart, operatorCreateSourceCardDispatchStart)
+  : "";
+if (!operatorSourceLineageBackfillRuntimeShell.includes("dispatchOperatorKeyedRuntimeTool(toolName, {")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("draw_source_candidate_batch: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("audit_published_post_lineage: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("recover_published_post_lineage: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("create_all_missing_manifest_source_cards: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("prepare_manifest_source_card_backfill: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("get_source_candidate_batch: async () =>")
+    || !operatorSourceLineageBackfillRuntimeShell.includes("if (sourceLineageBackfillRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_source_lineage_backfill_runtime_dispatch_cutover_incomplete");
+}
+if (operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "draw_source_candidate_batch")')
+    || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "audit_published_post_lineage")')
+    || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "recover_published_post_lineage")')
+    || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "create_all_missing_manifest_source_cards")')
+    || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "prepare_manifest_source_card_backfill")')
+    || operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "get_source_candidate_batch")')) {
+  lifecycleErrors.push("operator_source_lineage_backfill_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -1720,6 +1746,7 @@ if (!operatorSavedPatternSourceExclusionServiceTests.includes("rejects missing e
   lifecycleErrors.push("operator_saved_pattern_source_exclusion_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestSourceDrawService"')
+    || !source.includes("draw_source_candidate_batch: async () =>")
     || !source.includes("drawOperatorManifestSourceBatch({")
     || !source.includes("getActiveSession: async")
     || !source.includes("persistDraw: async")
@@ -1748,15 +1775,17 @@ if (!operatorManifestSourceDrawServiceTests.includes("rejects unsupported brands
   lifecycleErrors.push("operator_manifest_source_draw_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorPublishedPostLineageAuditService"')
+    || !source.includes("audit_published_post_lineage: async () =>")
+    || !source.includes("recover_published_post_lineage: async () =>")
     || !source.includes("auditOperatorPublishedPostLineage({")
     || !source.includes("recoverOperatorPublishedPostLineage({")
     || !source.includes("listRows: async ({ minimumLikes, days, limit })")
     || !source.includes("recoverLineage: async (recoveryPayload, minimumVerifiedLikes)")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_import_or_binding_missing");
 }
-const publishedLineageRecoveryHandlerStart = source.indexOf('if (toolName === "recover_published_post_lineage")');
+const publishedLineageRecoveryHandlerStart = source.indexOf('recover_published_post_lineage: async () =>');
 const publishedLineageRecoveryHandlerEnd = source.indexOf(
-  'if (toolName === "create_all_missing_manifest_source_cards")',
+  'create_all_missing_manifest_source_cards: async () =>',
   publishedLineageRecoveryHandlerStart,
 );
 const publishedLineageRecoveryHandler = publishedLineageRecoveryHandlerStart >= 0
@@ -1796,6 +1825,7 @@ if (!operatorPublishedPostLineageAuditServiceTests.includes("applies exact defau
   lifecycleErrors.push("operator_published_post_lineage_audit_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestSourceCardBackfillService"')
+    || !source.includes("create_all_missing_manifest_source_cards: async () =>")
     || !source.includes("createAllMissingManifestSourceCards({")
     || !source.includes("callTool: async (internalToolName, internalPayload)")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_service_import_or_binding_missing");
@@ -1825,6 +1855,7 @@ if (!operatorManifestSourceCardBackfillServiceTests.includes("rejects non-Manife
   lifecycleErrors.push("operator_manifest_source_card_backfill_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestSourceCardBackfillPreparationService"')
+    || !source.includes("prepare_manifest_source_card_backfill: async () =>")
     || !source.includes("prepareOperatorManifestSourceCardBackfill({")
     || !source.includes("loadState: async ({ limit })")) {
   lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_import_or_binding_missing");
@@ -1854,6 +1885,7 @@ if (!operatorManifestSourceCardBackfillPreparationServiceTests.includes("rejects
   lifecycleErrors.push("operator_manifest_source_card_backfill_preparation_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSourceCandidateBatchReadService"')
+    || !source.includes("get_source_candidate_batch: async () =>")
     || !source.includes("readOperatorSourceCandidateBatch(payload")
     || !source.includes("listSelections: async (batchId)")) {
   lifecycleErrors.push("operator_source_candidate_batch_read_service_import_or_binding_missing");

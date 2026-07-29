@@ -12788,7 +12788,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     );
   }
 
-    if (toolName === "draw_source_candidate_batch") {
+      const sourceLineageBackfillRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
+    draw_source_candidate_batch: async () => {
     const drawResult = await drawOperatorManifestSourceBatch({
       brandKey: brand.brand_key,
       payload,
@@ -12877,11 +12878,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            AND brand_key = ?`,
       ).bind(input.workflowSessionId, input.brandKey).run(),
     });
-    return operatorJsonResponse(drawResult.body, drawResult.status);
-  }
-
-
-    if (toolName === "audit_published_post_lineage") {
+          return { body: drawResult.body, status: drawResult.status };
+    },
+    audit_published_post_lineage: async () => {
     await ensureThreadsPostsArchiveTable(env);
     await ensureOperatorWorkflowTables(env);
     await ensureOperatorPostMetricSnapshotsTable(env);
@@ -12978,11 +12977,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         return rows.results ?? [];
       },
     });
-    return operatorJsonResponse(audit);
-  }
-
-
-        if (toolName === "recover_published_post_lineage") {
+          return { body: audit, status: 200 };
+    },
+    recover_published_post_lineage: async () => {
     const recovery = await recoverOperatorPublishedPostLineage({
       brandKey: brand.brand_key,
       payload,
@@ -13004,10 +13001,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         minimumVerifiedLikes,
       ),
     });
-    return operatorJsonResponse(recovery.body, recovery.status);
-  }
-
-          if (toolName === "create_all_missing_manifest_source_cards") {
+          return { body: recovery.body, status: recovery.status };
+    },
+    create_all_missing_manifest_source_cards: async () => {
     const backfill = await createAllMissingManifestSourceCards({
       brandKey: brand.brand_key,
       payload,
@@ -13022,11 +13018,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         internalPayload,
       ),
     });
-    return operatorJsonResponse(backfill.body, backfill.status);
-  }
-
-
-    if (toolName === "prepare_manifest_source_card_backfill") {
+          return { body: backfill.body, status: backfill.status };
+    },
+    prepare_manifest_source_card_backfill: async () => {
     await ensureOperatorWorkflowTables(env);
     const preparation = await prepareOperatorManifestSourceCardBackfill({
       brandKey: brand.brand_key,
@@ -13083,11 +13077,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       canonicalizeThreadsSourceUrl,
       extractThreadsPostIdFromUrl,
     });
-    return operatorJsonResponse(preparation.body, preparation.status);
-  }
-
-
-    if (toolName === "get_source_candidate_batch") {
+          return { body: preparation.body, status: preparation.status };
+    },
+    get_source_candidate_batch: async () => {
     const sourceBatch = await readOperatorSourceCandidateBatch(payload, {
       normalizeText: normalizeOperatorText,
       loadBatch: async (batchId) => await env.DB.prepare(
@@ -13121,9 +13113,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       },
       parseJson: safeParseJsonString,
     });
-    return operatorJsonResponse(sourceBatch.body, sourceBatch.status);
+          return { body: sourceBatch.body, status: sourceBatch.status };
+    },
+  });
+  if (sourceLineageBackfillRuntimeDispatch.handled) {
+    return operatorJsonResponse(
+      sourceLineageBackfillRuntimeDispatch.body,
+      sourceLineageBackfillRuntimeDispatch.status,
+    );
   }
-
 
             if (toolName === "create_source_card") {
       const sourceCardAdmission = await admitOperatorSourceCardCreation({
