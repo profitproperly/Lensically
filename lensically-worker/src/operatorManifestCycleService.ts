@@ -4,7 +4,11 @@ type JsonRecord = Record<string, unknown>;
 
 export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES = [
   "get_manifest_cycle_analysis_page",
-  "get_manifest_cycle_receipt",
+    "get_manifest_cycle_receipt",
+  "get_manifest_intelligence_foundation",
+  "get_performance_learning",
+  "get_manifest_intelligence_audit",
+  "get_content_focus",
   "commit_manifest_cycle_strategy",
   "record_manifest_cycle_defect",
   "resolve_manifest_cycle_defect",
@@ -51,12 +55,22 @@ export interface OperatorManifestCycleServiceDependencies {
     cycleId?: string | null;
     operationId?: string | null;
   }): Promise<JsonRecord | null>;
-  buildCycleReceiptRead(
+    buildCycleReceiptRead(
     receipt: JsonRecord,
     section: unknown,
     offset: unknown,
     limit: unknown,
   ): JsonRecord;
+  normalizeMachineKey(value: unknown, fallback: string): string;
+  readIntelligenceFoundation(brandKey: string): Promise<unknown>;
+  readPerformanceLearning(brandKey: string, includePosts: boolean): Promise<unknown>;
+  readIntelligenceAudit(input: {
+    brandKey: string;
+    section: string;
+    offset: number;
+    limit: number;
+  }): Promise<unknown>;
+  readContentFocus(brandKey: string): Promise<unknown>;
   recordCycleDefect(input: JsonRecord): Promise<unknown>;
   resolveCycleDefect(input: JsonRecord): Promise<unknown>;
   finalizeCycleReceipt(input: JsonRecord): Promise<JsonRecord>;
@@ -140,6 +154,47 @@ export async function handleOperatorManifestCycleServiceTool(
       available: Boolean(receipt),
       cycle_receipt: receiptRead?.summary ?? null,
       receipt_section: receiptSection,
+    });
+  }
+
+    if (toolName === "get_manifest_intelligence_foundation") {
+    return result({
+      success: true,
+      brand_key: brandKey,
+      intelligence_foundation: await dependencies.readIntelligenceFoundation(brandKey),
+    });
+  }
+
+  if (toolName === "get_performance_learning") {
+    return result({
+      success: true,
+      brand_key: brandKey,
+      performance_learning: await dependencies.readPerformanceLearning(
+        brandKey,
+        payload.include_posts === true,
+      ),
+    });
+  }
+
+  if (toolName === "get_manifest_intelligence_audit") {
+    const requestedSection = dependencies.normalizeMachineKey(payload.audit_section, "summary");
+    return result({
+      success: true,
+      brand_key: brandKey,
+      intelligence_audit: await dependencies.readIntelligenceAudit({
+        brandKey,
+        section: requestedSection,
+        offset: Number(payload.offset ?? 0),
+        limit: Number(payload.limit ?? 20),
+      }),
+    });
+  }
+
+  if (toolName === "get_content_focus") {
+    return result({
+      success: true,
+      brand_key: brandKey,
+      content_focus: await dependencies.readContentFocus(brandKey),
     });
   }
 

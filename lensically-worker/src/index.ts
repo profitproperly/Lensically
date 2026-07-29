@@ -12471,12 +12471,32 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         input as Parameters<typeof appendManifestCycleEvent>[1],
       ),
             getCycleReceipt: (input) => getManifestCycleReceipt(env.DB, input) as Promise<Record<string, unknown> | null>,
-      buildCycleReceiptRead: (receipt, section, offset, limit) => buildManifestCycleReceiptRead(
+            buildCycleReceiptRead: (receipt, section, offset, limit) => buildManifestCycleReceiptRead(
         receipt as Parameters<typeof buildManifestCycleReceiptRead>[0],
         section as Parameters<typeof buildManifestCycleReceiptRead>[1],
         offset as Parameters<typeof buildManifestCycleReceiptRead>[2],
         limit as Parameters<typeof buildManifestCycleReceiptRead>[3],
       ) as unknown as Record<string, unknown>,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      readIntelligenceFoundation: (brandKey) => getManifestIntelligenceFoundation(
+        env.DB,
+        brandKey as GptBrandKey,
+      ),
+      readPerformanceLearning: (brandKey, includePosts) => getLatestOperatorPerformanceLearning(
+        env,
+        brandKey as GptBrandKey,
+        includePosts,
+      ),
+      readIntelligenceAudit: ({ brandKey, section, offset, limit }) => buildManifestMeasurementAuditRead(env.DB, {
+        brand_key: brandKey as GptBrandKey,
+        section: section as ManifestAuditSection,
+        offset,
+        limit,
+      }),
+      readContentFocus: (brandKey) => getLatestOperatorContentFocus(
+        env,
+        brandKey as GptBrandKey,
+      ),
       recordCycleDefect: (input) => recordManifestCycleDefect(
         env.DB,
         input as Parameters<typeof recordManifestCycleDefect>[1],
@@ -14926,43 +14946,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
                                 
 
-  if (toolName === "get_manifest_intelligence_foundation") {
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      intelligence_foundation: await getManifestIntelligenceFoundation(env.DB, brand.brand_key),
-    });
-  }
+  
 
-                            if (toolName === "get_performance_learning") {
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      performance_learning: await getLatestOperatorPerformanceLearning(env, brand.brand_key, payload.include_posts === true),
-    });
-  }
+                            
 
-  if (toolName === "get_manifest_intelligence_audit") {
-    const requestedSection = normalizeOperatorMachineKey(payload.audit_section, "summary") as ManifestAuditSection;
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      intelligence_audit: await buildManifestMeasurementAuditRead(env.DB, {
-        brand_key: brand.brand_key,
-        section: requestedSection,
-        offset: Number(payload.offset ?? 0),
-        limit: Number(payload.limit ?? 20),
-      }),
-    });
-  }
+  
 
-  if (toolName === "get_content_focus") {
-    return operatorJsonResponse({
-      success: true,
-      brand_key: brand.brand_key,
-      content_focus: await getLatestOperatorContentFocus(env, brand.brand_key),
-    });
-  }
+  
 
   if (toolName === "get_post_results") {
 

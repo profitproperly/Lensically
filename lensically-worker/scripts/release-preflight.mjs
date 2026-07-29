@@ -900,25 +900,41 @@ if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admiss
 }
 if (!source.includes('from "./operatorManifestCycleService"')
     || !source.includes("if (isOperatorManifestCycleServiceToolName(toolName))")
-    || !source.includes("handleOperatorManifestCycleServiceTool({")
-    || !source.includes("buildCycleReceiptRead: (receipt, section, offset, limit)")) {
+        || !source.includes("handleOperatorManifestCycleServiceTool({")
+    || !source.includes("buildCycleReceiptRead: (receipt, section, offset, limit)")
+    || !source.includes("readIntelligenceFoundation: (brandKey)")
+    || !source.includes("readPerformanceLearning: (brandKey, includePosts)")
+    || !source.includes("readIntelligenceAudit: ({ brandKey, section, offset, limit })")
+    || !source.includes("readContentFocus: (brandKey)")) {
   lifecycleErrors.push("operator_manifest_cycle_service_import_or_binding_missing");
 }
 if (source.includes('error: "complete_cycle_strategy_required"')
     || source.includes('"manifest_cycle_receipt_not_found"')
     || source.includes('eventType: "cycle_strategy_locked"')
     || source.includes('completion_trigger: "last_blocking_defect_resolved"')
-    || source.includes("const receiptRead = receipt")
-    || source.includes("if (receiptSection) delete receiptSection.summary")) {
+        || source.includes("const receiptRead = receipt")
+    || source.includes("if (receiptSection) delete receiptSection.summary")
+    || source.includes("intelligence_foundation: await getManifestIntelligenceFoundation")
+    || source.includes("performance_learning: await getLatestOperatorPerformanceLearning")
+    || source.includes("intelligence_audit: await buildManifestMeasurementAuditRead")
+    || source.includes("content_focus: await getLatestOperatorContentFocus")) {
   lifecycleErrors.push("operator_manifest_cycle_service_returned_to_index");
 }
 if (!operatorManifestCycleService.includes("export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES")
     || !operatorManifestCycleService.includes("export function isOperatorManifestCycleServiceToolName")
     || !operatorManifestCycleService.includes("export async function handleOperatorManifestCycleServiceTool")
         || !operatorManifestCycleService.includes('toolName === "get_manifest_cycle_analysis_page"')
-    || !operatorManifestCycleService.includes('toolName === "get_manifest_cycle_receipt"')
+        || !operatorManifestCycleService.includes('toolName === "get_manifest_cycle_receipt"')
     || !operatorManifestCycleService.includes("dependencies.buildCycleReceiptRead")
     || !operatorManifestCycleService.includes("cycle_receipt: receiptRead?.summary ?? null")
+    || !operatorManifestCycleService.includes('toolName === "get_manifest_intelligence_foundation"')
+    || !operatorManifestCycleService.includes("dependencies.readIntelligenceFoundation")
+    || !operatorManifestCycleService.includes('toolName === "get_performance_learning"')
+    || !operatorManifestCycleService.includes("dependencies.readPerformanceLearning")
+    || !operatorManifestCycleService.includes('toolName === "get_manifest_intelligence_audit"')
+    || !operatorManifestCycleService.includes("dependencies.readIntelligenceAudit")
+    || !operatorManifestCycleService.includes('toolName === "get_content_focus"')
+    || !operatorManifestCycleService.includes("dependencies.readContentFocus")
     || !operatorManifestCycleService.includes('toolName === "commit_manifest_cycle_strategy"')
     || !operatorManifestCycleService.includes('toolName === "record_manifest_cycle_defect"')
     || !operatorManifestCycleService.includes("dependencies.readEvidencePage")
@@ -932,7 +948,8 @@ if (!operatorManifestCycleService.includes("export const OPERATOR_MANIFEST_CYCLE
   lifecycleErrors.push("operator_manifest_cycle_service_module_incomplete");
 }
 if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page validation and observed failures")
-    || !operatorManifestCycleServiceTests.includes("preserves bounded cycle receipt reads and exact unavailable state")
+        || !operatorManifestCycleServiceTests.includes("preserves bounded cycle receipt reads and exact unavailable state")
+    || !operatorManifestCycleServiceTests.includes("preserves adjacent Manifest intelligence reads and audit normalization")
     || !operatorManifestCycleServiceTests.includes("preserves complete strategy locking and source-selection metadata")
     || !operatorManifestCycleServiceTests.includes("preserves seven-stage defect validation and receipt requirements")
     || !operatorManifestCycleServiceTests.includes("preserves final defect resolution and cycle completion reconciliation")) {
