@@ -50,7 +50,16 @@ function createHarness() {
       strategy_change_warranted: true,
       consumption_contract: { required: true },
     } as JsonRecord)),
-    buildAccountPosition: vi.fn(async () => ({ follower_count: 900 } as JsonRecord)),
+        buildAccountPosition: vi.fn(async () => ({ follower_count: 900 } as JsonRecord)),
+    compactPersistedValue: vi.fn((value: unknown) => {
+      const candidate = value && typeof value === "object" && !Array.isArray(value)
+        ? value as JsonRecord
+        : {};
+      if (typeof candidate.oversized_payload === "string") {
+        return { follower_count: candidate.follower_count, compacted: true };
+      }
+      return candidate;
+    }),
     readExistingCycle: vi.fn(async () => null as { id: string } | null),
     writeCycle: vi.fn(async () => undefined),
     readLockedSourceSelectionPlan: vi.fn(async () => [] as JsonRecord[]),
@@ -109,7 +118,8 @@ function createHarness() {
     ensureRequiredSchemas: mocks.ensureRequiredSchemas,
     readSavedPatternStates: mocks.readSavedPatternStates,
     refreshSavedPatternIntelligence: mocks.refreshSavedPatternIntelligence,
-    buildDecisionIntelligence: mocks.buildDecisionIntelligence,
+        buildDecisionIntelligence: mocks.buildDecisionIntelligence,
+    compactPersistedValue: mocks.compactPersistedValue,
     buildAccountPosition: mocks.buildAccountPosition,
     readExistingCycle: mocks.readExistingCycle,
     createId: () => "cycle-1",
@@ -297,7 +307,7 @@ describe("Operator Manifest cycle construction service", () => {
     expect((result.cycle as JsonRecord).account_position).toBeUndefined();
   });
 
-  it("completes a fully occupied horizon without source-plan work", async () => {
+    it("completes a fully occupied horizon without source-plan work", async () => {
     const { dependencies, mocks, slots } = createHarness();
     mocks.buildCoverage.mockResolvedValueOnce({
       occupied: new Map(slots.map((slot, index) => [slot.key, { scheduled_post_id: index + 1 }])),
@@ -339,5 +349,54 @@ describe("Operator Manifest cycle construction service", () => {
       },
     });
     expect(String(result.next_action)).toContain("prepared horizon is covered");
+  });
+
+  it("bounds oversized cycle construction state before D1 persistence", async () => {
+    const { dependencies, mocks, slots } = createHarness();
+    mocks.buildAccountPosition.mockResolvedValueOnce({
+      follower_count: 900,
+      oversized_payload: "x".repeat(2_000_000),
+    });
+    mocks.persistLockedSourceSelectionPlan.mockResolvedValueOnce(slots.map((slot, index) => ({
+      slot_key: slot.key,
+      selection_order: index + 1,
+      source_identity_key: `source-${index}`,
+      source_card_family_id: `family-${index}`,
+      source_card_id: `card-${index}`,
+      engine_version: "source-selection-v1",
+      status: "locked",
+      receipt: {
+        policy_version: "policy-v1",
+        lifetime_label: "proven",
+        recent_label: "healthy",
+        score: 2.5,
+        oversized_payload: "y".repeat(1_000_000),
+      },
+    })));
+
+    await constructOperatorManifestAutonomousCycle(input, dependencies);
+
+    expect(mocks.compactPersistedValue).toHaveBeenCalledWith(
+      expect.objectContaining({ oversized_payload: expect.any(String) }),
+      "manifest_cycle.account_position",
+    );
+    expect(mocks.writeCycle).toHaveBeenCalledWith(expect.objectContaining({
+      accountPosition: { follower_count: 900, compacted: true },
+    }));
+    const receiptInput = mocks.beginCycleReceipt.mock.calls[0][0] as JsonRecord;
+    const horizonPlan = receiptInput.horizonPlan as JsonRecord;
+    const persistedPlan = horizonPlan.locked_source_selection_plan as JsonRecord[];
+    expect(persistedPlan).toHaveLength(slots.length);
+    expect(JSON.stringify(persistedPlan)).not.toContain("oversized_payload");
+    expect(persistedPlan[0]).toMatchObject({
+      slot_key: slots[0].key,
+      source_card_id: "card-0",
+      selection_evidence: {
+        policy_version: "policy-v1",
+        lifetime_label: "proven",
+        recent_label: "healthy",
+        score: 2.5,
+      },
+    });
   });
 });

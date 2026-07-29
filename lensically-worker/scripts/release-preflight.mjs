@@ -1545,7 +1545,10 @@ if (!operatorManifestCycleConstructionService.includes("export async function co
     || !operatorManifestCycleConstructionService.includes("dependencies.buildCoverage")
     || !operatorManifestCycleConstructionService.includes("dependencies.refreshSavedPatternIntelligence")
     || !operatorManifestCycleConstructionService.includes("dependencies.selectSourceLineup")
-    || !operatorManifestCycleConstructionService.includes("dependencies.buildRollingEvidence")
+        || !operatorManifestCycleConstructionService.includes("dependencies.buildRollingEvidence")
+    || !operatorManifestCycleConstructionService.includes("dependencies.compactPersistedValue")
+    || !operatorManifestCycleConstructionService.includes("compactLockedSourceSelectionPlanForReceipt")
+    || !operatorManifestCycleConstructionService.includes("persistedAccountPosition")
     || !operatorManifestCycleConstructionService.includes("dependencies.beginCycleReceipt")
     || !operatorManifestCycleConstructionService.includes('eventType: "cycle_prepared"')
     || !operatorManifestCycleConstructionService.includes("original_model_posts_forbidden: true")) {
@@ -1553,7 +1556,8 @@ if (!operatorManifestCycleConstructionService.includes("export async function co
 }
 if (!operatorManifestCycleConstructionServiceTests.includes("constructs a new authoritative cycle and locks only eligible source cards")
     || !operatorManifestCycleConstructionServiceTests.includes("refreshes an existing cycle with a compact cycle and decision reference")
-    || !operatorManifestCycleConstructionServiceTests.includes("completes a fully occupied horizon without source-plan work")) {
+    || !operatorManifestCycleConstructionServiceTests.includes("completes a fully occupied horizon without source-plan work")
+    || !operatorManifestCycleConstructionServiceTests.includes("bounds oversized cycle construction state before D1 persistence")) {
   lifecycleErrors.push("operator_manifest_cycle_construction_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestPersistenceAdmissionService"')

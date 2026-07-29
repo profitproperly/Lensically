@@ -57,7 +57,8 @@ export interface OperatorManifestCycleConstructionDependencies {
     derived: JsonRecord | null;
   }>;
   refreshSavedPatternIntelligence(input: JsonRecord): Promise<unknown>;
-  buildDecisionIntelligence(brandKey: string): Promise<JsonRecord>;
+    buildDecisionIntelligence(brandKey: string): Promise<JsonRecord>;
+  compactPersistedValue(value: unknown, path: string): JsonRecord;
   buildAccountPosition(input: {
     targetSlots: OperatorManifestConstructionSlot[];
     coverage: OperatorManifestConstructionCoverage;
@@ -110,6 +111,37 @@ function asRecords(value: unknown): JsonRecord[] {
   return Array.isArray(value)
     ? value.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object" && !Array.isArray(item))
     : [];
+}
+
+function compactLockedSourceSelectionPlanForReceipt(plan: JsonRecord[]): JsonRecord[] {
+  return plan.map((row) => {
+    const receipt = record(row.receipt);
+    return {
+      slot_key: row.slot_key ?? receipt.slot_key ?? null,
+      selection_order: Number(row.selection_order ?? 0),
+      source_identity_key: row.source_identity_key ?? receipt.source_identity_key ?? null,
+      source_card_family_id: row.source_card_family_id ?? receipt.source_card_family_id ?? null,
+      source_card_id: row.source_card_id ?? receipt.source_card_id ?? null,
+      engine_version: row.engine_version ?? null,
+      status: row.status ?? null,
+      selection_evidence: {
+        policy_version: receipt.policy_version ?? null,
+        lifetime_label: receipt.lifetime_label ?? null,
+        recent_label: receipt.recent_label ?? null,
+        lifetime_sample_size: Number(receipt.lifetime_sample_size ?? 0),
+        lifetime_index: Number(receipt.lifetime_index ?? 0),
+        shrunk_performance: Number(receipt.shrunk_performance ?? 0),
+        exploration_bonus: Number(receipt.exploration_bonus ?? 0),
+        uses_24h: Number(receipt.uses_24h ?? 0),
+        uses_7d: Number(receipt.uses_7d ?? 0),
+        uses_28d: Number(receipt.uses_28d ?? 0),
+        planned_uses: Number(receipt.planned_uses ?? 0),
+        exposure_burden: Number(receipt.exposure_burden ?? 0),
+        cooldown_hours: Number(receipt.cooldown_hours ?? 0),
+        score: Number(receipt.score ?? 0),
+      },
+    };
+  });
 }
 
 function compactOperatorManifestThreadsSnapshot(snapshot: JsonRecord): JsonRecord {
@@ -272,13 +304,17 @@ export async function constructOperatorManifestAutonomousCycle(
     strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
     consumption_contract: decisionIntelligence.consumption_contract ?? {},
   };
-    const accountPosition = await dependencies.buildAccountPosition({
+        const accountPosition = await dependencies.buildAccountPosition({
     targetSlots,
     coverage,
     clock,
     threadsSnapshot: boundedThreadsSnapshot,
     deliveryReconciliation,
   });
+  const persistedAccountPosition = dependencies.compactPersistedValue(
+    accountPosition,
+    "manifest_cycle.account_position",
+  );
 
   const existing = await dependencies.readExistingCycle(operationId, brandKey);
   const cycleId = existing?.id ?? dependencies.createId();
@@ -295,9 +331,9 @@ export async function constructOperatorManifestAutonomousCycle(
     horizonHours,
     horizonStartLocal: targetSlots[0]?.key ?? defaultHorizonKey,
     horizonEndLocal: targetSlots[targetSlots.length - 1]?.key ?? defaultHorizonKey,
-    targetSlots,
+        targetSlots,
     missingSlots,
-    accountPosition,
+    accountPosition: persistedAccountPosition,
   });
 
   let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
@@ -361,7 +397,19 @@ export async function constructOperatorManifestAutonomousCycle(
     published: publishedExposure,
     scheduled: scheduledExposure,
   });
-  const rollingMaturityRefresh = record(rollingEvidence.maturity_refresh);
+    const rollingMaturityRefresh = record(rollingEvidence.maturity_refresh);
+  const persistedHorizonPlan = dependencies.compactPersistedValue({
+    target_slots: targetSlots,
+    authoritative_missing_slots: missingSlots,
+    occupied_slots: targetSlots
+      .filter((slot) => coverage.occupied.has(slot.key))
+      .map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
+    full_horizon_lineup_required_before_first_persist: true,
+    backend_source_selection_locked: lockedSourceSelectionPlan.length > 0,
+    source_selection_plan_status: sourceSelectionPlanStatus,
+    source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
+    locked_source_selection_plan: compactLockedSourceSelectionPlanForReceipt(lockedSourceSelectionPlan),
+  }, "manifest_cycle.horizon_plan");
   const cycleReceipt = await dependencies.beginCycleReceipt({
     cycleId,
     brandKey,
@@ -374,7 +422,7 @@ export async function constructOperatorManifestAutonomousCycle(
       invocation_mode: "model_orchestrated_autonomous_cycle",
     },
     startupState: {
-      account_position: accountPosition,
+            account_position: persistedAccountPosition,
       occupancy_sources: [
         "live Threads posts",
         "threads_posts_archive",
@@ -407,18 +455,7 @@ export async function constructOperatorManifestAutonomousCycle(
     },
     inputStrategyVersionId: dependencies.normalizeText(inputStrategyVersion.id, 160, true),
     exposureSnapshotId: dependencies.normalizeText(exposureSnapshot.id, 160, true),
-    horizonPlan: {
-      target_slots: targetSlots,
-      authoritative_missing_slots: missingSlots,
-      occupied_slots: targetSlots
-        .filter((slot) => coverage.occupied.has(slot.key))
-        .map((slot) => ({ ...slot, evidence: coverage.occupied.get(slot.key) })),
-      full_horizon_lineup_required_before_first_persist: true,
-      backend_source_selection_locked: lockedSourceSelectionPlan.length > 0,
-      source_selection_plan_status: sourceSelectionPlanStatus,
-      source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
-      locked_source_selection_plan: lockedSourceSelectionPlan,
-    },
+        horizonPlan: persistedHorizonPlan,
     startedAt: clock.effective_now_iso,
   });
   await dependencies.appendCycleEvent({

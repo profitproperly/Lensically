@@ -726,7 +726,47 @@ function compactOperatorPayloadValue(
       compactOperatorPayloadValue(entry, path ? `${path}.${key}` : key, limits, truncations, depth + 1),
     ]));
   }
-  return String(value).slice(0, limits.stringChars);
+    return String(value).slice(0, limits.stringChars);
+}
+
+const MANIFEST_CYCLE_DURABLE_JSON_MAX_BYTES = 384_000;
+
+function compactManifestCyclePersistedValue(value: unknown, path: string): Record<string, unknown> {
+  const originalBytes = operatorPayloadBytes(value);
+  const attempts = [
+    { arrayItems: 72, stringChars: 1200, objectKeys: 64, maxDepth: 8 },
+    { arrayItems: 48, stringChars: 600, objectKeys: 40, maxDepth: 6 },
+    { arrayItems: 24, stringChars: 300, objectKeys: 24, maxDepth: 5 },
+    { arrayItems: 12, stringChars: 180, objectKeys: 16, maxDepth: 4 },
+  ];
+  let compacted: unknown = value;
+  let truncations: OperatorPayloadTruncation[] = [];
+  for (const limits of attempts) {
+    const currentTruncations: OperatorPayloadTruncation[] = [];
+    compacted = compactOperatorPayloadValue(value, path, limits, currentTruncations);
+    truncations = currentTruncations;
+    if (operatorPayloadBytes(compacted) <= MANIFEST_CYCLE_DURABLE_JSON_MAX_BYTES) break;
+  }
+  const compactedRecord = compacted && typeof compacted === "object" && !Array.isArray(compacted)
+    ? compacted as Record<string, unknown>
+    : { value: compacted };
+  const envelope: Record<string, unknown> = {
+    ...compactedRecord,
+    persistence_compaction: {
+      version: "manifest-cycle-durable-json-v1",
+      path,
+      original_bytes: originalBytes,
+      persisted_bytes: 0,
+      truncated: truncations.length > 0 || operatorPayloadBytes(compacted) < originalBytes,
+      truncation_count: truncations.length,
+    },
+  };
+  const persistedBytes = operatorPayloadBytes(envelope);
+  if (persistedBytes > MANIFEST_CYCLE_DURABLE_JSON_MAX_BYTES) {
+    throw new Error(`manifest_cycle_persisted_json_budget_exceeded:${path}:${persistedBytes}`);
+  }
+  (envelope.persistence_compaction as Record<string, unknown>).persisted_bytes = persistedBytes;
+  return envelope;
 }
 
 function compactOperatorContinuityReviewBatch(value: unknown): unknown {
@@ -10886,7 +10926,8 @@ async function prepareManifestAutonomousCycle(
     noninterferencePolicy: MANIFEST_NONINTERFERENCE_POLICY,
     analysisWindowDays: MANIFEST_ANALYSIS_WINDOW_DAYS,
     recentExposureHours: MANIFEST_RECENT_EXPOSURE_HOURS,
-            normalizeText: normalizeOperatorText,
+                        normalizeText: normalizeOperatorText,
+    compactPersistedValue: compactManifestCyclePersistedValue,
     refreshTrustedUtcClock: refreshManifestTrustedUtcClock,
     readDatabaseClock: async () => {
       const row = await env.DB.prepare(
