@@ -170,8 +170,9 @@ jobs:
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          
           node scripts/test-d1-migration-release.mjs
-                    node scripts/test-d1-backfill-runner.mjs
+          node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
@@ -270,8 +271,9 @@ jobs:
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          
           node scripts/test-d1-migration-release.mjs
-                    node scripts/test-d1-backfill-runner.mjs
+          node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
@@ -359,8 +361,9 @@ jobs:
           set -euo pipefail
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          
           node scripts/test-d1-migration-release.mjs
-                    node scripts/test-d1-backfill-runner.mjs
+          node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
@@ -562,8 +565,9 @@ jobs:
           node scripts/release-preflight.mjs
           npx tsc --noEmit
           node scripts/run-full-validation.mjs --check
+          
           node scripts/test-d1-migration-release.mjs
-                    node scripts/test-d1-backfill-runner.mjs
+          node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
