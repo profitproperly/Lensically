@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-8a-workflow-modernization-audit
-repository_base_sha: 2f2cba9ff040e8a8aa295e6fb79c0ae0c8ccc5c6
-production_sha: 2f2cba9ff040e8a8aa295e6fb79c0ae0c8ccc5c6
+active_checkpoint: stage-8b-validated-web-artifact-reuse
+repository_base_sha: 55e0c174996a02676f37b80f4d6f311f31303908
+production_sha: 55e0c174996a02676f37b80f4d6f311f31303908
 
 
 
@@ -1411,11 +1411,29 @@ Completed checkpoint — Stage 7E router closure:
 
 Stage 7 router and runtime composition — COMPLETE AND DEPLOYED.
 
-ACTIVE checkpoint — Stage 8A workflow modernization audit:
+Completed checkpoint — Stage 8A shared full-validation modernization:
 
-Audit the current engineering workflow, workflow lint/structure validator, change classifier, validation evidence, artifact handling, migration lane, cron lane, Worker release, and web release against every Stage 8 requirement. Identify only real gaps and select the smallest coherent first implementation slice.
+- Audited the engineering workflow and selected the highest verified clean-run waste: duplicated broad validation command lists in push and fallback release lanes, each starting dozens of separate Vitest processes.
+- Added one source-controlled `run-full-validation.mjs` contract containing the canonical 66-file full-test inventory plus 10 curated Operator milestone acceptance tests.
+- Replaced the duplicated push and fallback release command lists with the shared runner while preserving complete fallback preflight, typecheck, plan-integrity, and full-suite behavior.
+- Reduced broad validation to eight guarded processes: Operator smoke, six deterministic 11-file memory-resetting batches, and one milestone-acceptance process.
+- Added `--check` and `--print-plan`, exact inventory, partition, required-test, duplicate, missing-file, and process-count enforcement, plus timing receipts.
+- Kept Cloudflare shared-storage semantics intact. Added a durable D1 migration owner lock so one file applies migrations and all other files wait for exact ledger completion; partial, failed, mismatched, and timed-out migration states fail closed.
+- Added named 60-second concurrency-safe bounds and release guards for the full source-backed cycle fixture and monthly-growth analytics regression.
+- Extended the Ruby workflow validator and independent release preflight to require the shared runner, complete fallback gates, block-scalar execution, exact six-space step indentation, and permanent absence of duplicated broad commands.
+- A P1 dispatch rejection exposed malformed YAML from drifted step indentation at SHA `26ee7ad1110c3049ca444aa214e86cca4bff5315` (incident `744d68c1-41db-4b38-a90f-5b3c0f342812`). The root cause was repaired across every affected step; raw pre-parse indentation enforcement now prevents recurrence. Dedicated workflow lint passed in run `30432176618`.
+- Database authority now recognizes migration-test membership through the checked shared inventory instead of requiring an inline duplicated command.
+- Push validation passed in run `30433034268`.
+- All eight Operator shards passed in run `30433057622`.
+- The broad push milestone completed within the agreed two-to-five-minute architecture target: it was created at `07:48:39Z`, and the release was dispatched after success at `07:51:18Z`.
+- Exact-SHA release passed in run `30433196256`.
+- Live production independently confirmed exact SHA `55e0c174996a02676f37b80f4d6f311f31303908` with 75/75 public tools.
 
-The first implementation must improve measured release efficiency while preserving complete fallback validation whenever exact-SHA evidence is missing, classification is uncertain, or a high-risk surface changed. Add source-controlled enforcement and focused regressions, then validate and release the bounded Stage 8A slice before advancing.
+ACTIVE checkpoint — Stage 8B validated web artifact reuse:
+
+Build the Cloudflare web artifact once during exact-SHA validation, package it with a release manifest containing the source SHA and artifact digest, and upload it as validation evidence. For a matching exact-SHA release, download and verify that artifact, then deploy it without reinstalling web dependencies or rebuilding. If the artifact is missing, expired, mismatched, corrupt, or not produced by a successful qualifying validation run, fail closed into the complete existing build-and-validation fallback path.
+
+Add independent workflow-structure and release-preflight enforcement, focused artifact-manifest validation, real exact-SHA web-path benchmarking, and a bounded release with retained-site verification before advancing.
 
 
 
@@ -1468,7 +1486,7 @@ Remaining work after this checkpoint:
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
-8. Test and release modernization — ACTIVE at Stage 8A
+8. Test and release modernization — ACTIVE at Stage 8B
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
@@ -1498,13 +1516,14 @@ Stage 4 completion is preserved above. Stage 5 closes only when the MCP protocol
 
 ## Blockers
 
-ACTIVE P1 — Stage 8A workflow dispatch rejected at exact SHA `26ee7ad1110c3049ca444aa214e86cca4bff5315`:
+None currently recorded.
 
-- `runGitHubWorkflow` returned HTTP 422 with `workflow_dispatch_failed` before a confirmed workflow run was created.
-- Incident: `744d68c1-41db-4b38-a90f-5b3c0f342812`.
-- Side effects are unconfirmed; no validation result may be inferred.
-- Current action: inspect the dedicated workflow-lint result and exact workflow structure, repair the root cause, add prevention, then resume Stage 8A validation on a new exact SHA.
-- Stage 8A remains the active checkpoint; this incident does not authorize unrelated work or Manifest operations.
+Resolved P1 — Stage 8A workflow dispatch rejection:
+
+- Incident `744d68c1-41db-4b38-a90f-5b3c0f342812` was caused by drifted YAML step indentation, not a backend or credential failure.
+- Every affected step was restored to canonical job-level indentation.
+- The dedicated lint lane now parses the workflow and raw-scans for misindented step markers before any engineering dispatch.
+- Regression evidence: workflow lint run `30432176618`, push run `30433034268`, exact-SHA release run `30433196256`, and live production SHA `55e0c174996a02676f37b80f4d6f311f31303908`.
 
 ## Fresh-Chat Startup
 
