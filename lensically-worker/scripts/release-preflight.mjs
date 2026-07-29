@@ -1052,7 +1052,7 @@ if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page
   lifecycleErrors.push("operator_manifest_cycle_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorHourlyCoverageService"')
-    || !source.includes('if (toolName === "get_hourly_coverage")')
+    || !source.includes("get_hourly_coverage: async () =>")
     || !source.includes("handleOperatorHourlyCoverageService({")) {
   lifecycleErrors.push("operator_hourly_coverage_service_import_or_binding_missing");
 }
