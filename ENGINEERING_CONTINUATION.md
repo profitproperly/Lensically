@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d4-gate-draft-execution-routing
-repository_base_sha: bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0
-production_sha: bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0
+active_checkpoint: stage-7d5-gate-memory-routing
+repository_base_sha: 16389b9bb729578be4d8476e19746a9154708437
+production_sha: 16389b9bb729578be4d8476e19746a9154708437
 
 
 
@@ -1366,11 +1366,23 @@ Completed checkpoint — Stage 7D3 source-card and generation-run routing:
 - Exact-SHA release passed in run `30428253323`.
 - Live production independently confirmed exact SHA `bc29dfebbfbdd08a4d4d19e0ad0c6bef7c8f0af0` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7D4 gate and draft execution routing:
+Completed checkpoint — Stage 7D4 gate and draft execution routing:
 
-Route `run_gates`, `submit_candidate_draft`, `save_self_rejected_draft`, `mark_draft_shown`, `approve_draft`, and `reject_draft` through the keyed response dispatcher. Preserve gate evaluation, draft admission and persistence, shown-state inventory, decision transitions, claim updates, strategy-memory learning, and exact early responses.
+- Routed `run_gates`, `submit_candidate_draft`, `save_self_rejected_draft`, `mark_draft_shown`, `approve_draft`, and `reject_draft` through the keyed response dispatcher.
+- Shared one draft-submission handler across candidate and self-rejected aliases and one decision handler across approve/reject aliases, eliminating duplicate routing without duplicating product logic.
+- Preserved gate evaluation, draft admission and persistence, shown-state inventory, decision transitions, daily-claim updates, strategy-memory learning, and exact early HTTP responses.
+- Preserved the exact approve/reject tool union inside the shared handler without a cast or weakened service contract.
+- Added permanent lifecycle enforcement requiring the handler composition and preventing the six direct branches from returning.
+- Push validation passed in run `30428550756`.
+- All eight Operator shards passed in run `30428570133`.
+- Exact-SHA release passed in run `30428848762`.
+- Live production independently confirmed exact SHA `16389b9bb729578be4d8476e19746a9154708437` with 75/75 public tools.
 
-Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to gate-management and strategy/scheduling routing.
+ACTIVE checkpoint — Stage 7D5 gate management and strategy-memory routing:
+
+Route `list_active_gates`, `create_or_update_gate`, `promote_memory_to_gate`, `list_strategy_memory`, and `save_strategy_memory` through the keyed response dispatcher. Preserve active-gate filters, gate mutation planning and persistence, memory promotion, memory reads and saves, aliases, D1 adapters, and exact early responses.
+
+Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the final scheduling/results runtime cluster.
 
 
 
