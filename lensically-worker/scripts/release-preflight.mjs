@@ -123,6 +123,8 @@ const operatorStrategyMemoryListReadService = read("src/operatorStrategyMemoryLi
 const operatorStrategyMemoryListReadServiceTests = read("test/operatorStrategyMemoryListReadService.spec.ts");
 const operatorStrategyMemorySaveService = read("src/operatorStrategyMemorySaveService.ts");
 const operatorStrategyMemorySaveServiceTests = read("test/operatorStrategyMemorySaveService.spec.ts");
+const operatorScheduledPostListReadService = read("src/operatorScheduledPostListReadService.ts");
+const operatorScheduledPostListReadServiceTests = read("test/operatorScheduledPostListReadService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -362,6 +364,9 @@ if (!workflow.includes("test/operatorStrategyMemoryListReadService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorStrategyMemorySaveService.spec.ts")) {
   errors.push("operator_strategy_memory_save_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorScheduledPostListReadService.spec.ts")) {
+  errors.push("operator_scheduled_post_list_read_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -2040,6 +2045,38 @@ if (!operatorStrategyMemorySaveServiceTests.includes("returns the exact invalid-
     || !operatorStrategyMemorySaveServiceTests.includes("composes exact persisted and null memory responses")) {
   lifecycleErrors.push("operator_strategy_memory_save_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorScheduledPostListReadService"')
+    || !source.includes("readOperatorScheduledPostList({ payload }")
+    || !source.includes("defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE")
+    || !source.includes("listForLocalDate: async ({ date, timezone })")
+    || !source.includes("return operatorJsonResponse(scheduledPostList)")) {
+  lifecycleErrors.push("operator_scheduled_post_list_read_service_import_or_binding_missing");
+}
+if (source.includes("const date = normalizeOperatorText(payload.date, 20, true)")
+    || source.includes("const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE")
+    || source.includes("deletion_history_exposed_to_model: false,")) {
+  lifecycleErrors.push("operator_scheduled_post_list_read_service_returned_to_index");
+}
+if (!operatorScheduledPostListReadService.includes("export async function readOperatorScheduledPostList")
+    || !operatorScheduledPostListReadService.includes("dependencies.normalizeText(input.payload.date, 20, true)")
+    || !operatorScheduledPostListReadService.includes("dependencies.defaultTimezone")
+    || !operatorScheduledPostListReadService.includes("dependencies.isValidIsoDate(date)")
+    || !operatorScheduledPostListReadService.includes("dependencies.listForLocalDate")
+    || !operatorScheduledPostListReadService.includes("returned_count: items.length")
+    || !operatorScheduledPostListReadService.includes("has_more: false")
+    || !operatorScheduledPostListReadService.includes("deletion_history_exposed_to_model: false")) {
+  lifecycleErrors.push("operator_scheduled_post_list_read_service_module_incomplete");
+}
+if (!operatorScheduledPostListReadServiceTests.includes("retrieves one valid local date with the normalized explicit timezone")
+    || !operatorScheduledPostListReadServiceTests.includes("uses the workspace timezone and returns an empty exact response when date is absent")
+    || !operatorScheduledPostListReadServiceTests.includes("suppresses retrieval for an invalid normalized date")) {
+  lifecycleErrors.push("operator_scheduled_post_list_read_service_tests_incomplete");
+}
+
+
+
+
+
 
 
 

@@ -146,6 +146,7 @@ import {
   composeOperatorStrategyMemorySaveResponse,
   planOperatorStrategyMemorySave,
 } from "./operatorStrategyMemorySaveService";
+import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadService";
 
 
 
@@ -14665,19 +14666,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-        if (toolName === "list_scheduled_posts") {
-    const date = normalizeOperatorText(payload.date, 20, true);
-    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-    const items = date && isValidIsoDate(date)
-      ? await listScheduledPostsForThreadsAccountOnLocalDate(env, brand.profile.threads_user_id, date, timezone)
-      : [];
-        return operatorJsonResponse({
-      items,
-      returned_count: items.length,
-      total_count: items.length,
-      has_more: false,
-      deletion_history_exposed_to_model: false,
+                if (toolName === "list_scheduled_posts") {
+    const scheduledPostList = await readOperatorScheduledPostList({ payload }, {
+      normalizeText: normalizeOperatorText,
+      defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+      isValidIsoDate,
+      listForLocalDate: async ({ date, timezone }) => await listScheduledPostsForThreadsAccountOnLocalDate(
+        env,
+        brand.profile.threads_user_id,
+        date,
+        timezone,
+      ),
     });
+    return operatorJsonResponse(scheduledPostList);
   }
 
     if (toolName === "delete_scheduled_post") {
