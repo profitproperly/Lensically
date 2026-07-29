@@ -194,7 +194,10 @@ const releaseAcceptanceTests = read("scripts/test-release-acceptance.mjs");
 const legacyMigrationPlanner = read("scripts/plan-d1-migration-release.mjs");
 const legacyMigrationPolicy = read("database/migration-release-policy.json");
 const workerGitignore = read(".gitignore");
-const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
+const workflowSource = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
+// Workflow validation coverage is delegated to the canonical full-validation runner. Inspect both
+// source-controlled surfaces so centralized inventory replaces duplicated per-test workflow commands.
+const workflow = `${workflowSource}\n${fullValidationRunner}`;
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
 
@@ -274,9 +277,9 @@ if (!workerPackage.includes('"database:migrations:check": "node scripts/d1-migra
     || !d1MigrationRelease.includes("migration_applied_file_edited")
     || !d1MigrationRelease.includes("migration_backfill_forbidden_in_normal_directory")
     || !d1MigrationRelease.includes("migration_plan_identity_changed")
-    || !d1MigrationRelease.includes("--plan-remote")
-    || !d1MigrationRelease.includes("--apply-remote")
-    || !d1MigrationRelease.includes("--verify-remote")
+        || !d1MigrationRelease.includes('args["plan-remote"]')
+    || !d1MigrationRelease.includes('args["apply-remote"]')
+    || !d1MigrationRelease.includes('args["verify-remote"]')
     || !d1MigrationReleaseTests.includes("d1_migration_release_contract_valid")
     || !d1BackfillRunner.includes('execution_mode !== "explicit_only"')
     || !d1BackfillRunner.includes("backfill_explicit_confirmation_mismatch")
@@ -607,7 +610,7 @@ if (!workflowLint.includes('name: Lensically workflow lint')
     || !workflowLint.includes("workflow_dispatch:")) {
   errors.push("independent_workflow_yaml_watchdog_incomplete");
 }
-if (!workflowStructureValidator.includes("document = YAML.parse_file(path)")
+if (!workflowStructureValidator.includes("document = YAML.parse(source, filename: path)")
     || !workflowStructureValidator.includes("assert_no_duplicate_mapping_keys(document)")
     || !workflowStructureValidator.includes("duplicate_mapping_key")
     || !workflowStructureValidator.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
@@ -628,7 +631,7 @@ if (!workflow.includes("for attempt in $(seq 1 45); do")
     || !workflow.includes("sleep 2")) {
   errors.push("release_runtime_propagation_guard_incomplete");
 }
-if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"')
+if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.release.generated.json --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"')
     || !workflow.includes("node ../lensically-worker/scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.toml")
     || workflow.includes('run: npx wrangler deploy')
         || !wranglerDeployRetry.includes('from "./wrangler-deploy-retry-core.mjs"')
@@ -3232,7 +3235,7 @@ const directMainContractChecks = [
   ["direct_discovery", source.includes("const tools = await buildOperatorPublicMcpTools(env)")],
     ["direct_entry_gate", operatorMcpToolCallDispatcher.includes("const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName)")],
   ["legacy_gateway_hidden", operatorMcpToolCallDispatcher.includes("const legacyGatewayEntry = requestedToolName === dependencies.routedExecutionGateway")],
-  ["direct_server_guard", operatorMcpToolCallDispatcher.includes("execution_guard: await dependencies.createExecutionGuard(requestedToolName, requestedArgs)")],
+    ["direct_server_guard", operatorMcpToolCallDispatcher.includes("execution_guard: await dependencies.createExecutionGuard(requestedToolName, governedRequestedArgs)")],
   ["generic_gateway_not_advertised", tests.includes('expect(names).not.toEqual(expect.arrayContaining([\n      "executeLensicallyIntent"')],
   ["closed_public_schemas", tests.includes("tool.inputSchema?.additionalProperties === false")],
   ["server_side_proceed", source.includes("Later direct account calls use server-side continuity and do not send a Proceed flag")],
@@ -3260,7 +3263,11 @@ if (!workflow.includes("run-name: Lensically ${{ inputs.task || 'push-validation
 if (!workflow.includes("cancel-in-progress: true")) {
   errors.push("workflow_superseded_run_cancellation_missing");
 }
-if (!workflow.includes("node scripts/release-preflight.mjs --print-crons")) errors.push("workflow_cron_single_source_missing");
+if (!workflow.includes("node scripts/test-cron-release.mjs")
+    || !workflow.includes("node scripts/cron-release.mjs --check --config wrangler.jsonc")
+    || !workflow.includes("Reconcile exact Wrangler cron schedule")) {
+  errors.push("workflow_cron_single_source_missing");
+}
 if (!workflow.includes("release_id:")) errors.push("workflow_release_id_missing");
 if (!workflow.includes("release_sha:")) errors.push("workflow_release_sha_missing");
 if (!workflow.includes("test/systemDirectory.spec.ts")
@@ -3291,7 +3298,7 @@ if (workflow.includes("Full Operator MCP tests") || workflow.includes("/tmp/lens
 if (!workflow.includes("worker-release:")
     || !workflow.includes("inputs.task == 'worker-deploy'")
     || !workflow.includes("Deploy exact validated Worker head")
-    || !workflow.includes("npx wrangler deploy")) {
+    || !workflow.includes("run-wrangler-deploy-with-retry.mjs --config wrangler.release.generated.json")) {
   errors.push("explicit_exact_sha_release_path_missing");
 }
 
@@ -3376,7 +3383,8 @@ const manifestAutonomousGrowthChecks = [
     ["analysis_page_tool", operatorMcpManifestCycleRegistry.includes('name: "get_manifest_cycle_analysis_page"')],
   ["cycle_strategy_tool", operatorMcpManifestCycleRegistry.includes('name: "commit_manifest_cycle_strategy"')],
     ["persist_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "persist_manifest_autonomous_post"')],
-  ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')
+    ["retired_monolithic_commit", !operatorMcpAutonomousExecutionRegistry.includes('name: "commit_manifest_autonomous_runway"')
+    && tests.includes('expect(names).not.toContain("commit_manifest_autonomous_runway")')
     && !source.includes("async function commitManifestAutonomousRunway(")
     && !source.includes("invalid_or_duplicate_autonomous_post")
     && !source.includes("autonomous_generation_gates_failed")
