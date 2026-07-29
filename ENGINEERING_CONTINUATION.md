@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6as-manifest-cycle-receipt-read-service
-repository_base_sha: e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9
-production_sha: e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9
+active_checkpoint: stage-6at-manifest-intelligence-read-service
+repository_base_sha: 88073d1880a80a85be30faf5dacfaf155315fd59
+production_sha: 88073d1880a80a85be30faf5dacfaf155315fd59
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AS Manifest cycle receipt read service extraction.
+- Current checkpoint: Stage 6AT Manifest intelligence read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1168,17 +1168,30 @@ Completed checkpoint — Stage 6AR approved-draft scheduling service extraction:
 - Hardened exact-SHA release and live verification passed in run `30415868077`.
 - Live production independently confirmed exact SHA `e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AS Manifest cycle receipt read service extraction:
+Completed checkpoint — Stage 6AS Manifest cycle receipt read service extraction:
 
-Move `get_manifest_cycle_receipt` into the existing Manifest cycle service while preserving:
+- Extended `src/operatorManifestCycleService.ts` ownership to include `get_manifest_cycle_receipt`.
+- Moved optional cycle and operation identity normalization, canonical receipt retrieval, bounded section construction, summary separation, exact unavailable state, and exact response composition into the product service.
+- Reduced `index.ts` to canonical brand identity, receipt persistence and read-builder adapters, shared normalization, and HTTP transport.
+- Extended `test/operatorManifestCycleService.spec.ts` atomically with available and unavailable receipt regressions, including pagination inputs and duplicate-summary removal.
+- Added permanent service ownership and inline-return prevention gates.
+- Focused validation passed in run `30416139495`.
+- Push validation passed in run `30416125813`.
+- All eight Operator shards passed in run `30416375424`.
+- Hardened exact-SHA release and live verification passed in run `30416434133`.
+- Live production independently confirmed exact SHA `88073d1880a80a85be30faf5dacfaf155315fd59` with 75/75 public tools.
 
-- optional cycle ID and cycle-operation-ID normalization
-- canonical receipt retrieval by brand, cycle, or operation identity
-- bounded receipt-section pagination and summary separation
-- exact unavailable-state response without mutation
-- exact success response for summary plus the requested section with duplicate summary removed
+ACTIVE checkpoint — Stage 6AT Manifest intelligence read service extraction:
 
-Keep canonical brand identity, receipt persistence adapter, receipt-read builder, shared text normalization, and HTTP transport explicit at the `index.ts` boundary. Extend the existing Manifest cycle service and direct regression suite atomically, update its declared tool ownership, and add permanent handler-scoped ownership gates before exact-SHA release.
+Move the four adjacent read-only Manifest intelligence handlers into the existing Manifest product-service cluster:
+
+- `get_manifest_intelligence_foundation`
+- `get_performance_learning`
+- `get_manifest_intelligence_audit`
+- `get_content_focus`
+
+Preserve canonical brand identity, the exact response keys, performance-post inclusion semantics, audit-section normalization with summary fallback, audit offset and limit coercion, and read-only behavior. Keep each persistence or product read adapter, shared machine-key normalization, and HTTP transport explicit at the `index.ts` boundary. Extend the existing service and direct regression suite atomically, update declared tool ownership, and add permanent inline-return prevention gates before exact-SHA release.
+
 
 
 
@@ -1222,7 +1235,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AS
+6. Product-service extraction — ACTIVE at Stage 6AT
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
