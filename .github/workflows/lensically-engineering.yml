@@ -81,7 +81,7 @@ jobs:
                 web_changed=true
                 full_validation=true
                 ;;
-              .github/workflows/*|lensically-worker/package.json|lensically-worker/package-lock.json|lensically-worker/wrangler*|lensically-worker/migrations/*|lensically-worker/scripts/*|lensically-worker/src/index.ts|lensically-worker/tsconfig*|lensically-worker/vitest*)
+              .github/workflows/*|lensically-worker/package.json|lensically-worker/package-lock.json|lensically-worker/wrangler*|lensically-worker/database/migrations/*|lensically-worker/database/backfills/*|lensically-worker/scripts/*|lensically-worker/src/index.ts|lensically-worker/tsconfig*|lensically-worker/vitest*)
                 full_validation=true
                 ;;
             esac
@@ -162,13 +162,16 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          node scripts/d1-migration-release.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
@@ -256,13 +259,16 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          node scripts/d1-migration-release.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
 
       - name: Run selected fast validation
@@ -340,12 +346,15 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Verify lifecycle and run deterministic shard
+            - name: Verify lifecycle and run deterministic shard
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           node scripts/validate-test-syntax.mjs
           node scripts/run-full-validation.mjs --check
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          node scripts/d1-migration-release.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
@@ -414,7 +423,7 @@ jobs:
           while IFS= read -r path; do
             case "${path}" in
               lensically-web/*) web_changed=true ;;
-              lensically-worker/migrations/*) migrations_changed=true ;;
+                            lensically-worker/database/migrations/*) migrations_changed=true ;;
               lensically-worker/wrangler*) cron_changed=true ;;
             esac
           done < /tmp/lensically-release-files.txt
@@ -423,7 +432,8 @@ jobs:
           echo "migrations_changed=${migrations_changed}" >> "${GITHUB_OUTPUT}"
           echo "cron_changed=${cron_changed}" >> "${GITHUB_OUTPUT}"
           echo "validated_run_id=${validated_run_id}" >> "${GITHUB_OUTPUT}"
-          echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
+                    echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
+          echo "deployed_sha=${deployed_sha}" >> "${GITHUB_OUTPUT}"
           cat /tmp/lensically-release-files.txt
 
       - name: Setup Node
@@ -539,21 +549,39 @@ jobs:
         working-directory: lensically-worker
         run: |
           set -euo pipefail
-          node scripts/release-preflight.mjs
+                    node scripts/release-preflight.mjs
           npx tsc --noEmit
           node scripts/run-full-validation.mjs --check
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          node scripts/d1-migration-release.mjs --check
           node scripts/run-full-validation.mjs
 
-                        
-            
-      - name: Apply exact-head database migrations
+      - name: Plan exact-head database migrations
         if: steps.release_scope.outputs.migrations_changed == 'true'
         working-directory: lensically-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc
+          LENSICALLY_PRODUCTION_SHA: ${{ steps.release_scope.outputs.deployed_sha }}
+        run: node scripts/d1-migration-release.mjs --plan-remote --production-sha "${LENSICALLY_PRODUCTION_SHA}" --output /tmp/lensically-d1-migration-plan.json
 
+      - name: Apply exact planned database migrations
+        if: steps.release_scope.outputs.migrations_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LENSICALLY_PRODUCTION_SHA: ${{ steps.release_scope.outputs.deployed_sha }}
+        run: node scripts/d1-migration-release.mjs --apply-remote --production-sha "${LENSICALLY_PRODUCTION_SHA}" --plan /tmp/lensically-d1-migration-plan.json
+
+      - name: Verify exact production migration ledger
+        if: steps.release_scope.outputs.migrations_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/d1-migration-release.mjs --verify-remote
 
       - name: Deploy exact validated Worker head
         working-directory: lensically-worker

@@ -180,6 +180,12 @@ const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
 const fullValidationRunner = read("scripts/run-full-validation.mjs");
 const testMigrationSetup = read("test/apply-migrations.ts");
+const workerPackage = read("package.json");
+const d1MigrationRelease = read("scripts/d1-migration-release.mjs");
+const d1MigrationReleaseTests = read("scripts/test-d1-migration-release.mjs");
+const d1BackfillRunner = read("scripts/run-d1-backfill.mjs");
+const d1BackfillRunnerTests = read("scripts/test-d1-backfill-runner.mjs");
+const d1BackfillReceiptMigration = read("database/migrations/0018_backfill_execution_receipts.sql");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
@@ -254,6 +260,43 @@ if (!testMigrationSetup.includes("async function hasExactMigrationLedger(")
     || !testMigrationSetup.includes("no such table: lensically_test_migrations")
     || !testMigrationSetup.includes("test_migration_binding_empty")) {
   errors.push("idempotent_test_migration_setup_missing");
+}
+if (!workerPackage.includes('"database:migrations:check": "node scripts/d1-migration-release.mjs --check"')
+    || !workerPackage.includes('"database:migrations:test": "node scripts/test-d1-migration-release.mjs"')
+    || !workerPackage.includes('"database:backfills:test": "node scripts/test-d1-backfill-runner.mjs"')
+    || !d1MigrationRelease.includes("migration_production_ledger_not_exact_prefix")
+    || !d1MigrationRelease.includes("migration_applied_file_edited")
+    || !d1MigrationRelease.includes("migration_backfill_forbidden_in_normal_directory")
+    || !d1MigrationRelease.includes("migration_plan_identity_changed")
+    || !d1MigrationRelease.includes("--plan-remote")
+    || !d1MigrationRelease.includes("--apply-remote")
+    || !d1MigrationRelease.includes("--verify-remote")
+    || !d1MigrationReleaseTests.includes("d1_migration_release_contract_valid")
+    || !d1BackfillRunner.includes('execution_mode !== "explicit_only"')
+    || !d1BackfillRunner.includes("backfill_explicit_confirmation_mismatch")
+    || !d1BackfillRunner.includes("lensically_backfill_runs")
+    || !d1BackfillRunner.includes("lensically_backfill_batch_receipts")
+    || !d1BackfillRunnerTests.includes("d1_backfill_runner_contract_valid")
+    || !d1BackfillReceiptMigration.includes("CREATE TABLE IF NOT EXISTS lensically_backfill_runs")
+    || !d1BackfillReceiptMigration.includes("CREATE TABLE IF NOT EXISTS lensically_backfill_batch_receipts")) {
+  errors.push("d1_migration_and_backfill_release_contract_incomplete");
+}
+if (!workflow.includes("lensically-worker/database/migrations/*")
+    || workflow.includes("lensically-worker/migrations/*")
+    || !workflow.includes("Plan exact-head database migrations")
+    || !workflow.includes("Apply exact planned database migrations")
+    || !workflow.includes("Verify exact production migration ledger")
+    || !workflow.includes("d1-migration-release.mjs --plan-remote")
+    || !workflow.includes("d1-migration-release.mjs --apply-remote")
+    || !workflow.includes("d1-migration-release.mjs --verify-remote")
+    || workflow.includes("run: npx wrangler d1 migrations apply")) {
+  errors.push("planned_d1_release_workflow_incomplete");
+}
+if (!workflowStructureValidator.includes("release_migration_plan_missing")
+    || !workflowStructureValidator.includes("release_migration_apply_not_plan_bound")
+    || !workflowStructureValidator.includes("direct_unplanned_migration_apply_returned")
+    || !workflowStructureValidator.includes("legacy_migration_path_classifier_returned")) {
+  errors.push("planned_d1_release_structure_enforcement_missing");
 }
 if (!webPackage.includes('"test:validated-artifact": "node scripts/test-validated-web-artifact.mjs"')
     || !validatedWebArtifact.includes('WEB_ARTIFACT_CONTRACT = "lensically-validated-web-artifact-v1"')

@@ -84,14 +84,26 @@ abort("release_shared_full_validation_missing") unless release_gate_run.include?
 abort("release_shared_full_validation_execution_missing") unless release_gate_run.lines.count { |line| line.strip == "node scripts/run-full-validation.mjs" } == 1
 abort("release_fallback_preflight_missing") unless release_gate_run.include?("node scripts/release-preflight.mjs")
 abort("release_fallback_typecheck_missing") unless release_gate_run.include?("npx tsc --noEmit")
+abort("release_migration_contract_tests_missing") unless release_gate_run.include?("node scripts/test-d1-migration-release.mjs") && release_gate_run.include?("node scripts/test-d1-backfill-runner.mjs") && release_gate_run.include?("node scripts/d1-migration-release.mjs --check")
+
+migration_plan = step_run(jobs, "worker-release", "Plan exact-head database migrations")
+abort("release_migration_plan_missing") unless migration_plan.include?("d1-migration-release.mjs --plan-remote") && migration_plan.include?("deployed_sha") && migration_plan.include?("/tmp/lensically-d1-migration-plan.json")
+migration_apply = step_run(jobs, "worker-release", "Apply exact planned database migrations")
+abort("release_migration_apply_not_plan_bound") unless migration_apply.include?("d1-migration-release.mjs --apply-remote") && migration_apply.include?("--plan /tmp/lensically-d1-migration-plan.json")
+migration_verify = step_run(jobs, "worker-release", "Verify exact production migration ledger")
+abort("release_migration_verify_missing") unless migration_verify.include?("d1-migration-release.mjs --verify-remote")
+abort("direct_unplanned_migration_apply_returned") if source.include?("run: npx wrangler d1 migrations apply")
+abort("canonical_migration_path_missing") unless source.include?("lensically-worker/database/migrations/*")
+abort("legacy_migration_path_classifier_returned") if source.include?("lensically-worker/migrations/*")
 
 [
   ["push-validation", "Typecheck and lifecycle gate"],
   ["fast-validation", "Typecheck and lifecycle gate"],
   ["operator-test-shards", "Verify lifecycle and run deterministic shard"],
 ].each do |job_name, step_name|
-  run = step_run(jobs, job_name, step_name)
+    run = step_run(jobs, job_name, step_name)
   abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
+  abort("migration_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-d1-migration-release.mjs") && run.include?("node scripts/test-d1-backfill-runner.mjs") && run.include?("node scripts/d1-migration-release.mjs --check")
 end
 
 push_checkout = step_for(jobs, "push-validation", "Checkout pushed head")
