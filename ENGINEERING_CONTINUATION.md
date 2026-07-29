@@ -1557,7 +1557,7 @@ Remaining work after this checkpoint:
 
 ## Remaining
 
-### Active job — `worker-monolith-refactor`
+### Queued job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
