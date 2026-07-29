@@ -188,6 +188,11 @@ const d1BackfillRunnerTests = read("scripts/test-d1-backfill-runner.mjs");
 const d1BackfillReceiptMigration = read("database/migrations/0018_backfill_execution_receipts.sql");
 const cronRelease = read("scripts/cron-release.mjs");
 const cronReleaseTests = read("scripts/test-cron-release.mjs");
+const releaseAcceptance = read("release-acceptance.json");
+const releaseAcceptanceValidator = read("scripts/validate-release-acceptance.mjs");
+const releaseAcceptanceTests = read("scripts/test-release-acceptance.mjs");
+const legacyMigrationPlanner = read("scripts/plan-d1-migration-release.mjs");
+const legacyMigrationPolicy = read("database/migration-release-policy.json");
 const workerGitignore = read(".gitignore");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
@@ -210,11 +215,6 @@ if (!Array.isArray(crons) || crons.length === 0 || crons.some((cron) => typeof c
   throw new Error("wrangler_crons_invalid");
 }
 if (new Set(crons).size !== crons.length) throw new Error("duplicate_wrangler_crons");
-
-if (process.argv.includes("--print-crons")) {
-  process.stdout.write(`${crons.join("\n")}\n`);
-  process.exit(0);
-}
 
 const errors = [];
 if (!tests.includes("horizon_hours: 1,\n      operation_id: `test-intelligence-foundation-${crypto.randomUUID()}`")) {
@@ -326,6 +326,25 @@ if (!workflowStructureValidator.includes("trigger_neutral_worker_config_missing"
     || !workflowStructureValidator.includes("inline_cron_schedule_api_returned")
     || !workflowStructureValidator.includes("schedule_contract_classifier_missing")) {
   errors.push("trigger_neutral_cron_release_structure_enforcement_missing");
+}
+if (!workerPackage.includes('"release:acceptance:check": "node scripts/validate-release-acceptance.mjs"')
+    || !workerPackage.includes('"release:acceptance:test": "node scripts/test-release-acceptance.mjs"')
+    || !releaseAcceptance.includes('"version": "lensically-release-acceptance-v1"')
+    || !releaseAcceptance.includes('"category": "routine_worker_validation"')
+    || !releaseAcceptance.includes('"category": "large_migration_or_backfill"')
+    || !releaseAcceptanceValidator.includes("release_acceptance_target_missed")
+    || !releaseAcceptanceValidator.includes("release_acceptance_source_marker_missing")
+    || !releaseAcceptanceValidator.includes("release_acceptance_regex_count_mismatch")
+    || !releaseAcceptanceTests.includes("release_acceptance_contract_valid")
+    || !legacyMigrationPlanner.includes('LEGACY_MIGRATION_PLANNER_STATUS = "retired"')
+    || !legacyMigrationPlanner.includes('CANONICAL_MIGRATION_PLANNER = "scripts/d1-migration-release.mjs"')
+    || legacyMigrationPlanner.includes("planMigrationRelease")
+    || !legacyMigrationPolicy.includes('"status": "retired"')
+    || !legacyMigrationPolicy.includes('"canonical_planner": "scripts/d1-migration-release.mjs"')
+    || !workflow.includes("node scripts/test-release-acceptance.mjs")
+    || !workflow.includes("node scripts/validate-release-acceptance.mjs")
+    || !workflowStructureValidator.includes("release_acceptance_validation_missing")) {
+  errors.push("stage_8_release_acceptance_contract_incomplete");
 }
 if (!webPackage.includes('"test:validated-artifact": "node scripts/test-validated-web-artifact.mjs"')
     || !validatedWebArtifact.includes('WEB_ARTIFACT_CONTRACT = "lensically-validated-web-artifact-v1"')

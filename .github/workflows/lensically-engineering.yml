@@ -174,8 +174,10 @@ jobs:
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
-          node scripts/test-cron-release.mjs
+                    node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
@@ -275,8 +277,10 @@ jobs:
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
-          node scripts/test-cron-release.mjs
+                    node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
           node scripts/release-preflight.mjs --capability-lifecycle-only
 
       - name: Run selected fast validation
@@ -365,8 +369,10 @@ jobs:
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
-          node scripts/test-cron-release.mjs
+                    node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
@@ -569,8 +575,10 @@ jobs:
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
-          node scripts/test-cron-release.mjs
+                    node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
           node scripts/run-full-validation.mjs
 
       - name: Plan exact-head database migrations

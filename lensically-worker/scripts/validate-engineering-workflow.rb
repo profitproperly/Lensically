@@ -9,10 +9,12 @@ abort("misindented_step_markers:#{misindented_step_lines.join(",")}") unless mis
 canonical_gate_commands = [
   "node scripts/release-preflight.mjs",
   "node scripts/test-d1-migration-release.mjs",
-    "node scripts/test-d1-backfill-runner.mjs",
+  "node scripts/test-d1-backfill-runner.mjs",
   "node scripts/d1-migration-release.mjs --check",
   "node scripts/test-cron-release.mjs",
   "node scripts/cron-release.mjs --check --config wrangler.jsonc",
+  "node scripts/test-release-acceptance.mjs",
+  "node scripts/validate-release-acceptance.mjs",
 ]
 misindented_gate_commands = source.lines.each_with_index.filter_map do |line, index|
   stripped = line.strip
@@ -101,6 +103,7 @@ abort("release_fallback_preflight_missing") unless release_gate_run.include?("no
 abort("release_fallback_typecheck_missing") unless release_gate_run.include?("npx tsc --noEmit")
 abort("release_migration_contract_tests_missing") unless release_gate_run.include?("node scripts/test-d1-migration-release.mjs") && release_gate_run.include?("node scripts/test-d1-backfill-runner.mjs") && release_gate_run.include?("node scripts/d1-migration-release.mjs --check")
 abort("release_cron_contract_tests_missing") unless release_gate_run.include?("node scripts/test-cron-release.mjs") && release_gate_run.include?("node scripts/cron-release.mjs --check --config wrangler.jsonc")
+abort("release_acceptance_validation_missing") unless release_gate_run.include?("node scripts/test-release-acceptance.mjs") && release_gate_run.include?("node scripts/validate-release-acceptance.mjs")
 
 migration_plan_step = step_for(jobs, "worker-release", "Plan exact-head database migrations")
 migration_plan = migration_plan_step["run"].to_s
@@ -136,10 +139,11 @@ abort("schedule_contract_classifier_missing") unless release_scope.include?("sch
   ["fast-validation", "Typecheck and lifecycle gate"],
   ["operator-test-shards", "Verify lifecycle and run deterministic shard"],
 ].each do |job_name, step_name|
-    run = step_run(jobs, job_name, step_name)
+  run = step_run(jobs, job_name, step_name)
   abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
-    abort("migration_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-d1-migration-release.mjs") && run.include?("node scripts/test-d1-backfill-runner.mjs") && run.include?("node scripts/d1-migration-release.mjs --check")
+  abort("migration_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-d1-migration-release.mjs") && run.include?("node scripts/test-d1-backfill-runner.mjs") && run.include?("node scripts/d1-migration-release.mjs --check")
   abort("cron_contract_validation_missing:#{job_name}") unless run.include?("node scripts/test-cron-release.mjs") && run.include?("node scripts/cron-release.mjs --check --config wrangler.jsonc")
+  abort("release_acceptance_validation_missing:#{job_name}") unless run.include?("node scripts/test-release-acceptance.mjs") && run.include?("node scripts/validate-release-acceptance.mjs")
 end
 
 push_checkout = step_for(jobs, "push-validation", "Checkout pushed head")
