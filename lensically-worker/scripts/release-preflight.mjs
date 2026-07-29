@@ -121,6 +121,8 @@ const operatorGateMutationPlanningService = read("src/operatorGateMutationPlanni
 const operatorGateMutationPlanningServiceTests = read("test/operatorGateMutationPlanningService.spec.ts");
 const operatorStrategyMemoryListReadService = read("src/operatorStrategyMemoryListReadService.ts");
 const operatorStrategyMemoryListReadServiceTests = read("test/operatorStrategyMemoryListReadService.spec.ts");
+const operatorStrategyMemorySaveService = read("src/operatorStrategyMemorySaveService.ts");
+const operatorStrategyMemorySaveServiceTests = read("test/operatorStrategyMemorySaveService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -357,6 +359,9 @@ if (!workflow.includes("test/operatorGateMutationPlanningService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorStrategyMemoryListReadService.spec.ts")) {
   errors.push("operator_strategy_memory_list_read_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorStrategyMemorySaveService.spec.ts")) {
+  errors.push("operator_strategy_memory_save_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -2003,6 +2008,38 @@ if (!operatorStrategyMemoryListReadServiceTests.includes("uses unfiltered active
     || !operatorStrategyMemoryListReadServiceTests.includes("applies the lower limit bound and computes has_more from offset plus returned count")) {
   lifecycleErrors.push("operator_strategy_memory_list_read_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorStrategyMemorySaveService"')
+    || !source.includes("planOperatorStrategyMemorySave(payload")
+    || !source.includes("normalizeKind: normalizeGptStrategyMemoryKind")
+    || !source.includes("allowedKinds: Array.from(GPT_STRATEGY_MEMORY_KINDS)")
+    || !source.includes("kind: memorySave.values.memoryKind")
+    || !source.includes("composeOperatorStrategyMemorySaveResponse(memory)")) {
+  lifecycleErrors.push("operator_strategy_memory_save_service_import_or_binding_missing");
+}
+if (source.includes("const kind = normalizeGptStrategyMemoryKind(payload.kind)")
+    || source.includes("strategy_memory_body_required\" }, 400")
+    || source.includes("metadataJson: normalizeOperatorJson({ ...(payload.metadata")) {
+  lifecycleErrors.push("operator_strategy_memory_save_service_returned_to_index");
+}
+if (!operatorStrategyMemorySaveService.includes("export function planOperatorStrategyMemorySave")
+    || !operatorStrategyMemorySaveService.includes("export function composeOperatorStrategyMemorySaveResponse")
+    || !operatorStrategyMemorySaveService.includes("dependencies.normalizeKind")
+    || !operatorStrategyMemorySaveService.includes("invalid_strategy_memory_kind")
+    || !operatorStrategyMemorySaveService.includes("Array.from(dependencies.allowedKinds)")
+    || !operatorStrategyMemorySaveService.includes("strategy_memory_body_required")
+    || !operatorStrategyMemorySaveService.includes("source: payload.source ?? \"mcp_operator\"")
+    || !operatorStrategyMemorySaveService.includes("metadataJson")
+    || !operatorStrategyMemorySaveService.includes("memory_id: memory?.id ?? null")) {
+  lifecycleErrors.push("operator_strategy_memory_save_service_module_incomplete");
+}
+if (!operatorStrategyMemorySaveServiceTests.includes("returns the exact invalid-kind rejection with all allowed kinds")
+    || !operatorStrategyMemorySaveServiceTests.includes("returns the exact required-body rejection after valid kind admission")
+    || !operatorStrategyMemorySaveServiceTests.includes("builds normalized persistence values with default source metadata")
+    || !operatorStrategyMemorySaveServiceTests.includes("uses an explicit source and ignores malformed metadata containers")
+    || !operatorStrategyMemorySaveServiceTests.includes("composes exact persisted and null memory responses")) {
+  lifecycleErrors.push("operator_strategy_memory_save_service_tests_incomplete");
+}
+
 
 
 

@@ -142,6 +142,11 @@ import {
 import { readOperatorActiveGates } from "./operatorActiveGateReadService";
 import { planOperatorGateMutation } from "./operatorGateMutationPlanningService";
 import { readOperatorStrategyMemoryList } from "./operatorStrategyMemoryListReadService";
+import {
+  composeOperatorStrategyMemorySaveResponse,
+  planOperatorStrategyMemorySave,
+} from "./operatorStrategyMemorySaveService";
+
 
 
 
@@ -14638,25 +14643,27 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-    if (toolName === "save_strategy_memory") {
-    const kind = normalizeGptStrategyMemoryKind(payload.kind);
-    const body = normalizeOperatorText(payload.body, 20000);
-    if (!kind) {
-      return operatorJsonResponse({ success: false, error: "invalid_strategy_memory_kind", allowed_kinds: Array.from(GPT_STRATEGY_MEMORY_KINDS) }, 400);
-    }
-    if (!body) {
-      return operatorJsonResponse({ success: false, error: "strategy_memory_body_required" }, 400);
+      if (toolName === "save_strategy_memory") {
+    const memorySave = planOperatorStrategyMemorySave(payload, {
+      normalizeKind: normalizeGptStrategyMemoryKind,
+      allowedKinds: Array.from(GPT_STRATEGY_MEMORY_KINDS),
+      normalizeText: normalizeOperatorText,
+      normalizeJson: normalizeOperatorJson,
+    });
+    if (memorySave.kind === "response") {
+      return operatorJsonResponse(memorySave.body, memorySave.status);
     }
     const memory = await saveGptStrategyMemory(env, {
       accountId: brand.account_id,
       threadsUserId: brand.profile.threads_user_id,
-      kind,
-      title: normalizeOperatorText(payload.title, 500, true),
-      body,
-      metadataJson: normalizeOperatorJson({ ...(payload.metadata as Record<string, unknown> ?? {}), source: payload.source ?? "mcp_operator" }, {}),
+      kind: memorySave.values.memoryKind,
+      title: memorySave.values.title,
+      body: memorySave.values.body,
+      metadataJson: memorySave.values.metadataJson,
     });
-    return operatorJsonResponse({ memory_id: memory?.id ?? null });
+    return operatorJsonResponse(composeOperatorStrategyMemorySaveResponse(memory));
   }
+
 
         if (toolName === "list_scheduled_posts") {
     const date = normalizeOperatorText(payload.date, 20, true);
