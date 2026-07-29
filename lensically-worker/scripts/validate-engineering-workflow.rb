@@ -93,6 +93,9 @@ required_worker_release_steps = [
 missing_worker_release_steps = required_worker_release_steps.reject { |name| worker_release_step_names.include?(name) }
 abort("worker_release_steps_missing:#{missing_worker_release_steps.join(",")}") unless missing_worker_release_steps.empty?
 
+push_gate_run = step_run(jobs, "push-validation", "Typecheck and lifecycle gate")
+abort("push_release_fallback_preflight_missing") unless push_gate_run.lines.count { |line| line.strip == "node scripts/release-preflight.mjs" } == 1
+
 push_full_run = step_run(jobs, "push-validation", "Run full push validation")
 abort("push_shared_full_validation_missing") unless push_full_run.strip == "node scripts/run-full-validation.mjs"
 

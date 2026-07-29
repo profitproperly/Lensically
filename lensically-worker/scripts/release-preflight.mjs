@@ -251,7 +251,8 @@ if (workflow.includes("npm run test -- --run test/operatorMcpProtocol.spec.ts")
     || workflow.includes("npm run test -- --run test/operatorScheduledPostEditMutationService.spec.ts")) {
   errors.push("duplicated_broad_validation_commands_returned");
 }
-if (!workflowStructureValidator.includes("push_shared_full_validation_missing")
+if (!workflowStructureValidator.includes("push_release_fallback_preflight_missing")
+    || !workflowStructureValidator.includes("push_shared_full_validation_missing")
     || !workflowStructureValidator.includes("release_shared_full_validation_missing")
     || !workflowStructureValidator.includes("duplicated_broad_validation_commands_returned")) {
   errors.push("shared_full_validation_workflow_structure_enforcement_missing");

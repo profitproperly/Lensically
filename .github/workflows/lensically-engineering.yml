@@ -178,8 +178,9 @@ jobs:
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/test-release-acceptance.mjs
-          node scripts/validate-release-acceptance.mjs
+                    node scripts/validate-release-acceptance.mjs
           node scripts/release-preflight.mjs --capability-lifecycle-only
+          node scripts/release-preflight.mjs
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
       - name: Run fast mapped validation
