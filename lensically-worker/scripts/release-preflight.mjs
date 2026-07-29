@@ -1022,6 +1022,26 @@ if (operatorSchedulingResultsRuntimeShell.includes('if (toolName === "list_sched
     || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "get_post_results")')) {
   lifecycleErrors.push("operator_scheduling_results_runtime_dispatch_returned_to_index");
 }
+const operatorProductHandlerStart = source.indexOf("async function handleOperatorTool(");
+const operatorProductHandlerEnd = source.indexOf(
+  "function buildOperatorMcpBaseTools",
+  operatorProductHandlerStart,
+);
+const operatorProductHandler = operatorProductHandlerStart >= 0
+  && operatorProductHandlerEnd > operatorProductHandlerStart
+  ? source.slice(operatorProductHandlerStart, operatorProductHandlerEnd)
+  : "";
+const directOperatorProductBranches = operatorProductHandler.match(/\bif\s*\(\s*toolName\s*===/g) ?? [];
+if (!operatorProductHandler.includes("admitOperatorRuntimeToolCall({")
+    || !operatorProductHandler.includes("dispatchOperatorManifestRuntimeTool({")
+    || !operatorProductHandler.includes("dispatchOperatorKeyedRuntimeTool(toolName, {")
+    || !operatorProductHandler.includes("dispatchOperatorKeyedResponseTool(toolName, {")
+    || !operatorProductHandler.includes('error: "unknown_operator_tool"')) {
+  lifecycleErrors.push("operator_product_runtime_router_composition_incomplete");
+}
+if (directOperatorProductBranches.length > 0) {
+  lifecycleErrors.push(`operator_product_runtime_direct_branches_returned:${directOperatorProductBranches.length}`);
+}
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
     || operatorToolAdmissionShell.includes("RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)")

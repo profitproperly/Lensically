@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d6-scheduling-results-routing
-repository_base_sha: 73f3b2b049d5f6389272adc7e5d1092e93c34f7b
-production_sha: 73f3b2b049d5f6389272adc7e5d1092e93c34f7b
+active_checkpoint: stage-7e-router-closure
+repository_base_sha: 3ab716529baf5232487e590dff4dbf4ced04a1bc
+production_sha: 3ab716529baf5232487e590dff4dbf4ced04a1bc
 
 
 
@@ -1388,11 +1388,23 @@ Completed checkpoint — Stage 7D5 gate management and strategy-memory routing:
 - Exact-SHA release passed in run `30429397596`.
 - Live production independently confirmed exact SHA `73f3b2b049d5f6389272adc7e5d1092e93c34f7b` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7D6 scheduling and results runtime routing:
+Completed checkpoint — Stage 7D6 scheduling and results runtime routing:
 
-Route `list_scheduled_posts`, `delete_scheduled_post`, `edit_scheduled_post`, `schedule_owner_approved_batch`, `schedule_approved_draft`, and `get_post_results` through keyed runtime composition. Preserve owner-ratified destructive controls, edit and scheduling admission, hourly coverage and collision gates, lineage and inventory writes, batch and single-draft behavior, D1 adapters, exact status codes, and every early response.
+- Routed `list_scheduled_posts`, `delete_scheduled_post`, `edit_scheduled_post`, `schedule_owner_approved_batch`, `schedule_approved_draft`, and `get_post_results` through one keyed response dispatcher.
+- Preserved deletion controls, retry and edit behavior, scheduling gates, lineage and inventory writes, batch and single-draft orchestration, D1 adapters, exact status codes, and every early response.
+- Added permanent lifecycle ownership enforcement preventing all six direct product branches from returning.
+- The first eight-shard run exposed a 30-second timeout in the existing full source-backed cycle fixture. Root cause was the fixture's intentionally heavy source-card, evidence-page, strategy, and persistence setup under concurrent shards.
+- Centralized a 60-second heavy-fixture timeout across every active test using that setup and added a release-preflight guard preventing the unstable timeout from returning.
+- Push validation passed in run `30430036703`.
+- All eight Operator shards passed in run `30430067870`.
+- Exact-SHA release passed in run `30430312310`.
+- Live production independently confirmed exact SHA `3ab716529baf5232487e590dff4dbf4ced04a1bc` with 75/75 public tools.
 
-Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, and independent live verification. After release, audit remaining `handleOperatorTool` product branches and either close Stage 7 or activate one final explicitly bounded residual cluster.
+ACTIVE checkpoint — Stage 7E router closure:
+
+Enforce one whole-handler closure gate proving `handleOperatorTool` contains the composed admission and runtime dispatch boundaries, the unknown-tool fallback, and zero direct `if (toolName === ...)` product branches. The audit has already found no residual product-runtime branches; remaining direct matches belong to separate engineering/admin routers and operation-key helpers.
+
+Run focused validation, all eight shards, exact-SHA release, and independent live verification on the closure-gated head. If clean, mark Stage 7 complete and activate Stage 8 test and release modernization.
 
 
 
@@ -1444,7 +1456,7 @@ Remaining work after this checkpoint:
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
-7. Router and runtime composition — ACTIVE at Stage 7D
+7. Router and runtime composition — ACTIVE at Stage 7E closure
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
