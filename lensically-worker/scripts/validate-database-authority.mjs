@@ -132,14 +132,30 @@ export function validateDatabaseAuthority(root = defaultRoot) {
     const wranglerConfig = readFileSync(resolve(root, "wrangler.jsonc"), "utf8");
   if (!wranglerConfig.includes('"migrations_dir": "database/migrations"')) errors.push("wrangler_migration_directory_missing");
   if (!wranglerConfig.includes('"migrations_table": "lensically_d1_migrations"')) errors.push("wrangler_migration_ledger_missing");
-    const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
+      const releaseWorkflow = readFileSync(resolve(root, "../.github/workflows/lensically-engineering.yml"), "utf8");
   const fullValidationRunner = readFileSync(resolve(root, "scripts/run-full-validation.mjs"), "utf8");
-    if (!releaseWorkflow.includes("wrangler d1 migrations apply lensically-db --remote --config wrangler.jsonc")) {
-    errors.push("release_migration_apply_missing");
+  const migrationReleasePlanner = readFileSync(resolve(root, "scripts/d1-migration-release.mjs"), "utf8");
+  const plannedMigrationSteps = [
+    "Plan exact-head database migrations",
+    "Apply exact planned database migrations",
+    "Verify exact production migration ledger",
+  ];
+  const missingPlannedMigrationSteps = plannedMigrationSteps.filter((name) => !releaseWorkflow.includes(`\n      - name: ${name}\n`));
+  if (missingPlannedMigrationSteps.length > 0) {
+    errors.push(`planned_release_migration_steps_missing:${missingPlannedMigrationSteps.join(",")}`);
   }
-    if (!releaseWorkflow.includes("\n      - name: Apply exact-head database migrations\n        if: steps.release_scope.outputs.migrations_changed == 'true'\n        working-directory: lensically-worker")) {
-    errors.push("release_migration_step_indentation_invalid");
+  if (!releaseWorkflow.includes("d1-migration-release.mjs --plan-remote")
+      || !releaseWorkflow.includes("d1-migration-release.mjs --apply-remote")
+      || !releaseWorkflow.includes("d1-migration-release.mjs --verify-remote")
+      || !migrationReleasePlanner.includes("migration_production_ledger_not_exact_prefix")
+      || !migrationReleasePlanner.includes("migration_applied_file_edited")
+      || !migrationReleasePlanner.includes("migration_plan_identity_changed")) {
+    errors.push("planned_release_migration_contract_missing");
   }
+  if (releaseWorkflow.includes("run: npx wrangler d1 migrations apply")) {
+    errors.push("direct_unplanned_release_migration_apply_returned");
+  }
+
 
 
   const migrationDirectory = resolve(root, manifest.canonical_migration_directory);
