@@ -13611,7 +13611,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return sourceCardGenerationRuntimeDispatch.response;
   }
 
-    if (toolName === "run_gates") {
+      const runGatesHandler = async (): Promise<Response> => {
     const result = await evaluateOperatorGates({ payload }, {
       normalizeText: normalizeOperatorText,
       normalizeStage: normalizeOperatorStage,
@@ -13627,10 +13627,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         modelGateResults: gateInput.modelGateResults,
       }),
     });
-    return operatorJsonResponse(result);
-  }
+        return operatorJsonResponse(result);
+  };
 
-        if (toolName === "submit_candidate_draft" || toolName === "save_self_rejected_draft") {
+  const draftSubmissionHandler = async (): Promise<Response> => {
     const draftAdmission = await admitOperatorGenerationDraft(payload, {
       normalizeText: normalizeOperatorText,
       parseJson: safeParseJsonString,
@@ -13706,10 +13706,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         insertValues.metadataJson,
       )
       .run();
-    return operatorJsonResponse(draftPersistence.body);
-  }
+        return operatorJsonResponse(draftPersistence.body);
+  };
 
-    if (toolName === "mark_draft_shown") {
+  const markDraftShownHandler = async (): Promise<Response> => {
     const shownTransition = await planOperatorDraftShownTransition({
       brandKey: brand.brand_key,
       payload,
@@ -13740,10 +13740,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         ? inventory.analysis as Record<string, unknown>
         : null,
     });
-    return operatorJsonResponse(shownPlan.body);
-  }
+        return operatorJsonResponse(shownPlan.body);
+  };
 
-    if (toolName === "approve_draft" || toolName === "reject_draft") {
+  const draftDecisionHandler = async (): Promise<Response> => {
     const decisionPlanning = await planOperatorDraftDecision({
       toolName,
       accountId: brand.account_id,
@@ -13803,7 +13803,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         ? inventory.strategy as Record<string, unknown>
         : null,
     });
-    return operatorJsonResponse(composeOperatorDraftDecisionResponse(decisionPlan, memory));
+        return operatorJsonResponse(composeOperatorDraftDecisionResponse(decisionPlan, memory));
+  };
+
+  const gateDraftExecutionRuntimeDispatch = await dispatchOperatorKeyedResponseTool(toolName, {
+    run_gates: runGatesHandler,
+    submit_candidate_draft: draftSubmissionHandler,
+    save_self_rejected_draft: draftSubmissionHandler,
+    mark_draft_shown: markDraftShownHandler,
+    approve_draft: draftDecisionHandler,
+    reject_draft: draftDecisionHandler,
+  });
+  if (gateDraftExecutionRuntimeDispatch.handled) {
+    return gateDraftExecutionRuntimeDispatch.response;
   }
 
     if (toolName === "list_active_gates") {

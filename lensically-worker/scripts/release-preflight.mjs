@@ -922,7 +922,7 @@ if (operatorSourceLineageBackfillRuntimeShell.includes('if (toolName === "draw_s
   lifecycleErrors.push("operator_source_lineage_backfill_runtime_dispatch_returned_to_index");
 }
 const operatorRunGatesDispatchStart = source.indexOf(
-  'if (toolName === "run_gates")',
+  "const runGatesHandler = async (): Promise<Response> =>",
   operatorCreateSourceCardDispatchStart,
 );
 const operatorSourceCardGenerationRuntimeShell = operatorCreateSourceCardDispatchStart >= 0
@@ -942,6 +942,30 @@ if (operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "create_
     || operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "get_source_card")')
     || operatorSourceCardGenerationRuntimeShell.includes('if (toolName === "create_generation_run")')) {
   lifecycleErrors.push("operator_source_card_generation_runtime_dispatch_returned_to_index");
+}
+const operatorActiveGateDispatchStart = source.indexOf(
+  'if (toolName === "list_active_gates")',
+  operatorRunGatesDispatchStart,
+);
+const operatorGateDraftExecutionRuntimeShell = operatorRunGatesDispatchStart >= 0
+  && operatorActiveGateDispatchStart > operatorRunGatesDispatchStart
+  ? source.slice(operatorRunGatesDispatchStart, operatorActiveGateDispatchStart)
+  : "";
+if (!operatorGateDraftExecutionRuntimeShell.includes("const runGatesHandler = async")
+    || !operatorGateDraftExecutionRuntimeShell.includes("const draftSubmissionHandler = async")
+    || !operatorGateDraftExecutionRuntimeShell.includes("const markDraftShownHandler = async")
+    || !operatorGateDraftExecutionRuntimeShell.includes("const draftDecisionHandler = async")
+    || !operatorGateDraftExecutionRuntimeShell.includes("dispatchOperatorKeyedResponseTool(toolName, {")
+    || !operatorGateDraftExecutionRuntimeShell.includes("save_self_rejected_draft: draftSubmissionHandler")
+    || !operatorGateDraftExecutionRuntimeShell.includes("reject_draft: draftDecisionHandler")
+    || !operatorGateDraftExecutionRuntimeShell.includes("if (gateDraftExecutionRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_gate_draft_execution_runtime_dispatch_cutover_incomplete");
+}
+if (operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "run_gates")')
+    || operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "submit_candidate_draft"')
+    || operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "mark_draft_shown")')
+    || operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "approve_draft"')) {
+  lifecycleErrors.push("operator_gate_draft_execution_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -2167,6 +2191,7 @@ if (!operatorGenerationRunPersistencePlanningServiceTests.includes("skips the ex
   lifecycleErrors.push("operator_generation_run_persistence_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorGenerationDraftAdmissionService"')
+    || !source.includes("const draftSubmissionHandler = async")
     || !source.includes("admitOperatorGenerationDraft(payload")
     || !source.includes("loadExistingDraft: async ({ runId, sourceCardId, text })")
     || !source.includes("countExistingDrafts: async ({ runId, sourceCardId })")
@@ -2195,6 +2220,7 @@ if (!operatorGenerationDraftAdmissionServiceTests.includes("returns the exact re
   lifecycleErrors.push("operator_generation_draft_admission_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorGenerationDraftPersistencePlanningService"')
+    || !source.includes("const draftSubmissionHandler = async")
     || !source.includes("planOperatorGenerationDraftPersistence({")
     || !source.includes("runGates: async (gateInput)")
     || !source.includes("const insertValues = draftPersistence.insertValues")
@@ -2221,6 +2247,7 @@ if (!operatorGenerationDraftPersistencePlanningServiceTests.includes("runs candi
   lifecycleErrors.push("operator_generation_draft_persistence_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorDraftShownTransitionService"')
+    || !source.includes("const markDraftShownHandler = async")
     || !source.includes("planOperatorDraftShownTransition({")
     || !source.includes("loadDraft: async (draftId)")
     || !source.includes("isAllowedTransition: isAllowedOperatorTransition")
@@ -2252,6 +2279,7 @@ if (!operatorDraftShownTransitionServiceTests.includes("returns the exact requir
   lifecycleErrors.push("operator_draft_shown_transition_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorDraftDecisionService"')
+    || !source.includes("const draftDecisionHandler = async")
     || !source.includes("planOperatorDraftDecision({")
     || !source.includes("composeOperatorDraftDecisionResponse(decisionPlan, memory)")
     || !source.includes("loadDraft: async (draftId)")
@@ -2310,9 +2338,9 @@ if (!operatorActiveGateReadServiceTests.includes("passes null scopes when option
     || !operatorActiveGateReadServiceTests.includes("normalizes every supplied scope and returns the exact gates response")) {
   lifecycleErrors.push("operator_active_gate_read_service_tests_incomplete");
 }
-const operatorGateEvaluationHandlerStart = source.indexOf('if (toolName === "run_gates") {');
+const operatorGateEvaluationHandlerStart = source.indexOf('const runGatesHandler = async (): Promise<Response> =>');
 const operatorGateEvaluationHandlerEnd = source.indexOf(
-  'if (toolName === "submit_candidate_draft"',
+  'const draftSubmissionHandler = async (): Promise<Response> =>',
   operatorGateEvaluationHandlerStart,
 );
 const operatorGateEvaluationHandler = operatorGateEvaluationHandlerStart >= 0
