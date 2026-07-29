@@ -10852,8 +10852,7 @@ async function prepareManifestAutonomousCycle(
     noninterferencePolicy: MANIFEST_NONINTERFERENCE_POLICY,
     analysisWindowDays: MANIFEST_ANALYSIS_WINDOW_DAYS,
     recentExposureHours: MANIFEST_RECENT_EXPOSURE_HOURS,
-        normalizeText: normalizeOperatorText,
-    compactThreadsSnapshot: compactManifestPrepareThreadsSnapshot,
+            normalizeText: normalizeOperatorText,
     refreshTrustedUtcClock: refreshManifestTrustedUtcClock,
     readDatabaseClock: async () => {
       const row = await env.DB.prepare(

@@ -27,8 +27,7 @@ export interface OperatorManifestCycleConstructionDependencies {
   noninterferencePolicy: unknown;
   analysisWindowDays: number;
   recentExposureHours: number;
-    normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
-  compactThreadsSnapshot(snapshot: JsonRecord): JsonRecord;
+      normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
   refreshTrustedUtcClock(): Promise<string | null>;
   readDatabaseClock(): Promise<string | null>;
   resolveClock(
@@ -113,6 +112,36 @@ function asRecords(value: unknown): JsonRecord[] {
     : [];
 }
 
+function compactOperatorManifestThreadsSnapshot(snapshot: JsonRecord): JsonRecord {
+  const evaluation = record(snapshot.performance_evaluation);
+  const metricSnapshots = Array.isArray(snapshot.metric_snapshots)
+    ? asRecords(snapshot.metric_snapshots).slice(0, 12)
+    : record(snapshot.metric_snapshots);
+  return {
+    refreshed: snapshot.refreshed === true,
+    complete: snapshot.complete === true,
+    threads_server_time_iso: snapshot.threads_server_time_iso ?? null,
+    latest_published_at: snapshot.latest_published_at ?? null,
+    published_count: Number(snapshot.published_count ?? 0),
+    list_metrics_available: snapshot.list_metrics_available === true,
+    list_metrics_complete: snapshot.list_metrics_complete === true,
+    due_checkpoint_post_count: Number(snapshot.due_checkpoint_post_count ?? 0),
+    due_checkpoint_count: Number(snapshot.due_checkpoint_count ?? 0),
+    processed_due_checkpoint_count: Number(snapshot.processed_due_checkpoint_count ?? 0),
+    remaining_due_checkpoint_count: Number(snapshot.remaining_due_checkpoint_count ?? 0),
+    continuation_required: snapshot.continuation_required === true,
+    max_insight_calls_per_invocation: Number(snapshot.max_insight_calls_per_invocation ?? 0),
+    metric_snapshots: metricSnapshots,
+    performance_evaluation: {
+      evaluator_version: evaluation.evaluator_version ?? null,
+      maturity_scores_upserted: Number(evaluation.maturity_scores_upserted ?? 0),
+      evidence_records: Number(evaluation.evidence_records ?? 0),
+      manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
+    },
+    error: snapshot.error ?? null,
+  };
+}
+
 function databaseTimeIso(raw: string | null): string | null {
   return raw ? `${raw.replace(" ", "T").replace(/Z$/, "")}Z` : null;
 }
@@ -139,9 +168,9 @@ export async function constructOperatorManifestAutonomousCycle(
     explicitOperationId,
     phasedPreparation,
     runtimeNowIso,
-        threadsSnapshot,
+            threadsSnapshot,
   } = input;
-  const boundedThreadsSnapshot = dependencies.compactThreadsSnapshot(threadsSnapshot);
+  const boundedThreadsSnapshot = compactOperatorManifestThreadsSnapshot(threadsSnapshot);
 
   const [trustedUtcTimeIso, databaseClockRaw] = await Promise.all([
     dependencies.refreshTrustedUtcClock(),

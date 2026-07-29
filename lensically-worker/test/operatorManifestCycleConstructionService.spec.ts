@@ -21,12 +21,7 @@ function createHarness() {
   const mocks = {
     refreshTrustedUtcClock: vi.fn(async () => "2026-07-27T18:05:00.000Z"),
     readDatabaseClock: vi.fn(async () => "2026-07-27 18:04:59"),
-        resolveClock: vi.fn(() => ({ effective_now_iso: "2026-07-27T18:05:00.000Z", source: "trusted_utc" })),
-    compactThreadsSnapshot: vi.fn((snapshot: JsonRecord) => {
-      const bounded = { ...snapshot };
-      delete bounded.raw_posts;
-      return bounded;
-    }),
+            resolveClock: vi.fn(() => ({ effective_now_iso: "2026-07-27T18:05:00.000Z", source: "trusted_utc" })),
     parseTimestampMs: vi.fn(() => Date.parse("2026-07-27T18:05:00.000Z")),
     localDateTimeParts: vi.fn(() => ({ date: "2026-07-27", hour: 18 })),
     buildTargetSlots: vi.fn(() => slots),
@@ -100,8 +95,7 @@ function createHarness() {
     noninterferencePolicy: { active: true },
     analysisWindowDays: 28,
     recentExposureHours: 72,
-        normalizeText,
-    compactThreadsSnapshot: mocks.compactThreadsSnapshot,
+            normalizeText,
     refreshTrustedUtcClock: mocks.refreshTrustedUtcClock,
     readDatabaseClock: mocks.readDatabaseClock,
     resolveClock: mocks.resolveClock,
@@ -179,8 +173,7 @@ describe("Operator Manifest cycle construction service", () => {
       account_id: "account-1",
       app_user_id: "app-user-1",
     });
-    expect(mocks.compactThreadsSnapshot).toHaveBeenCalledWith(input.threadsSnapshot);
-    expect(mocks.buildAccountPosition).toHaveBeenCalledWith(expect.objectContaining({
+        expect(mocks.buildAccountPosition).toHaveBeenCalledWith(expect.objectContaining({
       threadsSnapshot: expect.not.objectContaining({ raw_posts: expect.anything() }),
     }));
     expect(mocks.writeCycle).toHaveBeenCalledWith(expect.objectContaining({
