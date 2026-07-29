@@ -119,7 +119,7 @@ jobs:
 
             
 
-            - name: Install web dependencies
+                  - name: Install web dependencies
         if: steps.push_scope.outputs.web_changed == 'true' && steps.push_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
