@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6au-account-post-results-service
-repository_base_sha: 19ed5e04842b983a2bb88ca09b7b11aff461fd51
-production_sha: 19ed5e04842b983a2bb88ca09b7b11aff461fd51
+active_checkpoint: stage-6av-published-post-lineage-recovery-service
+repository_base_sha: d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7
+production_sha: d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AU account post-results lineage service extraction.
+- Current checkpoint: Stage 6AV published-post lineage recovery service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1194,20 +1194,35 @@ Completed checkpoint — Stage 6AT Manifest intelligence read service extraction
 - Hardened exact-SHA release and live verification passed in run `30416956788`.
 - Live production independently confirmed exact SHA `19ed5e04842b983a2bb88ca09b7b11aff461fd51` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AU account post-results lineage service extraction:
+Completed checkpoint — Stage 6AU account post-results lineage service extraction:
 
-Move `get_post_results` deterministic orchestration and response construction into the account read-service cluster while preserving:
+- Extended `src/operatorAccountStateService.ts` with `readOperatorPostResults` as the deterministic authority for schema-preparation sequencing, published-post admission, scheduled lineage and draft fallback, source lineage retrieval, metric coercion and evaluation, compact/full branching, response construction, metric-snapshot idempotency decisions, maturity evidence, optional history, and follower-attribution prohibition.
+- Reduced `get_post_results` in `src/index.ts` to canonical account and Threads identity, every explicit D1 query and write, archive/evaluator table preparation, source-card retrieval, metric evaluation, JSON parsing and serialization, UUID and clock adapters, and HTTP transport.
+- Extended `test/operatorAccountStateService.spec.ts` atomically with schema-before-admission, compact lineage and generation evidence, changed-metric persistence, full maturity and optional-history, and duplicate-snapshot suppression regressions.
+- Implementation committed at `6af0b7c24536133b0e2a69a9dd51e2110329c019`.
+- Initial focused and push runs `30417426306` and `30417413031` correctly blocked release because the new return-ownership guard globally matched a legitimate follower-attribution policy outside the `get_post_results` handler.
+- Root cause: a shared response fragment was searched across all of `index.ts` instead of the owned handler body.
+- Repaired in `d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7` by slicing the exact `get_post_results` handler before checking returned service-owned fragments; this permanently enforces the existing handler-scoped ownership rule.
+- Repaired focused validation passed in run `30417529047`.
+- Push validation passed in run `30417480548`.
+- All eight Operator shards passed in run `30417729566`.
+- Hardened exact-SHA release and live verification passed in run `30417796141`.
+- Live production independently confirmed exact SHA `d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7` with 75/75 public tools.
 
-- archive and metric-snapshot schema readiness before admission
-- published-post ID normalization and exact missing-input response
-- scheduled lineage lookup with draft fallback
-- archive, source-card, and immutable source-selection retrieval
-- metric coercion, anomaly evaluation, capture timestamp, and learning-validity fields
-- compact response mode with bounded generation and draft evidence
-- full response mode with idempotent metric-snapshot persistence, performance fingerprint, maturity scores, optional metric history, follower-attribution prohibition, and warning semantics
-- exact lineage, source, source-card, generation-run, draft, post, metrics, and response-mode shapes
+ACTIVE checkpoint — Stage 6AV published-post lineage recovery service extraction:
 
-Keep canonical app/account/Threads/brand identity, every D1 query and write, archive/evaluator table preparation, source-card retrieval, metric evaluator, JSON parsing/serialization, UUID creation, clock, and HTTP transport explicit at the `index.ts` boundary. Extend `operatorAccountStateService.ts` and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Extend the published-post lineage product-service cluster to own `recover_published_post_lineage` orchestration while preserving:
+
+- compatibility workflow-session and source-card-title normalization
+- the Manifest all-missing-source-cards compatibility bridge
+- deterministic bridge operation identity fallback and exact batch-operation suffix
+- bounded internal dispatch to `create_all_missing_manifest_source_cards`
+- exact HTTP-status coercion and compatibility-bridge response field
+- normal recovery delegation with canonical minimum verified likes
+- exact normal recovery payload and status mapping
+
+Keep canonical brand identity, request-scoped internal tool dispatch, the existing recovery persistence helper, clock, shared text normalization, the Manifest minimum-likes constant, and HTTP transport explicit at the `index.ts` boundary. Extend `operatorPublishedPostLineageAuditService.ts` and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1253,7 +1268,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AU
+6. Product-service extraction — ACTIVE at Stage 6AV
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
