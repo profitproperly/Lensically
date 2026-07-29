@@ -11,7 +11,6 @@ const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
-const manifestIntelligence = read("src/manifestIntelligence.ts");
 const operatorMcpProtocol = read("src/operatorMcpProtocol.ts");
 const operatorMcpProtocolTests = read("test/operatorMcpProtocol.spec.ts");
 const operatorMcpToolDefinitions = read("src/operatorMcpToolDefinitions.ts");
