@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
-status: active
+status: idle
 updated_at: 2026-07-29
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: worker-monolith-refactor
-active_checkpoint: stage-8e-release-acceptance-consolidation
-repository_base_sha: 53863c243cf90e8370d2e49fe637b5f17e344909
-production_sha: 53863c243cf90e8370d2e49fe637b5f17e344909
+active_job_id: none
+active_checkpoint: none
+repository_base_sha: bf2f93636eeb88ac64b92f0888c23e44672ec31b
+production_sha: bf2f93636eeb88ac64b92f0888c23e44672ec31b
 
 
 
