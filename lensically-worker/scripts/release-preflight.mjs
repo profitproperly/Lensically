@@ -179,6 +179,7 @@ const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
 const fullValidationRunner = read("scripts/run-full-validation.mjs");
+const testMigrationSetup = read("test/apply-migrations.ts");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
@@ -236,6 +237,14 @@ if (!workflowStructureValidator.includes("push_shared_full_validation_missing")
     || !workflowStructureValidator.includes("release_shared_full_validation_missing")
     || !workflowStructureValidator.includes("duplicated_broad_validation_commands_returned")) {
   errors.push("shared_full_validation_workflow_structure_enforcement_missing");
+}
+if (!testMigrationSetup.includes("async function hasExactMigrationLedger(")
+    || !testMigrationSetup.includes("SELECT name FROM lensically_test_migrations ORDER BY name ASC")
+    || !testMigrationSetup.includes("test_migration_ledger_mismatch")
+    || !testMigrationSetup.includes("no such table: lensically_test_migrations")
+    || !testMigrationSetup.includes("if (await hasExactMigrationLedger(testEnv.DB, migrationNames)) return;")
+    || !testMigrationSetup.includes("test_migration_binding_empty")) {
+  errors.push("idempotent_test_migration_setup_missing");
 }
 const manifestSourceBackedFixtureTimeoutUsages = tests.match(/MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS/g) ?? [];
 if (!tests.includes("const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;")
