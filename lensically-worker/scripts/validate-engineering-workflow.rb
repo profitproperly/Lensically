@@ -94,6 +94,12 @@ abort("release_fallback_typecheck_missing") unless release_gate_run.include?("np
   abort("full_validation_plan_check_missing:#{job_name}") unless run.include?("node scripts/run-full-validation.mjs --check")
 end
 
+push_checkout = step_for(jobs, "push-validation", "Checkout pushed head")
+abort("push_full_history_checkout_missing") unless push_checkout.dig("with", "fetch-depth") == 0
+push_classification = step_run(jobs, "push-validation", "Classify pushed change")
+abort("push_production_relative_classification_missing") unless push_classification.include?("https://api.lensically.com/api/operator/health") && push_classification.include?("validation_scope=deployed_production")
+abort("push_classification_fallback_missing") unless push_classification.include?("validation_scope=event_before_fallback") && push_classification.include?("validation_scope=parent_fallback")
+
 push_artifact_test = step_run(jobs, "push-validation", "Test validated web artifact contract")
 abort("push_web_artifact_test_missing") unless push_artifact_test.include?("npm run test:validated-artifact")
 push_web_build = step_run(jobs, "push-validation", "Build exact validated web artifact")

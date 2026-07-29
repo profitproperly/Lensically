@@ -276,6 +276,14 @@ if (!validatedWebArtifactTests.includes("packageValidatedWebArtifact")
     || !validatedWebArtifactTests.includes("web_artifact_unexpected_root")) {
   errors.push("validated_web_artifact_tests_incomplete");
 }
+if (!workflow.includes("validation_scope=deployed_production")
+    || !workflow.includes("validation_scope=event_before_fallback")
+    || !workflow.includes("validation_scope=parent_fallback")
+    || !workflow.includes("https://api.lensically.com/api/operator/health")
+    || !workflowStructureValidator.includes("push_production_relative_classification_missing")
+    || !workflowStructureValidator.includes("push_classification_fallback_missing")) {
+  errors.push("production_relative_push_classification_missing");
+}
 if (!workflow.includes("actions/upload-artifact@v4")
     || !workflow.includes("Package exact validated web artifact")
     || !workflow.includes("actions/download-artifact@v4")
