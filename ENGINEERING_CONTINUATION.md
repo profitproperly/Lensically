@@ -1498,7 +1498,13 @@ Stage 4 completion is preserved above. Stage 5 closes only when the MCP protocol
 
 ## Blockers
 
-None currently recorded.
+ACTIVE P1 — Stage 8A workflow dispatch rejected at exact SHA `26ee7ad1110c3049ca444aa214e86cca4bff5315`:
+
+- `runGitHubWorkflow` returned HTTP 422 with `workflow_dispatch_failed` before a confirmed workflow run was created.
+- Incident: `744d68c1-41db-4b38-a90f-5b3c0f342812`.
+- Side effects are unconfirmed; no validation result may be inferred.
+- Current action: inspect the dedicated workflow-lint result and exact workflow structure, repair the root cause, add prevention, then resume Stage 8A validation on a new exact SHA.
+- Stage 8A remains the active checkpoint; this incident does not authorize unrelated work or Manifest operations.
 
 ## Fresh-Chat Startup
 
