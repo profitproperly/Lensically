@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7c-account-review-runtime-dispatch
-repository_base_sha: ea61814c10ee7c6b02b9f2f3871decd971366035
-production_sha: ea61814c10ee7c6b02b9f2f3871decd971366035
+active_checkpoint: stage-7c2-review-batch-runtime-dispatch
+repository_base_sha: 99cfef9f1fe5a322f15810340cfb9e241a05277e
+production_sha: 99cfef9f1fe5a322f15810340cfb9e241a05277e
 
 
 
@@ -1296,11 +1296,23 @@ Completed checkpoint — Stage 7B Manifest runtime dispatch composition:
 - Exact-SHA release passed in run `30424793999`.
 - Live production independently confirmed exact SHA `ea61814c10ee7c6b02b9f2f3871decd971366035` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7C Account and review runtime dispatch composition:
+Stage 7C Account and review runtime dispatch composition — IN PROGRESS.
 
-Move the next coherent runtime shell out of `handleOperatorTool`: account-state reads, Lensically UI reads, Manifest review-batch retirement, hourly coverage, review-batch claim/read/attachment/source-skip/scheduling, and their response normalization. Keep all existing product services and D1 adapters exact; centralize only ordered routing and runtime response composition.
+Completed subcheckpoint — Stage 7C1 account and coverage keyed routing:
 
-Add direct regression coverage and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
+- Added the reusable `dispatchOperatorKeyedRuntimeTool` runtime composition primitive with exact-handler, default-status, explicit-status, and unknown-tool regressions.
+- Routed `get_account_state`, `read_lensically_ui_surface`, `discard_manifest_review_batch`, and `get_hourly_coverage` through one lazy keyed dispatcher while preserving all existing service and D1 adapters.
+- Added permanent lifecycle enforcement requiring the keyed bindings and forbidding the four direct branches from returning.
+- Push validation passed in run `30425227541`.
+- All eight Operator shards passed in run `30425247565`.
+- Exact-SHA release passed in run `30425505502`.
+- Live production independently confirmed exact SHA `99cfef9f1fe5a322f15810340cfb9e241a05277e` with 75/75 public tools.
+
+ACTIVE subcheckpoint — Stage 7C2 review-batch operations routing:
+
+Route `get_manifest_review_batch`, `attach_manifest_review_draft`, `skip_manifest_review_source`, and `schedule_manifest_review_batch` through the reusable keyed runtime dispatcher while preserving their existing services, D1 adapters, ordering, status codes, and scheduling gates.
+
+Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, and independent live verification. Then extract the remaining inline `claim_manifest_review_batch` workflow as Stage 7C3.
 
 
 
