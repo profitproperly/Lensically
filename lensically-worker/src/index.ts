@@ -1012,9 +1012,27 @@ export function compactManifestAutonomousPreparationPayload(
   const targetSlots = (Array.isArray(cycle.target_slots) ? cycle.target_slots : [])
     .map(compactManifestAutonomousSlot)
     .filter((slot): slot is Record<string, unknown> => Boolean(slot));
-  const missingSlots = (Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [])
+    const missingSlots = (Array.isArray(cycle.missing_slots) ? cycle.missing_slots : [])
     .map(compactManifestAutonomousSlot)
     .filter((slot): slot is Record<string, unknown> => Boolean(slot));
+  const lockedSourceSelectionPlan = (Array.isArray(payload.locked_source_selection_plan)
+    ? payload.locked_source_selection_plan
+    : [])
+    .map((value) => {
+      const item = value && typeof value === "object" && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+      return {
+        slot_key: item.slot_key ?? null,
+        selection_order: item.selection_order ?? null,
+        source_identity_key: item.source_identity_key ?? null,
+        source_card_family_id: item.source_card_family_id ?? null,
+        source_card_id: item.source_card_id ?? null,
+        engine_version: item.engine_version ?? null,
+        status: item.status ?? null,
+      };
+    })
+    .filter((item) => Boolean(item.slot_key && item.source_card_id));
   const occupiedSlots = (Array.isArray(runway.occupied_slots) ? runway.occupied_slots : [])
     .map((value) => {
       const slot = compactManifestAutonomousSlot(value);
@@ -1079,7 +1097,12 @@ export function compactManifestAutonomousPreparationPayload(
       refreshed_live_state: payload.refreshed_live_state === true,
       rolling_evidence: compactManifestRollingEvidence(payload.rolling_evidence),
       strategy_required: payload.strategy_required === true,
-      source_backed_generation_only: payload.source_backed_generation_only === true,
+            source_backed_generation_only: payload.source_backed_generation_only === true,
+      source_selection_plan_status: payload.source_selection_plan_status ?? null,
+      locked_source_selection_plan: lockedSourceSelectionPlan,
+      model_source_substitution_allowed: false,
+      remaining_missing_count: payload.remaining_missing_count ?? missingSlots.length,
+      next_missing_slot: compactManifestAutonomousSlot(payload.next_missing_slot),
       next_action: payload.next_action ?? null,
       cycle: {
         id: cycle.id ?? null,
@@ -1172,8 +1195,9 @@ export function compactManifestAutonomousPreparationPayload(
         truncated: true,
         actionable_autonomous_cycle_preserved: true,
         all_target_slots_preserved: targetSlots.length === (Array.isArray(cycle.target_slots) ? cycle.target_slots.length : 0),
-        all_missing_slots_preserved: missingSlots.length === (Array.isArray(cycle.missing_slots) ? cycle.missing_slots.length : 0),
-                decision_intelligence_categories_preserved: true,
+                all_missing_slots_preserved: missingSlots.length === (Array.isArray(cycle.missing_slots) ? cycle.missing_slots.length : 0),
+        all_locked_source_plan_items_preserved: lockedSourceSelectionPlan.length === (Array.isArray(payload.locked_source_selection_plan) ? payload.locked_source_selection_plan.length : 0),
+        decision_intelligence_categories_preserved: true,
         rolling_evidence_manifest_preserved: true,
       },
     };
@@ -1309,7 +1333,12 @@ export function compactManifestAutonomousPreparationPayload(
     refreshed_live_state: payload.refreshed_live_state === true,
     rolling_evidence: compactManifestRollingEvidence(payload.rolling_evidence),
     strategy_required: payload.strategy_required === true,
-    source_backed_generation_only: payload.source_backed_generation_only === true,
+        source_backed_generation_only: payload.source_backed_generation_only === true,
+    source_selection_plan_status: payload.source_selection_plan_status ?? null,
+    locked_source_selection_plan: lockedSourceSelectionPlan,
+    model_source_substitution_allowed: false,
+    remaining_missing_count: payload.remaining_missing_count ?? missingSlots.length,
+    next_missing_slot: compactManifestAutonomousSlot(payload.next_missing_slot),
     next_action: payload.next_action ?? null,
     cycle: {
       id: cycle.id ?? null,
@@ -1419,8 +1448,9 @@ export function compactManifestAutonomousPreparationPayload(
       truncated: true,
       actionable_autonomous_cycle_preserved: true,
       all_target_slots_preserved: true,
-      all_missing_slots_preserved: true,
-            decision_intelligence_categories_preserved: true,
+            all_missing_slots_preserved: true,
+      all_locked_source_plan_items_preserved: lockedSourceSelectionPlan.length === (Array.isArray(payload.locked_source_selection_plan) ? payload.locked_source_selection_plan.length : 0),
+      decision_intelligence_categories_preserved: true,
       rolling_evidence_manifest_preserved: true,
       minimal_operational_tier: true,
     },

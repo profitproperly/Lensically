@@ -3485,6 +3485,11 @@ for (const workKey of supersededDefaultWorkItems) {
 if (!source.includes('work_key: "manifest_autonomous_posting_restoration"')) {
   errors.push("manifest_posting_restoration_default_missing");
 }
+if (!source.includes("locked_source_selection_plan: lockedSourceSelectionPlan")
+    || !source.includes("all_locked_source_plan_items_preserved")
+    || !source.includes("model_source_substitution_allowed: false")) {
+  errors.push("bounded_manifest_locked_source_plan_missing");
+}
 if (source.includes('callDirectLiveTool("getOperatorStartupContext"')) {
   errors.push("self_referential_live_startup_probe_forbidden");
 }
