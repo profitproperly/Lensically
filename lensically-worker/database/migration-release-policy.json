@@ -1,0 +1,13 @@
+{
+  "version": "lensically-migration-release-policy-v1",
+  "filename_pattern": "^\\d{4}_[a-z0-9][a-z0-9_]*\\.sql$",
+  "sequence_starts_at": 1,
+  "required_release_class_header": "-- lensically-release-class: <schema|backfill>",
+  "normal_release_class": "schema",
+  "long_running_release_class": "backfill",
+  "normal_release_rule": "Only ordered, unapplied schema migrations that pass the safety planner may run in the standard release lane.",
+  "backfill_rule": "Backfill-class work never runs through the standard migration apply command and requires the measured resumable backfill lane.",
+  "edited_applied_migration_rule": "Any modification, deletion, or rename of a migration present at the deployed production SHA fails release closed.",
+  "production_ledger_rule": "Applied production migration names must be an exact ordered prefix of the repository migration inventory.",
+  "unapplied_rule": "Wrangler's remote unapplied list must equal the repository suffix after the applied production prefix."
+}
