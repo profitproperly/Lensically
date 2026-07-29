@@ -1233,16 +1233,29 @@ Completed checkpoint — Stage 6AW account directory read service extraction:
 - Hardened exact-SHA release and live verification passed in run `30419064029`.
 - Live production independently confirmed exact SHA `882593fdeebeb21954361c3bfae50b4d3535b674` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AX gate-evaluation service extraction:
+Completed checkpoint — Stage 6AX gate-evaluation service extraction:
 
-Move `run_gates` deterministic request shaping, product-level orchestration, and exact response ownership into a bounded gate-evaluation service while preserving:
+- Extended `src/operatorGateMutationPlanningService.ts` with `evaluateOperatorGates` as the gate-domain authority for source-card, draft-text, stage, lane, content-type, draft-analysis, and model-gate normalization plus exact gate-engine result propagation.
+- Reduced `run_gates` in `src/index.ts` to the existing gate engine, canonical brand context, shared normalizers, and HTTP transport.
+- Extended `test/operatorGateMutationPlanningService.spec.ts` atomically with exact normalization, nested-lane fallback, explicit-lane precedence, invalid structured-surface, and exact result regressions.
+- Added permanent handler-scoped ownership gates without modifying the proven gate engine.
+- Focused validation passed in run `30419695010`.
+- Push validation passed in run `30419687047`.
+- All eight Operator shards passed in run `30419943519`.
+- Hardened exact-SHA release and live verification passed in run `30420001078`.
+- Live production independently confirmed exact SHA `42ddc4fbbb89d89ca8029d18eb7677d9a512684f` with 75/75 public tools.
 
-- source-card, draft-text, stage-scope, lane-key, content-type, draft-analysis, and model-gate normalization
-- canonical brand context and gate-engine delegation
-- exact result propagation without weakening any deterministic or model gate
-- read/evaluation behavior without unrelated product mutation
+ACTIVE checkpoint — Stage 6AY retired monolithic runway removal:
 
-Keep canonical brand identity, the existing gate engine, shared normalizers, and HTTP transport explicit at the `index.ts` boundary. Create the service and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Remove the unreferenced `commitManifestAutonomousRunway` implementation from `src/index.ts` while preserving:
+
+- the public `commit_manifest_autonomous_runway` retirement response and 410 status
+- the supported one-post persistence path through `persist_manifest_autonomous_post`
+- shared source-card resolution still used by the supported persistence service
+- all current autonomous-cycle behavior and live tool boundaries
+
+Add permanent lifecycle prevention proving the retired implementation cannot return, then run exact-SHA validation and release.
+
 
 
 
@@ -1291,7 +1304,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AX
+6. Product-service extraction — ACTIVE at Stage 6AY
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
