@@ -178,6 +178,7 @@ const tests = read("test/operatorMode.spec.ts");
 const manifestAutonomousTests = read("manifest-autonomous-cycle.test.ts");
 const operatorShardRunner = read("scripts/run-operator-shard.mjs");
 const testSyntaxValidator = read("scripts/validate-test-syntax.mjs");
+const fullValidationRunner = read("scripts/run-full-validation.mjs");
 const workflow = read("../.github/workflows/lensically-engineering.yml").replace(/\r\n/g, "\n");
 const workflowLint = read("../.github/workflows/lensically-workflow-lint.yml").replace(/\r\n/g, "\n");
 const workflowStructureValidator = read("scripts/validate-engineering-workflow.rb");
@@ -203,6 +204,35 @@ if (process.argv.includes("--print-crons")) {
 }
 
 const errors = [];
+const sharedFullValidationCalls = workflow.match(/node scripts\/run-full-validation\.mjs/g) ?? [];
+if (!fullValidationRunner.includes('contract: "lensically-full-validation-v1"')
+    || !fullValidationRunner.includes("const completeTestFiles = [")
+    || !fullValidationRunner.includes("const operatorMilestoneTitles = [")
+    || !fullValidationRunner.includes('process_count: 3')
+    || !fullValidationRunner.includes('process.argv.includes("--check")')
+    || !fullValidationRunner.includes('"test/databaseMigrations.spec.ts"')
+    || !fullValidationRunner.includes('"test/operatorMcpRoutingPolicy.spec.ts"')
+    || !fullValidationRunner.includes('"test/operatorManifestPersistenceService.spec.ts"')
+    || !fullValidationRunner.includes('"test/operatorScheduledPostEditMutationService.spec.ts"')
+    || !fullValidationRunner.includes('"manifest-autonomous-cycle.test.ts"')
+    || !fullValidationRunner.includes('"test/systemDirectory.spec.ts"')
+    || !fullValidationRunner.includes('"test/threadsPublishService.spec.ts"')
+    || !fullValidationRunner.includes('"test/humanFreeAutonomy.spec.ts"')) {
+  errors.push("shared_full_validation_runner_incomplete");
+}
+if (sharedFullValidationCalls.length < 6) {
+  errors.push(`shared_full_validation_workflow_calls_incomplete:${sharedFullValidationCalls.length}`);
+}
+if (workflow.includes("npm run test -- --run test/operatorMcpProtocol.spec.ts")
+    || workflow.includes("npm run test -- --run test/operatorManifestPersistenceService.spec.ts")
+    || workflow.includes("npm run test -- --run test/operatorScheduledPostEditMutationService.spec.ts")) {
+  errors.push("duplicated_broad_validation_commands_returned");
+}
+if (!workflowStructureValidator.includes("push_shared_full_validation_missing")
+    || !workflowStructureValidator.includes("release_shared_full_validation_missing")
+    || !workflowStructureValidator.includes("duplicated_broad_validation_commands_returned")) {
+  errors.push("shared_full_validation_workflow_structure_enforcement_missing");
+}
 const manifestSourceBackedFixtureTimeoutUsages = tests.match(/MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS/g) ?? [];
 if (!tests.includes("const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;")
     || manifestSourceBackedFixtureTimeoutUsages.length < 5) {
