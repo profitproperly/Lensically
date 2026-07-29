@@ -2787,8 +2787,12 @@ const manifestAutonomousGrowthChecks = [
     ["prepare_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "prepare_manifest_autonomous_cycle"')],
     ["analysis_page_tool", operatorMcpManifestCycleRegistry.includes('name: "get_manifest_cycle_analysis_page"')],
   ["cycle_strategy_tool", operatorMcpManifestCycleRegistry.includes('name: "commit_manifest_cycle_strategy"')],
-  ["persist_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "persist_manifest_autonomous_post"')],
-  ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')],
+    ["persist_tool", operatorMcpAutonomousExecutionRegistry.includes('name: "persist_manifest_autonomous_post"')],
+  ["retired_monolithic_commit", source.includes('error: "retired_monolithic_autonomous_commit"')
+    && !source.includes("async function commitManifestAutonomousRunway(")
+    && !source.includes("invalid_or_duplicate_autonomous_post")
+    && !source.includes("autonomous_generation_gates_failed")
+    && !source.includes("autonomous_scheduling_gates_failed")],
     ["source_backed_only", source.includes('source_backed_generation_only: true')
     && source.includes('canonical_source_card_required')
     && manifestIntelligence.includes('manifest_cycle_lineup_source_backed_only')
