@@ -11,6 +11,7 @@ const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
+const manifestIntelligence = read("src/manifestIntelligence.ts");
 const operatorMcpProtocol = read("src/operatorMcpProtocol.ts");
 const operatorMcpProtocolTests = read("test/operatorMcpProtocol.spec.ts");
 const operatorMcpToolDefinitions = read("src/operatorMcpToolDefinitions.ts");
@@ -1557,8 +1558,16 @@ if (!operatorManifestCycleConstructionService.includes("export async function co
 if (!operatorManifestCycleConstructionServiceTests.includes("constructs a new authoritative cycle and locks only eligible source cards")
     || !operatorManifestCycleConstructionServiceTests.includes("refreshes an existing cycle with a compact cycle and decision reference")
     || !operatorManifestCycleConstructionServiceTests.includes("completes a fully occupied horizon without source-plan work")
+    || !operatorManifestCycleConstructionServiceTests.includes("bounds oversized evidence snapshot metadata before D1 persistence")
     || !operatorManifestCycleConstructionServiceTests.includes("bounds oversized cycle construction state before D1 persistence")) {
   lifecycleErrors.push("operator_manifest_cycle_construction_service_tests_incomplete");
+}
+if (!manifestIntelligence.includes("export function stableManifestEvidenceSnapshotMetadataJson")
+    || !manifestIntelligence.includes("MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES")
+    || !manifestIntelligence.includes('"manifest_evidence.hard_bans"')
+    || !manifestIntelligence.includes("snapshotMetadataJson.hardBans")
+    || manifestIntelligence.includes("stableManifestJson(input.hardBans), stableManifestJson(input.experiments)")) {
+  lifecycleErrors.push("manifest_evidence_snapshot_metadata_budget_guard_missing");
 }
 if (!source.includes('from "./operatorManifestPersistenceAdmissionService"')
     || !source.includes("admitOperatorManifestPersistence({")

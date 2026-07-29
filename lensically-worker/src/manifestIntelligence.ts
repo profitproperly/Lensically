@@ -111,6 +111,101 @@ export function stableManifestJson(value: unknown): string {
   return JSON.stringify(stableValue(value));
 }
 
+export const MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES = 120000;
+
+const MANIFEST_EVIDENCE_METADATA_PRIORITY_KEYS = [
+  "primary_metric",
+  "snapshot_key",
+  "cycle_id",
+  "version",
+  "window_hours",
+  "rule_key",
+  "description",
+  "rule_type",
+  "scope",
+  "source_authority",
+  "experiment_key",
+  "family_key",
+  "status",
+  "updated_at",
+] as const;
+const MANIFEST_EVIDENCE_METADATA_PRIORITY = new Map<string, number>(
+  MANIFEST_EVIDENCE_METADATA_PRIORITY_KEYS.map((key, index) => [key, index]),
+);
+
+function manifestEvidenceJsonBytes(value: unknown): number {
+  return new TextEncoder().encode(stableManifestJson(value)).byteLength;
+}
+
+function compactManifestEvidenceMetadataValue(
+  value: unknown,
+  limits: { arrayItems: number; stringChars: number; objectKeys: number; maxDepth: number },
+  depth = 0,
+): unknown {
+  if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") {
+    return value ?? null;
+  }
+  if (typeof value === "string") return value.slice(0, limits.stringChars);
+  if (depth >= limits.maxDepth) return Array.isArray(value) ? [] : { compacted: true };
+  if (Array.isArray(value)) {
+    return value.slice(0, limits.arrayItems).map((item) => compactManifestEvidenceMetadataValue(
+      item,
+      limits,
+      depth + 1,
+    ));
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as JsonRecord).map(([key, entry], index) => ({ key, entry, index }));
+    entries.sort((left, right) => {
+      const leftRank = MANIFEST_EVIDENCE_METADATA_PRIORITY.get(left.key) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = MANIFEST_EVIDENCE_METADATA_PRIORITY.get(right.key) ?? Number.MAX_SAFE_INTEGER;
+      return leftRank - rightRank || left.index - right.index;
+    });
+    return Object.fromEntries(entries.slice(0, limits.objectKeys).map(({ key, entry }) => [
+      key,
+      compactManifestEvidenceMetadataValue(entry, limits, depth + 1),
+    ]));
+  }
+  return String(value).slice(0, limits.stringChars);
+}
+
+export function stableManifestEvidenceSnapshotMetadataJson(
+  value: unknown,
+  path: string,
+  maxBytes = MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES,
+): string {
+  const boundedBytes = Math.max(4096, Math.trunc(maxBytes));
+  const originalJson = stableManifestJson(value);
+  if (new TextEncoder().encode(originalJson).byteLength <= boundedBytes) return originalJson;
+  const attempts = [
+    { arrayItems: 72, stringChars: 1200, objectKeys: 48, maxDepth: 7 },
+    { arrayItems: 48, stringChars: 600, objectKeys: 32, maxDepth: 6 },
+    { arrayItems: 24, stringChars: 300, objectKeys: 20, maxDepth: 5 },
+    { arrayItems: 12, stringChars: 160, objectKeys: 12, maxDepth: 4 },
+    { arrayItems: 6, stringChars: 96, objectKeys: 8, maxDepth: 3 },
+  ];
+  for (const limits of attempts) {
+    const compacted = compactManifestEvidenceMetadataValue(value, limits);
+    if (manifestEvidenceJsonBytes(compacted) <= boundedBytes) return stableManifestJson(compacted);
+  }
+  if (Array.isArray(value)) return "[]";
+  const source = value && typeof value === "object" ? value as JsonRecord : {};
+  const fallback = {
+    primary_metric: source.primary_metric ?? null,
+    persistence_compaction: {
+      version: "manifest-evidence-snapshot-metadata-v1",
+      path,
+      original_bytes: new TextEncoder().encode(originalJson).byteLength,
+      fallback: true,
+    },
+  };
+  const fallbackJson = stableManifestJson(fallback);
+  if (new TextEncoder().encode(fallbackJson).byteLength > boundedBytes) {
+    throw new Error(`manifest_evidence_snapshot_metadata_budget_exceeded:${path}`);
+  }
+  return fallbackJson;
+}
+
 export function chunkManifestEvidenceWriteRows<T>(
   rows: T[],
   maxRows = MANIFEST_EVIDENCE_WRITE_MAX_ROWS,
@@ -750,10 +845,18 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
     hard_bans: input.hardBans,
     experiments: input.experiments,
   });
-  const existing = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? LIMIT 1`)
+    const existing = await db.prepare(`SELECT * FROM operator_manifest_evidence_snapshots WHERE cycle_id = ? LIMIT 1`)
     .bind(input.cycleId).first<JsonRecord>();
   const snapshotId = text(existing?.id, 160) || crypto.randomUUID();
   if (existing && String(existing.brand_key) !== input.brandKey) throw new Error("manifest_evidence_cycle_brand_conflict");
+  const snapshotMetadataJson = {
+    benchmarks: stableManifestEvidenceSnapshotMetadataJson(input.benchmarks, "manifest_evidence.benchmarks"),
+    previousBenchmarks: stableManifestEvidenceSnapshotMetadataJson(input.previousBenchmarks ?? {}, "manifest_evidence.previous_benchmarks"),
+    recentExposure: stableManifestEvidenceSnapshotMetadataJson(input.recentExposure, "manifest_evidence.recent_exposure"),
+    futureSchedule: stableManifestEvidenceSnapshotMetadataJson(input.futureSchedule, "manifest_evidence.future_schedule"),
+    hardBans: stableManifestEvidenceSnapshotMetadataJson(input.hardBans, "manifest_evidence.hard_bans"),
+    experiments: stableManifestEvidenceSnapshotMetadataJson(input.experiments, "manifest_evidence.experiments"),
+  };
   await db.prepare(`INSERT INTO operator_manifest_evidence_snapshots (
       id, cycle_id, brand_key, snapshot_version, as_of, timezone, window_days,
             window_start, window_end, post_count, mature_count, immature_count, incomplete_count,
@@ -774,9 +877,9 @@ export async function createManifestEvidenceSnapshot(db: D1Database, input: {
       snapshotId, input.cycleId, input.brandKey, MANIFEST_EVIDENCE_SNAPSHOT_VERSION,
             input.asOf, input.timezone, MANIFEST_ANALYSIS_WINDOW_DAYS, input.windowStart, input.windowEnd,
       postCount, matureCount, immatureCount, incompleteCount, pageSize, pageCount, pageByteBudget,
-      stableManifestJson(input.benchmarks), stableManifestJson(input.previousBenchmarks ?? {}),
-      stableManifestJson(input.recentExposure), stableManifestJson(input.futureSchedule),
-      stableManifestJson(input.hardBans), stableManifestJson(input.experiments), sourceHash,
+            snapshotMetadataJson.benchmarks, snapshotMetadataJson.previousBenchmarks,
+      snapshotMetadataJson.recentExposure, snapshotMetadataJson.futureSchedule,
+      snapshotMetadataJson.hardBans, snapshotMetadataJson.experiments, sourceHash,
     ).run();
   if (!existing || String(existing.source_hash) !== sourceHash) {
         await db.batch([

@@ -4,6 +4,11 @@ import {
   type OperatorManifestConstructionSlot,
   type OperatorManifestCycleConstructionDependencies,
 } from "../src/operatorManifestCycleConstructionService";
+import {
+  MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES,
+  stableManifestEvidenceSnapshotMetadataJson,
+} from "../src/manifestIntelligence";
+
 
 type JsonRecord = Record<string, unknown>;
 
@@ -349,6 +354,41 @@ describe("Operator Manifest cycle construction service", () => {
       },
     });
     expect(String(result.next_action)).toContain("prepared horizon is covered");
+  });
+
+    it("bounds oversized evidence snapshot metadata before D1 persistence", () => {
+    const oversizedHardBans = Array.from({ length: 150 }, (_, index) => ({
+      rule_key: `rule-${index}`,
+      description: `Description ${index} ${"d".repeat(3000)}`,
+      rule_type: "semantic_rule",
+      pattern: `Pattern ${index} ${"p".repeat(8000)}`,
+      scope: "manifest_generation",
+      source_authority: `memory:${index}`,
+      pass_examples: ["a".repeat(3000)],
+      fail_examples: ["b".repeat(3000)],
+    }));
+    const hardBansJson = stableManifestEvidenceSnapshotMetadataJson(
+      oversizedHardBans,
+      "manifest_evidence.hard_bans",
+    );
+    expect(new TextEncoder().encode(hardBansJson).byteLength)
+      .toBeLessThanOrEqual(MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES);
+    const parsedHardBans = JSON.parse(hardBansJson) as JsonRecord[];
+    expect(Array.isArray(parsedHardBans)).toBe(true);
+    expect(parsedHardBans.length).toBeGreaterThan(0);
+    expect(parsedHardBans[0]).toMatchObject({
+      rule_key: "rule-0",
+      rule_type: "semantic_rule",
+      scope: "manifest_generation",
+      source_authority: "memory:0",
+    });
+    const benchmarksJson = stableManifestEvidenceSnapshotMetadataJson({
+      primary_metric: "24_hour_likes",
+      oversized_payload: "x".repeat(1_000_000),
+    }, "manifest_evidence.benchmarks");
+    expect(JSON.parse(benchmarksJson)).toMatchObject({ primary_metric: "24_hour_likes" });
+    expect(new TextEncoder().encode(benchmarksJson).byteLength)
+      .toBeLessThanOrEqual(MANIFEST_EVIDENCE_SNAPSHOT_METADATA_MAX_BYTES);
   });
 
   it("bounds oversized cycle construction state before D1 persistence", async () => {
