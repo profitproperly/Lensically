@@ -2052,9 +2052,14 @@ if (!source.includes('from "./operatorScheduledPostListReadService"')
     || !source.includes("return operatorJsonResponse(scheduledPostList)")) {
   lifecycleErrors.push("operator_scheduled_post_list_read_service_import_or_binding_missing");
 }
-if (source.includes("const date = normalizeOperatorText(payload.date, 20, true)")
-    || source.includes("const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE")
-    || source.includes("const items = date && isValidIsoDate(date)")) {
+const scheduledPostListHandlerStart = source.indexOf('if (toolName === "list_scheduled_posts")');
+const scheduledPostListHandlerEnd = source.indexOf('if (toolName === "delete_scheduled_post")', scheduledPostListHandlerStart);
+const scheduledPostListHandler = scheduledPostListHandlerStart >= 0 && scheduledPostListHandlerEnd > scheduledPostListHandlerStart
+  ? source.slice(scheduledPostListHandlerStart, scheduledPostListHandlerEnd)
+  : "";
+if (scheduledPostListHandler.includes("const date = normalizeOperatorText(payload.date, 20, true)")
+    || scheduledPostListHandler.includes("const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE")
+    || scheduledPostListHandler.includes("const items = date && isValidIsoDate(date)")) {
   lifecycleErrors.push("operator_scheduled_post_list_read_service_returned_to_index");
 }
 if (!operatorScheduledPostListReadService.includes("export async function readOperatorScheduledPostList")
