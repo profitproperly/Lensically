@@ -203,6 +203,11 @@ if (process.argv.includes("--print-crons")) {
 }
 
 const errors = [];
+const manifestSourceBackedFixtureTimeoutUsages = tests.match(/MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS/g) ?? [];
+if (!tests.includes("const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;")
+    || manifestSourceBackedFixtureTimeoutUsages.length < 5) {
+  errors.push("manifest_source_backed_fixture_timeout_guard_missing");
+}
 if (!workflow.includes("test/operatorMcpProtocol.spec.ts")) {
   errors.push("operator_mcp_protocol_workflow_gate_missing");
 }

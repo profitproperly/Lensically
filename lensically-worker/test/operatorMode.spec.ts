@@ -289,6 +289,8 @@ type ManifestSourceBackedCycleTestFixture = {
   strategyPayload: Record<string, unknown>;
 };
 
+const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;
+
 async function prepareManifestSourceBackedCycleForTest(
   options: { commitStrategy?: boolean } = {},
 ): Promise<ManifestSourceBackedCycleTestFixture> {
@@ -4601,8 +4603,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     const stored = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies WHERE cycle_id = ?`,
     ).bind(fixture.prepared.cycle.id).first<{ total: number }>();
-    expect(Number(stored?.total ?? 0)).toBe(0);
-  }, 30000);
+        expect(Number(stored?.total ?? 0)).toBe(0);
+  }, MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS);
 
   it("rejects follower attribution before source-backed scheduling state is created", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
@@ -4622,8 +4624,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
       `SELECT COUNT(*) AS total FROM operator_autonomous_lineup_items
        WHERE cycle_id = ? AND scheduled_post_id IS NOT NULL`,
     ).bind(fixture.prepared.cycle.id).first<{ total: number }>();
-    expect(Number(scheduled?.total ?? 0)).toBe(0);
-  }, 30000);
+        expect(Number(scheduled?.total ?? 0)).toBe(0);
+  }, MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS);
 
         it("returns the next exact locked cycle plan item from hourly coverage", async () => {
     const fixture = await prepareManifestSourceBackedCycleForTest();
@@ -4659,8 +4661,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
       source_card_id: fixture.sourceCardId,
       source_selection_id: fixture.sourceSelectionId,
     });
-    expect(nextPlan.id).toBe(fixture.planItemIds.get(nextPlan.slot_key));
-  }, 30000);
+        expect(nextPlan.id).toBe(fixture.planItemIds.get(nextPlan.slot_key));
+  }, MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS);
 
     it("reads a complete cycle receipt after source-backed persistence without mutation", async () => {
         const fixture = await prepareManifestSourceBackedCycleForTest();
@@ -4809,8 +4811,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
         (SELECT COUNT(*) FROM operator_manifest_post_hypotheses WHERE cycle_id = ?) AS hypotheses`,
     ).bind(fixture.prepared.cycle.id, fixture.prepared.cycle.id, fixture.prepared.cycle.id)
       .first<{ receipts: number; events: number; hypotheses: number }>();
-        expect(receiptCountsAfter).toEqual(receiptCountsBefore);
-  }, 60000);
+                expect(receiptCountsAfter).toEqual(receiptCountsBefore);
+  }, MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS);
 
       it("rejects the retired scheduled-post review tool from the public MCP surface", async () => {
     const rejected = await mcpToolRaw<Record<string, unknown>>("review_manifest_scheduled_post", {
