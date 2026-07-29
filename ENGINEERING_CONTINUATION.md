@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
-status: idle
+status: active
 updated_at: 2026-07-29
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
-repository_base_sha: bf2f93636eeb88ac64b92f0888c23e44672ec31b
-production_sha: bf2f93636eeb88ac64b92f0888c23e44672ec31b
+active_job_id: p1_live_verification_startup_ack
+active_checkpoint: repair_verify_deployed_mcp_startup_ack
+repository_base_sha: 0f9e25bdd88cf85e4ce480617237691521acf635
+production_sha: 00686baacbc83d3baebcdb660a1b9e7938cd03b8
 
 
 
@@ -31,7 +31,15 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 
 ## Unified Job Queue
 
-### 10 — ACTIVE — `worker-monolith-refactor`
+### 1 — ACTIVE — `p1_live_verification_startup_ack`
+
+- Incident: `23bf4d07-e4dd-47a3-9c36-74ec8e8bd77e`.
+- Verified failure: `verifyDeployedMcpVersion` reached the live 75-tool endpoint but returned `startup_direct: false`, blocking normal work.
+- Root cause: the live self-verification path invokes `getOperatorStartupContext` with empty arguments even though every public tool now requires the exact `governing_standards_ack` field.
+- Current checkpoint: pass the mandatory acknowledgment through the live startup probe, add focused regression coverage, validate, exact-SHA release, independently verify the live boundary, and close the incident before resuming Stage 9.
+- Completion condition: shared cause repaired, focused regression passed, exact tested head released, live `startup_direct: true`, incident closure recorded, and normal work unblocked.
+
+### 10 — QUEUED — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
 - Current checkpoint: Stage 8E release acceptance consolidation.
@@ -73,7 +81,7 @@ Stage 3 production evidence:
 
 ## Current Action
 
-No current Lensically job is active. Stage 9 is queued under an owner-directed hold and has not started.
+Repair the P1 live verification startup acknowledgment regression. The owner has explicitly resumed the engineering continuation; after this incident closes, resume `worker-monolith-refactor` at Stage 9 final comparison and production release, then continue the queue in canonical order.
 
 ### Canonical steering rule — immediate scope reduction
 
@@ -1599,7 +1607,11 @@ Stage 4 completion is preserved above. Stage 5 closes only when the MCP protocol
 
 ## Blockers
 
-None currently recorded.
+Active P1 — live verification startup acknowledgment regression:
+
+- Incident `23bf4d07-e4dd-47a3-9c36-74ec8e8bd77e`.
+- `verifyDeployedMcpVersion` successfully initialized the live MCP endpoint and listed all 75 tools, but its direct startup probe omitted the mandatory governing-standards acknowledgment and therefore returned no startup payload.
+- Normal work remains blocked until the shared invocation is repaired, regression-protected, released, and live-verified.
 
 Resolved P1 — Stage 8A workflow dispatch rejection:
 
