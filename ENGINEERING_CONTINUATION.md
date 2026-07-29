@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d5-gate-memory-routing
-repository_base_sha: 16389b9bb729578be4d8476e19746a9154708437
-production_sha: 16389b9bb729578be4d8476e19746a9154708437
+active_checkpoint: stage-7d6-scheduling-results-routing
+repository_base_sha: 73f3b2b049d5f6389272adc7e5d1092e93c34f7b
+production_sha: 73f3b2b049d5f6389272adc7e5d1092e93c34f7b
 
 
 
@@ -1378,11 +1378,21 @@ Completed checkpoint — Stage 7D4 gate and draft execution routing:
 - Exact-SHA release passed in run `30428848762`.
 - Live production independently confirmed exact SHA `16389b9bb729578be4d8476e19746a9154708437` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 7D5 gate management and strategy-memory routing:
+Completed checkpoint — Stage 7D5 gate management and strategy-memory routing:
 
-Route `list_active_gates`, `create_or_update_gate`, `promote_memory_to_gate`, `list_strategy_memory`, and `save_strategy_memory` through the keyed response dispatcher. Preserve active-gate filters, gate mutation planning and persistence, memory promotion, memory reads and saves, aliases, D1 adapters, and exact early responses.
+- Routed `list_active_gates`, `create_or_update_gate`, `promote_memory_to_gate`, `list_strategy_memory`, and `save_strategy_memory` through shared keyed response handlers.
+- Shared one gate-mutation handler across create/update and memory-promotion aliases while preserving active-gate filters, mutation planning, D1 persistence, strategy-memory reads and saves, and exact early responses.
+- Added permanent lifecycle ownership enforcement preventing the five direct branches from returning.
+- Push validation passed in run `30429007256`.
+- All eight Operator shards passed in run `30429030073`.
+- Exact-SHA release passed in run `30429397596`.
+- Live production independently confirmed exact SHA `73f3b2b049d5f6389272adc7e5d1092e93c34f7b` with 75/75 public tools.
 
-Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the final scheduling/results runtime cluster.
+ACTIVE checkpoint — Stage 7D6 scheduling and results runtime routing:
+
+Route `list_scheduled_posts`, `delete_scheduled_post`, `edit_scheduled_post`, `schedule_owner_approved_batch`, `schedule_approved_draft`, and `get_post_results` through keyed runtime composition. Preserve owner-ratified destructive controls, edit and scheduling admission, hourly coverage and collision gates, lineage and inventory writes, batch and single-draft behavior, D1 adapters, exact status codes, and every early response.
+
+Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, and independent live verification. After release, audit remaining `handleOperatorTool` product branches and either close Stage 7 or activate one final explicitly bounded residual cluster.
 
 
 
