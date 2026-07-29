@@ -106,6 +106,7 @@ import {
   observeOperatorManifestCycleToolResult,
 } from "./operatorManifestCycleObservationService";
 import {
+    readOperatorAccountDirectory,
   readOperatorAccountState,
   readOperatorPostResults,
 } from "./operatorAccountStateService";
@@ -12438,12 +12439,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 
 
-  if (toolName === "list_accounts") {
-    return operatorJsonResponse({
-      accounts: await listOperatorAccounts(env),
-      operating_mode: "autonomous_operator",
-      human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+    if (toolName === "list_accounts") {
+    const accountDirectory = await readOperatorAccountDirectory({
+      humanFreeAutonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
+    }, {
+      listAccounts: () => listOperatorAccounts(env),
     });
+    return operatorJsonResponse(accountDirectory);
   }
 
   const brand = await resolveOperatorBrandFromPayload(env, payload);

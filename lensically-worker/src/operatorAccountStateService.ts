@@ -1,5 +1,20 @@
 type JsonRecord = Record<string, unknown>;
 
+export interface OperatorAccountDirectoryDependencies {
+  listAccounts(): Promise<JsonRecord[]>;
+}
+
+export async function readOperatorAccountDirectory(
+  input: { humanFreeAutonomy: JsonRecord },
+  dependencies: OperatorAccountDirectoryDependencies,
+): Promise<JsonRecord> {
+  return {
+    accounts: await dependencies.listAccounts(),
+    operating_mode: "autonomous_operator",
+    human_free_autonomy: input.humanFreeAutonomy,
+  };
+}
+
 export interface OperatorAccountStateDependencies {
   getActiveSession(brandKey: string): Promise<JsonRecord | null>;
   getSourceCard(brandKey: string, sourceCardId: string): Promise<JsonRecord | null>;

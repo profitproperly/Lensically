@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-    readOperatorAccountState,
+      readOperatorAccountDirectory,
+  readOperatorAccountState,
   readOperatorPostResults,
   type OperatorAccountStateDependencies,
   type OperatorPostResultsDependencies,
@@ -27,6 +28,31 @@ function createHarness() {
   };
   return { mocks, dependencies };
 }
+
+describe("operator account directory service", () => {
+  it("returns the canonical account directory and autonomy contract without brand selection", async () => {
+    const listAccounts = vi.fn(async () => [
+      { brand_key: "manifest_mental", account_id: "account-1" },
+      { brand_key: "vectrix", account_id: "account-2" },
+    ]);
+    const humanFreeAutonomy = {
+      owner_review: "optional_non_blocking",
+      execution_mode: "autonomous_operator",
+    };
+
+    const result = await readOperatorAccountDirectory({ humanFreeAutonomy }, { listAccounts });
+
+    expect(listAccounts).toHaveBeenCalledOnce();
+    expect(result).toEqual({
+      accounts: [
+        { brand_key: "manifest_mental", account_id: "account-1" },
+        { brand_key: "vectrix", account_id: "account-2" },
+      ],
+      operating_mode: "autonomous_operator",
+      human_free_autonomy: humanFreeAutonomy,
+    });
+  });
+});
 
 describe("operatorAccountStateService", () => {
   it("reads the selected account state and resolves its active source card", async () => {

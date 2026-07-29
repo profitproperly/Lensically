@@ -1151,8 +1151,10 @@ if (!operatorManifestCycleObservationServiceTests.includes("classifies expected 
   lifecycleErrors.push("operator_manifest_cycle_observation_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorAccountStateService"')
+    || !source.includes("readOperatorAccountDirectory({")
     || !source.includes("readOperatorAccountState({")
     || !source.includes("readOperatorPostResults({")
+        || !source.includes("listAccounts: () => listOperatorAccounts(env)")
     || !source.includes("getActiveSession: (brandKey)")
     || !source.includes("countScheduledPosts: async")
     || !source.includes("loadScheduledLineage: async (publishedPostId)")
@@ -1160,6 +1162,15 @@ if (!source.includes('from "./operatorAccountStateService"')
     || !source.includes("listPerformanceScores: async (publishedPostId)")) {
   lifecycleErrors.push("operator_account_state_service_import_or_binding_missing");
 }
+const operatorAccountDirectoryHandlerStart = source.indexOf('if (toolName === "list_accounts")');
+const operatorAccountDirectoryHandlerEnd = source.indexOf(
+  "const brand = await resolveOperatorBrandFromPayload",
+  operatorAccountDirectoryHandlerStart,
+);
+const operatorAccountDirectoryHandler = operatorAccountDirectoryHandlerStart >= 0
+  && operatorAccountDirectoryHandlerEnd > operatorAccountDirectoryHandlerStart
+  ? source.slice(operatorAccountDirectoryHandlerStart, operatorAccountDirectoryHandlerEnd)
+  : "";
 const operatorPostResultsHandlerStart = source.indexOf('if (toolName === "get_post_results")');
 const operatorPostResultsHandlerEnd = source.indexOf(
   'return operatorJsonResponse({ success: false, error: "unknown_operator_tool"',
@@ -1169,7 +1180,10 @@ const operatorPostResultsHandler = operatorPostResultsHandlerStart >= 0
   && operatorPostResultsHandlerEnd > operatorPostResultsHandlerStart
   ? source.slice(operatorPostResultsHandlerStart, operatorPostResultsHandlerEnd)
   : "";
-if (source.includes("active_workflow_session: activeSession")
+if (operatorAccountDirectoryHandler.includes("accounts: await listOperatorAccounts(env)")
+    || operatorAccountDirectoryHandler.includes('operating_mode: "autonomous_operator"')
+    || operatorAccountDirectoryHandler.includes("human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT")
+    || source.includes("active_workflow_session: activeSession")
     || source.includes("latest_approved_drafts: approved")
     || source.includes("active_gates_count: gates.length")
     || operatorPostResultsHandler.includes("const lineageRow = scheduled ?? draftFallback")
@@ -1178,7 +1192,11 @@ if (source.includes("active_workflow_session: activeSession")
     || operatorPostResultsHandler.includes("latestSnapshot?.metrics_json !== serializedMetrics")) {
   lifecycleErrors.push("operator_account_state_service_returned_to_index");
 }
-if (!operatorAccountStateService.includes("export async function readOperatorAccountState")
+if (!operatorAccountStateService.includes("export async function readOperatorAccountDirectory")
+    || !operatorAccountStateService.includes("dependencies.listAccounts")
+    || !operatorAccountStateService.includes('operating_mode: "autonomous_operator"')
+    || !operatorAccountStateService.includes("human_free_autonomy: input.humanFreeAutonomy")
+    || !operatorAccountStateService.includes("export async function readOperatorAccountState")
     || !operatorAccountStateService.includes("dependencies.getActiveSession")
     || !operatorAccountStateService.includes("dependencies.getSourceCard")
     || !operatorAccountStateService.includes("dependencies.listDraftsByStatus")
@@ -1196,7 +1214,8 @@ if (!operatorAccountStateService.includes("export async function readOperatorAcc
     || !operatorAccountStateService.includes("dependencies.listMetricHistory")) {
   lifecycleErrors.push("operator_account_state_service_module_incomplete");
 }
-if (!operatorAccountStateServiceTests.includes("reads the selected account state and resolves its active source card")
+if (!operatorAccountStateServiceTests.includes("returns the canonical account directory and autonomy contract without brand selection")
+    || !operatorAccountStateServiceTests.includes("reads the selected account state and resolves its active source card")
     || !operatorAccountStateServiceTests.includes("does not read a source card when the active session has no source identity")
         || !operatorAccountStateServiceTests.includes("normalizes an unavailable scheduled count without changing the response contract")
     || !operatorAccountStateServiceTests.includes("prepares schemas before exact published-post admission")
