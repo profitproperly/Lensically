@@ -762,12 +762,13 @@ if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 55-tool a
 }
 if (!source.includes('from "./operatorMcpRoutingPolicy"')
     || !source.includes("admitOperatorRuntimeToolCall,")
+    || !source.includes("dispatchOperatorManifestRuntimeTool,")
     || !source.includes("const OPERATOR_MCP_ROUTING_POLICY = createOperatorMcpRoutingPolicy")) {
   lifecycleErrors.push("operator_mcp_routing_policy_import_or_binding_missing");
 }
 const operatorToolHandlerStart = source.indexOf("async function handleOperatorTool(");
 const operatorToolHandlerDispatchStart = source.indexOf(
-  'if (isOperatorManifestCycleServiceToolName(toolName))',
+  "const manifestRuntimeDispatch = await dispatchOperatorManifestRuntimeTool(",
   operatorToolHandlerStart,
 );
 const operatorToolAdmissionShell = operatorToolHandlerStart >= 0
@@ -967,8 +968,8 @@ if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admiss
   lifecycleErrors.push("operator_mcp_tool_call_dispatcher_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestCycleService"')
-    || !source.includes("if (isOperatorManifestCycleServiceToolName(toolName))")
-        || !source.includes("handleOperatorManifestCycleServiceTool({")
+    || !source.includes("isCycleServiceToolName: isOperatorManifestCycleServiceToolName")
+    || !source.includes("handleCycleService: (serviceToolName, servicePayload) => handleOperatorManifestCycleServiceTool({")
     || !source.includes("buildCycleReceiptRead: (receipt, section, offset, limit)")
     || !source.includes("readIntelligenceFoundation: (brandKey)")
     || !source.includes("readPerformanceLearning: (brandKey, includePosts)")
