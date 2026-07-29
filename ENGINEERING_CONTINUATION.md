@@ -1563,7 +1563,7 @@ Remaining work after this checkpoint:
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
 8. Test and release modernization — COMPLETE AND DEPLOYED
-9. Final comparison and production release — QUEUED AFTER STAGE 8
+9. Final comparison and production release — QUEUED; RESUME ONLY ON OWNER INSTRUCTION
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
 
