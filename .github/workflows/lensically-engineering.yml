@@ -49,7 +49,8 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-            - name: Checkout pushed head
+            
+      - name: Checkout pushed head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -58,8 +59,8 @@ jobs:
         id: push_scope
         shell: bash
         run: |
-          set -euo pipefail
-                    deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty' || true)"
+                    set -euo pipefail
+          deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty' || true)"
           if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
             validation_base="${deployed_sha}"
             validation_scope=deployed_production
