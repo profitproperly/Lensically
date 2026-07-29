@@ -73,7 +73,13 @@ Stage 3 production evidence:
 
 ## Current Action
 
-### Stage 4 — Database authority
+No current Lensically job is active. Stage 9 is queued under an owner-directed hold and has not started.
+
+### Canonical steering rule — immediate scope reduction
+
+When the owner redirects, narrows, stops, or replaces an instruction, the newest explicit instruction immediately overrides prior execution momentum. Do not reread, re-audit, rediscover, reconcile, or rebuild project state unless that exact new instruction cannot be completed safely without it. Stop the displaced action, perform only the minimum work required by the owner's correction, respect the stated stopping boundary, and then stop. Verification must never substitute for following the instruction.
+
+### Historical completed work — Stage 4 database authority
 
 Establish one canonical, versioned database migration authority with one schema owner per table and no request-time schema mutation.
 
