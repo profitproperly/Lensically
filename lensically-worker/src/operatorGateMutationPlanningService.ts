@@ -249,7 +249,8 @@ type OperatorGateEngineDependencies<TStage extends string> = {
   normalizeSourceContract(value: unknown): Record<string, unknown>;
   normalizeSourceContractStringList(value: unknown): string[];
   sourceContractItemText(value: unknown): string | null;
-  inferRealmEntranceKey(value: string | null): string;
+    inferRealmEntranceKey(value: string | null): string | null;
+
   extractOpeningPhrase(value: string): string | null;
   containsRejectedSurface(normalizedDraft: string, surface: string): boolean;
   rejectionSimilarity(left: string, right: string): number;
