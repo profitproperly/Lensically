@@ -76,6 +76,11 @@ const completeTestFiles = [
   "test/humanFreeAutonomy.spec.ts",
 ];
 
+const completeTestGroups = Array.from(
+  { length: 6 },
+  (_, index) => completeTestFiles.slice(index * 11, (index + 1) * 11),
+);
+
 const operatorMilestoneTitles = [
   "advertises the curated direct typed Main surface and concise instructions",
   "makes the static router the only public action path",
@@ -112,8 +117,16 @@ function validatePlan() {
   const missingFiles = completeTestFiles.filter((file) => !existsSync(resolve(workerRoot, file)));
   if (missingFiles.length > 0) fail(`full_validation_missing_files:${missingFiles.join(",")}`);
 
-  const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
+    const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
   if (missingRequired.length > 0) fail(`full_validation_required_files_missing:${missingRequired.join(",")}`);
+
+  const groupedFiles = completeTestGroups.flat();
+  if (completeTestGroups.length !== 6
+      || completeTestGroups.some((group) => group.length !== 11)
+      || groupedFiles.length !== completeTestFiles.length
+      || groupedFiles.some((file, index) => file !== completeTestFiles[index])) {
+    fail("full_validation_batch_partition_invalid");
+  }
 
   if (operatorMilestoneTitles.length < 10 || new Set(operatorMilestoneTitles).size !== operatorMilestoneTitles.length) {
     fail("full_validation_operator_milestone_plan_invalid");
@@ -123,7 +136,9 @@ function validatePlan() {
     contract: "lensically-full-validation-v1",
     complete_test_file_count: completeTestFiles.length,
     operator_milestone_test_count: operatorMilestoneTitles.length,
-    process_count: 3,
+        process_count: completeTestGroups.length + 2,
+    complete_test_batch_count: completeTestGroups.length,
+    complete_test_batch_size: completeTestGroups[0].length,
   };
 }
 
@@ -153,7 +168,8 @@ if (process.argv.includes("--check")) {
 if (process.argv.includes("--print-plan")) {
   console.log(JSON.stringify({
     ...plan,
-    complete_test_files: completeTestFiles,
+        complete_test_files: completeTestFiles,
+    complete_test_groups: completeTestGroups,
     operator_milestone_titles: operatorMilestoneTitles,
   }, null, 2));
   process.exit(0);
@@ -163,13 +179,15 @@ if (!existsSync(vitestCli)) fail(`full_validation_vitest_cli_missing:${vitestCli
 const totalStartedAt = performance.now();
 const durations = [];
 durations.push(run("operator-smoke", process.execPath, ["scripts/run-operator-validation.mjs", "smoke"]));
-durations.push(run("complete-test-inventory", process.execPath, [
-  vitestCli,
-  "--run",
-  ...completeTestFiles,
-  "--reporter=dot",
-  "--bail=1",
-]));
+for (const [index, testFiles] of completeTestGroups.entries()) {
+  durations.push(run(`complete-test-inventory-${index + 1}/${completeTestGroups.length}`, process.execPath, [
+    vitestCli,
+    "--run",
+    ...testFiles,
+    "--reporter=dot",
+    "--bail=1",
+  ]));
+}
 const escapedPattern = operatorMilestoneTitles
   .map((title) => title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   .join("|");
