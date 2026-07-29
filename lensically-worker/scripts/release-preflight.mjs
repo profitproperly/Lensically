@@ -125,6 +125,8 @@ const operatorStrategyMemorySaveService = read("src/operatorStrategyMemorySaveSe
 const operatorStrategyMemorySaveServiceTests = read("test/operatorStrategyMemorySaveService.spec.ts");
 const operatorScheduledPostListReadService = read("src/operatorScheduledPostListReadService.ts");
 const operatorScheduledPostListReadServiceTests = read("test/operatorScheduledPostListReadService.spec.ts");
+const operatorScheduledPostDeletionService = read("src/operatorScheduledPostDeletionService.ts");
+const operatorScheduledPostDeletionServiceTests = read("test/operatorScheduledPostDeletionService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -367,6 +369,9 @@ if (!workflow.includes("test/operatorStrategyMemorySaveService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorScheduledPostListReadService.spec.ts")) {
   errors.push("operator_scheduled_post_list_read_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorScheduledPostDeletionService.spec.ts")) {
+  errors.push("operator_scheduled_post_deletion_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -2077,6 +2082,48 @@ if (!operatorScheduledPostListReadServiceTests.includes("retrieves one valid loc
     || !operatorScheduledPostListReadServiceTests.includes("suppresses retrieval for an invalid normalized date")) {
   lifecycleErrors.push("operator_scheduled_post_list_read_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorScheduledPostDeletionService"')
+    || !source.includes("deleteOperatorScheduledPost({ payload }")
+    || !source.includes("normalizeReasonCode: normalizeScheduledPostDeletionReasonCode")
+    || !source.includes("allowedReasonCodes: SCHEDULED_POST_DELETION_REASON_CODES")
+    || !source.includes('deletedBy: "model"')
+    || !source.includes('deletionSource: "mcp"')
+    || !source.includes("return operatorJsonResponse(scheduledPostDeletion.body, scheduledPostDeletion.statusCode)")) {
+  lifecycleErrors.push("operator_scheduled_post_deletion_service_import_or_binding_missing");
+}
+const scheduledPostDeletionHandlerStart = source.indexOf('if (toolName === "delete_scheduled_post")');
+const scheduledPostDeletionHandlerEnd = source.indexOf('if (toolName === "edit_scheduled_post")', scheduledPostDeletionHandlerStart);
+const scheduledPostDeletionHandler = scheduledPostDeletionHandlerStart >= 0 && scheduledPostDeletionHandlerEnd > scheduledPostDeletionHandlerStart
+  ? source.slice(scheduledPostDeletionHandlerStart, scheduledPostDeletionHandlerEnd)
+  : "";
+if (scheduledPostDeletionHandler.includes("const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0))")
+    || scheduledPostDeletionHandler.includes("const reasonCode = normalizeScheduledPostDeletionReasonCode(payload.reason_code)")
+    || scheduledPostDeletionHandler.includes('deletion.outcome === "not_found"')) {
+  lifecycleErrors.push("operator_scheduled_post_deletion_service_returned_to_index");
+}
+if (!operatorScheduledPostDeletionService.includes("export async function deleteOperatorScheduledPost")
+    || !operatorScheduledPostDeletionService.includes("allowedReasonCodes: readonly unknown[]")
+    || !operatorScheduledPostDeletionService.includes("scheduled_post_id is required")
+    || !operatorScheduledPostDeletionService.includes("scheduled_post_deletion_reason_code_required")
+    || !operatorScheduledPostDeletionService.includes("dependencies.deleteScheduledPost")
+    || !operatorScheduledPostDeletionService.includes("scheduled_post_not_found")
+    || !operatorScheduledPostDeletionService.includes("only_approved_scheduled_posts_can_be_deleted")
+    || !operatorScheduledPostDeletionService.includes("scheduled_post_deletion_reason_required")
+    || !operatorScheduledPostDeletionService.includes("strategy_memory_written: false")) {
+  lifecycleErrors.push("operator_scheduled_post_deletion_service_module_incomplete");
+}
+if (!operatorScheduledPostDeletionServiceTests.includes("rejects a missing scheduled-post ID before protected deletion")
+    || !operatorScheduledPostDeletionServiceTests.includes("rejects an invalid deletion reason with the exact allowed codes")
+    || !operatorScheduledPostDeletionServiceTests.includes("normalizes and forwards the protected deletion request")
+    || !operatorScheduledPostDeletionServiceTests.includes("maps %s to the exact error response")
+    || !operatorScheduledPostDeletionServiceTests.includes("returns null deletion and false replay for a fresh helper result")) {
+  lifecycleErrors.push("operator_scheduled_post_deletion_service_tests_incomplete");
+}
+
+
+
+
+
 
 
 

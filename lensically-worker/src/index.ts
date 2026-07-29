@@ -147,6 +147,7 @@ import {
   planOperatorStrategyMemorySave,
 } from "./operatorStrategyMemorySaveService";
 import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadService";
+import { deleteOperatorScheduledPost } from "./operatorScheduledPostDeletionService";
 
 
 
@@ -14681,40 +14682,26 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(scheduledPostList);
   }
 
-    if (toolName === "delete_scheduled_post") {
-    const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0));
-    const reasonCode = normalizeScheduledPostDeletionReasonCode(payload.reason_code);
-    const reasonDetail = normalizeOperatorText(payload.reason_detail, 8000, true);
-    if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
-      return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
-    }
-    if (!reasonCode) {
-      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_code_required", allowed_reason_codes: SCHEDULED_POST_DELETION_REASON_CODES }, 400);
-    }
-    const deletion = await deleteScheduledPostForAppUser(env, WORKSPACE_APP_USER_ID, scheduledPostId, {
-      expectedThreadsUserId: brand.profile.threads_user_id,
-      reasonCode,
-      reasonDetail,
-      deletedBy: "model",
-      deletionSource: "mcp",
-      operationId: normalizeOperatorText(payload.operation_id, 240, true),
+        if (toolName === "delete_scheduled_post") {
+    const scheduledPostDeletion = await deleteOperatorScheduledPost({ payload }, {
+      normalizeReasonCode: normalizeScheduledPostDeletionReasonCode,
+      allowedReasonCodes: SCHEDULED_POST_DELETION_REASON_CODES,
+      normalizeText: normalizeOperatorText,
+      deleteScheduledPost: async ({ scheduledPostId, reasonCode, reasonDetail, operationId }) => await deleteScheduledPostForAppUser(
+        env,
+        WORKSPACE_APP_USER_ID,
+        scheduledPostId,
+        {
+          expectedThreadsUserId: brand.profile.threads_user_id,
+          reasonCode,
+          reasonDetail,
+          deletedBy: "model",
+          deletionSource: "mcp",
+          operationId,
+        },
+      ),
     });
-    if (deletion.outcome === "not_found") {
-      return operatorJsonResponse({ success: false, error: "scheduled_post_not_found" }, 404);
-    }
-    if (deletion.outcome === "not_deletable") {
-      return operatorJsonResponse({ success: false, error: "only_approved_scheduled_posts_can_be_deleted" }, 409);
-    }
-    if (deletion.outcome === "reason_required") {
-      return operatorJsonResponse({ success: false, error: "scheduled_post_deletion_reason_required" }, 400);
-    }
-    return operatorJsonResponse({
-      success: true,
-      deleted: true,
-      deletion: deletion.record ?? null,
-      replayed: deletion.replayed === true,
-      strategy_memory_written: false,
-    });
+    return operatorJsonResponse(scheduledPostDeletion.body, scheduledPostDeletion.statusCode);
   }
 
   if (toolName === "edit_scheduled_post") {
