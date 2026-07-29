@@ -12536,7 +12536,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return operatorJsonResponse(reviewOperationsRuntimeDispatch.body, reviewOperationsRuntimeDispatch.status);
   }
 
-    if (toolName === "start_workflow_session") {
+      const workflowContextSourceRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
+    start_workflow_session: async () => {
     const sessionResult = await startOperatorWorkflowSession({
       brandKey: brand.brand_key,
       payload,
@@ -12558,10 +12559,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       ).run(),
       workflowTemplatePayload,
     });
-    return operatorJsonResponse(sessionResult);
-  }
-
-    if (toolName === "admit_context") {
+          return { body: sessionResult, status: 200 };
+    },
+    admit_context: async () => {
     const admissionResult = await admitOperatorContext({
       brandKey: brand.brand_key,
       payload,
@@ -12587,10 +12587,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         input.notes,
       ).run(),
     });
-    return operatorJsonResponse(admissionResult);
-  }
-
-    if (toolName === "get_production_board") {
+          return { body: admissionResult, status: 200 };
+    },
+    get_production_board: async () => {
     const boardResult = await readOperatorProductionBoard({
       brandKey: brand.brand_key,
       payload,
@@ -12613,10 +12612,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       },
       parseJsonString: safeParseJsonString,
     });
-    return operatorJsonResponse(boardResult);
-  }
-
-          if (toolName === "list_source_candidates") {
+          return { body: boardResult, status: 200 };
+    },
+    list_source_candidates: async () => {
     const candidateResult = await listOperatorSourceCandidates({
       brandKey: brand.brand_key,
       payload,
@@ -12637,10 +12635,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         };
       },
     });
-    return operatorJsonResponse(candidateResult);
-  }
-
-    if (toolName === "delete_saved_pattern_source") {
+          return { body: candidateResult, status: 200 };
+    },
+    delete_saved_pattern_source: async () => {
     const exclusionResult = await excludeOperatorSavedPatternSource({
       brandKey: brand.brand_key,
       payload,
@@ -12781,7 +12778,14 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
             deleted_source_card_count: deletedSourceCardCount,
       unlinked_selection_count: unlinkedSelectionCount,
     });
-    */
+        */
+    },
+  });
+  if (workflowContextSourceRuntimeDispatch.handled) {
+    return operatorJsonResponse(
+      workflowContextSourceRuntimeDispatch.body,
+      workflowContextSourceRuntimeDispatch.status,
+    );
   }
 
     if (toolName === "draw_source_candidate_batch") {

@@ -850,7 +850,7 @@ if (operatorClaimReviewRuntimeShell.includes('if (toolName === "claim_manifest_r
   lifecycleErrors.push("operator_review_batch_claim_logic_returned_to_index");
 }
 const operatorWorkflowSessionDispatchStart = source.indexOf(
-  'if (toolName === "start_workflow_session")',
+  "const workflowContextSourceRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
   operatorReviewOperationsDispatchStart,
 );
 const operatorReviewOperationsRuntimeShell = operatorReviewOperationsDispatchStart >= 0
@@ -870,6 +870,30 @@ if (operatorReviewOperationsRuntimeShell.includes('if (toolName === "get_manifes
     || operatorReviewOperationsRuntimeShell.includes('if (toolName === "skip_manifest_review_source")')
     || operatorReviewOperationsRuntimeShell.includes('if (toolName === "schedule_manifest_review_batch")')) {
   lifecycleErrors.push("operator_review_operations_runtime_dispatch_returned_to_index");
+}
+const operatorSourceDrawDispatchStart = source.indexOf(
+  'if (toolName === "draw_source_candidate_batch")',
+  operatorWorkflowSessionDispatchStart,
+);
+const operatorWorkflowContextSourceRuntimeShell = operatorWorkflowSessionDispatchStart >= 0
+  && operatorSourceDrawDispatchStart > operatorWorkflowSessionDispatchStart
+  ? source.slice(operatorWorkflowSessionDispatchStart, operatorSourceDrawDispatchStart)
+  : "";
+if (!operatorWorkflowContextSourceRuntimeShell.includes("dispatchOperatorKeyedRuntimeTool(toolName, {")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("start_workflow_session: async () =>")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("admit_context: async () =>")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("get_production_board: async () =>")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("list_source_candidates: async () =>")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("delete_saved_pattern_source: async () =>")
+    || !operatorWorkflowContextSourceRuntimeShell.includes("if (workflowContextSourceRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_workflow_context_source_runtime_dispatch_cutover_incomplete");
+}
+if (operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "start_workflow_session")')
+    || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "admit_context")')
+    || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "get_production_board")')
+    || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "list_source_candidates")')
+    || operatorWorkflowContextSourceRuntimeShell.includes('if (toolName === "delete_saved_pattern_source")')) {
+  lifecycleErrors.push("operator_workflow_context_source_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
@@ -1555,6 +1579,7 @@ if (!operatorManifestReviewBatchSchedulingServiceTests.includes("returns the exa
     lifecycleErrors.push("operator_manifest_review_batch_scheduling_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorWorkflowSessionStartService"')
+    || !source.includes("start_workflow_session: async () =>")
     || !source.includes("startOperatorWorkflowSession({")
     || !source.includes("getActiveSession: ()")
     || !source.includes("insertSession: async")) {
@@ -1580,6 +1605,7 @@ if (!operatorWorkflowSessionStartServiceTests.includes("reuses an account-select
   lifecycleErrors.push("operator_workflow_session_start_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorContextAdmissionService"')
+    || !source.includes("admit_context: async () =>")
     || !source.includes("admitOperatorContext({")
     || !source.includes("insertAdmission: async")) {
   lifecycleErrors.push("operator_context_admission_service_import_or_binding_missing");
@@ -1604,6 +1630,7 @@ if (!operatorContextAdmissionServiceTests.includes("persists an empty complete a
   lifecycleErrors.push("operator_context_admission_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorProductionBoardService"')
+    || !source.includes("get_production_board: async () =>")
     || !source.includes("readOperatorProductionBoard({")
     || !source.includes("listActiveItems: async")
     || !source.includes("parseJsonString: safeParseJsonString")) {
@@ -1632,6 +1659,7 @@ if (!operatorProductionBoardServiceTests.includes("returns an empty board with e
   lifecycleErrors.push("operator_production_board_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSourceCandidateListService"')
+    || !source.includes("list_source_candidates: async () =>")
     || !source.includes("listOperatorSourceCandidates({")
     || !source.includes("listCandidates: async")
     || !source.includes("manifestSourceMinVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES")) {
@@ -1658,6 +1686,7 @@ if (!operatorSourceCandidateListServiceTests.includes("uses empty source filters
   lifecycleErrors.push("operator_source_candidate_list_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorSavedPatternSourceExclusionService"')
+    || !source.includes("delete_saved_pattern_source: async () =>")
     || !source.includes("excludeOperatorSavedPatternSource({")
     || !source.includes("upsertExclusion: async")
     || !source.includes("skipActiveSelections: async")
