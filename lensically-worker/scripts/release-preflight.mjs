@@ -217,6 +217,9 @@ if (process.argv.includes("--print-crons")) {
 }
 
 const errors = [];
+if (!tests.includes("horizon_hours: 1,\n      operation_id: `test-intelligence-foundation-${crypto.randomUUID()}`")) {
+  errors.push("manifest_intelligence_foundation_test_setup_unbounded");
+}
 const sharedFullValidationCalls = workflow.match(/node scripts\/run-full-validation\.mjs/g) ?? [];
 if (!fullValidationRunner.includes('contract: "lensically-full-validation-v1"')
     || !fullValidationRunner.includes("const completeTestFiles = [")

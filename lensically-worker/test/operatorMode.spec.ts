@@ -3824,10 +3824,12 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
 
   it("reads the active intelligence policies, latest strategy version, exposure ledger, and latest cycle receipt without mutation", async () => {
     await activateManifestAutonomyForTest();
-    const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
+        const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
-      horizon_hours: 48,
+      // One slot creates the canonical receipt and exposure evidence this read-only test needs.
+      // A full 48-hour runway belongs to runway tests and made this regression timing-sensitive in parallel CI.
+      horizon_hours: 1,
       operation_id: `test-intelligence-foundation-${crypto.randomUUID()}`,
       proceed_confirmed: true,
     });
