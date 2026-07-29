@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ak-strategy-memory-list-read-service
-repository_base_sha: b8b3edf9075fde54540bd5690c5bc901a31ae72c
-production_sha: b8b3edf9075fde54540bd5690c5bc901a31ae72c
+active_checkpoint: stage-6al-strategy-memory-save-service
+repository_base_sha: 6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1
+production_sha: 6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1
 
 
 
@@ -1069,18 +1069,29 @@ Completed checkpoint — Stage 6AJ gate mutation admission and persistence-plann
 - Hardened exact-SHA release and live verification passed in run `30409518252`.
 - Live production independently confirmed exact SHA `b8b3edf9075fde54540bd5690c5bc901a31ae72c` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AK strategy-memory list read service extraction:
+Completed checkpoint — Stage 6AK strategy-memory list read service extraction:
 
-Extract the deterministic `list_strategy_memory` workflow into a focused dependency-injected service while preserving:
+- Added `src/operatorStrategyMemoryListReadService.ts` as the dependency-injected authority for optional memory-kind normalization, default and bounded pagination, active-memory filter construction, account-scoped list and count retrieval, and exact pagination response composition.
+- Reduced `list_strategy_memory` in `src/index.ts` to the canonical account identity, strategy-memory list and count helpers, shared machine-key normalization, and HTTP transport.
+- Added `test/operatorStrategyMemoryListReadService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Focused validation passed in run `30409921115`.
+- Push validation passed in run `30409909538`.
+- All eight Operator shards passed in run `30410184683`; an older identical duplicate dispatch was safely cancelled by the existing exact-task concurrency guard before execution.
+- Hardened exact-SHA release and live verification passed in run `30410239281`.
+- Live production independently confirmed exact SHA `6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1` with 75/75 public tools.
 
-- optional memory-kind normalization
-- default limit 50 with an inclusive 1-to-100 clamp
-- offset normalization with a zero floor
-- empty versus single-kind filter construction
-- account-scoped active-memory list and count retrieval with identical filters
-- exact response composition for items, returned count, total count, and `has_more`
+ACTIVE checkpoint — Stage 6AL strategy-memory save service extraction:
 
-Keep the strategy-memory list and count helpers, canonical account identity, shared machine-key normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the deterministic `save_strategy_memory` workflow into a focused dependency-injected service while preserving:
+
+- canonical strategy-memory kind normalization and the exact allowed-kind error response
+- required body normalization with the exact body-required error response
+- optional title normalization
+- metadata normalization with durable default source `mcp_operator`
+- account and Threads identity binding for persistence
+- exact `{ memory_id }` response composition, including a null fallback
+
+Keep the strategy-memory persistence helper, canonical account and Threads identity, shared text and JSON normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 
 
@@ -1120,7 +1131,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AK
+6. Product-service extraction — ACTIVE at Stage 6AL
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
