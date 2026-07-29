@@ -101,7 +101,7 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
     },
   });
 
-  return {
+    return {
     statusCode: 200,
     body: {
       success: true,
@@ -111,3 +111,137 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
     },
   };
 }
+
+type OwnerApprovedBatchScheduledItem = {
+  index: number;
+  scheduled_post_id: number;
+  date: string;
+  time: string;
+};
+
+export async function scheduleOperatorOwnerApprovedBatch<TBrand>(
+  input: {
+    payload: Record<string, unknown>;
+    brandKey: TBrand;
+    defaultTimezone: string;
+  },
+  dependencies: {
+    normalizeText: (value: unknown, maxLength: number, allowEmpty?: boolean) => string | null;
+    isValidIsoDate: (value: string) => boolean;
+    isValidTime: (value: string) => boolean;
+    createScheduledPost: (post: {
+      text: string;
+      date: string;
+      time: string;
+      timezone: string;
+    }) => Promise<{
+      success: boolean;
+      scheduledPostId: number | null;
+      error?: string | null;
+    }>;
+    saveStrategyMemory: (memory: {
+      kind: "scheduled_batch";
+      title: "Owner-approved direct scheduling batch";
+      body: string;
+      metadata: {
+        source: "schedule_owner_approved_batch";
+        scheduled_post_ids: number[];
+        timezone: string;
+      };
+    }) => Promise<void>;
+  },
+): Promise<{
+  statusCode: number;
+  body: Record<string, unknown>;
+}> {
+  const ownerApproval = dependencies.normalizeText(input.payload.owner_approval, 4_000);
+  const timezone = dependencies.normalizeText(input.payload.timezone, 100, true) ?? input.defaultTimezone;
+  const rawPosts = Array.isArray(input.payload.posts) ? input.payload.posts.slice(0, 12) : [];
+
+  if (!ownerApproval || !rawPosts.length) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "owner_approval_and_posts_required" },
+    };
+  }
+
+  if (String(input.brandKey) === "manifest_mental") {
+    return {
+      statusCode: 409,
+      body: {
+        success: false,
+        error: "manifest_lineage_preserving_schedule_required",
+        reason: "Direct text-only batch scheduling bypasses source cards, generation runs, drafts, and future metric lineage.",
+        required_tools: ["schedule_manifest_review_batch", "schedule_approved_draft"],
+        account_mutated: false,
+      },
+    };
+  }
+
+  const scheduledItems: OwnerApprovedBatchScheduledItem[] = [];
+  for (let index = 0; index < rawPosts.length; index += 1) {
+    const rawPost = rawPosts[index];
+    const post = rawPost && typeof rawPost === "object" && !Array.isArray(rawPost)
+      ? rawPost as Record<string, unknown>
+      : {};
+    const text = dependencies.normalizeText(post.text, 20_000);
+    const date = dependencies.normalizeText(post.date, 20);
+    const time = dependencies.normalizeText(post.time, 20);
+
+    if (!text || !date || !time || !dependencies.isValidIsoDate(date) || !dependencies.isValidTime(time)) {
+      return {
+        statusCode: 400,
+        body: {
+          success: false,
+          error: "valid_text_date_and_time_required",
+          failed_index: index,
+          scheduled_count: scheduledItems.length,
+          scheduled_items: scheduledItems,
+        },
+      };
+    }
+
+    const scheduled = await dependencies.createScheduledPost({ text, date, time, timezone });
+    if (!scheduled.success || !scheduled.scheduledPostId) {
+      return {
+        statusCode: 400,
+        body: {
+          success: false,
+          error: scheduled.error ?? "schedule_failed",
+          failed_index: index,
+          scheduled_count: scheduledItems.length,
+          scheduled_items: scheduledItems,
+        },
+      };
+    }
+
+    scheduledItems.push({
+      index,
+      scheduled_post_id: scheduled.scheduledPostId,
+      date,
+      time,
+    });
+  }
+
+  await dependencies.saveStrategyMemory({
+    kind: "scheduled_batch",
+    title: "Owner-approved direct scheduling batch",
+    body: `Scheduled ${scheduledItems.length} owner-approved posts. Approval: ${ownerApproval}`,
+    metadata: {
+      source: "schedule_owner_approved_batch",
+      scheduled_post_ids: scheduledItems.map((item) => item.scheduled_post_id),
+      timezone,
+    },
+  });
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      scheduled_count: scheduledItems.length,
+      scheduled_items: scheduledItems,
+      timezone,
+    },
+  };
+}
+

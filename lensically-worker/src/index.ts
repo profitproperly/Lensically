@@ -149,7 +149,10 @@ import {
 import { readOperatorScheduledPostList } from "./operatorScheduledPostListReadService";
 import { deleteOperatorScheduledPost } from "./operatorScheduledPostDeletionService";
 import { retryOperatorScheduledPost } from "./operatorScheduledPostRetryService";
-import { editOperatorScheduledPost } from "./operatorScheduledPostEditMutationService";
+import {
+  editOperatorScheduledPost,
+  scheduleOperatorOwnerApprovedBatch,
+} from "./operatorScheduledPostEditMutationService";
 
 
 
@@ -14803,82 +14806,42 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
   if (toolName === "schedule_owner_approved_batch") {
-    const ownerApproval = normalizeOperatorText(payload.owner_approval, 4000);
-    const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE;
-    const rawPosts = Array.isArray(payload.posts) ? payload.posts.slice(0, 12) : [];
-    if (!ownerApproval || !rawPosts.length) {
-      return operatorJsonResponse({ success: false, error: "owner_approval_and_posts_required" }, 400);
-    }
-    if (brand.brand_key === "manifest_mental") {
-      return operatorJsonResponse({
-        success: false,
-        error: "manifest_lineage_preserving_schedule_required",
-        reason: "Direct text-only batch scheduling bypasses source cards, generation runs, drafts, and future metric lineage.",
-        required_tools: ["schedule_manifest_review_batch", "schedule_approved_draft"],
-        account_mutated: false,
-      }, 409);
-    }
-    const scheduledItems: Array<Record<string, unknown>> = [];
-    for (let index = 0; index < rawPosts.length; index += 1) {
-      const rawPost = rawPosts[index];
-      const post = rawPost && typeof rawPost === "object" && !Array.isArray(rawPost)
-        ? rawPost as Record<string, unknown>
-        : {};
-      const text = normalizeOperatorText(post.text, 20000);
-      const date = normalizeOperatorText(post.date, 20);
-      const time = normalizeOperatorText(post.time, 20);
-      if (!text || !date || !time || !isValidIsoDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-        return operatorJsonResponse({
-          success: false,
-          error: "valid_text_date_and_time_required",
-          failed_index: index,
-          scheduled_count: scheduledItems.length,
-          scheduled_items: scheduledItems,
-        }, 400);
-      }
-      const scheduled = await createScheduledPostForAppUser(
-        env,
-        WORKSPACE_APP_USER_ID,
-        brand.profile.threads_user_id,
-        text,
-        date,
-        time,
-        timezone,
-      );
-      if (!scheduled.success || !scheduled.scheduledPostId) {
-        return operatorJsonResponse({
-          success: false,
-          error: scheduled.error ?? "schedule_failed",
-          failed_index: index,
-          scheduled_count: scheduledItems.length,
-          scheduled_items: scheduledItems,
-        }, 400);
-      }
-      scheduledItems.push({
-        index,
-        scheduled_post_id: scheduled.scheduledPostId,
-        date,
-        time,
-      });
-    }
-    await saveGptStrategyMemory(env, {
-      accountId: brand.account_id,
-      threadsUserId: brand.profile.threads_user_id,
-      kind: "scheduled_batch",
-      title: "Owner-approved direct scheduling batch",
-      body: `Scheduled ${scheduledItems.length} owner-approved posts. Approval: ${ownerApproval}`,
-      metadataJson: normalizeOperatorJson({
-        source: "schedule_owner_approved_batch",
-        scheduled_post_ids: scheduledItems.map((item) => item.scheduled_post_id),
-        timezone,
-      }, {}),
+        const ownerApprovedBatch = await scheduleOperatorOwnerApprovedBatch({
+      payload,
+      brandKey: brand.brand_key,
+      defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    }, {
+      normalizeText: normalizeOperatorText,
+      isValidIsoDate,
+      isValidTime: (value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value),
+      createScheduledPost: async ({ text, date, time, timezone }) => {
+        const scheduled = await createScheduledPostForAppUser(
+          env,
+          WORKSPACE_APP_USER_ID,
+          brand.profile.threads_user_id,
+          text,
+          date,
+          time,
+          timezone,
+        );
+        return {
+          success: scheduled.success,
+          scheduledPostId: scheduled.scheduledPostId ?? null,
+          error: scheduled.error ?? null,
+        };
+      },
+      saveStrategyMemory: async (memory) => {
+        await saveGptStrategyMemory(env, {
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          kind: memory.kind,
+          title: memory.title,
+          body: memory.body,
+          metadataJson: normalizeOperatorJson(memory.metadata, {}),
+        });
+      },
     });
-    return operatorJsonResponse({
-      success: true,
-      scheduled_count: scheduledItems.length,
-      scheduled_items: scheduledItems,
-      timezone,
-    });
+    return operatorJsonResponse(ownerApprovedBatch.body, ownerApprovedBatch.statusCode);
   }
 
   if (toolName === "schedule_approved_draft") {

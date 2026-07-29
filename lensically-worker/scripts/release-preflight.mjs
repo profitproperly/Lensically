@@ -2274,6 +2274,41 @@ if (!operatorScheduledPostEditMutationServiceTests.includes("preserves omitted e
     || !operatorScheduledPostEditMutationServiceTests.includes("uses the exact update-failure fallback and zero linked-draft count")) {
   lifecycleErrors.push("operator_scheduled_post_edit_mutation_service_tests_incomplete");
 }
+if (!source.includes("scheduleOperatorOwnerApprovedBatch({")
+    || !source.includes("isValidTime: (value) =>")
+    || !source.includes("createScheduledPost: async ({ text, date, time, timezone })")
+    || !source.includes("saveStrategyMemory: async (memory)")
+    || !source.includes("return operatorJsonResponse(ownerApprovedBatch.body, ownerApprovedBatch.statusCode)")) {
+  lifecycleErrors.push("operator_owner_approved_batch_scheduling_service_import_or_binding_missing");
+}
+const ownerApprovedBatchHandlerStart = source.indexOf('if (toolName === "schedule_owner_approved_batch")');
+const ownerApprovedBatchHandlerEnd = source.indexOf('if (toolName === "schedule_approved_draft")', ownerApprovedBatchHandlerStart);
+const ownerApprovedBatchHandler = ownerApprovedBatchHandlerStart >= 0 && ownerApprovedBatchHandlerEnd > ownerApprovedBatchHandlerStart
+  ? source.slice(ownerApprovedBatchHandlerStart, ownerApprovedBatchHandlerEnd)
+  : "";
+if (ownerApprovedBatchHandler.includes("const ownerApproval = normalizeOperatorText(payload.owner_approval")
+    || ownerApprovedBatchHandler.includes("for (let index = 0; index < rawPosts.length; index += 1)")
+    || ownerApprovedBatchHandler.includes("scheduled_count: scheduledItems.length")) {
+  lifecycleErrors.push("operator_owner_approved_batch_scheduling_service_returned_to_index");
+}
+if (!operatorScheduledPostEditMutationService.includes("export async function scheduleOperatorOwnerApprovedBatch")
+    || !operatorScheduledPostEditMutationService.includes("input.payload.posts.slice(0, 12)")
+    || !operatorScheduledPostEditMutationService.includes("manifest_lineage_preserving_schedule_required")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.isValidIsoDate(date)")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.isValidTime(time)")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.createScheduledPost")
+    || !operatorScheduledPostEditMutationService.includes("dependencies.saveStrategyMemory")
+    || !operatorScheduledPostEditMutationService.includes('source: "schedule_owner_approved_batch"')) {
+  lifecycleErrors.push("operator_owner_approved_batch_scheduling_service_module_incomplete");
+}
+if (!operatorScheduledPostEditMutationServiceTests.includes("rejects missing approval or posts before scheduling")
+    || !operatorScheduledPostEditMutationServiceTests.includes("blocks Manifest direct scheduling with the exact lineage response")
+    || !operatorScheduledPostEditMutationServiceTests.includes("returns exact partial progress when a later post is invalid")
+    || !operatorScheduledPostEditMutationServiceTests.includes("maps a scheduling failure with exact prior progress")
+    || !operatorScheduledPostEditMutationServiceTests.includes("normalizes, schedules sequentially, saves exact memory, and returns success")) {
+  lifecycleErrors.push("operator_owner_approved_batch_scheduling_service_tests_incomplete");
+}
+
 
 if (literalVersionAssertionEntries.length > 0) {
   lifecycleErrors.push(`operator_version_literal_assertion_forbidden:${literalVersionAssertionEntries.map((entry) => entry.line_number).join(",")}`);
