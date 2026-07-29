@@ -616,7 +616,7 @@ if (!workflowStructureValidator.includes("document = YAML.parse(source, filename
     || !workflowStructureValidator.includes("duplicate_mapping_key")
     || !workflowStructureValidator.includes("required = %w[push-validation fast-validation operator-test-shards worker-release]")
     || !workflowStructureValidator.includes('job.key?("runs-on")')
-    || !workflowStructureValidator.includes('job["steps"].is_a?(Array)')
+        || !workflowStructureValidator.includes('abort("job_steps_not_list:#{name}") unless steps.is_a?(Array)')
     || !workflowStructureValidator.includes("required_worker_release_steps")
     || !workflowStructureValidator.includes("Verify production runtime, scheduler, retained website, and retired legacy surfaces")) {
   errors.push("engineering_workflow_structure_validator_incomplete");
@@ -642,7 +642,7 @@ if (!workflow.includes('node scripts/run-wrangler-deploy-with-retry.mjs --config
     || !wranglerDeployRetryCore.includes("export function getDeployRetryDelayMs")
     || !wranglerDeployRetryCore.includes("export async function runWranglerDeployWithRetry")
     || !wranglerDeployRetryCore.includes("maxAttempts = 4")
-    || !wranglerDeployRetryCore.includes("[code:\\s*10013]")
+        || !wranglerDeployRetryCore.includes("/\\[code:\\s*10013\\]/i")
     || !wranglerDeployRetryCore.includes("deterministic failure; not retrying")
     || !wranglerDeployRetryCore.includes("transient retry budget exhausted")
     || wranglerDeployRetryCore.includes('from "node:')
