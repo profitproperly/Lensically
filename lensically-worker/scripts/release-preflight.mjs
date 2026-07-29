@@ -2054,7 +2054,7 @@ if (!source.includes('from "./operatorScheduledPostListReadService"')
 }
 if (source.includes("const date = normalizeOperatorText(payload.date, 20, true)")
     || source.includes("const timezone = normalizeOperatorText(payload.timezone, 100, true) ?? WORKSPACE_DEFAULT_TIMEZONE")
-    || source.includes("deletion_history_exposed_to_model: false,")) {
+    || source.includes("const items = date && isValidIsoDate(date)")) {
   lifecycleErrors.push("operator_scheduled_post_list_read_service_returned_to_index");
 }
 if (!operatorScheduledPostListReadService.includes("export async function readOperatorScheduledPostList")
