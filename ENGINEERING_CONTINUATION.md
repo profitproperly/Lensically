@@ -1562,7 +1562,7 @@ Remaining work after this checkpoint:
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
-8. Test and release modernization — ACTIVE at Stage 8E
+8. Test and release modernization — COMPLETE AND DEPLOYED
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
