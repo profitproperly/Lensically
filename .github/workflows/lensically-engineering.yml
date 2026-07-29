@@ -552,7 +552,8 @@ jobs:
         working-directory: lensically-worker
         run: |
           set -euo pipefail
-                              node scripts/release-preflight.mjs
+                              
+          node scripts/release-preflight.mjs
           npx tsc --noEmit
           node scripts/run-full-validation.mjs --check
           node scripts/test-d1-migration-release.mjs
