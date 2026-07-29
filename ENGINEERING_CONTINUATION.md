@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ao-scheduled-post-retry-service
-repository_base_sha: f9aeb121321c24d6c9fb3682907e98539b1a49c1
-production_sha: f9aeb121321c24d6c9fb3682907e98539b1a49c1
+active_checkpoint: stage-6ap-scheduled-post-edit-mutation-service
+repository_base_sha: 1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd
+production_sha: 1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AO scheduled-post retry service extraction.
+- Current checkpoint: Stage 6AP scheduled-post edit mutation service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1117,18 +1117,33 @@ Completed checkpoint — Stage 6AN scheduled-post deletion service extraction:
 - Hardened exact-SHA release and live verification passed in run `30412500165`.
 - Live production independently confirmed exact SHA `f9aeb121321c24d6c9fb3682907e98539b1a49c1` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AO scheduled-post retry service extraction:
+Completed checkpoint — Stage 6AO scheduled-post retry service extraction:
 
-Extract the deterministic `retry_now` branch of `edit_scheduled_post` into a focused dependency-injected service while preserving:
+- Added `src/operatorScheduledPostRetryService.ts` as the dependency-injected authority for retryable-record admission, exact not-found/published/status/due responses, one protected processing attempt, refreshed-state retrieval, and exact 200-versus-502 response composition.
+- Reduced the `retry_now` branch of `edit_scheduled_post` in `src/index.ts` to scheduled-post ID admission, account-scoped D1 retrieval adapters, canonical app and Threads identities, the scheduler processing helper, canonical approved and posted status constants, the clock adapter, and HTTP transport.
+- Added `test/operatorScheduledPostRetryService.spec.ts`, both workflow lanes, and permanent handler-scoped ownership gates.
+- Push run `30412654950` failed because the service source was committed before its required direct regression test; the mapped-validation source-to-test gate blocked progression exactly as designed.
+- Push run `30412714272` then exposed an invalid Vitest table callback that destructured a row object as an iterable. The callback was corrected and preflight now permanently requires the valid direct-object callback while rejecting the invalid iterable-destructuring shape.
+- Focused validation passed in run `30412987630`.
+- Push validation passed in run `30412968064`.
+- All eight Operator shards passed in run `30413235549`; older duplicate run `30413228541` was safely cancelled.
+- Hardened exact-SHA release and live verification passed in run `30413323414`; older duplicate release `30413321364` was safely cancelled.
+- Live production independently confirmed exact SHA `1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd` with 75/75 public tools.
 
-- account-scoped retryable-record retrieval after scheduled-post ID admission
-- exact not-found, already-published, not-retryable, and not-due responses
-- approved-only and elapsed-time retry admission
-- one protected scheduled-post processing attempt
-- account-scoped refreshed-record retrieval after the attempt
-- exact published-success determination and 200-versus-502 response composition
+ACTIVE checkpoint — Stage 6AP scheduled-post edit mutation service extraction:
 
-Keep the scheduled-post ID admission, D1 retrieval adapters, canonical app and Threads identity, scheduler processing helper, canonical approved and posted status constants, clock adapter, and HTTP transport explicit at the `index.ts` boundary. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
+Extract the deterministic non-retry branch of `edit_scheduled_post` into a focused dependency-injected service while preserving:
+
+- property-presence detection for text, date, time, spoiler-all-text, and spoiler phrases
+- normalization of supplied values plus the canonical workspace timezone fallback
+- one protected scheduled-post update-helper invocation with canonical app and Threads identity
+- exact update-failure status and error response mapping
+- account-scoped linked-draft retrieval after a successful update
+- scheduled-post inventory persistence intent using updated text, linked source-card identity, parsed linked strategy, and deterministic edit analysis
+- exact success response for the updated post, linked-draft update count, and linked draft ID
+
+Keep scheduled-post ID admission, the protected update helper, linked-draft SQL, inventory persistence, canonical app/account/Threads/brand identity, spoiler parsing, persisted strategy parsing, shared normalizers, and HTTP transport explicit at the `index.ts` boundary. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1168,7 +1183,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AO
+6. Product-service extraction — ACTIVE at Stage 6AP
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
