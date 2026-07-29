@@ -119,6 +119,8 @@ const operatorActiveGateReadService = read("src/operatorActiveGateReadService.ts
 const operatorActiveGateReadServiceTests = read("test/operatorActiveGateReadService.spec.ts");
 const operatorGateMutationPlanningService = read("src/operatorGateMutationPlanningService.ts");
 const operatorGateMutationPlanningServiceTests = read("test/operatorGateMutationPlanningService.spec.ts");
+const operatorStrategyMemoryListReadService = read("src/operatorStrategyMemoryListReadService.ts");
+const operatorStrategyMemoryListReadServiceTests = read("test/operatorStrategyMemoryListReadService.spec.ts");
 const wranglerDeployRetry = read("scripts/run-wrangler-deploy-with-retry.mjs");
 const wranglerDeployRetryCore = read("scripts/wrangler-deploy-retry-core.mjs");
 const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
@@ -352,6 +354,9 @@ if (!workflow.includes("test/operatorActiveGateReadService.spec.ts")) {
 }
 if (!workflow.includes("test/operatorGateMutationPlanningService.spec.ts")) {
   errors.push("operator_gate_mutation_planning_service_workflow_gate_missing");
+}
+if (!workflow.includes("test/operatorStrategyMemoryListReadService.spec.ts")) {
+  errors.push("operator_strategy_memory_list_read_service_workflow_gate_missing");
 }
 if (!workflow.includes("test/wranglerDeployRetry.spec.ts")) {
   errors.push("wrangler_deploy_retry_workflow_gate_missing");
@@ -1970,6 +1975,35 @@ if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found
     || !operatorGateMutationPlanningServiceTests.includes("builds a normalized account-scoped insert plan and exact response")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_tests_incomplete");
 }
+if (!source.includes('from "./operatorStrategyMemoryListReadService"')
+    || !source.includes("readOperatorStrategyMemoryList({ payload }")
+    || !source.includes("listActiveMemory: async ({ kinds, limit, offset, status })")
+    || !source.includes("countActiveMemory: async ({ kinds, status })")
+    || !source.includes("return operatorJsonResponse(memoryList)")) {
+  lifecycleErrors.push("operator_strategy_memory_list_read_service_import_or_binding_missing");
+}
+if (source.includes("const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 50)), 1), 100)")
+    || source.includes("const kinds = kind ? [kind] : []")
+    || source.includes("has_more: offset + items.length < total")) {
+  lifecycleErrors.push("operator_strategy_memory_list_read_service_returned_to_index");
+}
+if (!operatorStrategyMemoryListReadService.includes("export async function readOperatorStrategyMemoryList")
+    || !operatorStrategyMemoryListReadService.includes("dependencies.normalizeMachineKey")
+    || !operatorStrategyMemoryListReadService.includes("Math.min(")
+    || !operatorStrategyMemoryListReadService.includes("Math.max(")
+    || !operatorStrategyMemoryListReadService.includes('status: "active"')
+    || !operatorStrategyMemoryListReadService.includes("dependencies.listActiveMemory")
+    || !operatorStrategyMemoryListReadService.includes("dependencies.countActiveMemory")
+    || !operatorStrategyMemoryListReadService.includes("returned_count: items.length")
+    || !operatorStrategyMemoryListReadService.includes("has_more: offset + items.length < total")) {
+  lifecycleErrors.push("operator_strategy_memory_list_read_service_module_incomplete");
+}
+if (!operatorStrategyMemoryListReadServiceTests.includes("uses unfiltered active memory with default pagination and exact counts")
+    || !operatorStrategyMemoryListReadServiceTests.includes("normalizes one kind and clamps limit and offset before active retrieval")
+    || !operatorStrategyMemoryListReadServiceTests.includes("applies the lower limit bound and computes has_more from offset plus returned count")) {
+  lifecycleErrors.push("operator_strategy_memory_list_read_service_tests_incomplete");
+}
+
 
 
 

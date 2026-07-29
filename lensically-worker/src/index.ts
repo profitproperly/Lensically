@@ -141,6 +141,8 @@ import {
 } from "./operatorDraftDecisionService";
 import { readOperatorActiveGates } from "./operatorActiveGateReadService";
 import { planOperatorGateMutation } from "./operatorGateMutationPlanningService";
+import { readOperatorStrategyMemoryList } from "./operatorStrategyMemoryListReadService";
+
 
 
 
@@ -14614,15 +14616,27 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
 
-  if (toolName === "list_strategy_memory") {
-    const kind = normalizeOperatorMachineKey(payload.kind, "");
-    const limit = Math.min(Math.max(Math.trunc(Number(payload.limit ?? 50)), 1), 100);
-    const offset = Math.max(Math.trunc(Number(payload.offset ?? 0)), 0);
-    const kinds = kind ? [kind] : [];
-    const items = await listGptStrategyMemory(env, brand.account_id, kinds, limit, offset, "active");
-    const total = await countGptStrategyMemory(env, brand.account_id, kinds, "active");
-    return operatorJsonResponse({ items, returned_count: items.length, total_count: total, has_more: offset + items.length < total });
+    if (toolName === "list_strategy_memory") {
+    const memoryList = await readOperatorStrategyMemoryList({ payload }, {
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      listActiveMemory: async ({ kinds, limit, offset, status }) => await listGptStrategyMemory(
+        env,
+        brand.account_id,
+        kinds,
+        limit,
+        offset,
+        status,
+      ),
+      countActiveMemory: async ({ kinds, status }) => await countGptStrategyMemory(
+        env,
+        brand.account_id,
+        kinds,
+        status,
+      ),
+    });
+    return operatorJsonResponse(memoryList);
   }
+
 
     if (toolName === "save_strategy_memory") {
     const kind = normalizeGptStrategyMemoryKind(payload.kind);
