@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-8b-validated-web-artifact-reuse
-repository_base_sha: 55e0c174996a02676f37b80f4d6f311f31303908
-production_sha: 55e0c174996a02676f37b80f4d6f311f31303908
+active_checkpoint: stage-8c-migration-release-modernization
+repository_base_sha: 8931e04a39e8a7a5a724b73e8b71294135a87a64
+production_sha: 8931e04a39e8a7a5a724b73e8b71294135a87a64
 
 
 
@@ -1429,11 +1429,29 @@ Completed checkpoint — Stage 8A shared full-validation modernization:
 - Exact-SHA release passed in run `30433196256`.
 - Live production independently confirmed exact SHA `55e0c174996a02676f37b80f4d6f311f31303908` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 8B validated web artifact reuse:
+Completed checkpoint — Stage 8B validated web artifact reuse:
 
-Build the Cloudflare web artifact once during exact-SHA validation, package it with a release manifest containing the source SHA and artifact digest, and upload it as validation evidence. For a matching exact-SHA release, download and verify that artifact, then deploy it without reinstalling web dependencies or rebuilding. If the artifact is missing, expired, mismatched, corrupt, or not produced by a successful qualifying validation run, fail closed into the complete existing build-and-validation fallback path.
+- Added an exact OpenNext artifact contract containing source SHA, archive SHA-256, archive size, `package-lock.json` SHA-256, and the required `.open-next/worker.js` plus `.open-next/assets` paths.
+- Added safe archive verification that rejects invalid SHA, source mismatch, dependency-lock mismatch, size or digest mismatch, missing required paths, absolute paths, traversal, and unexpected archive roots before extraction.
+- Added focused round-trip and tamper regressions for packaging, restoration, wrong SHA, archive mutation, traversal, and unexpected-root rejection.
+- Push validation now runs the artifact regression, builds the real Cloudflare output once with `build:cf`, packages it, and uploads a seven-day exact-SHA artifact.
+- Release locates the latest successful exact-SHA push run, verifies a non-expired SHA-named artifact, downloads it cross-run, validates and restores it, and deploys without reinstalling web dependencies or rebuilding.
+- Missing, expired, unavailable, corrupt, mismatched, or dependency-cache-miss evidence selects an explicit complete fallback: install if needed, rerun the artifact regression, rebuild `build:cf`, and run the complete release gates.
+- Replaced latest-commit push classification with production-relative classification from the deployed production SHA through the pushed head, with event-before and parent fallbacks. This prevents later validator-only commits from hiding earlier web, migration, cron, or other high-risk changes in a multi-commit checkpoint.
+- Added independent Ruby workflow-structure and release-preflight enforcement covering artifact production, cross-run download, SHA/digest restoration, explicit path selection, complete fallback, full-history checkout, production-relative classification, and permanent removal of the unconditional release rebuild.
+- A sequence of workflow-lint failures exposed additive indentation inherited by line-level repository patches. The entire push job opening was rewritten from a column-zero anchor, and dedicated workflow lint passed in run `30434586581`.
+- Push validation passed in run `30434586570`; the artifact contract test, `build:cf`, package, upload, and shared full suite all succeeded.
+- Typecheck and authority validation passed in run `30434711363`.
+- All eight Operator shards passed in run `30434722502`.
+- Exact-SHA release passed in run `30434835071`. Artifact download, verification, and restore succeeded; fallback dependency installation, fallback build, and fallback full release gates were all skipped; Worker and web deploy plus retained-site verification passed.
+- The real validated web checkpoint completed inside the broad two-to-five-minute target: push validation began at `08:12:20Z`, and the artifact-reuse release was dispatched after success at `08:16:03Z`.
+- Live production independently confirmed exact SHA `8931e04a39e8a7a5a724b73e8b71294135a87a64` with 75/75 public tools.
 
-Add independent workflow-structure and release-preflight enforcement, focused artifact-manifest validation, real exact-SHA web-path benchmarking, and a bounded release with retained-site verification before advancing.
+ACTIVE checkpoint — Stage 8C migration release modernization:
+
+Audit migration filenames, ordering, the authoritative migration ledger, local migration regression coverage, production release commands, and any data-bearing migrations or backfills. Add a source-controlled pre-release planner that validates deterministic ordering and safety, compares the exact repository migration set with production, and emits only the unapplied migration plan before any mutation.
+
+The normal small-migration release path must apply only the validated unapplied set and verify the production ledger afterward. Large data backfills must be explicitly classified out of the normal release command into a measured long-running lane with resumability, progress receipts, and no implicit execution. Preserve complete fallback validation and fail closed on missing access, ledger mismatch, ordering ambiguity, edited applied migrations, unknown production entries, or unsafe statements.
 
 
 
@@ -1486,7 +1504,7 @@ Remaining work after this checkpoint:
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
 7. Router and runtime composition — COMPLETE AND DEPLOYED
-8. Test and release modernization — ACTIVE at Stage 8B
+8. Test and release modernization — ACTIVE at Stage 8C
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
 ### Next job — `chl_autonomous_operator_foundation_v1`
