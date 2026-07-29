@@ -12687,7 +12687,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            AND status NOT IN ('scheduled', 'published')`,
       ).bind(input.brandKey, String(input.patternId)).run(),
     });
-    return operatorJsonResponse(exclusionResult.body, exclusionResult.status);
+          return { body: exclusionResult.body, status: exclusionResult.status };
 
     /* Legacy destructive deletion path intentionally retired. Historical pattern,
        card, generation, and analytics data must remain intact.
