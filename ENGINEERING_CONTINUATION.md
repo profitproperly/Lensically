@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7d1-workflow-context-source-routing
-repository_base_sha: 2f5acef79b9b32729a73ffcdf5509e19765afb7d
-production_sha: 2f5acef79b9b32729a73ffcdf5509e19765afb7d
+active_checkpoint: stage-7d2-source-lineage-backfill-routing
+repository_base_sha: b5572cbbd538b09cd5a60cf89fa95d481df8e254
+production_sha: b5572cbbd538b09cd5a60cf89fa95d481df8e254
 
 
 
@@ -1335,11 +1335,21 @@ Completed checkpoint — Stage 7C Account and review runtime dispatch compositio
 - Account, Lensically UI, review retirement, hourly coverage, review-batch read/attach/source-resolution/scheduling, and review-batch claim now use extracted runtime composition.
 - Product logic remains in its existing service owners; `handleOperatorTool` retains only explicit platform dependency wiring and ordered dispatcher fallthrough.
 
-ACTIVE checkpoint — Stage 7D1 workflow, context, board, and source-list routing:
+Completed checkpoint — Stage 7D1 workflow, context, board, and source-list routing:
 
-Route `start_workflow_session`, `admit_context`, `get_production_board`, `list_source_candidates`, and non-destructive `delete_saved_pattern_source` exclusion through the reusable keyed runtime dispatcher. Preserve service ownership, response ordering, D1 adapters, and the permanently retired destructive deletion path.
+- Routed `start_workflow_session`, `admit_context`, `get_production_board`, `list_source_candidates`, and non-destructive `delete_saved_pattern_source` exclusion through one lazy keyed dispatcher.
+- Preserved all existing service owners, D1 adapters, status behavior, ordered fallthrough, and the documented retired destructive deletion implementation.
+- Added permanent lifecycle enforcement requiring the five keyed handlers and preventing their direct branches from returning.
+- Push validation passed in run `30426945586`.
+- All eight Operator shards passed in run `30426969950`.
+- Exact-SHA release passed in run `30427252507`.
+- Live production independently confirmed exact SHA `b5572cbbd538b09cd5a60cf89fa95d481df8e254` with 75/75 public tools.
 
-Add permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
+ACTIVE checkpoint — Stage 7D2 source draw, lineage, and backfill routing:
+
+Route `draw_source_candidate_batch`, `audit_published_post_lineage`, `recover_published_post_lineage`, `create_all_missing_manifest_source_cards`, `prepare_manifest_source_card_backfill`, and `get_source_candidate_batch` through the reusable keyed runtime dispatcher. Preserve existing service ownership, recovery ordering, continuation contracts, D1 adapters, and status codes.
+
+Add permanent ownership enforcement, run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
 
 
 
