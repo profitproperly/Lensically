@@ -1,7 +1,15 @@
 require "yaml"
 
 path = ARGV.fetch(0)
-document = YAML.parse_file(path)
+source = File.read(path)
+misindented_step_lines = source.lines.each_with_index.filter_map do |line, index|
+  index + 1 if line.match?(/^ {8,}- name:/)
+end
+abort("misindented_step_markers:#{misindented_step_lines.join(",")}") unless misindented_step_lines.empty?
+if source.lines.any? { |line| line.match?(/^\s+run:\s+node scripts\/run-full-validation\.mjs\s*$/) }
+  abort("shared_full_validation_requires_block_run")
+end
+document = YAML.parse(source, filename: path)
 
 def assert_no_duplicate_mapping_keys(node, path = [])
   if node.is_a?(Psych::Nodes::Mapping)
