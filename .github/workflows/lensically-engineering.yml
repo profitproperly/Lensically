@@ -371,10 +371,26 @@ jobs:
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "Accept: application/vnd.github+json" \
             "${runs_url}" > /tmp/lensically-push-runs.json
-          if jq -e --arg sha "${RELEASE_SHA}" '.workflow_runs | any(.head_sha == $sha and .conclusion == "success")' /tmp/lensically-push-runs.json > /dev/null; then
+                    validated_run_id="$(jq -r --arg sha "${RELEASE_SHA}" '[.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success")] | sort_by(.id) | last | .id // empty' /tmp/lensically-push-runs.json)"
+          if [[ -n "${validated_run_id}" ]]; then
             full_release=false
           else
             full_release=true
+          fi
+          web_artifact_available=false
+          if [[ -n "${validated_run_id}" ]]; then
+            artifacts_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${validated_run_id}/artifacts?per_page=100"
+            if curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              "${artifacts_url}" > /tmp/lensically-push-artifacts.json; then
+              artifact_name="lensically-web-${RELEASE_SHA}"
+              if jq -e --arg name "${artifact_name}" '.artifacts | any(.name == $name and .expired == false)' /tmp/lensically-push-artifacts.json > /dev/null; then
+                web_artifact_available=true
+              fi
+            else
+              echo "Validated web artifact lookup failed; complete fallback remains required." >&2
+            fi
           fi
           deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty')"
           if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
