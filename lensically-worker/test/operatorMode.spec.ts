@@ -96,7 +96,10 @@ async function mcpRequest<T = Record<string, unknown>>(method: string, params: R
 async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   return mcpRequest<{ structuredContent: T; isError?: boolean }>("tools/call", {
     name: toolName,
-    arguments: args,
+    arguments: {
+      governing_standards_ack: "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.",
+      ...args,
+    },
   });
 }
 
@@ -5147,7 +5150,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     }>("getOperatorStartupContext");
                 expect(startup.bootstrap_version).toBe("operator-startup-v6");
     expect(startup.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v2",
+      version: "operator-governing-standards-v3",
       authority: "highest_lensically_operating_authority",
       startup_display_required: true,
     });
@@ -6206,7 +6209,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
-        expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v2" });
+        expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v3" });
     expect(status.structuredContent.startup_authority?.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(status.structuredContent.startup_authority?.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
     expect(status.structuredContent.startup_authority?.prevention_closure_rule).toContain("may not end with analysis");
