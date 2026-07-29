@@ -444,6 +444,7 @@ jobs:
 
             
 
+      
       - name: Restore web dependencies
         if: steps.release_scope.outputs.web_changed == 'true'
         id: release_web_cache
@@ -452,23 +453,80 @@ jobs:
           path: lensically-web/node_modules
           key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
 
-            
+      - name: Download exact validated web artifact
+        id: download_web_artifact
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.release_scope.outputs.web_artifact_available == 'true' &&
+          steps.release_scope.outputs.validated_run_id != '' &&
+          steps.release_web_cache.outputs.cache-hit == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: lensically-web-${{ inputs.release_sha }}
+          path: ${{ runner.temp }}/lensically-web-artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.release_scope.outputs.validated_run_id }}
 
-      - name: Install web dependencies
-        if: steps.release_scope.outputs.web_changed == 'true' && steps.release_web_cache.outputs.cache-hit != 'true'
+      - name: Restore exact validated web artifact
+        id: restore_web_artifact
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.download_web_artifact.outcome == 'success'
+        continue-on-error: true
+        working-directory: lensically-web
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/lensically-web-artifact
+        run: node scripts/validated-web-artifact.mjs restore --sha "${RELEASE_SHA}" --directory "${ARTIFACT_DIRECTORY}"
+
+      - name: Resolve validated web release path
+        id: web_release_path
+        if: steps.release_scope.outputs.web_changed == 'true'
+        env:
+          ARTIFACT_AVAILABLE: ${{ steps.release_scope.outputs.web_artifact_available }}
+          WEB_CACHE_HIT: ${{ steps.release_web_cache.outputs.cache-hit }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_web_artifact.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore_web_artifact.outcome }}
+        run: |
+          set -euo pipefail
+          use_validated_artifact=false
+          fallback_reason=artifact_unavailable
+          if [[ "${ARTIFACT_AVAILABLE}" == "true" && "${WEB_CACHE_HIT}" == "true" && "${DOWNLOAD_OUTCOME}" == "success" && "${RESTORE_OUTCOME}" == "success" ]]; then
+            use_validated_artifact=true
+            fallback_reason=none
+          elif [[ "${WEB_CACHE_HIT}" != "true" ]]; then
+            fallback_reason=web_dependency_cache_miss
+          elif [[ "${DOWNLOAD_OUTCOME}" == "failure" ]]; then
+            fallback_reason=artifact_download_failed
+          elif [[ "${RESTORE_OUTCOME}" == "failure" ]]; then
+            fallback_reason=artifact_verification_failed
+          fi
+          echo "use_validated_artifact=${use_validated_artifact}" >> "${GITHUB_OUTPUT}"
+          echo "fallback_reason=${fallback_reason}" >> "${GITHUB_OUTPUT}"
+          echo "web_release_path=${use_validated_artifact} reason=${fallback_reason}"
+
+      - name: Install fallback web dependencies
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.web_release_path.outputs.use_validated_artifact != 'true' &&
+          steps.release_web_cache.outputs.cache-hit != 'true'
         working-directory: lensically-web
         run: npm ci
 
-            
-
-            
-      - name: Build exact-head web product
-        if: steps.release_scope.outputs.web_changed == 'true'
+      - name: Build fallback exact-head web product
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.web_release_path.outputs.use_validated_artifact != 'true'
         working-directory: lensically-web
-        run: npm run build:cf
+        run: |
+          npm run test:validated-artifact
+          npm run build:cf
 
       - name: Run exact-head release gates
-        if: steps.release_scope.outputs.full_release == 'true'
+        if: >-
+          steps.release_scope.outputs.full_release == 'true' ||
+          (steps.release_scope.outputs.web_changed == 'true' && steps.web_release_path.outputs.use_validated_artifact != 'true')
         working-directory: lensically-worker
         run: |
           set -euo pipefail
