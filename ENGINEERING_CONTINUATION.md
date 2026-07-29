@@ -1245,16 +1245,24 @@ Completed checkpoint — Stage 6AX gate-evaluation service extraction:
 - Hardened exact-SHA release and live verification passed in run `30420001078`.
 - Live production independently confirmed exact SHA `42ddc4fbbb89d89ca8029d18eb7677d9a512684f` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AY retired monolithic runway removal:
+Completed checkpoint — Stage 6AY retired monolithic runway removal:
 
-Remove the unreferenced `commitManifestAutonomousRunway` implementation from `src/index.ts` while preserving:
+- Deleted the entire unreferenced `commitManifestAutonomousRunway` multi-post implementation from `src/index.ts`.
+- Preserved the public `commit_manifest_autonomous_runway` 410 retirement response and the supported one-post persistence path through `persist_manifest_autonomous_post`.
+- Preserved shared canonical source-card resolution still used by supported persistence.
+- Added permanent lifecycle enforcement requiring the retirement response while forbidding the legacy function and its generation/scheduling failure surfaces.
+- Focused validation passed in run `30420303338`.
+- Push validation passed in run `30420296049`.
+- All eight Operator shards passed in run `30420534057`.
+- Hardened exact-SHA release passed in run `30420586949`.
+- Independent verification initially observed the prior SHA during propagation, then confirmed exact production SHA `40843ccd28b37f86095dbf4840d09e44b1b85485` with 75/75 public tools.
 
-- the public `commit_manifest_autonomous_runway` retirement response and 410 status
-- the supported one-post persistence path through `persist_manifest_autonomous_post`
-- shared source-card resolution still used by the supported persistence service
-- all current autonomous-cycle behavior and live tool boundaries
+ACTIVE checkpoint — Stage 6AZ gate engine service extraction:
 
-Add permanent lifecycle prevention proving the retired implementation cannot return, then run exact-SHA validation and release.
+Move the remaining `runOperatorGates` product logic and gate-result construction out of `src/index.ts` into the existing gate-domain service while preserving every deterministic, model, scheduling, source-fidelity, repetition, safety, and brand-specific gate outcome.
+
+Keep D1 reads, source-card and context retrieval, rejection-context construction, shared normalization primitives, time/scheduling adapters, and other platform dependencies explicit at the `index.ts` boundary. Extend the existing gate-domain regression suite atomically, add permanent ownership enforcement, then run exact-SHA validation and release.
+
 
 
 
@@ -1304,7 +1312,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AY
+6. Product-service extraction — ACTIVE at Stage 6AZ
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
