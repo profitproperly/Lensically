@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
 status: active
-updated_at: 2026-07-28
+updated_at: 2026-07-29
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6aw-account-directory-read-service
-repository_base_sha: 1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9
-production_sha: 1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9
+active_checkpoint: stage-7a-operator-runtime-composition
+repository_base_sha: 975064c77f062d9d6806d8e330833b499fba87aa
+production_sha: 975064c77f062d9d6806d8e330833b499fba87aa
 
 
 
@@ -34,8 +34,8 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AW account directory read service extraction.
-- Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
+- Current checkpoint: Stage 7A Operator runtime composition.
+- Remaining dependency chain: finish Stage 7 router/runtime composition, then Stage 8 test/release modernization and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
 ### 20 — QUEUED — `chl_autonomous_operator_foundation_v1`
@@ -1257,11 +1257,27 @@ Completed checkpoint — Stage 6AY retired monolithic runway removal:
 - Hardened exact-SHA release passed in run `30420586949`.
 - Independent verification initially observed the prior SHA during propagation, then confirmed exact production SHA `40843ccd28b37f86095dbf4840d09e44b1b85485` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AZ gate engine service extraction:
+Completed checkpoint — Stage 6AZ gate engine service extraction and Stage 6 closure:
 
-Move the remaining `runOperatorGates` product logic and gate-result construction out of `src/index.ts` into the existing gate-domain service while preserving every deterministic, model, scheduling, source-fidelity, repetition, safety, and brand-specific gate outcome.
+- Moved every `runOperatorGates` decision branch and gate-result composition path from `src/index.ts` into `src/operatorGateMutationPlanningService.ts` through explicit platform dependencies.
+- Preserved deterministic, model, scheduling, source-fidelity, repetition, owner-rejection, duplicate, safety, and brand-specific outcomes without rewriting gate behavior.
+- Kept D1, source-card, rejection-context, inventory, scheduling, draft, persistence, normalization, UUID, and clock responsibilities explicit as `index.ts` adapters.
+- Extended the existing gate-domain regression suite atomically and added permanent lifecycle enforcement forbidding gate-decision logic from returning to `index.ts`.
+- Initial implementation committed at `6cf04eb932e6f2512d96f9a092429740563aa8d8`.
+- Initial push validation `30421541857` correctly failed because the extracted dependency contract declared realm inference non-null while the existing helper legitimately returns `null`.
+- Repaired the dependency contract at `975064c77f062d9d6806d8e330833b499fba87aa`; runtime behavior was unchanged and the nullable boundary is now type-enforced.
+- Repaired focused validation passed in run `30421600469`.
+- Push validation passed in run `30421591056`.
+- All eight Operator shards passed in run `30421645471`.
+- Hardened exact-SHA release passed in run `30422544795`.
+- Live production independently confirmed exact SHA `975064c77f062d9d6806d8e330833b499fba87aa` with 75/75 public tools.
+- Stage 6 product-service extraction is complete.
 
-Keep D1 reads, source-card and context retrieval, rejection-context construction, shared normalization primitives, time/scheduling adapters, and other platform dependencies explicit at the `index.ts` boundary. Extend the existing gate-domain regression suite atomically, add permanent ownership enforcement, then run exact-SHA validation and release.
+ACTIVE checkpoint — Stage 7A Operator runtime composition:
+
+Audit the remaining `handleOperatorTool` and Worker runtime entrypoint composition, then move the first coherent routing/runtime cluster out of `src/index.ts` without relocating product-service logic back into the entrypoint.
+
+Keep authorization, canonical tool-name resolution, retired-tool boundaries, payload admission, account resolution, direct service dispatch, observation, transport, and error normalization behavior exact. Add direct regression coverage and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, and independent live verification.
 
 
 
@@ -1283,7 +1299,7 @@ Keep D1 reads, source-card and context retrieval, rejection-context construction
 
 Remaining work after this checkpoint:
 
-- Continue Stage 6 product-service extraction in bounded domain clusters through Stage 6 completion.
+- Complete Stage 7 router and runtime composition in bounded clusters.
 - Continue directly through Stages 7, 8, and 9 without switching to the queued CHL foundation between monolith checkpoints.
 - After the final Stage 9 exact-SHA release and live verification, advance `chl_autonomous_operator_foundation_v1` to ACTIVE and begin `atomic_write_reconciliation`.
 
@@ -1312,8 +1328,8 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AZ
-7. Router and runtime composition — QUEUED AFTER STAGE 6
+6. Product-service extraction — COMPLETE AND DEPLOYED
+7. Router and runtime composition — ACTIVE at Stage 7A
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
