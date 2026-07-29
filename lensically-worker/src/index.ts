@@ -88,7 +88,10 @@ import {
   isOperatorMcpEngineeringToolName,
   operatorMcpToolNameRequiresProceed,
 } from "./operatorMcpRegistryComposition";
-import { createOperatorMcpRoutingPolicy } from "./operatorMcpRoutingPolicy";
+import {
+  admitOperatorRuntimeToolCall,
+  createOperatorMcpRoutingPolicy,
+} from "./operatorMcpRoutingPolicy";
 import { dispatchOperatorMcpRequest } from "./operatorMcpDispatcher";
 import { dispatchOperatorMcpToolCall } from "./operatorMcpToolCallDispatcher";
 import {
@@ -11747,39 +11750,36 @@ async function observeManifestCycleToolResult(
 
 
 async function handleOperatorTool(request: Request, env: Env, toolName: string): Promise<Response> {
-  if (!isGptRequestAuthorized(request, env) && !isOperatorMcpRequestAuthorized(request, env) && !isInternalRequestAuthorized(request, env)) {
-    return unauthorizedGptResponse();
-  }
-    const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName);
-  if (RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)) {
-    return operatorJsonResponse({
+  const admission = await admitOperatorRuntimeToolCall({ request, toolName }, {
+    isAuthorized: (candidate) => isGptRequestAuthorized(candidate, env)
+      || isOperatorMcpRequestAuthorized(candidate, env)
+      || isInternalRequestAuthorized(candidate, env),
+    unauthorizedResponse: unauthorizedGptResponse,
+    canonicalToolName: OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName,
+    retiredToolNames: RETIRED_HUMAN_GUIDANCE_TOOL_NAMES,
+    retiredToolResponse: (canonicalToolName) => operatorJsonResponse({
       success: false,
       error: "human_guidance_tool_retired",
       tool_name: canonicalToolName,
       human_free_autonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
-    }, 410);
-  }
-  await prepareOperatorMode(env);
-    const payload = await readOperatorPayload(request);
-  const scopedCall = OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload);
-  toolName = scopedCall.tool_name;
-  Object.assign(payload, scopedCall.args);
-
-
-
-    if (toolName === "list_accounts") {
-    const accountDirectory = await readOperatorAccountDirectory({
+    }, 410),
+    prepare: () => prepareOperatorMode(env),
+    readPayload: readOperatorPayload,
+    scopeCall: OPERATOR_MCP_ROUTING_POLICY.scopeCall,
+    accountDirectoryResponse: async () => operatorJsonResponse(await readOperatorAccountDirectory({
       humanFreeAutonomy: HUMAN_FREE_AUTONOMY_CONTRACT,
     }, {
       listAccounts: () => listOperatorAccounts(env),
-    });
-    return operatorJsonResponse(accountDirectory);
-  }
-
-  const brand = await resolveOperatorBrandFromPayload(env, payload);
-  if (!brand) {
-    return operatorJsonResponse({ success: false, error: "brand_key is required or unavailable" }, 400);
-  }
+    })),
+    resolveBrand: (payload) => resolveOperatorBrandFromPayload(env, payload),
+    missingBrandResponse: () => operatorJsonResponse({
+      success: false,
+      error: "brand_key is required or unavailable",
+    }, 400),
+  });
+  if (admission.kind === "response") return admission.response;
+  toolName = admission.toolName;
+  const { payload, brand } = admission;
 
         if (isOperatorManifestCycleServiceToolName(toolName)) {
     const serviceResult = await handleOperatorManifestCycleServiceTool({

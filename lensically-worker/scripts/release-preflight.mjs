@@ -761,8 +761,33 @@ if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 55-tool a
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpRoutingPolicy"')
+    || !source.includes("admitOperatorRuntimeToolCall,")
     || !source.includes("const OPERATOR_MCP_ROUTING_POLICY = createOperatorMcpRoutingPolicy")) {
   lifecycleErrors.push("operator_mcp_routing_policy_import_or_binding_missing");
+}
+const operatorToolHandlerStart = source.indexOf("async function handleOperatorTool(");
+const operatorToolHandlerDispatchStart = source.indexOf(
+  'if (isOperatorManifestCycleServiceToolName(toolName))',
+  operatorToolHandlerStart,
+);
+const operatorToolAdmissionShell = operatorToolHandlerStart >= 0
+  && operatorToolHandlerDispatchStart > operatorToolHandlerStart
+  ? source.slice(operatorToolHandlerStart, operatorToolHandlerDispatchStart)
+  : "";
+if (!operatorToolAdmissionShell.includes("admitOperatorRuntimeToolCall({ request, toolName }")
+    || !operatorToolAdmissionShell.includes("retiredToolNames: RETIRED_HUMAN_GUIDANCE_TOOL_NAMES")
+    || !operatorToolAdmissionShell.includes("accountDirectoryResponse: async ()")
+    || !operatorToolAdmissionShell.includes("resolveBrand: (payload) => resolveOperatorBrandFromPayload(env, payload)")
+    || !operatorToolAdmissionShell.includes('if (admission.kind === "response") return admission.response')) {
+  lifecycleErrors.push("operator_runtime_admission_cutover_incomplete");
+}
+if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
+    || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")
+    || operatorToolAdmissionShell.includes("RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(canonicalToolName)")
+    || operatorToolAdmissionShell.includes("const scopedCall = OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload)")
+    || operatorToolAdmissionShell.includes('if (toolName === "list_accounts")')
+    || operatorToolAdmissionShell.includes("const brand = await resolveOperatorBrandFromPayload(env, payload)")) {
+  lifecycleErrors.push("operator_runtime_admission_returned_to_index");
 }
 if (source.includes("function requestedMcpBrandKey(")
     || source.includes("function operatorMcpCallRequiresProceed(")
@@ -787,7 +812,11 @@ if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorM
     || !operatorMcpRoutingPolicy.includes("export function canonicalOperatorExecutionArgs")
     || !operatorMcpRoutingPolicy.includes("export function canonicalAutonomyToolName")
     || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
-    || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")) {
+    || !operatorMcpRoutingPolicy.includes("export function createOperatorMcpRoutingPolicy")
+    || !operatorMcpRoutingPolicy.includes("export async function admitOperatorRuntimeToolCall")
+    || !operatorMcpRoutingPolicy.includes("dependencies.retiredToolNames.has(canonicalToolName)")
+    || !operatorMcpRoutingPolicy.includes('scopedCall.tool_name === "list_accounts"')
+    || !operatorMcpRoutingPolicy.includes("dependencies.resolveBrand(payload)")) {
   lifecycleErrors.push("operator_mcp_routing_policy_module_incomplete");
 }
 if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicalization and account injection")
@@ -795,7 +824,12 @@ if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicali
     || !operatorMcpRoutingPolicyTests.includes("preserves guided Proceed requirements and autonomous exemptions")
     || !operatorMcpRoutingPolicyTests.includes("preserves nested alias canonicalization and strips execution metadata")
     || !operatorMcpRoutingPolicyTests.includes("preserves autonomy canonical names and handler classification")
-    || !operatorMcpRoutingPolicyTests.includes("binds injected normalizers into one deterministic routing policy")) {
+    || !operatorMcpRoutingPolicyTests.includes("binds injected normalizers into one deterministic routing policy")
+    || !operatorMcpRoutingPolicyTests.includes("stops unauthorized requests before routing work")
+    || !operatorMcpRoutingPolicyTests.includes("retires canonical tools before preparation or payload reads")
+    || !operatorMcpRoutingPolicyTests.includes("preserves scoped payload admission and brand resolution order")
+    || !operatorMcpRoutingPolicyTests.includes("serves the account directory without brand resolution")
+    || !operatorMcpRoutingPolicyTests.includes("returns the exact missing-brand response after scoped admission")) {
   lifecycleErrors.push("operator_mcp_routing_policy_tests_incomplete");
 }
 if (!source.includes('from "./operatorMcpTransport"')) {

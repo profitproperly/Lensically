@@ -181,7 +181,73 @@ export function createOperatorMcpRoutingPolicy(dependencies: {
       args,
       dependencies.normalizeText,
     ),
-    classifyHandler: classifyOperatorMcpHandler,
+        classifyHandler: classifyOperatorMcpHandler,
   } as const;
 }
+
+export type OperatorRuntimeAdmission<TBrand> =
+  | { kind: "response"; response: Response }
+  | {
+      kind: "context";
+      toolName: string;
+      payload: Record<string, unknown>;
+      brand: TBrand;
+    };
+
+export async function admitOperatorRuntimeToolCall<TBrand>(
+  input: {
+    request: Request;
+    toolName: string;
+  },
+  dependencies: {
+    isAuthorized(request: Request): boolean;
+    unauthorizedResponse(): Response;
+    canonicalToolName(toolName: string): string;
+    retiredToolNames: ReadonlySet<string>;
+    retiredToolResponse(canonicalToolName: string): Response;
+    prepare(): Promise<void>;
+    readPayload(request: Request): Promise<Record<string, unknown>>;
+    scopeCall(toolName: string, payload: Record<string, unknown>): ScopedOperatorMcpCall;
+    accountDirectoryResponse(): Promise<Response>;
+    resolveBrand(payload: Record<string, unknown>): Promise<TBrand | null>;
+    missingBrandResponse(): Response;
+  },
+): Promise<OperatorRuntimeAdmission<TBrand>> {
+  if (!dependencies.isAuthorized(input.request)) {
+    return { kind: "response", response: dependencies.unauthorizedResponse() };
+  }
+
+  const canonicalToolName = dependencies.canonicalToolName(input.toolName);
+  if (dependencies.retiredToolNames.has(canonicalToolName)) {
+    return {
+      kind: "response",
+      response: dependencies.retiredToolResponse(canonicalToolName),
+    };
+  }
+
+  await dependencies.prepare();
+  const payload = await dependencies.readPayload(input.request);
+  const scopedCall = dependencies.scopeCall(input.toolName, payload);
+  Object.assign(payload, scopedCall.args);
+
+  if (scopedCall.tool_name === "list_accounts") {
+    return {
+      kind: "response",
+      response: await dependencies.accountDirectoryResponse(),
+    };
+  }
+
+  const brand = await dependencies.resolveBrand(payload);
+  if (!brand) {
+    return { kind: "response", response: dependencies.missingBrandResponse() };
+  }
+
+  return {
+    kind: "context",
+    toolName: scopedCall.tool_name,
+    payload,
+    brand,
+  };
+}
+
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS,
+    MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS,
+  admitOperatorRuntimeToolCall,
   canonicalAutonomyToolName,
   canonicalOperatorExecutionArgs,
   canonicalScopedOperatorMcpToolName,
@@ -100,7 +101,7 @@ describe("Operator MCP routing policy", () => {
     expect(classifyOperatorMcpHandler("get_account_state")).toBe("account");
   });
 
-  it("binds injected normalizers into one deterministic routing policy", () => {
+    it("binds injected normalizers into one deterministic routing policy", () => {
     expect(policy.requestedBrandKey("get_account_state", { brand_key: "opmg" })).toBe("opmg_deadman");
     expect(policy.callRequiresProceed("get_manifest_cycle_receipt", { brand_key: "manifest" })).toBe(false);
     expect(policy.canonicalExecutionArgs("runEngineeringTool", {
@@ -113,3 +114,133 @@ describe("Operator MCP routing policy", () => {
     expect(policy.classifyHandler("get_monthly_growth_review")).toBe("admin");
   });
 });
+
+type RuntimeBrand = { brand_key: string };
+
+function createRuntimeAdmissionDependencies() {
+  const events: string[] = [];
+  const dependencies = {
+    isAuthorized: vi.fn((_request: Request) => true),
+    unauthorizedResponse: vi.fn(() => new Response("unauthorized", { status: 401 })),
+    canonicalToolName: vi.fn((toolName: string) => toolName.replace(/^(?:mm_|om_|vx_)/, "")),
+    retiredToolNames: new Set<string>(["retired_guidance"]),
+    retiredToolResponse: vi.fn((canonicalToolName: string) => new Response(
+      JSON.stringify({ error: "human_guidance_tool_retired", tool_name: canonicalToolName }),
+      { status: 410 },
+    )),
+    prepare: vi.fn(async () => { events.push("prepare"); }),
+    readPayload: vi.fn(async (_request: Request) => {
+      events.push("read_payload");
+      return { draft_id: "draft-1" } as Record<string, unknown>;
+    }),
+    scopeCall: vi.fn((toolName: string, payload: Record<string, unknown>) => {
+      events.push("scope_call");
+      return {
+        tool_name: toolName,
+        args: { ...payload },
+        scoped_brand_key: null as OperatorMcpBrandKey | null,
+      };
+    }),
+    accountDirectoryResponse: vi.fn(async () => new Response(
+      JSON.stringify({ accounts: [] }),
+      { status: 200 },
+    )),
+    resolveBrand: vi.fn(async (_payload: Record<string, unknown>): Promise<RuntimeBrand | null> => {
+      events.push("resolve_brand");
+      return { brand_key: "manifest_mental" };
+    }),
+    missingBrandResponse: vi.fn(() => new Response(
+      JSON.stringify({ success: false, error: "brand_key is required or unavailable" }),
+      { status: 400 },
+    )),
+  };
+  return { events, dependencies };
+}
+
+describe("Operator runtime admission", () => {
+  const request = new Request("https://api.lensically.com/operator", { method: "POST" });
+
+  it("stops unauthorized requests before routing work", async () => {
+    const { events, dependencies } = createRuntimeAdmissionDependencies();
+    dependencies.isAuthorized.mockReturnValue(false);
+
+    const result = await admitOperatorRuntimeToolCall({ request, toolName: "get_account_state" }, dependencies);
+
+    expect(result.kind).toBe("response");
+    if (result.kind === "response") expect(result.response.status).toBe(401);
+    expect(events).toEqual([]);
+    expect(dependencies.canonicalToolName).not.toHaveBeenCalled();
+  });
+
+  it("retires canonical tools before preparation or payload reads", async () => {
+    const { events, dependencies } = createRuntimeAdmissionDependencies();
+
+    const result = await admitOperatorRuntimeToolCall({ request, toolName: "mm_retired_guidance" }, dependencies);
+
+    expect(result.kind).toBe("response");
+    if (result.kind === "response") {
+      expect(result.response.status).toBe(410);
+      expect(await result.response.json()).toMatchObject({
+        error: "human_guidance_tool_retired",
+        tool_name: "retired_guidance",
+      });
+    }
+    expect(events).toEqual([]);
+    expect(dependencies.readPayload).not.toHaveBeenCalled();
+  });
+
+  it("preserves scoped payload admission and brand resolution order", async () => {
+    const { events, dependencies } = createRuntimeAdmissionDependencies();
+    dependencies.scopeCall.mockImplementation((toolName, payload) => {
+      events.push("scope_call");
+      return {
+        tool_name: toolName.slice(3),
+        args: { ...payload, brand_key: "manifestmental" },
+        scoped_brand_key: "manifest_mental",
+      };
+    });
+
+    const result = await admitOperatorRuntimeToolCall({ request, toolName: "mm_get_account_state" }, dependencies);
+
+    expect(result).toEqual({
+      kind: "context",
+      toolName: "get_account_state",
+      payload: { draft_id: "draft-1", brand_key: "manifestmental" },
+      brand: { brand_key: "manifest_mental" },
+    });
+    expect(events).toEqual(["prepare", "read_payload", "scope_call", "resolve_brand"]);
+    expect(dependencies.resolveBrand).toHaveBeenCalledWith({
+      draft_id: "draft-1",
+      brand_key: "manifestmental",
+    });
+  });
+
+  it("serves the account directory without brand resolution", async () => {
+    const { dependencies } = createRuntimeAdmissionDependencies();
+    dependencies.scopeCall.mockReturnValue({
+      tool_name: "list_accounts",
+      args: {},
+      scoped_brand_key: null,
+    });
+
+    const result = await admitOperatorRuntimeToolCall({ request, toolName: "list_accounts" }, dependencies);
+
+    expect(result.kind).toBe("response");
+    if (result.kind === "response") expect(result.response.status).toBe(200);
+    expect(dependencies.accountDirectoryResponse).toHaveBeenCalledTimes(1);
+    expect(dependencies.resolveBrand).not.toHaveBeenCalled();
+  });
+
+  it("returns the exact missing-brand response after scoped admission", async () => {
+    const { events, dependencies } = createRuntimeAdmissionDependencies();
+    dependencies.resolveBrand.mockResolvedValue(null);
+
+    const result = await admitOperatorRuntimeToolCall({ request, toolName: "get_account_state" }, dependencies);
+
+    expect(result.kind).toBe("response");
+    if (result.kind === "response") expect(result.response.status).toBe(400);
+    expect(events).toEqual(["prepare", "read_payload", "scope_call", "resolve_brand"]);
+    expect(dependencies.missingBrandResponse).toHaveBeenCalledTimes(1);
+  });
+});
+
