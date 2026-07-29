@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ar-approved-draft-scheduling-service
-repository_base_sha: 337f3eabd14977014e60d351544612e31711f146
-production_sha: 337f3eabd14977014e60d351544612e31711f146
+active_checkpoint: stage-6as-manifest-cycle-receipt-read-service
+repository_base_sha: e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9
+production_sha: e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AR approved-draft scheduling service extraction.
+- Current checkpoint: Stage 6AS Manifest cycle receipt read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1155,20 +1155,31 @@ Completed checkpoint — Stage 6AQ owner-approved batch scheduling service extra
 - Hardened exact-SHA release and live verification passed in run `30415186350`.
 - Live production independently confirmed exact SHA `337f3eabd14977014e60d351544612e31711f146` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AR approved-draft scheduling service extraction:
+Completed checkpoint — Stage 6AR approved-draft scheduling service extraction:
 
-Extract the deterministic `schedule_approved_draft` orchestration into the scheduled-post mutation service cluster while preserving:
+- Extended `src/operatorScheduledPostEditMutationService.ts` as the scheduled-post mutation cluster authority for draft/date/time/timezone normalization, missing-input admission, existing-schedule idempotency, scheduling-gate orchestration, scheduling failure mapping, draft and source-claim transitions, strategy-tag and inventory intents, and exact response composition.
+- Reduced `schedule_approved_draft` in `src/index.ts` to canonical app/account/Threads/brand identity, draft and existing-schedule reads, gate execution, scheduled-post creation, D1 transition writes, strategy-tag persistence, inventory persistence, shared normalizers, workspace timezone, and HTTP transport.
+- Extended `test/operatorScheduledPostEditMutationService.spec.ts` atomically with missing-input, idempotency, gate-failure, scheduling-failure, lineage-persistence, and exact-success regressions.
+- The first atomic patch attempt was rejected before commit because a generic test-file terminator matched two locations. The patch was rebuilt around the unique final batch-success assertion and committed without partial mutation.
+- Permanent prevention: repository text patches that append or insert code must use a repository-verified semantic anchor unique to the target block; generic closing-brace or describe terminators are forbidden.
+- Focused validation passed in run `30415585338`.
+- Push validation passed in run `30415573096`.
+- All eight Operator shards passed in run `30415823077`.
+- Hardened exact-SHA release and live verification passed in run `30415868077`.
+- Live production independently confirmed exact SHA `e0ecd7ed1aa0aa31a881bf79f60ef0a953e2bdb9` with 75/75 public tools.
 
-- draft ID, date, time, and timezone normalization
-- exact missing-input admission response
-- existing scheduled or published draft idempotency and exact reused response
-- scheduling gate orchestration and exact gate-failure response
-- one scheduled-post creation attempt and exact scheduling failure mapping
-- draft and daily-source-claim transition intent after scheduling
-- strategy-tag and scheduled inventory persistence intent
-- exact success response with scheduled-post and draft identity
+ACTIVE checkpoint — Stage 6AS Manifest cycle receipt read service extraction:
 
-Keep canonical app/account/Threads/brand identity, draft retrieval, existing scheduled-post D1 read, gate execution, scheduled-post creation, D1 transition writes, strategy-tag persistence, inventory persistence, shared normalizers, workspace timezone, and HTTP transport explicit at the `index.ts` boundary. Extend the service and direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Move `get_manifest_cycle_receipt` into the existing Manifest cycle service while preserving:
+
+- optional cycle ID and cycle-operation-ID normalization
+- canonical receipt retrieval by brand, cycle, or operation identity
+- bounded receipt-section pagination and summary separation
+- exact unavailable-state response without mutation
+- exact success response for summary plus the requested section with duplicate summary removed
+
+Keep canonical brand identity, receipt persistence adapter, receipt-read builder, shared text normalization, and HTTP transport explicit at the `index.ts` boundary. Extend the existing Manifest cycle service and direct regression suite atomically, update its declared tool ownership, and add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1211,7 +1222,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AR
+6. Product-service extraction — ACTIVE at Stage 6AS
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
@@ -1254,7 +1265,7 @@ None currently recorded.
 5. Resume only the one `ACTIVE` job and its one `Current Action`; do not restart completed checkpoints or promote a queued/captured item.
 6. Treat D1 work state, action-closure receipts, chat history, Growth Mission records, and other documents as evidence or telemetry only.
 7. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
-8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume. After any client-side safety block, transport interruption, concurrent-writer evidence, or ambiguous mutation response, reconcile repository HEAD and engineering-audit state before retrying; never assume the mutation was not invoked or that the prior head is still current. When identical commands exist in multiple workflow lanes, use lane-specific surrounding context so every atomic replacement matches exactly once. Ownership-return gates must be scoped to the exact handler body or use repository-verified unique fragments, never global shared normalization or response fields that can legitimately remain elsewhere in `index.ts`; verify uniqueness before committing the gate. Create every new extracted service and its direct regression test in the same atomic patch set; never commit a service-only intermediate head.
+8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume. After any client-side safety block, transport interruption, concurrent-writer evidence, or ambiguous mutation response, reconcile repository HEAD and engineering-audit state before retrying; never assume the mutation was not invoked or that the prior head is still current. When identical commands exist in multiple workflow lanes, use lane-specific surrounding context so every atomic replacement matches exactly once. Ownership-return gates must be scoped to the exact handler body or use repository-verified unique fragments, never global shared normalization or response fields that can legitimately remain elsewhere in `index.ts`; verify uniqueness before committing the gate. Create every new extracted service and its direct regression test in the same atomic patch set; never commit a service-only intermediate head. Every repository text insertion or append must use a repository-verified semantic anchor unique to the intended block; generic closing-brace, array terminator, or describe terminator anchors are forbidden.
 9. Validate and release each bounded implementation checkpoint independently before moving to the next.
 10. Rewrite this file after every meaningful checkpoint, accepted new job, precedence change, completion, or verified interrupt.
 
