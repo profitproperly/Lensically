@@ -1221,17 +1221,29 @@ Completed checkpoint — Stage 6AV published-post lineage recovery service extra
 - Hardened exact-SHA release and live verification passed in run `30418424779`.
 - Live production independently confirmed exact SHA `1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AW account directory read service extraction:
+Completed checkpoint — Stage 6AW account directory read service extraction:
 
-Extend the account read-service cluster to own `list_accounts` response construction while preserving:
+- Extended `src/operatorAccountStateService.ts` with `readOperatorAccountDirectory` as the deterministic authority for exact account-directory response construction, autonomous operating-mode declaration, and inclusion of the complete human-free autonomy contract.
+- Reduced `list_accounts` in `src/index.ts` to account-directory retrieval, the source-controlled autonomy contract, and HTTP transport; no selected brand is required.
+- Extended `test/operatorAccountStateService.spec.ts` atomically with exact directory-response and empty-directory regressions.
+- Added permanent handler-scoped ownership gates.
+- Focused validation passed in run `30418582172`.
+- Push validation passed in run `30418565706`.
+- All eight Operator shards passed in run `30419010304`.
+- Hardened exact-SHA release and live verification passed in run `30419064029`.
+- Live production independently confirmed exact SHA `882593fdeebeb21954361c3bfae50b4d3535b674` with 75/75 public tools.
 
-- canonical account directory retrieval
-- exact `accounts` response key
-- autonomous operating-mode declaration
-- the complete human-free autonomy contract in the response
-- read-only behavior without requiring a selected brand
+ACTIVE checkpoint — Stage 6AX gate-evaluation service extraction:
 
-Keep account-directory persistence retrieval, the source-controlled autonomy contract, and HTTP transport explicit at the `index.ts` boundary. Extend `operatorAccountStateService.ts` and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Move `run_gates` deterministic request shaping, product-level orchestration, and exact response ownership into a bounded gate-evaluation service while preserving:
+
+- source-card, draft-text, stage-scope, lane-key, content-type, draft-analysis, and model-gate normalization
+- canonical brand context and gate-engine delegation
+- exact result propagation without weakening any deterministic or model gate
+- read/evaluation behavior without unrelated product mutation
+
+Keep canonical brand identity, the existing gate engine, shared normalizers, and HTTP transport explicit at the `index.ts` boundary. Create the service and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1279,7 +1291,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AW
+6. Product-service extraction — ACTIVE at Stage 6AX
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
