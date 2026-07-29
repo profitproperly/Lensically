@@ -129,12 +129,13 @@ jobs:
         working-directory: lensically-web
         run: npm run build
 
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
+          node scripts/run-full-validation.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
@@ -223,12 +224,13 @@ jobs:
         run: rm -rf node_modules/.vite node_modules/.cache
 
       
-      - name: Typecheck and lifecycle gate
+            - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
+          node scripts/run-full-validation.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
 
       - name: Run selected fast validation
@@ -305,11 +307,12 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-      - name: Verify lifecycle and run deterministic shard
+            - name: Verify lifecycle and run deterministic shard
         working-directory: lensically-worker
         run: |
           set -euo pipefail
           node scripts/validate-test-syntax.mjs
+          node scripts/run-full-validation.mjs --check
           node scripts/release-preflight.mjs --capability-lifecycle-only
           node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
 
