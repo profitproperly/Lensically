@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6an-scheduled-post-deletion-service
-repository_base_sha: 56bb17438effd616db0851050fc36ffe09716ff9
-production_sha: 56bb17438effd616db0851050fc36ffe09716ff9
+active_checkpoint: stage-6ao-scheduled-post-retry-service
+repository_base_sha: f9aeb121321c24d6c9fb3682907e98539b1a49c1
+production_sha: f9aeb121321c24d6c9fb3682907e98539b1a49c1
 
 
 
@@ -1106,18 +1106,29 @@ Completed checkpoint — Stage 6AM scheduled-post list read service extraction:
 - Hardened exact-SHA release and live verification passed in run `30411876286`.
 - Live production independently confirmed exact SHA `56bb17438effd616db0851050fc36ffe09716ff9` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AN scheduled-post deletion service extraction:
+Completed checkpoint — Stage 6AN scheduled-post deletion service extraction:
 
-Extract the deterministic `delete_scheduled_post` orchestration into a focused dependency-injected service while preserving:
+- Added `src/operatorScheduledPostDeletionService.ts` as the dependency-injected authority for ID and reason admission, reason-detail and operation-ID normalization, protected helper orchestration, exact outcome mapping, and success response composition.
+- Reduced `delete_scheduled_post` in `src/index.ts` to canonical app and Threads identity, deletion-reason and text normalizers, allowed reason constants, the protected deletion helper, fixed model/MCP attribution, and HTTP transport.
+- Added `test/operatorScheduledPostDeletionService.spec.ts`, both workflow lanes, and permanent handler-scoped ownership gates covering every protected deletion outcome and replay behavior.
+- Focused validation passed in run `30412201580`.
+- Push validation passed in run `30412193424`.
+- All eight Operator shards passed in run `30412444590`.
+- Hardened exact-SHA release and live verification passed in run `30412500165`.
+- Live production independently confirmed exact SHA `f9aeb121321c24d6c9fb3682907e98539b1a49c1` with 75/75 public tools.
 
-- scheduled-post ID truncation and positive-integer admission with the exact required-ID response
-- canonical deletion-reason normalization with the exact allowed-reasons response
-- optional reason-detail and operation-ID normalization
-- protected deletion invocation with canonical app and Threads identity, `deletedBy: model`, and `deletionSource: mcp`
-- exact outcome mapping for not found, not deletable, and reason required
-- exact success response for deletion record, replay state, and `strategy_memory_written: false`
+ACTIVE checkpoint — Stage 6AO scheduled-post retry service extraction:
 
-Keep the protected scheduled-post deletion helper, canonical app and Threads identity, reason-code and text normalizers, allowed reason constants, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
+Extract the deterministic `retry_now` branch of `edit_scheduled_post` into a focused dependency-injected service while preserving:
+
+- account-scoped retryable-record retrieval after scheduled-post ID admission
+- exact not-found, already-published, not-retryable, and not-due responses
+- approved-only and elapsed-time retry admission
+- one protected scheduled-post processing attempt
+- account-scoped refreshed-record retrieval after the attempt
+- exact published-success determination and 200-versus-502 response composition
+
+Keep the scheduled-post ID admission, D1 retrieval adapters, canonical app and Threads identity, scheduler processing helper, canonical approved and posted status constants, clock adapter, and HTTP transport explicit at the `index.ts` boundary. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
 
 
 
@@ -1157,7 +1168,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AN
+6. Product-service extraction — ACTIVE at Stage 6AO
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
