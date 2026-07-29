@@ -105,7 +105,10 @@ import {
   manifestCycleFailureIsDefect as manifestCycleFailureIsDefectService,
   observeOperatorManifestCycleToolResult,
 } from "./operatorManifestCycleObservationService";
-import { readOperatorAccountState } from "./operatorAccountStateService";
+import {
+  readOperatorAccountState,
+  readOperatorPostResults,
+} from "./operatorAccountStateService";
 import { readOperatorLensicallyUiSurface } from "./operatorLensicallyUiSurfaceService";
 import { retireOperatorManifestReviewBatch } from "./operatorManifestReviewBatchRetirementService";
 import { readOperatorManifestReviewBatchState } from "./operatorManifestReviewBatchStateService";
@@ -14954,62 +14957,61 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
   
 
-  if (toolName === "get_post_results") {
-
-    await ensureThreadsPostsArchiveTable(env);
-    await ensureOperatorPostMetricSnapshotsTable(env);
-    const publishedPostId = normalizeOperatorText(payload.published_post_id, 255);
-
-    if (!publishedPostId) {
-      return operatorJsonResponse({ success: false, error: "published_post_id is required" }, 400);
-    }
-    const scheduled = await env.DB.prepare(
-      `SELECT
-         s.id AS scheduled_post_id,
-         s.post_text,
-         s.status AS scheduled_status,
-         s.scheduled_time,
-         s.published_at,
-         s.published_post_id,
-         d.id AS draft_id,
-         d.run_id,
-         d.source_card_id,
-         d.status AS draft_status
-       FROM scheduled_posts s
-       LEFT JOIN gpt_generation_drafts d
-         ON d.scheduled_post_id = s.id
-        AND d.account_id = ?
-       WHERE s.threads_user_id = ?
-         AND s.published_post_id = ?
-       ORDER BY s.id DESC
-       LIMIT 1`,
-    ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
-
-    const draftFallback = scheduled ? null : await env.DB.prepare(
-      `SELECT id AS draft_id, run_id, source_card_id, status AS draft_status, scheduled_post_id, published_post_id
-       FROM gpt_generation_drafts
-       WHERE account_id = ?
-         AND threads_user_id = ?
-         AND published_post_id = ?
-       ORDER BY datetime(updated_at) DESC
-       LIMIT 1`,
-    ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
-    const lineageRow = scheduled ?? draftFallback;
-
-    const archivePost = await env.DB.prepare(
-      `SELECT post_id, post_text, post_timestamp, post_permalink, post_username,
-              views, likes, replies, reposts, quotes, shares, engagement_total,
-              first_seen_at, last_seen_at, last_synced_at
-       FROM threads_posts_archive
-       WHERE threads_user_id = ?
-         AND post_id = ?
-       LIMIT 1`,
-    ).bind(brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>();
-
-    const sourceCardId = lineageRow?.source_card_id ? String(lineageRow.source_card_id) : null;
-    const sourceCard = sourceCardId ? await getOperatorSourceCard(env, brand.brand_key, sourceCardId) : null;
-    const sourceSelection = sourceCardId
-      ? await env.DB.prepare(
+    if (toolName === "get_post_results") {
+    const postResults = await readOperatorPostResults({
+      brandKey: brand.brand_key,
+      accountId: brand.account_id,
+      threadsUserId: brand.profile.threads_user_id,
+      payload,
+    }, {
+      ensureArchiveTable: async () => {
+        await ensureThreadsPostsArchiveTable(env);
+      },
+      ensureMetricSnapshotsTable: async () => {
+        await ensureOperatorPostMetricSnapshotsTable(env);
+      },
+      normalizeText: normalizeOperatorText,
+      loadScheduledLineage: async (publishedPostId) => await env.DB.prepare(
+        `SELECT
+           s.id AS scheduled_post_id,
+           s.post_text,
+           s.status AS scheduled_status,
+           s.scheduled_time,
+           s.published_at,
+           s.published_post_id,
+           d.id AS draft_id,
+           d.run_id,
+           d.source_card_id,
+           d.status AS draft_status
+         FROM scheduled_posts s
+         LEFT JOIN gpt_generation_drafts d
+           ON d.scheduled_post_id = s.id
+          AND d.account_id = ?
+         WHERE s.threads_user_id = ?
+           AND s.published_post_id = ?
+         ORDER BY s.id DESC
+         LIMIT 1`,
+      ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>(),
+      loadDraftFallback: async (publishedPostId) => await env.DB.prepare(
+        `SELECT id AS draft_id, run_id, source_card_id, status AS draft_status, scheduled_post_id, published_post_id
+         FROM gpt_generation_drafts
+         WHERE account_id = ?
+           AND threads_user_id = ?
+           AND published_post_id = ?
+         ORDER BY datetime(updated_at) DESC
+         LIMIT 1`,
+      ).bind(brand.account_id, brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>(),
+      loadArchivePost: async (publishedPostId) => await env.DB.prepare(
+        `SELECT post_id, post_text, post_timestamp, post_permalink, post_username,
+                views, likes, replies, reposts, quotes, shares, engagement_total,
+                first_seen_at, last_seen_at, last_synced_at
+         FROM threads_posts_archive
+         WHERE threads_user_id = ?
+           AND post_id = ?
+         LIMIT 1`,
+      ).bind(brand.profile.threads_user_id, publishedPostId).first<Record<string, unknown>>(),
+      loadSourceCard: (sourceCardId) => getOperatorSourceCard(env, brand.brand_key, sourceCardId),
+      loadSourceSelection: async (sourceCardId) => await env.DB.prepare(
         `SELECT s.*
          FROM operator_source_cards c
          JOIN operator_source_selections s
@@ -15018,243 +15020,108 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          WHERE c.brand_key = ?
            AND c.id = ?
          LIMIT 1`,
-      ).bind(brand.brand_key, sourceCardId).first<Record<string, unknown>>()
-      : null;
-
-        const metricValues = archivePost ? {
-      views: Number(archivePost.views ?? 0),
-      likes: Number(archivePost.likes ?? 0),
-      replies: Number(archivePost.replies ?? 0),
-      reposts: Number(archivePost.reposts ?? 0),
-      quotes: Number(archivePost.quotes ?? 0),
-      shares: Number(archivePost.shares ?? 0),
-      engagement_total: Number(archivePost.engagement_total ?? 0),
-    } : null;
-    const evaluatedMetrics = metricValues ? evaluateThreadsPostMetricsForLearning({
-      id: publishedPostId,
-      text: null,
-      timestamp: null,
-      permalink: null,
-      username: null,
-      profile_picture_url: null,
-      ...metricValues,
-    }) : null;
-    const metrics = metricValues ? {
-      ...metricValues,
-      captured_at: archivePost?.last_synced_at ?? new Date().toISOString(),
-      valid_for_learning: evaluatedMetrics?.validForLearning ?? false,
-      anomaly_reason: evaluatedMetrics?.anomalyReason ?? null,
-    } : null;
-
-    if (payload.compact === true) {
-      const generationRun = lineageRow?.run_id
-        ? await env.DB.prepare(
-          `SELECT id, source_card_id, source_card_family_id, source_card_version_number,
-                  objective, prompt_summary, status, metadata_json, adaptation_plan_json, created_at, updated_at
-           FROM gpt_generation_runs
-           WHERE id = ? AND account_id = ? AND threads_user_id = ?
-           LIMIT 1`,
-        ).bind(String(lineageRow.run_id), brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>()
-        : null;
-      const draftDetail = lineageRow?.draft_id
-        ? await env.DB.prepare(
-          `SELECT id, run_id, source_card_id, text, status, scheduled_post_id, published_post_id,
-                  strategy_json, metadata_json, created_at, updated_at
-           FROM gpt_generation_drafts
-           WHERE id = ? AND account_id = ? AND threads_user_id = ?
-           LIMIT 1`,
-        ).bind(String(lineageRow.draft_id), brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>()
-        : null;
-      const primarySource = sourceCard?.primary_source && typeof sourceCard.primary_source === "object"
-        ? sourceCard.primary_source as Record<string, unknown>
-        : null;
-      return operatorJsonResponse({
-        post: {
-          published_post_id: publishedPostId,
-          text: archivePost?.post_text ?? lineageRow?.post_text ?? null,
-          posted_at: archivePost?.post_timestamp ?? lineageRow?.published_at ?? null,
-        },
-        metrics,
-        lineage: {
-          source_selection_id: sourceSelection?.id ?? null,
-          source_batch_id: sourceSelection?.batch_id ?? null,
-          source_identity_key: sourceSelection?.source_identity_key ?? null,
-          source_card_id: sourceCardId,
-          generation_run_id: lineageRow?.run_id ?? null,
-          draft_id: lineageRow?.draft_id ?? null,
-          scheduled_post_id: lineageRow?.scheduled_post_id ?? null,
-          published_post_id: publishedPostId,
-        },
-        source: sourceSelection ? {
-          saved_pattern_id: sourceSelection.source_type === "saved_pattern" ? Number(sourceSelection.internal_source_id) : null,
-          source_type: sourceSelection.source_type ?? null,
-          source_identity_key: sourceSelection.source_identity_key ?? null,
-          source_text: sourceSelection.post_text ?? primarySource?.text ?? null,
-          source_likes: Number((safeParseJsonString(String(sourceSelection.metrics_snapshot_json ?? "{}")) as Record<string, unknown> | null)?.likes ?? 0),
-        } : null,
-        source_card: sourceCard ? {
-          id: sourceCard.id,
-          family_id: sourceCard.family_id ?? null,
-          version_number: sourceCard.version_number ?? null,
-          is_current: sourceCard.is_current ?? null,
-          title: sourceCard.title ?? null,
-          transformation_contract: sourceCard.transformation_contract ?? null,
-        } : null,
-        generation_run: generationRun ? {
-          id: generationRun.id,
-          source_card_id: generationRun.source_card_id ?? null,
-          source_card_family_id: generationRun.source_card_family_id ?? null,
-          source_card_version_number: generationRun.source_card_version_number ?? null,
-          objective: generationRun.objective ?? null,
-          prompt_summary: generationRun.prompt_summary ?? null,
-          status: generationRun.status ?? null,
-          metadata: safeParseJsonString(String(generationRun.metadata_json ?? "{}")) ?? {},
-          adaptation_plan: safeParseJsonString(String(generationRun.adaptation_plan_json ?? "{}")) ?? {},
-        } : null,
-        draft: draftDetail ? {
-          id: draftDetail.id,
-          run_id: draftDetail.run_id ?? null,
-          source_card_id: draftDetail.source_card_id ?? null,
-          status: draftDetail.status ?? null,
-          scheduled_post_id: draftDetail.scheduled_post_id ?? null,
-          published_post_id: draftDetail.published_post_id ?? null,
-          strategy: safeParseJsonString(String(draftDetail.strategy_json ?? "{}")) ?? {},
-          metadata: safeParseJsonString(String(draftDetail.metadata_json ?? "{}")) ?? {},
-        } : null,
-        warning: archivePost ? null : "Published post lineage was found, but synced Threads metrics are not available yet.",
-        response_mode: "compact",
-      });
-    }
-
-    if (metrics && evaluatedMetrics) {
-      const serializedMetrics = normalizeOperatorJson(evaluatedMetrics.metrics, {});
-      const latestSnapshot = await env.DB.prepare(
+      ).bind(brand.brand_key, sourceCardId).first<Record<string, unknown>>(),
+      evaluateMetrics: (publishedPostId, metricValues) => {
+        const evaluated = evaluateThreadsPostMetricsForLearning({
+          id: publishedPostId,
+          text: null,
+          timestamp: null,
+          permalink: null,
+          username: null,
+          profile_picture_url: null,
+          views: Number(metricValues.views ?? 0),
+          likes: Number(metricValues.likes ?? 0),
+          replies: Number(metricValues.replies ?? 0),
+          reposts: Number(metricValues.reposts ?? 0),
+          quotes: Number(metricValues.quotes ?? 0),
+          shares: Number(metricValues.shares ?? 0),
+          engagement_total: Number(metricValues.engagement_total ?? 0),
+        });
+        return {
+          metrics: evaluated.metrics as Record<string, unknown>,
+          validForLearning: evaluated.validForLearning,
+          anomalyReason: evaluated.anomalyReason,
+        };
+      },
+      loadGenerationRun: async (runId) => await env.DB.prepare(
+        `SELECT id, source_card_id, source_card_family_id, source_card_version_number,
+                objective, prompt_summary, status, metadata_json, adaptation_plan_json, created_at, updated_at
+         FROM gpt_generation_runs
+         WHERE id = ? AND account_id = ? AND threads_user_id = ?
+         LIMIT 1`,
+      ).bind(runId, brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>(),
+      loadDraftDetail: async (draftId) => await env.DB.prepare(
+        `SELECT id, run_id, source_card_id, text, status, scheduled_post_id, published_post_id,
+                strategy_json, metadata_json, created_at, updated_at
+         FROM gpt_generation_drafts
+         WHERE id = ? AND account_id = ? AND threads_user_id = ?
+         LIMIT 1`,
+      ).bind(draftId, brand.account_id, brand.profile.threads_user_id).first<Record<string, unknown>>(),
+      parseJson: (value) => safeParseJsonString(value),
+      serializeJson: (value) => normalizeOperatorJson(value, {}),
+      loadLatestMetricSnapshot: async (publishedPostId) => await env.DB.prepare(
         `SELECT metrics_json
          FROM operator_post_metric_snapshots
          WHERE brand_key = ?
            AND published_post_id = ?
          ORDER BY datetime(captured_at) DESC, datetime(created_at) DESC
          LIMIT 1`,
-      ).bind(brand.brand_key, publishedPostId).first<{ metrics_json: string }>();
-      if (latestSnapshot?.metrics_json !== serializedMetrics) {
+      ).bind(brand.brand_key, publishedPostId).first<{ metrics_json: string }>(),
+      insertMetricSnapshot: async (snapshot) => {
         await env.DB.prepare(
-                    `INSERT INTO operator_post_metric_snapshots (
+          `INSERT INTO operator_post_metric_snapshots (
             id, brand_key, published_post_id, scheduled_post_id, draft_id, generation_run_id,
             source_card_id, source_selection_id, metrics_json, captured_at,
             valid_for_learning, anomaly_reason, collection_source
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'get_post_results')`,
         ).bind(
-          crypto.randomUUID(),
+          snapshot.id,
           brand.brand_key,
-          publishedPostId,
-          lineageRow?.scheduled_post_id === null || lineageRow?.scheduled_post_id === undefined
-            ? null
-            : Number(lineageRow.scheduled_post_id),
-                    lineageRow?.draft_id ? String(lineageRow.draft_id) : null,
-          lineageRow?.run_id ? String(lineageRow.run_id) : null,
-          sourceCardId,
-          sourceSelection?.id ? String(sourceSelection.id) : null,
-          serializedMetrics,
-          String(metrics.captured_at),
-          evaluatedMetrics.validForLearning ? 1 : 0,
-          evaluatedMetrics.anomalyReason,
+          snapshot.publishedPostId,
+          snapshot.scheduledPostId,
+          snapshot.draftId,
+          snapshot.generationRunId,
+          snapshot.sourceCardId,
+          snapshot.sourceSelectionId,
+          snapshot.metricsJson,
+          snapshot.capturedAt,
+          snapshot.validForLearning ? 1 : 0,
+          snapshot.anomalyReason,
         ).run();
-      }
-    }
-
+      },
+      ensurePerformanceTables: async () => {
         await ensureOperatorPerformanceEvaluatorTables(env);
-    const fingerprintRow = await env.DB.prepare(
-      `SELECT fingerprint_json, fingerprint_version, updated_at
-       FROM operator_post_fingerprints
-       WHERE brand_key = ? AND published_post_id = ?
-       LIMIT 1`,
-    ).bind(brand.brand_key, publishedPostId).first<Record<string, unknown>>();
-    const performanceRows = await env.DB.prepare(
-      `SELECT checkpoint_hours, post_age_hours, metrics_json, rates_json, velocity_json,
-              scores_json, distribution_state, captured_at
-       FROM operator_post_performance_scores
-       WHERE brand_key = ? AND published_post_id = ? AND valid_for_learning = 1
-       ORDER BY checkpoint_hours ASC`,
-    ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>();
-    const includeHistory = payload.include_history === true;
-    const history = includeHistory
-
-      ? await env.DB.prepare(
-                `SELECT metrics_json, captured_at, valid_for_learning, anomaly_reason, collection_source
-         FROM operator_post_metric_snapshots
-         WHERE brand_key = ?
-           AND published_post_id = ?
-         ORDER BY datetime(captured_at) ASC, datetime(created_at) ASC`,
-      ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>()
-      : { results: [] as Record<string, unknown>[] };
-
-    return operatorJsonResponse({
-      post: archivePost ? {
-        published_post_id: publishedPostId,
-        text: archivePost.post_text ?? lineageRow?.post_text ?? null,
-        posted_at: archivePost.post_timestamp ?? lineageRow?.published_at ?? null,
-        permalink: archivePost.post_permalink ?? null,
-        username: archivePost.post_username ?? null,
-      } : scheduled ? {
-        published_post_id: publishedPostId,
-        text: scheduled.post_text ?? null,
-        posted_at: scheduled.published_at ?? null,
-        permalink: null,
-        username: null,
-      } : null,
-      metrics,
-      lineage: {
-        source_selection_id: sourceSelection?.id ?? null,
-        source_batch_id: sourceSelection?.batch_id ?? null,
-        source_identity_key: sourceSelection?.source_identity_key ?? null,
-        source_card_id: sourceCardId,
-        generation_run_id: lineageRow?.run_id ?? null,
-        draft_id: lineageRow?.draft_id ?? null,
-        scheduled_post_id: lineageRow?.scheduled_post_id ?? null,
-        published_post_id: publishedPostId,
       },
-      source_selection: sourceSelection ? {
-        id: sourceSelection.id,
-        batch_id: sourceSelection.batch_id,
-        draw_order: Number(sourceSelection.draw_order ?? 0),
-        source_identity_key: sourceSelection.source_identity_key,
-        threads_post_id: sourceSelection.threads_post_id ?? null,
-        canonical_source_url: sourceSelection.canonical_source_url ?? null,
-        metrics_snapshot: safeParseJsonString(String(sourceSelection.metrics_snapshot_json ?? "{}")) ?? {},
-        selected_at: sourceSelection.selected_at,
-      } : null,
-            source_card: sourceCard,
-      performance_evaluation: {
-        follower_attribution_policy: {
-          post_level_attribution: "forbidden",
-          day_or_period_post_attribution: "forbidden",
-          account_level_tracking_only: true,
-        },
-        fingerprint: fingerprintRow
-          ? safeParseJsonString(String(fingerprintRow.fingerprint_json ?? "{}")) ?? {}
-          : null,
-        fingerprint_version: fingerprintRow?.fingerprint_version ?? null,
-        maturity_scores: (performanceRows.results ?? []).map((row) => ({
-          checkpoint_hours: Number(row.checkpoint_hours),
-          post_age_hours: Number(row.post_age_hours),
-          metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
-          rates: safeParseJsonString(String(row.rates_json ?? "{}")) ?? {},
-          velocity: safeParseJsonString(String(row.velocity_json ?? "{}")) ?? {},
-          scores: safeParseJsonString(String(row.scores_json ?? "{}")) ?? {},
-          distribution_state: row.distribution_state,
-          captured_at: row.captured_at,
-        })),
+      loadFingerprint: async (publishedPostId) => await env.DB.prepare(
+        `SELECT fingerprint_json, fingerprint_version, updated_at
+         FROM operator_post_fingerprints
+         WHERE brand_key = ? AND published_post_id = ?
+         LIMIT 1`,
+      ).bind(brand.brand_key, publishedPostId).first<Record<string, unknown>>(),
+      listPerformanceScores: async (publishedPostId) => {
+        const rows = await env.DB.prepare(
+          `SELECT checkpoint_hours, post_age_hours, metrics_json, rates_json, velocity_json,
+                  scores_json, distribution_state, captured_at
+           FROM operator_post_performance_scores
+           WHERE brand_key = ? AND published_post_id = ? AND valid_for_learning = 1
+           ORDER BY checkpoint_hours ASC`,
+        ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>();
+        return rows.results ?? [];
       },
-            metric_history: (history.results ?? []).map((row) => ({
-
-        metrics: safeParseJsonString(String(row.metrics_json ?? "{}")) ?? {},
-        captured_at: row.captured_at,
-        valid_for_learning: Number(row.valid_for_learning ?? 1) === 1,
-        anomaly_reason: row.anomaly_reason ?? null,
-        collection_source: row.collection_source ?? null,
-      })),
-      warning: archivePost ? null : "Published post lineage was found, but synced Threads metrics are not available yet.",
+      listMetricHistory: async (publishedPostId) => {
+        const rows = await env.DB.prepare(
+          `SELECT metrics_json, captured_at, valid_for_learning, anomaly_reason, collection_source
+           FROM operator_post_metric_snapshots
+           WHERE brand_key = ?
+             AND published_post_id = ?
+           ORDER BY datetime(captured_at) ASC, datetime(created_at) ASC`,
+        ).bind(brand.brand_key, publishedPostId).all<Record<string, unknown>>();
+        return rows.results ?? [];
+      },
+      randomUuid: () => crypto.randomUUID(),
+      now: () => new Date().toISOString(),
     });
+    return operatorJsonResponse(postResults.body, postResults.status);
   }
 
 

@@ -1152,13 +1152,21 @@ if (!operatorManifestCycleObservationServiceTests.includes("classifies expected 
 }
 if (!source.includes('from "./operatorAccountStateService"')
     || !source.includes("readOperatorAccountState({")
+    || !source.includes("readOperatorPostResults({")
     || !source.includes("getActiveSession: (brandKey)")
-    || !source.includes("countScheduledPosts: async")) {
+    || !source.includes("countScheduledPosts: async")
+    || !source.includes("loadScheduledLineage: async (publishedPostId)")
+    || !source.includes("insertMetricSnapshot: async (snapshot)")
+    || !source.includes("listPerformanceScores: async (publishedPostId)")) {
   lifecycleErrors.push("operator_account_state_service_import_or_binding_missing");
 }
 if (source.includes("active_workflow_session: activeSession")
     || source.includes("latest_approved_drafts: approved")
-    || source.includes("active_gates_count: gates.length")) {
+    || source.includes("active_gates_count: gates.length")
+    || source.includes("const lineageRow = scheduled ?? draftFallback")
+    || source.includes('response_mode: "compact"')
+    || source.includes("follower_attribution_policy: {")
+    || source.includes("latestSnapshot?.metrics_json !== serializedMetrics")) {
   lifecycleErrors.push("operator_account_state_service_returned_to_index");
 }
 if (!operatorAccountStateService.includes("export async function readOperatorAccountState")
@@ -1167,13 +1175,25 @@ if (!operatorAccountStateService.includes("export async function readOperatorAcc
     || !operatorAccountStateService.includes("dependencies.listDraftsByStatus")
     || !operatorAccountStateService.includes("dependencies.countScheduledPosts")
     || !operatorAccountStateService.includes("dependencies.listActiveGates")
-    || !operatorAccountStateService.includes("active_workflow_session: activeSession")
-    || !operatorAccountStateService.includes("warnings: []")) {
+        || !operatorAccountStateService.includes("active_workflow_session: activeSession")
+    || !operatorAccountStateService.includes("warnings: []")
+    || !operatorAccountStateService.includes("export async function readOperatorPostResults")
+    || !operatorAccountStateService.includes("dependencies.ensureArchiveTable")
+    || !operatorAccountStateService.includes("const lineageRow = scheduled ?? draftFallback")
+    || !operatorAccountStateService.includes('response_mode: "compact"')
+    || !operatorAccountStateService.includes("dependencies.insertMetricSnapshot")
+    || !operatorAccountStateService.includes("latestSnapshot?.metrics_json !== serializedMetrics")
+    || !operatorAccountStateService.includes("follower_attribution_policy: {")
+    || !operatorAccountStateService.includes("dependencies.listMetricHistory")) {
   lifecycleErrors.push("operator_account_state_service_module_incomplete");
 }
 if (!operatorAccountStateServiceTests.includes("reads the selected account state and resolves its active source card")
     || !operatorAccountStateServiceTests.includes("does not read a source card when the active session has no source identity")
-    || !operatorAccountStateServiceTests.includes("normalizes an unavailable scheduled count without changing the response contract")) {
+        || !operatorAccountStateServiceTests.includes("normalizes an unavailable scheduled count without changing the response contract")
+    || !operatorAccountStateServiceTests.includes("prepares schemas before exact published-post admission")
+    || !operatorAccountStateServiceTests.includes("preserves the compact lineage and generation evidence response")
+    || !operatorAccountStateServiceTests.includes("persists changed metrics and returns full maturity evidence with optional history")
+    || !operatorAccountStateServiceTests.includes("skips duplicate metric persistence and omitted history reads")) {
   lifecycleErrors.push("operator_account_state_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorLensicallyUiSurfaceService"')
