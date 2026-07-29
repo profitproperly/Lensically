@@ -807,7 +807,7 @@ if (operatorManifestRuntimeShell.includes("if (isOperatorManifestCycleServiceToo
   lifecycleErrors.push("operator_manifest_runtime_dispatch_returned_to_index");
 }
 const operatorClaimReviewDispatchStart = source.indexOf(
-  'if (toolName === "claim_manifest_review_batch")',
+  "const claimReviewRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
   operatorAccountStateDispatchStart,
 );
 const operatorAccountCoverageRuntimeShell = operatorAccountStateDispatchStart >= 0
@@ -832,6 +832,23 @@ const operatorReviewOperationsDispatchStart = source.indexOf(
   "const reviewOperationsRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(",
   operatorClaimReviewDispatchStart,
 );
+const operatorClaimReviewRuntimeShell = operatorClaimReviewDispatchStart >= 0
+  && operatorReviewOperationsDispatchStart > operatorClaimReviewDispatchStart
+  ? source.slice(operatorClaimReviewDispatchStart, operatorReviewOperationsDispatchStart)
+  : "";
+if (!operatorClaimReviewRuntimeShell.includes("claim_manifest_review_batch: async () =>")
+    || !operatorClaimReviewRuntimeShell.includes("claimOperatorManifestReviewBatch({")
+    || !operatorClaimReviewRuntimeShell.includes("insertDailyClaim: async")
+    || !operatorClaimReviewRuntimeShell.includes("if (claimReviewRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_review_batch_claim_runtime_cutover_incomplete");
+}
+if (operatorClaimReviewRuntimeShell.includes('if (toolName === "claim_manifest_review_batch")')
+    || operatorClaimReviewRuntimeShell.includes("const terminalExistingReview")
+    || operatorClaimReviewRuntimeShell.includes("const loadAvailableSelections")
+    || operatorClaimReviewRuntimeShell.includes("source_batch_rollover_failed")
+    || operatorClaimReviewRuntimeShell.includes("no_unclaimed_sources_available")) {
+  lifecycleErrors.push("operator_review_batch_claim_logic_returned_to_index");
+}
 const operatorWorkflowSessionDispatchStart = source.indexOf(
   'if (toolName === "start_workflow_session")',
   operatorReviewOperationsDispatchStart,
@@ -1403,6 +1420,9 @@ if (!operatorManifestReviewBatchRetirementServiceTests.includes("admits only Man
     lifecycleErrors.push("operator_manifest_review_batch_retirement_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewBatchStateService"')
+    || !source.includes("claimOperatorManifestReviewBatch,")
+    || !source.includes("claim_manifest_review_batch: async () =>")
+    || !source.includes("claimOperatorManifestReviewBatch({")
     || !source.includes("get_manifest_review_batch: async () =>")
     || !source.includes("readOperatorManifestReviewBatchState({")
     || !source.includes("findActiveReviewBatchId: async")
@@ -1415,6 +1435,12 @@ if (source.includes("autonomous_cycle_active: Boolean(activeAutonomousCycle)")
   lifecycleErrors.push("operator_manifest_review_batch_state_service_returned_to_index");
 }
 if (!operatorManifestReviewBatchStateService.includes("export async function readOperatorManifestReviewBatchState")
+    || !operatorManifestReviewBatchStateService.includes("export async function claimOperatorManifestReviewBatch")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.ensureSourceBatch")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.insertDailyClaim")
+    || !operatorManifestReviewBatchStateService.includes("dependencies.markSelectionClaimed")
+    || !operatorManifestReviewBatchStateService.includes("source_batch_rollover_failed")
+    || !operatorManifestReviewBatchStateService.includes("no_unclaimed_sources_available")
     || !operatorManifestReviewBatchStateService.includes("dependencies.ensureWorkflowTables")
     || !operatorManifestReviewBatchStateService.includes("dependencies.findActiveReviewBatchId")
     || !operatorManifestReviewBatchStateService.includes("dependencies.findActiveAutonomousCycle")
@@ -1427,7 +1453,12 @@ if (!operatorManifestReviewBatchStateServiceTests.includes("ensures workflow rea
     || !operatorManifestReviewBatchStateServiceTests.includes("serializes an explicitly identified review batch without discovery")
     || !operatorManifestReviewBatchStateServiceTests.includes("discovers the latest active batch with optional production-date scope")
     || !operatorManifestReviewBatchStateServiceTests.includes("returns autonomous-cycle continuation guidance when no review batch is active")
-    || !operatorManifestReviewBatchStateServiceTests.includes("returns the exact not-found response when an identified batch cannot serialize")) {
+    || !operatorManifestReviewBatchStateServiceTests.includes("returns the exact not-found response when an identified batch cannot serialize")
+    || !operatorManifestReviewBatchStateServiceTests.includes("rejects non-Manifest and invalid production dates before claim mutations")
+    || !operatorManifestReviewBatchStateServiceTests.includes("reuses an active nonterminal review batch idempotently")
+    || !operatorManifestReviewBatchStateServiceTests.includes("completes terminal batches and claims a bounded new source lineup")
+    || !operatorManifestReviewBatchStateServiceTests.includes("rolls to a fresh source batch when the first draw has no available selections")
+    || !operatorManifestReviewBatchStateServiceTests.includes("returns exact source-batch and empty-claim failure states")) {
     lifecycleErrors.push("operator_manifest_review_batch_state_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestReviewDraftAttachmentService"')
