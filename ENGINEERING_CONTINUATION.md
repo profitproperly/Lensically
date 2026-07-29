@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6al-strategy-memory-save-service
-repository_base_sha: 6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1
-production_sha: 6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1
+active_checkpoint: stage-6am-scheduled-post-list-read-service
+repository_base_sha: 2b4f3b004f016285a51d93a736fb2b503261caf7
+production_sha: 2b4f3b004f016285a51d93a736fb2b503261caf7
 
 
 
@@ -1080,18 +1080,31 @@ Completed checkpoint — Stage 6AK strategy-memory list read service extraction:
 - Hardened exact-SHA release and live verification passed in run `30410239281`.
 - Live production independently confirmed exact SHA `6b01a2a7cd0eb5bf11d4a79f435f4b3a8e7c33f1` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AL strategy-memory save service extraction:
+Completed checkpoint — Stage 6AL strategy-memory save service extraction:
 
-Extract the deterministic `save_strategy_memory` workflow into a focused dependency-injected service while preserving:
+- Added `src/operatorStrategyMemorySaveService.ts` as the deterministic authority for canonical memory-kind and body admission, optional title normalization, metadata and source normalization, persistence values, and exact response composition.
+- Reduced `save_strategy_memory` in `src/index.ts` to the strategy-memory persistence helper, canonical account and Threads identity, shared text and JSON normalization, and HTTP transport.
+- Added `test/operatorStrategyMemorySaveService.spec.ts`, both workflow lanes, and permanent handler-specific ownership gates.
+- Initial focused validation in run `30410672775` exposed a generic inference defect: allowed-kind response data widened the canonical persistence kind to plain `string`.
+- Repaired the shared type boundary by preventing `allowedKinds` from participating in persistence-kind inference and permanently enforced that contract in release preflight.
+- Repaired focused validation passed in run `30410762764`.
+- Push validation passed in run `30410754387`.
+- All eight Operator shards passed in run `30411016088`; an older identical duplicate dispatch was safely cancelled by the existing exact-task concurrency guard.
+- Hardened exact-SHA release and live verification passed in run `30411087939`.
+- Live production independently confirmed exact SHA `2b4f3b004f016285a51d93a736fb2b503261caf7` with 75/75 public tools.
 
-- canonical strategy-memory kind normalization and the exact allowed-kind error response
-- required body normalization with the exact body-required error response
-- optional title normalization
-- metadata normalization with durable default source `mcp_operator`
-- account and Threads identity binding for persistence
-- exact `{ memory_id }` response composition, including a null fallback
+ACTIVE checkpoint — Stage 6AM scheduled-post list read service extraction:
 
-Keep the strategy-memory persistence helper, canonical account and Threads identity, shared text and JSON normalization, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
+Extract the deterministic `list_scheduled_posts` workflow into a focused dependency-injected service while preserving:
+
+- optional date normalization
+- timezone normalization with the workspace default fallback
+- exact ISO-date admission before account-scoped retrieval
+- empty results when the date is absent or invalid
+- canonical Threads-account scheduled-post retrieval for one local date
+- exact response composition for items, returned count, total count, `has_more: false`, and `deletion_history_exposed_to_model: false`
+
+Keep the scheduled-post local-date list helper, canonical Threads identity, shared text normalization, ISO-date validation, workspace timezone default, and HTTP transport as explicit `index.ts` adapters. Add deterministic tests and permanent handler-specific ownership gates before exact-SHA release.
 
 
 
@@ -1131,7 +1144,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AL
+6. Product-service extraction — ACTIVE at Stage 6AM
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
@@ -1174,7 +1187,7 @@ None currently recorded.
 5. Resume only the one `ACTIVE` job and its one `Current Action`; do not restart completed checkpoints or promote a queued/captured item.
 6. Treat D1 work state, action-closure receipts, chat history, Growth Mission records, and other documents as evidence or telemetry only.
 7. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
-8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume.
+8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume. After any client-side safety block, transport interruption, concurrent-writer evidence, or ambiguous mutation response, reconcile repository HEAD and engineering-audit state before retrying; never assume the mutation was not invoked or that the prior head is still current. When identical commands exist in multiple workflow lanes, use lane-specific surrounding context so every atomic replacement matches exactly once.
 9. Validate and release each bounded implementation checkpoint independently before moving to the next.
 10. Rewrite this file after every meaningful checkpoint, accepted new job, precedence change, completion, or verified interrupt.
 
