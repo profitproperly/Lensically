@@ -2101,13 +2101,42 @@ if (!operatorGateMutationPlanningService.includes("export async function planOpe
     || !operatorGateMutationPlanningService.includes('mode: existing?.id ? "update" : "insert"')
     || !operatorGateMutationPlanningService.includes("sourceMemoryIdsJson")
     || !operatorGateMutationPlanningService.includes("created_from_memory_id")
-    || !operatorGateMutationPlanningService.includes("export async function evaluateOperatorGates")
+        || !operatorGateMutationPlanningService.includes("export async function evaluateOperatorGates")
     || !operatorGateMutationPlanningService.includes("dependencies.normalizeText(payload.source_card_id")
     || !operatorGateMutationPlanningService.includes("dependencies.normalizeStage(payload.stage")
     || !operatorGateMutationPlanningService.includes("payload.lane_key ?? draftAnalysis?.lane_key")
     || !operatorGateMutationPlanningService.includes("Array.isArray(payload.model_gate_results)")
-    || !operatorGateMutationPlanningService.includes("return dependencies.runGates({")) {
+    || !operatorGateMutationPlanningService.includes("return dependencies.runGates({")
+    || !operatorGateMutationPlanningService.includes("export async function runOperatorGateEngine")
+    || !operatorGateMutationPlanningService.includes('gateKey === "source_transformation_contract_gate"')
+    || !operatorGateMutationPlanningService.includes('gateKey === "historical_owner_rejection_gate"')
+    || !operatorGateMutationPlanningService.includes('gateKey === "exact_duplicate_gate"')
+    || !operatorGateMutationPlanningService.includes('gateKey === "scheduled_collision_gate"')
+    || !operatorGateMutationPlanningService.includes("dependencies.persistGateResult")
+    || !operatorGateMutationPlanningService.includes("No candidate gate executed for this context.")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_module_incomplete");
+}
+const operatorGateEngineAdapterStart = source.indexOf("async function runOperatorGates(");
+const operatorGateEngineAdapterEnd = source.indexOf(
+  "function isAllowedOperatorTransition",
+  operatorGateEngineAdapterStart,
+);
+const operatorGateEngineAdapter = operatorGateEngineAdapterStart >= 0
+  && operatorGateEngineAdapterEnd > operatorGateEngineAdapterStart
+  ? source.slice(operatorGateEngineAdapterStart, operatorGateEngineAdapterEnd)
+  : "";
+if (!operatorGateEngineAdapter.includes("return runOperatorGateEngine({")
+    || !operatorGateEngineAdapter.includes("findExactDuplicate: async")
+    || !operatorGateEngineAdapter.includes("persistGateResult:")) {
+  lifecycleErrors.push("operator_gate_engine_adapter_incomplete");
+}
+if (source.includes("function buildGateResult(")
+    || operatorGateEngineAdapter.includes('gateKey === "source_transformation_contract_gate"')
+    || operatorGateEngineAdapter.includes('gateKey === "historical_owner_rejection_gate"')
+    || operatorGateEngineAdapter.includes('gateKey === "exact_duplicate_gate"')
+    || operatorGateEngineAdapter.includes('gateKey === "scheduled_collision_gate"')
+    || operatorGateEngineAdapter.includes("No candidate gate executed for this context.")) {
+  lifecycleErrors.push("operator_gate_engine_returned_to_index");
 }
 if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found for an invalid promotion ID before gate lookup")
     || !operatorGateMutationPlanningServiceTests.includes("returns memory_not_found when the account-scoped promotion source is absent")
@@ -2115,7 +2144,10 @@ if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found
     || !operatorGateMutationPlanningServiceTests.includes("uses promoted memory fallbacks and builds an exact update plan")
     || !operatorGateMutationPlanningServiceTests.includes("builds a normalized account-scoped insert plan and exact response")
     || !operatorGateMutationPlanningServiceTests.includes("normalizes gate-evaluation input and preserves exact gate-engine results")
-    || !operatorGateMutationPlanningServiceTests.includes("preserves explicit lane precedence and rejects invalid structured surfaces")) {
+    || !operatorGateMutationPlanningServiceTests.includes("preserves explicit lane precedence and rejects invalid structured surfaces")
+    || !operatorGateMutationPlanningServiceTests.includes("preserves deterministic blocking gates and required execution auditing")
+    || !operatorGateMutationPlanningServiceTests.includes("preserves exact model results and persists every draft gate receipt")
+    || !operatorGateMutationPlanningServiceTests.includes("preserves duplicate and scheduling collision outcomes through explicit adapters")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorStrategyMemoryListReadService"')

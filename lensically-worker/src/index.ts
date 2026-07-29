@@ -150,6 +150,7 @@ import { readOperatorActiveGates } from "./operatorActiveGateReadService";
 import {
   evaluateOperatorGates,
   planOperatorGateMutation,
+  runOperatorGateEngine,
 } from "./operatorGateMutationPlanningService";
 import { readOperatorStrategyMemoryList } from "./operatorStrategyMemoryListReadService";
 import {
@@ -7820,26 +7821,6 @@ async function insertOperatorInventory(
     .run();
 }
 
-function buildGateResult(
-  gate: Record<string, unknown>,
-  result: OperatorGateResultValue,
-  rationale: string,
-  evidence: Record<string, unknown> | null = null,
-  repairGuidance: string | null = null,
-): Record<string, unknown> {
-  const blocking = result === "fail" && String(gate.severity) === "block";
-  return {
-    gate_id: gate.id,
-    gate_key: gate.gate_key,
-    result,
-    blocking,
-    rationale,
-    evaluated_by: gate.evaluator,
-    evidence,
-    repair_guidance: repairGuidance,
-  };
-}
-
 async function runOperatorGates(
   env: Env,
   input: {
@@ -7855,414 +7836,54 @@ async function runOperatorGates(
     scheduling?: { date?: string | null; time?: string | null; timezone?: string | null } | null;
   },
 ): Promise<{ showable: boolean; gate_results: Record<string, unknown>[]; blocking_failures: Record<string, unknown>[]; warnings: string[] }> {
-  await prepareOperatorMode(env);
-  const gates = await listOperatorGates(env, input.brand.brand_key, input.stageScope, input.laneKey ?? null, input.contentType ?? null);
-    const sourceCard = input.sourceCardId ? await getOperatorSourceCard(env, input.brand.brand_key, input.sourceCardId) : null;
-  const rejectionContext = input.stageScope === "gate_evaluation"
-    ? await buildOperatorRejectionContext(env, input.brand)
-    : null;
-  const draftText = normalizeOperatorText(input.draftText, 20000, true) ?? "";
-    const normalizedDraft = normalizeComparableText(draftText);
-
-    const sourceContract = normalizeSourceTransformationContract(sourceCard?.transformation_contract);
-  const manifestCloseMimicry = input.brand.brand_key === "manifest_mental";
-  const primarySource = sourceCard?.primary_source && typeof sourceCard.primary_source === "object" && !Array.isArray(sourceCard.primary_source)
-    ? sourceCard.primary_source as Record<string, unknown>
-    : {};
-  const primarySourceText = normalizeOperatorText(primarySource.text ?? primarySource.post_text, 20000, true) ?? "";
-  const exactSourceCopy = Boolean(primarySourceText) && normalizedDraft === normalizeComparableText(primarySourceText);
-  const mustPreserveExact = sourceContract.must_preserve_exact as string[];
-  const mayReuse = sourceContract.may_reuse as string[];
-  const approvedReusableSurfaces = new Set(
-    [...mustPreserveExact, ...mayReuse]
-      .map((surface) => normalizeComparableText(surface))
-      .filter(Boolean),
-  );
-  const results: Record<string, unknown>[] = [];
-  const warnings: string[] = [];
-
-  for (const gate of gates) {
-
-    const gateKey = String(gate.gate_key);
-    if (gateKey === "account_selected_gate") {
-      results.push(buildGateResult(gate, input.brand.brand_key ? "pass" : "fail", input.brand.brand_key ? "Account is selected." : "Missing account selection."));
-      continue;
-    }
-    if (gateKey === "operator_precheck_before_workflow") {
-      const latestAdmission = await getLatestOperatorContextAdmission(env, input.brand.brand_key, null);
-      const sections = Array.isArray(latestAdmission?.sections) ? latestAdmission.sections as Array<Record<string, unknown>> : [];
-      const operatorPrecheck = sections.find((section) => section.section === "operator_precheck");
-      const precheckComplete = latestAdmission?.admission_scope === "full_preflight"
-        && latestAdmission?.is_partial !== true
-        && operatorPrecheck?.coverage_status === "complete"
-        && operatorPrecheck?.has_more !== true
-        && !operatorPrecheck.error;
-      results.push(buildGateResult(
-        gate,
-        precheckComplete ? "pass" : "fail",
-        precheckComplete ? "Operator precheck is loaded." : "Operator precheck is missing or partial.",
-        {
-          context_admission_id: latestAdmission?.id ?? null,
-          admission_scope: latestAdmission?.admission_scope ?? null,
-          is_partial: latestAdmission?.is_partial ?? null,
-          section_count: sections.length,
-          operator_precheck_status: operatorPrecheck?.coverage_status ?? null,
-        },
-        "Complete the initial key-selection handshake before workflow, admin, or engineering actions.",
-      ));
-      continue;
-    }
-    if (gateKey === "source_card_required_gate") {
-      results.push(buildGateResult(gate, input.sourceCardId ? "pass" : "fail", input.sourceCardId ? "Source card id is present." : "Serious generation requires a source card.", null, "Create and lock a source card or record a narrow rewrite override."));
-      continue;
-    }
-    if (gateKey === "source_lock_gate") {
-      const locked = sourceCard?.status === "locked";
-      results.push(buildGateResult(gate, locked ? "pass" : "fail", locked ? "Source card is locked." : "Source card is not locked.", { source_card_status: sourceCard?.status ?? null }, "Lock the source card before showing drafts."));
-      continue;
-    }
-        if (gateKey === "source_transformation_contract_gate") {
-      const preservedFunctions = new Set(
-        normalizeSourceContractStringList(input.draftAnalysis?.preserved_functions)
-          .map((item) => normalizeComparableText(item)),
-      );
-      const transformedElements = new Set(
-        normalizeSourceContractStringList(input.draftAnalysis?.transformed_elements)
-          .map((item) => normalizeComparableText(item)),
-      );
-      const satisfiedTimeRequirements = new Set(
-        normalizeSourceContractStringList(input.draftAnalysis?.satisfied_time_or_context_requirements)
-          .map((item) => normalizeComparableText(item)),
-      );
-      const missingExact = mustPreserveExact.filter((surface) => {
-        const normalizedSurface = normalizeComparableText(surface);
-        return normalizedSurface && !normalizedDraft.includes(normalizedSurface);
-      });
-      const requiredFunctions = sourceContract.must_preserve_function as string[];
-      const missingFunctions = requiredFunctions.filter((requirement) => !preservedFunctions.has(normalizeComparableText(requirement)));
-      const requiredTime = sourceContract.time_or_context_requirements as string[];
-      const missingTime = requiredTime.filter((requirement) => !satisfiedTimeRequirements.has(normalizeComparableText(requirement)));
-      const copiedTransformTargets: string[] = [];
-      const undeclaredTransformRoles: string[] = [];
-      for (const item of sourceContract.must_transform as unknown[]) {
-        const sourceText = sourceContractItemText(item);
-        if (sourceText) {
-          const normalizedSourceText = normalizeComparableText(sourceText);
-          if (normalizedSourceText && normalizedDraft.includes(normalizedSourceText)) {
-            copiedTransformTargets.push(sourceText);
-          }
-        }
-        if (item && typeof item === "object" && !Array.isArray(item)) {
-          const record = item as Record<string, unknown>;
-          const role = normalizeOperatorText(record.role, 240, true);
-          if (role && !transformedElements.has(normalizeComparableText(role))) {
-            undeclaredTransformRoles.push(role);
-          }
-        }
-      }
-      const prohibitedPackages: Array<Record<string, unknown>> = [];
-      for (const combination of sourceContract.forbidden_complete_combinations as Array<Record<string, unknown>>) {
-        const surfaces = Array.isArray(combination.surfaces) ? combination.surfaces as unknown[] : [];
-        const matched = surfaces
-          .map((surface) => typeof surface === "string" ? surface : "")
-          .filter((surface) => {
-            const normalizedSurface = normalizeComparableText(surface);
-            return normalizedSurface && normalizedDraft.includes(normalizedSurface);
-          });
-        const minMatches = Math.max(2, Number(combination.min_matches ?? surfaces.length));
-        if (matched.length >= minMatches) {
-          prohibitedPackages.push({ matched_surfaces: matched, min_matches: minMatches, rationale: combination.rationale ?? null });
-        }
-      }
-      const copiedShouldTransform = (sourceContract.should_transform as unknown[])
-        .map((item) => sourceContractItemText(item))
-        .filter((item): item is string => Boolean(item))
-        .filter((surface) => {
-          const normalizedSurface = normalizeComparableText(surface);
-          return normalizedSurface && normalizedDraft.includes(normalizedSurface);
-        });
-      const audienceRewardRequired = Boolean(normalizeOperatorText(sourceContract.audience_reward, 2000, true));
-      const audienceRewardDelivered = input.draftAnalysis?.audience_reward_delivered === true;
-            const failures = {
-        missing_exact_surfaces: missingExact,
-        missing_preserved_functions: missingFunctions,
-        missing_time_or_context_requirements: missingTime,
-        exact_source_copy: manifestCloseMimicry && exactSourceCopy,
-        copied_must_transform_surfaces: manifestCloseMimicry ? [] : copiedTransformTargets,
-        undeclared_transformed_roles: manifestCloseMimicry ? [] : undeclaredTransformRoles,
-        prohibited_complete_packages: manifestCloseMimicry ? [] : prohibitedPackages,
-        audience_reward_missing: audienceRewardRequired && !audienceRewardDelivered,
-      };
-      const hasFailure = missingExact.length > 0
-        || missingFunctions.length > 0
-        || missingTime.length > 0
-        || (manifestCloseMimicry && exactSourceCopy)
-        || (!manifestCloseMimicry && copiedTransformTargets.length > 0)
-        || (!manifestCloseMimicry && undeclaredTransformRoles.length > 0)
-        || (!manifestCloseMimicry && prohibitedPackages.length > 0)
-        || (audienceRewardRequired && !audienceRewardDelivered);
-      if (hasFailure) {
-        results.push(buildGateResult(
-          gate,
-          "fail",
-          manifestCloseMimicry ? "Manifest draft failed the source-fidelity boundary." : "Draft does not satisfy the active source transformation contract.",
-          failures,
-          manifestCloseMimicry
-            ? "Keep the source hook, structure, meaning, tone, and payoff; change only enough wording to avoid reproducing the source exactly. Do not add a new scene or premise."
-            : "Preserve approved exact hooks/functions, declare satisfied semantic requirements, transform designated elements, deliver the audience reward, and avoid the prohibited full source package.",
-        ));
-      } else if (!manifestCloseMimicry && copiedShouldTransform.length) {
-        results.push(buildGateResult(
-          gate,
-          "pass_with_caution",
-          "Required transformation rules pass, but a should-transform surface remains close to the source.",
-          { copied_should_transform_surfaces: copiedShouldTransform },
-          "Consider changing the optional source surface unless retaining it is deliberate.",
-        ));
-      } else {
-        results.push(buildGateResult(
-          gate,
-          "pass",
-          manifestCloseMimicry
-            ? "Manifest draft preserves the source contract and is not an exact source copy."
-            : "Draft satisfies the active source transformation contract.",
-        ));
-      }
-      continue;
-    }
-        if (gateKey === "source_surface_copy_gate") {
-      if (manifestCloseMimicry) {
-        results.push(exactSourceCopy
-          ? buildGateResult(gate, "fail", "Manifest draft exactly copies the source post.", { source_text: primarySourceText }, "Change a small amount of wording while preserving the hook, structure, meaning, tone, and payoff.")
-          : buildGateResult(gate, "pass", "Manifest draft is not an exact source copy; close source mimicry is allowed."));
-        continue;
-      }
-
-      const forbidden = Array.isArray(sourceCard?.forbidden_surfaces) ? sourceCard?.forbidden_surfaces as unknown[] : [];
-      let copied: string | null = null;
-      let cautious: string | null = null;
-      for (const surface of forbidden) {
-        const phrase = typeof surface === "string" ? surface : String((surface as Record<string, unknown>)?.text ?? "");
-                const normalizedPhrase = normalizeComparableText(phrase);
-        if (!normalizedPhrase || approvedReusableSurfaces.has(normalizedPhrase)) {
-          continue;
-        }
-        const wordCount = normalizedPhrase.split(" ").filter(Boolean).length;
-
-        if (wordCount > 3 && normalizedDraft.includes(normalizedPhrase)) {
-          copied = phrase;
-          break;
-        }
-        if (wordCount <= 3 && normalizedDraft.includes(normalizedPhrase)) {
-          cautious = phrase;
-        }
-      }
-      if (copied) {
-        results.push(buildGateResult(gate, "fail", "Draft copies a forbidden source surface.", { copied_surface: copied }, "Rewrite away from the source surface while preserving the mechanism."));
-      } else if (cautious) {
-        results.push(buildGateResult(gate, "pass_with_caution", "Draft includes a short forbidden surface fragment.", { caution_surface: cautious }, "Check whether the short phrase is too close."));
-      } else {
-        results.push(buildGateResult(gate, "pass", "No forbidden source surface copied."));
-      }
-      continue;
-    }
-    if (gateKey === "current_inventory_repeat_gate") {
-      const latest = await getLatestOperatorInventory(env, input.brand.brand_key);
-      const candidateRealm = normalizeOperatorMachineKey(input.draftAnalysis?.realm_entrance_key, "")
-        || inferRealmEntranceKey(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText));
-      const latestRealm = normalizeOperatorMachineKey(latest?.realm_entrance_key, "");
-      const candidateOpening = normalizeComparableText(normalizeOperatorText(input.draftAnalysis?.opening_phrase, 240, true) ?? extractOpeningPhrase(draftText) ?? "");
-            const latestOpening = normalizeComparableText(String(latest?.opening_phrase ?? ""));
-      const reusableOpening = Array.from(approvedReusableSurfaces).find((surface) =>
-        Boolean(surface) && (candidateOpening.includes(surface) || normalizedDraft.startsWith(surface)),
-      ) ?? null;
-      if (candidateRealm && latestRealm && candidateRealm === latestRealm && !reusableOpening) {
-        results.push(buildGateResult(gate, "fail", "Candidate repeats the latest realm entrance for this account.", { candidate_realm: candidateRealm, latest_inventory_id: latest?.id ?? null }, "Rotate the opener/realm entrance before showing."));
-      } else if (candidateOpening && latestOpening && candidateOpening === latestOpening && !reusableOpening) {
-        results.push(buildGateResult(gate, "fail", "Candidate repeats the latest opening phrase for this account.", { opening_phrase: candidateOpening, latest_inventory_id: latest?.id ?? null }, "Change the opening phrase."));
-      } else if (reusableOpening) {
-        results.push(buildGateResult(gate, "pass", "Opening repetition is explicitly authorized by the active source transformation contract.", { reusable_surface: reusableOpening, latest_inventory_id: latest?.id ?? null }));
-      } else {
-        results.push(buildGateResult(gate, "pass", "No latest-inventory opening repeat detected."));
-      }
-
-      
-      continue;
-    }
-    if (gateKey === "historical_owner_rejection_gate") {
-      const coverageComplete = rejectionContext?.coverage_complete === true;
-      const requiredReviewCount = Number(rejectionContext?.required_review_count ?? 0);
-      const expectedFingerprint = String(rejectionContext?.context_fingerprint ?? "");
-            const explicitBannedSurfaces = Array.isArray(rejectionContext?.explicit_banned_surfaces)
-        ? rejectionContext.explicit_banned_surfaces.map(String)
-        : [];
-      const ownerApprovedSurfaceInputs = [
-        ...(Array.isArray(input.draftAnalysis?.owner_approved_surfaces)
-          ? input.draftAnalysis.owner_approved_surfaces.map(String)
-          : []),
-        normalizeOperatorText(input.draftAnalysis?.owner_requested_exact_surface, 500, true),
-      ].filter((surface): surface is string => Boolean(surface));
-      const currentOwnerApprovedSurfaces = ownerApprovedSurfaceInputs
-        .map((surface) => normalizeComparableText(surface))
-        .filter((surface) => Boolean(surface) && normalizedDraft.includes(surface));
-      const matchedBannedSurfaces = explicitBannedSurfaces.filter((surface) => {
-        const normalizedSurface = normalizeComparableText(surface);
-        const approvedForCurrentDraft = currentOwnerApprovedSurfaces.some((approvedSurface) =>
-          approvedSurface === normalizedSurface || approvedSurface.includes(normalizedSurface),
-        );
-        return !approvedForCurrentDraft && draftContainsOperatorRejectedSurface(normalizedDraft, surface);
-      });
-      if (manifestCloseMimicry) {
-        if (matchedBannedSurfaces.length) {
-          results.push(buildGateResult(
-            gate,
-            "fail",
-            "Manifest draft repeats language the owner explicitly hard-banned.",
-            {
-              enforcement_mode: "explicit_hard_bans_only",
-              context_fingerprint: expectedFingerprint,
-              matched_banned_surfaces: matchedBannedSurfaces,
-            },
-            "Remove only the matched hard-ban wording. Keep the source hook, structure, meaning, tone, and payoff close to the original.",
-          ));
-        } else {
-          results.push(buildGateResult(
-            gate,
-            coverageComplete ? "pass" : "pass_with_caution",
-            coverageComplete
-              ? "Manifest draft contains no explicit owner hard-ban surface."
-              : "Manifest draft contains no hard-ban surface in the available compact rejection context.",
-            {
-              enforcement_mode: "explicit_hard_bans_only",
-              context_fingerprint: expectedFingerprint,
-              explicit_hard_ban_count: explicitBannedSurfaces.length,
-              coverage_status: rejectionContext?.coverage_status ?? null,
-            },
-          ));
-        }
-        continue;
-      }
-      const rejectedDrafts = Array.isArray(rejectionContext?.rejected_drafts)
-        ? rejectionContext.rejected_drafts as Array<Record<string, unknown>>
-        : [];
-      const similarRejectedDrafts = rejectedDrafts
-        .map((record) => ({
-          context_id: record.context_id,
-          draft_id: record.draft_id,
-          similarity: operatorRejectionSimilarity(draftText, String(record.text ?? "")),
-          rejected_text: compactOperatorRejectionText(record.text, 300),
-          rejection_reason: compactOperatorRejectionText(record.rejection_reason, 600),
-        }))
-        .filter((record) => record.similarity >= 0.72)
-        .sort((left, right) => right.similarity - left.similarity)
-        .slice(0, 5);
-      if (!coverageComplete) {
-        results.push(buildGateResult(
-          gate,
-          "fail",
-          "Account rejection context is partial, so historical owner feedback cannot be safely enforced.",
-          {
-            context_fingerprint: expectedFingerprint,
-            required_review_count: requiredReviewCount,
-            coverage_status: rejectionContext?.coverage_status ?? "partial",
-          },
-          "Load the complete account rejection context before generating or showing another draft.",
-        ));
-      } else if (matchedBannedSurfaces.length || similarRejectedDrafts.length) {
-        results.push(buildGateResult(
-          gate,
-          "fail",
-          matchedBannedSurfaces.length
-            ? "Draft repeats language explicitly banned in prior owner rejection feedback."
-            : "Draft is too similar to a previously owner-rejected draft.",
-          {
-            context_fingerprint: expectedFingerprint,
-            matched_banned_surfaces: matchedBannedSurfaces,
-            similar_rejected_drafts: similarRejectedDrafts,
-          },
-          "Remove the matched rejected language or structure and regenerate from the source card using the account rejection context.",
-        ));
-      } else if (requiredReviewCount === 0) {
-        results.push(buildGateResult(gate, "pass", "No account owner-rejection records exist yet."));
-      } else {
-        const modelResult = input.modelGateResults?.find((item) => item.gate_key === gateKey);
-        const evidence = modelResult?.evidence && typeof modelResult.evidence === "object" && !Array.isArray(modelResult.evidence)
-          ? modelResult.evidence as Record<string, unknown>
-          : {};
-        const reviewedFingerprint = String(evidence.context_fingerprint ?? evidence.reviewed_rejection_context_fingerprint ?? "");
-        const reviewedCount = Number(evidence.reviewed_rejection_count ?? 0);
-        if (!modelResult?.result || !modelResult?.rationale) {
-          results.push(buildGateResult(
-            gate,
-            "fail",
-            "Historical owner rejection review was not recorded.",
-            { context_fingerprint: expectedFingerprint, required_review_count: requiredReviewCount },
-            "Review the complete account rejection context and submit an auditable historical_owner_rejection_gate result.",
-          ));
-        } else if (reviewedFingerprint !== expectedFingerprint || reviewedCount < requiredReviewCount) {
-          results.push(buildGateResult(
-            gate,
-            "fail",
-            "Historical owner rejection review did not cover the complete current context.",
-            {
-              expected_context_fingerprint: expectedFingerprint,
-              reviewed_context_fingerprint: reviewedFingerprint || null,
-              required_review_count: requiredReviewCount,
-              reviewed_rejection_count: reviewedCount,
-            },
-            "Review every rejection record in the current context pack and resubmit the gate with the exact fingerprint and count.",
-          ));
-        } else {
-          results.push(buildGateResult(
-            gate,
-            modelResult.result as OperatorGateResultValue,
-            String(modelResult.rationale),
-            { ...evidence, context_fingerprint: expectedFingerprint, reviewed_rejection_count: reviewedCount },
-            normalizeOperatorText(modelResult.repair_guidance, 1000, true),
-          ));
-        }
-      }
-      continue;
-    }
-    if (gateKey === "required_gate_execution_gate") {
-      const requiredGateKeys = gates
-        .filter((candidate) => String(candidate.severity) === "block" && String(candidate.gate_key) !== gateKey)
-        .map((candidate) => String(candidate.gate_key));
-      const resultByGate = new Map(results.map((result) => [String(result.gate_key), result]));
-      const missingGateKeys = requiredGateKeys.filter((requiredKey) => !resultByGate.has(requiredKey));
-      const unauditableGateKeys = requiredGateKeys.filter((requiredKey) => {
-        const result = resultByGate.get(requiredKey);
-        return result?.result === "not_applicable" || !normalizeOperatorText(result?.rationale, 2000, true);
-      });
-      const complete = missingGateKeys.length === 0 && unauditableGateKeys.length === 0;
-      results.push(buildGateResult(
-        gate,
-        complete ? "pass" : "fail",
-        complete
-          ? "Every active blocking gate executed with an auditable result."
-          : "One or more active blocking gates did not execute with an auditable result.",
-        {
-          required_gate_keys: requiredGateKeys,
-          executed_gate_keys: Array.from(resultByGate.keys()),
-          missing_gate_keys: missingGateKeys,
-          unauditable_gate_keys: unauditableGateKeys,
-        },
-        complete ? null : "Run every active blocking gate and include required model evidence before showing the draft.",
-      ));
-      continue;
-    }
-    if (gateKey === "exact_duplicate_gate") {
-
+  return runOperatorGateEngine({
+    brandKey: input.brand.brand_key,
+    accountId: input.brand.account_id,
+    threadsUserId: input.brand.profile.threads_user_id,
+    sourceCardId: input.sourceCardId,
+    draftId: input.draftId,
+    draftText: input.draftText,
+    stageScope: input.stageScope,
+    laneKey: input.laneKey,
+    contentType: input.contentType,
+    draftAnalysis: input.draftAnalysis,
+    modelGateResults: input.modelGateResults,
+    scheduling: input.scheduling,
+  }, {
+    defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
+    prepare: () => prepareOperatorMode(env),
+    listGates: ({ brandKey, stageScope, laneKey, contentType }) => listOperatorGates(
+      env,
+      brandKey as GptBrandKey,
+      stageScope,
+      laneKey,
+      contentType,
+    ),
+    getSourceCard: (brandKey, sourceCardId) => getOperatorSourceCard(
+      env,
+      brandKey as GptBrandKey,
+      sourceCardId,
+    ),
+    getRejectionContext: () => buildOperatorRejectionContext(env, input.brand),
+    getLatestContextAdmission: (brandKey) => getLatestOperatorContextAdmission(
+      env,
+      brandKey as GptBrandKey,
+      null,
+    ),
+    getLatestInventory: (brandKey) => getLatestOperatorInventory(env, brandKey as GptBrandKey),
+    findExactDuplicate: async ({ accountId, threadsUserId, draftId, normalizedDraft }) => {
       const duplicateRows = await env.DB.prepare(
         `SELECT text AS candidate_text, 'draft' AS source_type
-                  FROM gpt_generation_drafts
+         FROM gpt_generation_drafts
          WHERE account_id = ?
            AND id != COALESCE(?, '')
            AND status IN ('shown', 'approved', 'scheduled')
          ORDER BY updated_at DESC
          LIMIT 200`,
-      ).bind(input.brand.account_id, input.draftId ?? "").all<{ candidate_text: string; source_type: string }>();
-      let duplicate = (duplicateRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+      ).bind(accountId, draftId ?? "").all<{ candidate_text: string; source_type: string }>();
+      let duplicate = (duplicateRows.results ?? []).find(
+        (row) => normalizeComparableText(row.candidate_text) === normalizedDraft,
+      ) ?? null;
       if (!duplicate) {
         const scheduledRows = await env.DB.prepare(
           `SELECT post_text AS candidate_text, 'scheduled_post' AS source_type
@@ -8270,8 +7891,10 @@ async function runOperatorGates(
            WHERE threads_user_id = ?
            ORDER BY scheduled_time DESC
            LIMIT 200`,
-        ).bind(input.brand.profile.threads_user_id).all<{ candidate_text: string; source_type: string }>();
-        duplicate = (scheduledRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+        ).bind(threadsUserId).all<{ candidate_text: string; source_type: string }>();
+        duplicate = (scheduledRows.results ?? []).find(
+          (row) => normalizeComparableText(row.candidate_text) === normalizedDraft,
+        ) ?? null;
       }
       if (!duplicate && await doesTableExist(env, "threads_posts_archive")) {
         const archiveRows = await env.DB.prepare(
@@ -8280,100 +7903,51 @@ async function runOperatorGates(
            WHERE threads_user_id = ?
            ORDER BY datetime(last_seen_at) DESC
            LIMIT 200`,
-        ).bind(input.brand.profile.threads_user_id).all<{ candidate_text: string; source_type: string }>();
-        duplicate = (archiveRows.results ?? []).find((row) => normalizeComparableText(row.candidate_text) === normalizedDraft) ?? null;
+        ).bind(threadsUserId).all<{ candidate_text: string; source_type: string }>();
+        duplicate = (archiveRows.results ?? []).find(
+          (row) => normalizeComparableText(row.candidate_text) === normalizedDraft,
+        ) ?? null;
       }
-      results.push(duplicate
-        ? buildGateResult(gate, "fail", "Draft exactly matches known account content.", { source_type: duplicate.source_type }, "Write a materially different draft.")
-        : buildGateResult(gate, "pass", "No exact duplicate found in checked inventory."));
-      continue;
-    }
-    if (gateKey === "approved_before_schedule_gate") {
-      const draft = input.draftId ? await getOperatorDraft(env, input.brand, input.draftId) : null;
-      const approved = draft?.status === "approved";
-      results.push(buildGateResult(gate, approved ? "pass" : "fail", approved ? "Draft is approved." : "Draft is not approved.", { draft_status: draft?.status ?? null }, "Approve the draft before scheduling."));
-      continue;
-    }
-    if (gateKey === "scheduled_collision_gate") {
-      const timezone = input.scheduling?.timezone || WORKSPACE_DEFAULT_TIMEZONE;
-      const date = input.scheduling?.date;
-      const scheduled = date && isValidIsoDate(date)
-        ? await listScheduledPostsForThreadsAccountOnLocalDate(env, input.brand.profile.threads_user_id, date, timezone)
-        : [];
-      const sameText = scheduled.find((post) => normalizeComparableText(post.post_text) === normalizedDraft);
-      const sameTime = scheduled.find((post) => input.scheduling?.time && post.local_time === input.scheduling.time);
-      if (sameText || sameTime) {
-        results.push(buildGateResult(gate, "fail", sameText ? "Draft text collides with scheduled inventory." : "Requested time already has a scheduled post.", { scheduled_post_id: sameText?.id ?? sameTime?.id ?? null }, "Choose a different draft or time."));
-      } else {
-        results.push(buildGateResult(gate, "pass", "No scheduled collision detected."));
-      }
-      continue;
-    }
-    if (String(gate.evaluator) === "model" || String(gate.evaluator) === "hybrid") {
-      const modelResult = input.modelGateResults?.find((item) => item.gate_key === gateKey);
-      if (modelResult?.result && modelResult?.rationale) {
-        results.push(buildGateResult(
-          gate,
-          modelResult.result as OperatorGateResultValue,
-          String(modelResult.rationale),
-          modelResult.evidence && typeof modelResult.evidence === "object" ? modelResult.evidence as Record<string, unknown> : null,
-          normalizeOperatorText(modelResult.repair_guidance, 1000, true),
-        ));
-      } else {
-        results.push(buildGateResult(gate, "fail", "Hybrid/model gate requires a recorded model or owner evaluation before showing.", null, "Submit the gate result rationale before marking this draft showable."));
-      }
-      continue;
-    }
-    results.push(buildGateResult(gate, "not_applicable", "Gate has no v1 backend evaluator for this context."));
-  }
-
-    if (results.length === 0) {
-    results.push({
-      gate_id: "required-gate-execution",
-      gate_key: "required_gate_execution_gate",
-      result: "fail",
-      blocking: true,
-      rationale: "No candidate gate executed for this context.",
-      evaluated_by: "backend",
-      evidence: { stage_scope: input.stageScope, source_card_id: input.sourceCardId ?? null },
-      repair_guidance: "Load the applicable gates and provide the source card, candidate text, and required model evaluations before treating the candidate as showable.",
-    });
-  }
-
-  if (input.draftId) {
-    for (const result of results) {
-      await env.DB.prepare(
-        `INSERT INTO operator_gate_results (
-          id, brand_key, draft_id, source_card_id, gate_id, gate_key, result, blocking,
-          rationale, evaluated_by, evidence_json, repair_guidance
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-        .bind(
-          crypto.randomUUID(),
-          input.brand.brand_key,
-          input.draftId,
-          input.sourceCardId ?? null,
-          String(result.gate_id ?? ""),
-          String(result.gate_key ?? ""),
-          String(result.result ?? "not_applicable"),
-          result.blocking === true ? 1 : 0,
-          String(result.rationale ?? ""),
-          String(result.evaluated_by ?? "backend"),
-          normalizeOperatorJson(result.evidence ?? null, null),
-          normalizeOperatorText(result.repair_guidance, 2000, true),
-        )
-        .run();
-    }
-  }
-
-  const blockingFailures = results.filter((result) => result.blocking === true && result.result === "fail");
-  return {
-    showable: blockingFailures.length === 0,
-    gate_results: results,
-    blocking_failures: blockingFailures,
-    warnings,
-  };
+      return duplicate;
+    },
+    getDraft: (draftId) => getOperatorDraft(env, input.brand, draftId),
+    listScheduledPosts: ({ threadsUserId, date, timezone }) => (
+      listScheduledPostsForThreadsAccountOnLocalDate(env, threadsUserId, date, timezone)
+    ) as Promise<Array<Record<string, unknown>>>,
+    persistGateResult: ({ brandKey, draftId, sourceCardId, result }) => env.DB.prepare(
+      `INSERT INTO operator_gate_results (
+        id, brand_key, draft_id, source_card_id, gate_id, gate_key, result, blocking,
+        rationale, evaluated_by, evidence_json, repair_guidance
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      brandKey,
+      draftId,
+      sourceCardId,
+      String(result.gate_id ?? ""),
+      String(result.gate_key ?? ""),
+      String(result.result ?? "not_applicable"),
+      result.blocking === true ? 1 : 0,
+      String(result.rationale ?? ""),
+      String(result.evaluated_by ?? "backend"),
+      normalizeOperatorJson(result.evidence ?? null, null),
+      normalizeOperatorText(result.repair_guidance, 2000, true),
+    ).run(),
+    normalizeText: normalizeOperatorText,
+    normalizeMachineKey: normalizeOperatorMachineKey,
+    normalizeComparableText,
+    normalizeSourceContract: (value) => normalizeSourceTransformationContract(value) as unknown as Record<string, unknown>,
+    normalizeSourceContractStringList,
+    sourceContractItemText,
+    inferRealmEntranceKey,
+    extractOpeningPhrase,
+    containsRejectedSurface: draftContainsOperatorRejectedSurface,
+    rejectionSimilarity: operatorRejectionSimilarity,
+    compactRejectionText: compactOperatorRejectionText,
+    isValidIsoDate,
+  });
 }
+
 
 function isAllowedOperatorTransition(current: string, next: string): boolean {
   if (current === next) {

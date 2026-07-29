@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   evaluateOperatorGates,
   planOperatorGateMutation,
+  runOperatorGateEngine,
 } from "../src/operatorGateMutationPlanningService";
 
 function createDependencies() {
@@ -292,7 +293,7 @@ describe("operator gate evaluation", () => {
       runGates,
     });
 
-    expect(runGates).toHaveBeenCalledWith({
+        expect(runGates).toHaveBeenCalledWith({
       sourceCardId: null,
       draftText: null,
       stageScope: "gate_evaluation",
@@ -303,4 +304,131 @@ describe("operator gate evaluation", () => {
     });
   });
 });
+
+function createGateEngineDependencies(gates: Array<Record<string, unknown>>) {
+  const persistGateResult = vi.fn(async () => undefined);
+  return {
+    defaultTimezone: "America/New_York",
+    prepare: vi.fn(async () => undefined),
+    listGates: vi.fn(async () => gates),
+    getSourceCard: vi.fn(async () => ({ status: "locked", transformation_contract: {} })),
+    getRejectionContext: vi.fn(async () => ({ coverage_complete: true, required_review_count: 0 })),
+    getLatestContextAdmission: vi.fn(async () => null),
+    getLatestInventory: vi.fn(async () => null),
+    findExactDuplicate: vi.fn(async () => null),
+    getDraft: vi.fn(async () => ({ status: "approved" })),
+    listScheduledPosts: vi.fn(async () => []),
+    persistGateResult,
+    normalizeText: (value: unknown, maxLength: number) => {
+      if (typeof value !== "string") return null;
+      const normalized = value.trim().slice(0, maxLength);
+      return normalized || null;
+    },
+    normalizeMachineKey: (value: unknown, fallback = "") => {
+      if (typeof value !== "string") return fallback;
+      return value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
+    },
+    normalizeComparableText: (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, " "),
+    normalizeSourceContract: (value: unknown) => value && typeof value === "object" ? value as Record<string, unknown> : {},
+    normalizeSourceContractStringList: (value: unknown) => Array.isArray(value) ? value.map(String) : [],
+    sourceContractItemText: (value: unknown) => typeof value === "string" ? value : null,
+    inferRealmEntranceKey: (value: string | null) => value ?? "",
+    extractOpeningPhrase: (value: string) => value.split(" ").slice(0, 3).join(" "),
+    containsRejectedSurface: (draft: string, surface: string) => draft.includes(surface.toLowerCase()),
+    rejectionSimilarity: () => 0,
+    compactRejectionText: (value: unknown, maxLength: number) => String(value ?? "").slice(0, maxLength) || null,
+    isValidIsoDate: (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value),
+  };
+}
+
+describe("operator gate engine", () => {
+  it("preserves deterministic blocking gates and required execution auditing", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "gate-account", gate_key: "account_selected_gate", severity: "block", evaluator: "backend" },
+      { id: "gate-source", gate_key: "source_card_required_gate", severity: "block", evaluator: "backend" },
+      { id: "gate-required", gate_key: "required_gate_execution_gate", severity: "block", evaluator: "backend" },
+    ]);
+
+    const result = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-1",
+      threadsUserId: "threads-1",
+      stageScope: "gate_evaluation",
+      sourceCardId: null,
+      draftText: "Candidate",
+    }, dependencies);
+
+    expect(result.showable).toBe(false);
+    expect(result.blocking_failures).toEqual([
+      expect.objectContaining({ gate_key: "source_card_required_gate", result: "fail", blocking: true }),
+    ]);
+    expect(result.gate_results).toEqual([
+      expect.objectContaining({ gate_key: "account_selected_gate", result: "pass" }),
+      expect.objectContaining({ gate_key: "source_card_required_gate", result: "fail" }),
+      expect.objectContaining({ gate_key: "required_gate_execution_gate", result: "pass" }),
+    ]);
+  });
+
+  it("preserves exact model results and persists every draft gate receipt", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "model-gate", gate_key: "quality_gate", severity: "block", evaluator: "model" },
+    ]);
+    const result = await runOperatorGateEngine({
+      brandKey: "vectrix",
+      accountId: "account-2",
+      threadsUserId: "threads-2",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-2",
+      draftId: "draft-2",
+      draftText: "Candidate",
+      modelGateResults: [{
+        gate_key: "quality_gate",
+        result: "pass_with_caution",
+        rationale: "Strong but monitor repetition.",
+        evidence: { score: 0.81 },
+        repair_guidance: "Rotate the close next time.",
+      }],
+    }, dependencies);
+
+    expect(result).toMatchObject({ showable: true, blocking_failures: [] });
+    expect(result.gate_results[0]).toMatchObject({
+      gate_key: "quality_gate",
+      result: "pass_with_caution",
+      rationale: "Strong but monitor repetition.",
+      evidence: { score: 0.81 },
+      repair_guidance: "Rotate the close next time.",
+    });
+    expect(dependencies.persistGateResult).toHaveBeenCalledOnce();
+    expect(dependencies.persistGateResult).toHaveBeenCalledWith(expect.objectContaining({
+      brandKey: "vectrix",
+      draftId: "draft-2",
+      sourceCardId: "card-2",
+    }));
+  });
+
+  it("preserves duplicate and scheduling collision outcomes through explicit adapters", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "duplicate", gate_key: "exact_duplicate_gate", severity: "block", evaluator: "backend" },
+      { id: "collision", gate_key: "scheduled_collision_gate", severity: "block", evaluator: "backend" },
+    ]);
+    dependencies.findExactDuplicate.mockResolvedValue({ source_type: "archive_post" });
+    dependencies.listScheduledPosts.mockResolvedValue([{ id: 44, post_text: "Other", local_time: "09:00" }]);
+
+    const result = await runOperatorGateEngine({
+      brandKey: "opmg_deadman",
+      accountId: "account-3",
+      threadsUserId: "threads-3",
+      stageScope: "scheduling",
+      draftText: "Candidate",
+      scheduling: { date: "2026-07-29", time: "09:00", timezone: "America/New_York" },
+    }, dependencies);
+
+    expect(result.blocking_failures).toEqual([
+      expect.objectContaining({ gate_key: "exact_duplicate_gate", evidence: { source_type: "archive_post" } }),
+      expect.objectContaining({ gate_key: "scheduled_collision_gate", evidence: { scheduled_post_id: 44 } }),
+    ]);
+  });
+});
+
+
 
