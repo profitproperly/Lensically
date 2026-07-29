@@ -190,6 +190,9 @@ const operatingMemory = read("../OPERATING_MEMORY.md");
 const recoverySource = read("../lensically-recovery-worker/src/index.ts");
 const threadsPublishService = read("src/utils/threadsPublishService.ts");
 const threadsPublishTests = read("test/threadsPublishService.spec.ts");
+const webPackage = read("../lensically-web/package.json");
+const validatedWebArtifact = read("../lensically-web/scripts/validated-web-artifact.mjs");
+const validatedWebArtifactTests = read("../lensically-web/scripts/test-validated-web-artifact.mjs");
 
 const cronMatch = wrangler.match(/"crons"\s*:\s*(\[[\s\S]*?\])/);
 if (!cronMatch) throw new Error("wrangler_crons_missing");
@@ -251,6 +254,46 @@ if (!testMigrationSetup.includes("async function hasExactMigrationLedger(")
     || !testMigrationSetup.includes("no such table: lensically_test_migrations")
     || !testMigrationSetup.includes("test_migration_binding_empty")) {
   errors.push("idempotent_test_migration_setup_missing");
+}
+if (!webPackage.includes('"test:validated-artifact": "node scripts/test-validated-web-artifact.mjs"')
+    || !validatedWebArtifact.includes('WEB_ARTIFACT_CONTRACT = "lensically-validated-web-artifact-v1"')
+    || !validatedWebArtifact.includes("packageValidatedWebArtifact")
+    || !validatedWebArtifact.includes("restoreValidatedWebArtifact")
+    || !validatedWebArtifact.includes("web_artifact_source_sha_mismatch")
+    || !validatedWebArtifact.includes("web_artifact_package_lock_mismatch")
+    || !validatedWebArtifact.includes("web_artifact_digest_mismatch")
+    || !validatedWebArtifact.includes("validateArchiveEntries(entries)")
+    || !validatedWebArtifact.includes("web_artifact_unsafe_entry")
+    || !validatedWebArtifact.includes("web_artifact_unexpected_root")
+    || !validatedWebArtifact.includes('REQUIRED_PATHS = [".open-next/worker.js", ".open-next/assets"]')) {
+  errors.push("validated_web_artifact_contract_incomplete");
+}
+if (!validatedWebArtifactTests.includes("packageValidatedWebArtifact")
+    || !validatedWebArtifactTests.includes("restoreValidatedWebArtifact")
+    || !validatedWebArtifactTests.includes("web_artifact_source_sha_mismatch")
+    || !validatedWebArtifactTests.includes("web_artifact_size_mismatch|web_artifact_digest_mismatch")
+    || !validatedWebArtifactTests.includes("web_artifact_unsafe_entry")
+    || !validatedWebArtifactTests.includes("web_artifact_unexpected_root")) {
+  errors.push("validated_web_artifact_tests_incomplete");
+}
+if (!workflow.includes("actions/upload-artifact@v4")
+    || !workflow.includes("Package exact validated web artifact")
+    || !workflow.includes("actions/download-artifact@v4")
+    || !workflow.includes("validated-web-artifact.mjs restore")
+    || !workflow.includes("web_artifact_available")
+    || !workflow.includes("use_validated_artifact")
+    || !workflow.includes("artifact_verification_failed")
+    || !workflow.includes("Build fallback exact-head web product")
+    || !workflow.includes("steps.web_release_path.outputs.use_validated_artifact != 'true'")) {
+  errors.push("validated_web_artifact_workflow_incomplete");
+}
+if (workflow.includes("- name: Build exact-head web product")) {
+  errors.push("unconditional_release_web_rebuild_returned");
+}
+if (!workflowStructureValidator.includes("release_web_artifact_download_action_missing")
+    || !workflowStructureValidator.includes("release_web_fallback_full_gates_missing")
+    || !workflowStructureValidator.includes("unconditional_release_web_rebuild_returned")) {
+  errors.push("validated_web_artifact_structure_enforcement_missing");
 }
 const manifestSourceBackedFixtureTimeoutUsages = tests.match(/MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS/g) ?? [];
 if (!tests.includes("const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;")
