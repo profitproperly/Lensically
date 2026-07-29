@@ -21,10 +21,12 @@
 	"version_metadata": {
 		"binding": "CF_VERSION_METADATA"
 	},
-		"triggers": {
+			"triggers": {
+		// Source of truth for production schedules. Routine Worker deploys remove this block
+		// from their generated config; scripts/cron-release.mjs reconciles it explicitly.
 		"crons": [
 			"* * * * *",
-						"0 */12 * * *",
+			"0 */12 * * *",
 			"1 4,5 * * *",
 			"0 * * * *"
 		]
