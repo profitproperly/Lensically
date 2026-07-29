@@ -20,6 +20,8 @@ Every Lensically Operator Mode action is governed first by **Autonomy, Efficienc
 
 On any blocker, stop the original objective, identify and repair the exact root cause, durably record the failure and solution, generalize it, add permanent prevention or regression coverage, verify the repair, and only then resume. Retrying, decomposing, rephrasing, changing tools, or continuing around an unresolved block is forbidden.
 
+A stale tool schema in an already-open ChatGPT conversation after a successful public MCP schema deployment is not a Lensically blocker. It is the expected client-refresh handoff. Do not attempt to bypass it, weaken the deployed contract, invoke Recovery to engineer around it, or continue investigating. Report what changed, validation and deployment evidence, the exact live SHA/version, and any remaining state; then stop and end with the exact standalone line: `refresh the lensically operator mode mcp now`.
+
 ## Operating Loop
 
 For generation, scheduling, growth review, or strategy work:
