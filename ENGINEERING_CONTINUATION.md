@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7a-operator-runtime-composition
-repository_base_sha: 975064c77f062d9d6806d8e330833b499fba87aa
-production_sha: 975064c77f062d9d6806d8e330833b499fba87aa
+active_checkpoint: stage-7b-manifest-runtime-dispatch
+repository_base_sha: dcfef12dc6be031c4978d4f5942233adf8610663
+production_sha: dcfef12dc6be031c4978d4f5942233adf8610663
 
 
 
@@ -1273,11 +1273,23 @@ Completed checkpoint — Stage 6AZ gate engine service extraction and Stage 6 cl
 - Live production independently confirmed exact SHA `975064c77f062d9d6806d8e330833b499fba87aa` with 75/75 public tools.
 - Stage 6 product-service extraction is complete.
 
-ACTIVE checkpoint — Stage 7A Operator runtime composition:
+Completed checkpoint — Stage 7A Operator runtime admission composition:
 
-Audit the remaining `handleOperatorTool` and Worker runtime entrypoint composition, then move the first coherent routing/runtime cluster out of `src/index.ts` without relocating product-service logic back into the entrypoint.
+- Moved authorization, canonical tool-name resolution, retired-tool rejection, Operator preparation, payload admission, scoped-call normalization, account-directory routing, and brand resolution into `admitOperatorRuntimeToolCall` in `src/operatorMcpRoutingPolicy.ts`.
+- Preserved exact response ordering and status behavior while reducing `handleOperatorTool` to injected runtime admission and downstream dispatch.
+- Added direct regressions for unauthorized requests, retired tools, scoped admission order, account-directory bypass, and missing-brand handling.
+- Repaired lifecycle enforcement so it requires the injected routing-policy boundary instead of demanding the retired direct `scopeCall` implementation return to `index.ts`.
+- The owner explicitly froze Manifest generation, scheduling, and publishing until Stages 1–9 are complete; no account-content work may interrupt the refactor.
+- Push validation passed in run `30423972375`.
+- All eight Operator shards passed in run `30423984077`.
+- Exact-SHA release passed in run `30424024799`.
+- Live production independently confirmed exact SHA `dcfef12dc6be031c4978d4f5942233adf8610663` with 75/75 public tools.
 
-Keep authorization, canonical tool-name resolution, retired-tool boundaries, payload admission, account resolution, direct service dispatch, observation, transport, and error normalization behavior exact. Add direct regression coverage and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, and independent live verification.
+ACTIVE checkpoint — Stage 7B Manifest runtime dispatch composition:
+
+Move the coherent Manifest runtime-dispatch shell out of `handleOperatorTool`: cycle-service routing, autonomous preparation, retired monolithic commit rejection, one-post persistence, scheduled-post review, observation, and error normalization. Keep product logic in existing services and inject only platform callbacks.
+
+Add direct regression coverage and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
 
 
 
@@ -1329,7 +1341,7 @@ Remaining work after this checkpoint:
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
-7. Router and runtime composition — ACTIVE at Stage 7A
+7. Router and runtime composition — ACTIVE at Stage 7B
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
