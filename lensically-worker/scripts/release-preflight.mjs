@@ -799,7 +799,7 @@ if (source.includes("function requestedMcpBrandKey(")
     || source.includes('payload.brand_key = "opmgdeadman"')) {
   lifecycleErrors.push("operator_mcp_routing_policy_returned_to_index");
 }
-if (!source.includes("OPERATOR_MCP_ROUTING_POLICY.scopeCall(toolName, payload)")
+if (!operatorToolAdmissionShell.includes("scopeCall: OPERATOR_MCP_ROUTING_POLICY.scopeCall")
     || !source.includes("OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)")
     || !source.includes("OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args)")
     || !operatorMcpToolCallDispatcher.includes("dependencies.classifyHandler(toolName)")) {
