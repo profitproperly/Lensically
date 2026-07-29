@@ -38,8 +38,10 @@ export interface OperatorHourlyCoverageServiceDependencies {
     missingSlots: OperatorCoverageSlot[];
     scheduledPostIds: unknown[];
   }): Promise<unknown>;
-  readNextPlanItem(cycleId: string, brandKey: string, slotKey: string): Promise<JsonRecord | null>;
+    readNextPlanItem(cycleId: string, brandKey: string, slotKey: string): Promise<JsonRecord | null>;
+  readLockedSourcePlan(cycleId: string, brandKey: string): Promise<JsonRecord[]>;
   readPlanItems(cycleId: string, brandKey: string): Promise<JsonRecord[]>;
+
   getCycleReceipt(cycleId: string, brandKey: string): Promise<JsonRecord | null>;
   finalizeCycleReceipt(input: JsonRecord): Promise<JsonRecord>;
   appendCycleEvent(input: JsonRecord): Promise<unknown>;
@@ -164,10 +166,19 @@ export async function handleOperatorHourlyCoverageService(
   }
 
   const nextSlotKey = coverageState.remaining_missing_slots[0]?.key ?? null;
-  const nextCyclePlanItem = nextSlotKey
+    const nextCyclePlanItem = nextSlotKey
     ? await dependencies.readNextPlanItem(cycleId, brandKey, nextSlotKey)
     : null;
+  const lockedSourcePlan = (await dependencies.readLockedSourcePlan(cycleId, brandKey)).map((row) => ({
+    slot_key: row.slot_key ?? null,
+    selection_order: row.selection_order ?? null,
+    source_identity_key: row.source_identity_key ?? null,
+    source_card_family_id: row.source_card_family_id ?? null,
+    source_card_id: row.source_card_id ?? null,
+    status: row.status ?? null,
+  }));
   let cycleCompletion: JsonRecord | null = null;
+
 
   if (currentCycle && coverageState.remaining_missing_slots.length === 0) {
     const elapsedKeys = new Set(coverageState.elapsed_unfilled_slots.map((slot) => slot.key));
@@ -220,21 +231,27 @@ export async function handleOperatorHourlyCoverageService(
     cycle_elapsed_unfilled_slots: coverageState.elapsed_unfilled_slots,
     cycle_elapsed_unfilled_count: coverageState.elapsed_unfilled_slots.length,
     cycle_scheduled_post_ids: coverageState.scheduled_post_ids,
-    coverage_ledger_drift_repaired: ledgerDrift,
+        coverage_ledger_drift_repaired: ledgerDrift,
     cycle_completion: cycleCompletion,
+    cycle_locked_source_plan: lockedSourcePlan,
+    cycle_locked_source_plan_count: lockedSourcePlan.length,
     next_cycle_plan_item: nextCyclePlanItem
+
       ? {
           ...nextCyclePlanItem,
           nearby_avoid: dependencies.parseJson(String(nextCyclePlanItem.nearby_avoid_json ?? "[]")) ?? [],
         }
       : null,
   };
+    const coverageEventPayload = { ...coverageResponse };
+  delete coverageEventPayload.cycle_locked_source_plan;
   await dependencies.appendCycleEvent({
     cycleId,
     brandKey,
     eventKey: `coverage:${coverageOperationId}`,
     eventType: "coverage_reconciled",
-    payload: coverageResponse,
+    payload: coverageEventPayload,
   });
+
   return dependencies.observe(payload, coverageResponse);
 }

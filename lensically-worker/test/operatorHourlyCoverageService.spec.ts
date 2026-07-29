@@ -31,8 +31,10 @@ function createHarness() {
     recordDefect: vi.fn(async () => ({ id: "defect-1" })),
     resolveDefect: vi.fn(async () => ({ id: "defect-1", status: "resolved" })),
     updateCycleCoverage: vi.fn(async () => ({ success: true })),
-    readNextPlanItem: vi.fn(async () => null as JsonRecord | null),
+        readNextPlanItem: vi.fn(async () => null as JsonRecord | null),
+    readLockedSourcePlan: vi.fn(async () => [] as JsonRecord[]),
     readPlanItems: vi.fn(async () => [] as JsonRecord[]),
+
     getCycleReceipt: vi.fn(async () => null as JsonRecord | null),
     finalizeCycleReceipt: vi.fn(async () => ({ completed: true } as JsonRecord)),
     appendCycleEvent: vi.fn(async () => undefined),
@@ -53,8 +55,10 @@ function createHarness() {
     recordDefect: mocks.recordDefect,
     resolveDefect: mocks.resolveDefect,
     updateCycleCoverage: mocks.updateCycleCoverage,
-    readNextPlanItem: mocks.readNextPlanItem,
+        readNextPlanItem: mocks.readNextPlanItem,
+    readLockedSourcePlan: mocks.readLockedSourcePlan,
     readPlanItems: mocks.readPlanItems,
+
     getCycleReceipt: mocks.getCycleReceipt,
     finalizeCycleReceipt: mocks.finalizeCycleReceipt,
     appendCycleEvent: mocks.appendCycleEvent,
@@ -99,14 +103,25 @@ describe("Operator hourly coverage product service", () => {
       elapsed_unfilled_slots: [],
       scheduled_post_ids: [101],
     });
-    mocks.readNextPlanItem.mockResolvedValueOnce({
+        mocks.readNextPlanItem.mockResolvedValueOnce({
       id: "plan-2",
       slot_key: nextSlot.key,
       nearby_avoid_json: "[\"money-question\"]",
       status: "planned",
     });
+    mocks.readLockedSourcePlan.mockResolvedValueOnce([
+      {
+        slot_key: nextSlot.key,
+        selection_order: 1,
+        source_identity_key: "threads:source-1",
+        source_card_family_id: "family-1",
+        source_card_id: "card-1",
+        status: "locked",
+      },
+    ]);
 
     const result = await handleOperatorHourlyCoverageService({
+
       brandKey: "manifest_mental",
       payload: { cycle_id: "cycle-1", operation_id: "coverage-op-1" },
     }, dependencies);
@@ -146,13 +161,22 @@ describe("Operator hourly coverage product service", () => {
       observed: true,
       cycle_id: "cycle-1",
       cycle_authoritative_remaining_missing_count: 1,
-      coverage_ledger_drift_repaired: true,
+            coverage_ledger_drift_repaired: true,
+      cycle_locked_source_plan_count: 1,
+      cycle_locked_source_plan: [{
+        slot_key: nextSlot.key,
+        source_card_id: "card-1",
+        source_card_family_id: "family-1",
+      }],
       next_cycle_plan_item: { id: "plan-2", nearby_avoid: ["money-question"] },
     });
-    expect(mocks.appendCycleEvent).toHaveBeenCalledWith(expect.objectContaining({
+
+        expect(mocks.appendCycleEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: "coverage:coverage-op-1",
       eventType: "coverage_reconciled",
+      payload: expect.not.objectContaining({ cycle_locked_source_plan: expect.anything() }),
     }));
+
   });
 
   it("finalizes complete coverage while ignoring elapsed unfilled slots", async () => {

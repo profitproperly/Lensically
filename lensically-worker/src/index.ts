@@ -12209,7 +12209,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         input.cycleId,
         input.brandKey,
       ).run(),
-      readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
+            readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
         `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
                 family_key, strategic_role, generation_mode, source_kind, source_card_id,
                 source_selection_id, audience_reward, hook_direction, placement_reason,
@@ -12218,7 +12218,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
          LIMIT 1`,
       ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>(),
+      readLockedSourcePlan: (cycleId, brandKey) => readLockedSourceSelectionPlan(
+        env.DB,
+        brandKey,
+        cycleId,
+      ),
       readPlanItems: async (cycleId, brandKey) => {
+
         const rows = await env.DB.prepare(
           `SELECT slot_key, status FROM operator_manifest_cycle_plan_items WHERE cycle_id = ? AND brand_key = ?`,
         ).bind(cycleId, brandKey).all<Record<string, unknown>>();

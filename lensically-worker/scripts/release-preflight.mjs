@@ -1492,15 +1492,20 @@ if (!operatorHourlyCoverageService.includes("export async function handleOperato
     || !operatorHourlyCoverageService.includes("dependencies.recordDefect")
     || !operatorHourlyCoverageService.includes("dependencies.resolveDefect")
     || !operatorHourlyCoverageService.includes("dependencies.updateCycleCoverage")
-    || !operatorHourlyCoverageService.includes("dependencies.readNextPlanItem")
+        || !operatorHourlyCoverageService.includes("dependencies.readNextPlanItem")
+    || !operatorHourlyCoverageService.includes("dependencies.readLockedSourcePlan")
+    || !operatorHourlyCoverageService.includes("cycle_locked_source_plan: lockedSourcePlan")
     || !operatorHourlyCoverageService.includes("dependencies.finalizeCycleReceipt")
+
     || !operatorHourlyCoverageService.includes('completion_trigger: "authoritative_coverage_reconciliation"')
     || !operatorHourlyCoverageService.includes('eventType: "coverage_reconciled"')) {
   lifecycleErrors.push("operator_hourly_coverage_service_module_incomplete");
 }
 if (!operatorHourlyCoverageServiceTests.includes("preserves generic bounded hourly coverage reads for every brand")
-    || !operatorHourlyCoverageServiceTests.includes("repairs authoritative Manifest ledger drift and selects the next locked plan item")
+        || !operatorHourlyCoverageServiceTests.includes("repairs authoritative Manifest ledger drift and selects the next locked plan item")
+    || !operatorHourlyCoverageServiceTests.includes("cycle_locked_source_plan_count: 1")
     || !operatorHourlyCoverageServiceTests.includes("finalizes complete coverage while ignoring elapsed unfilled slots")) {
+
   lifecycleErrors.push("operator_hourly_coverage_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorManifestPrepareCheckpointService"')
