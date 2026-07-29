@@ -129,7 +129,7 @@ function createClaimHarness() {
     getActiveSession: vi.fn(async () => ({ id: "session-1" } as JsonRecord | null),
     insertSession: vi.fn(async () => undefined),
     retireActiveReviewBatches: vi.fn(async () => undefined),
-    findExistingReviewBatch: vi.fn(async () => null as { id: string } | null),
+        findExistingReviewBatch: vi.fn(async () => (null as { id: string } | null)),
     completeReviewBatch: vi.fn(async () => undefined),
     ensureSourceBatch: vi.fn(async () => ({
       batch: { id: "source-batch-1" },
