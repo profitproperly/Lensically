@@ -21,7 +21,12 @@ function createHarness() {
   const mocks = {
     refreshTrustedUtcClock: vi.fn(async () => "2026-07-27T18:05:00.000Z"),
     readDatabaseClock: vi.fn(async () => "2026-07-27 18:04:59"),
-    resolveClock: vi.fn(() => ({ effective_now_iso: "2026-07-27T18:05:00.000Z", source: "trusted_utc" })),
+        resolveClock: vi.fn(() => ({ effective_now_iso: "2026-07-27T18:05:00.000Z", source: "trusted_utc" })),
+    compactThreadsSnapshot: vi.fn((snapshot: JsonRecord) => {
+      const bounded = { ...snapshot };
+      delete bounded.raw_posts;
+      return bounded;
+    }),
     parseTimestampMs: vi.fn(() => Date.parse("2026-07-27T18:05:00.000Z")),
     localDateTimeParts: vi.fn(() => ({ date: "2026-07-27", hour: 18 })),
     buildTargetSlots: vi.fn(() => slots),
@@ -95,7 +100,8 @@ function createHarness() {
     noninterferencePolicy: { active: true },
     analysisWindowDays: 28,
     recentExposureHours: 72,
-    normalizeText,
+        normalizeText,
+    compactThreadsSnapshot: mocks.compactThreadsSnapshot,
     refreshTrustedUtcClock: mocks.refreshTrustedUtcClock,
     readDatabaseClock: mocks.readDatabaseClock,
     resolveClock: mocks.resolveClock,
@@ -150,8 +156,9 @@ const input = {
     remaining_due_checkpoint_count: 0,
     list_metrics_complete: true,
     max_insight_calls_per_invocation: 12,
-    metric_snapshots: [{ id: "metric-1" }],
+        metric_snapshots: [{ id: "metric-1" }],
     performance_evaluation: { evaluator_version: "eval-v1", maturity_scores_upserted: 4, evidence_records: 8 },
+    raw_posts: [{ text: "x".repeat(2_000_000) }],
   },
 };
 
@@ -167,11 +174,15 @@ describe("Operator Manifest cycle construction service", () => {
       "2026-07-27T17:00:00.000Z",
       "2026-07-27T18:05:00.000Z",
     );
-    expect(mocks.refreshSavedPatternIntelligence).toHaveBeenCalledWith({
+        expect(mocks.refreshSavedPatternIntelligence).toHaveBeenCalledWith({
       brand_key: "manifest_mental",
       account_id: "account-1",
       app_user_id: "app-user-1",
     });
+    expect(mocks.compactThreadsSnapshot).toHaveBeenCalledWith(input.threadsSnapshot);
+    expect(mocks.buildAccountPosition).toHaveBeenCalledWith(expect.objectContaining({
+      threadsSnapshot: expect.not.objectContaining({ raw_posts: expect.anything() }),
+    }));
     expect(mocks.writeCycle).toHaveBeenCalledWith(expect.objectContaining({
       existing: false,
       cycleId: "cycle-1",

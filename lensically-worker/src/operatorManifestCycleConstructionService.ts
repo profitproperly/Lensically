@@ -27,7 +27,8 @@ export interface OperatorManifestCycleConstructionDependencies {
   noninterferencePolicy: unknown;
   analysisWindowDays: number;
   recentExposureHours: number;
-  normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+    normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+  compactThreadsSnapshot(snapshot: JsonRecord): JsonRecord;
   refreshTrustedUtcClock(): Promise<string | null>;
   readDatabaseClock(): Promise<string | null>;
   resolveClock(
@@ -138,18 +139,19 @@ export async function constructOperatorManifestAutonomousCycle(
     explicitOperationId,
     phasedPreparation,
     runtimeNowIso,
-    threadsSnapshot,
+        threadsSnapshot,
   } = input;
+  const boundedThreadsSnapshot = dependencies.compactThreadsSnapshot(threadsSnapshot);
 
   const [trustedUtcTimeIso, databaseClockRaw] = await Promise.all([
     dependencies.refreshTrustedUtcClock(),
     dependencies.readDatabaseClock(),
   ]);
-  const clock = dependencies.resolveClock(
+    const clock = dependencies.resolveClock(
     runtimeNowIso,
-    threadsSnapshot.threads_server_time_iso,
+    boundedThreadsSnapshot.threads_server_time_iso,
     databaseTimeIso(databaseClockRaw),
-    threadsSnapshot.latest_published_at,
+    boundedThreadsSnapshot.latest_published_at,
     trustedUtcTimeIso,
   );
   const effectiveNowMs = dependencies.parseTimestampMs(clock.effective_now_iso) ?? dependencies.nowMs();
@@ -162,18 +164,18 @@ export async function constructOperatorManifestAutonomousCycle(
   const deliveryReconciliation = await dependencies.reconcileDelivery(timezone, effectiveNowMs);
   await dependencies.ensureRequiredSchemas();
 
-  const performanceEvaluation = record(threadsSnapshot.performance_evaluation);
+  const performanceEvaluation = record(boundedThreadsSnapshot.performance_evaluation);
   const intelligenceEngineRefresh = {
     mode: "autonomous_prepare_live_refresh",
     recomputed: true,
     refresh_owner: "autonomous_prepare",
-    due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
-    due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
-    processed_due_checkpoint_count: threadsSnapshot.processed_due_checkpoint_count,
-    remaining_due_checkpoint_count: threadsSnapshot.remaining_due_checkpoint_count,
-    list_metrics_complete: threadsSnapshot.list_metrics_complete,
-    max_insight_calls_per_invocation: threadsSnapshot.max_insight_calls_per_invocation,
-    metric_snapshots: threadsSnapshot.metric_snapshots,
+    due_checkpoint_post_count: boundedThreadsSnapshot.due_checkpoint_post_count,
+    due_checkpoint_count: boundedThreadsSnapshot.due_checkpoint_count,
+    processed_due_checkpoint_count: boundedThreadsSnapshot.processed_due_checkpoint_count,
+    remaining_due_checkpoint_count: boundedThreadsSnapshot.remaining_due_checkpoint_count,
+    list_metrics_complete: boundedThreadsSnapshot.list_metrics_complete,
+    max_insight_calls_per_invocation: boundedThreadsSnapshot.max_insight_calls_per_invocation,
+    metric_snapshots: boundedThreadsSnapshot.metric_snapshots,
     evaluator_version: performanceEvaluation.evaluator_version ?? null,
     maturity_scores_upserted: Number(performanceEvaluation.maturity_scores_upserted ?? 0),
     evidence_records: Number(performanceEvaluation.evidence_records ?? 0),
@@ -241,11 +243,11 @@ export async function constructOperatorManifestAutonomousCycle(
     strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
     consumption_contract: decisionIntelligence.consumption_contract ?? {},
   };
-  const accountPosition = await dependencies.buildAccountPosition({
+    const accountPosition = await dependencies.buildAccountPosition({
     targetSlots,
     coverage,
     clock,
-    threadsSnapshot,
+    threadsSnapshot: boundedThreadsSnapshot,
     deliveryReconciliation,
   });
 
@@ -363,9 +365,9 @@ export async function constructOperatorManifestAutonomousCycle(
       maturity_refresh: {
         ...rollingMaturityRefresh,
         collection_source: "autonomous_prepare",
-        due_checkpoint_post_count: threadsSnapshot.due_checkpoint_post_count,
-        due_checkpoint_count: threadsSnapshot.due_checkpoint_count,
-        metric_snapshots: threadsSnapshot.metric_snapshots,
+                due_checkpoint_post_count: boundedThreadsSnapshot.due_checkpoint_post_count,
+        due_checkpoint_count: boundedThreadsSnapshot.due_checkpoint_count,
+        metric_snapshots: boundedThreadsSnapshot.metric_snapshots,
         evaluator_version: performanceEvaluation.evaluator_version ?? null,
         maturity_scores_upserted: Number(performanceEvaluation.maturity_scores_upserted ?? 0),
       },
