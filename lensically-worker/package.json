@@ -1,32 +1,34 @@
 {
-	"name": "lensically-worker",
-	"version": "0.0.0",
-	"private": true,
-	"scripts": {
-						"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-				"start": "wrangler dev",
-		"architecture:baseline": "node scripts/worker-architecture-baseline.mjs",
-				"database:authority": "node scripts/validate-database-authority.mjs",
-		"database:migrations:check": "node scripts/d1-migration-release.mjs --check",
-		"database:migrations:test": "node scripts/test-d1-migration-release.mjs",
-				"database:backfills:test": "node scripts/test-d1-backfill-runner.mjs",
-		"cron:release:check": "node scripts/cron-release.mjs --check --config wrangler.jsonc",
-		"cron:release:test": "node scripts/test-cron-release.mjs",
-		"threads:token": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1",
-		"threads:token:vectrix": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1 -AccountSecretName THREADS_TOKEN_VECTRIX",
-		"test": "vitest",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.12.21",
-		"@types/node": "^25.4.0",
-		"typescript": "^5.5.2",
-		"vitest": "~3.2.0",
-		"wrangler": "^4.72.0"
-	},
-	"dependencies": {
-		"bcryptjs": "^3.0.3",
-		"resend": "^6.9.3"
-	}
+  "name": "lensically-worker",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "architecture:baseline": "node scripts/worker-architecture-baseline.mjs",
+    "database:authority": "node scripts/validate-database-authority.mjs",
+    "database:migrations:check": "node scripts/d1-migration-release.mjs --check",
+    "database:migrations:test": "node scripts/test-d1-migration-release.mjs",
+    "database:backfills:test": "node scripts/test-d1-backfill-runner.mjs",
+    "cron:release:check": "node scripts/cron-release.mjs --check --config wrangler.jsonc",
+    "cron:release:test": "node scripts/test-cron-release.mjs",
+    "release:acceptance:check": "node scripts/validate-release-acceptance.mjs",
+    "release:acceptance:test": "node scripts/test-release-acceptance.mjs",
+    "threads:token": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1",
+    "threads:token:vectrix": "powershell -ExecutionPolicy Bypass -File ./scripts/set-threads-token-everywhere.ps1 -AccountSecretName THREADS_TOKEN_VECTRIX",
+    "test": "vitest",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@types/node": "^25.4.0",
+    "typescript": "^5.5.2",
+    "vitest": "~3.2.0",
+    "wrangler": "^4.72.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "resend": "^6.9.3"
+  }
 }
