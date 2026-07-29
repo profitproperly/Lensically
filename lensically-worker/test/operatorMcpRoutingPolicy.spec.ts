@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
     MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS,
   admitOperatorRuntimeToolCall,
