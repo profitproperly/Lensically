@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6av-published-post-lineage-recovery-service
-repository_base_sha: d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7
-production_sha: d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7
+active_checkpoint: stage-6aw-account-directory-read-service
+repository_base_sha: 1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9
+production_sha: 1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AV published-post lineage recovery service extraction.
+- Current checkpoint: Stage 6AW account directory read service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1209,19 +1209,30 @@ Completed checkpoint — Stage 6AU account post-results lineage service extracti
 - Hardened exact-SHA release and live verification passed in run `30417796141`.
 - Live production independently confirmed exact SHA `d39dc2bd57c6e8b5ff2da0c5d382a039b9680ff7` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AV published-post lineage recovery service extraction:
+Completed checkpoint — Stage 6AV published-post lineage recovery service extraction:
 
-Extend the published-post lineage product-service cluster to own `recover_published_post_lineage` orchestration while preserving:
+- Extended `src/operatorPublishedPostLineageAuditService.ts` with `recoverOperatorPublishedPostLineage` as the deterministic authority for compatibility identity normalization, the Manifest all-missing-source-cards bridge, fallback operation identity, bounded internal dispatch, HTTP-status coercion, compatibility response composition, and normal recovery delegation.
+- Reduced `recover_published_post_lineage` in `src/index.ts` to canonical brand identity, request-scoped internal dispatch, the existing recovery persistence helper, clock, shared normalization, the Manifest minimum-likes constant, and HTTP transport.
+- Extended `test/operatorPublishedPostLineageAuditService.spec.ts` atomically with workflow-session and source-card-title bridge coverage, deterministic fallback identity, invalid-status coercion, normal recovery delegation, and non-Manifest isolation.
+- Added permanent handler-scoped ownership gates for recovery routing and bridge composition.
+- Focused validation passed in run `30418125978`.
+- Push validation passed in run `30418115834`.
+- All eight Operator shards passed in run `30418357850`.
+- Hardened exact-SHA release and live verification passed in run `30418424779`.
+- Live production independently confirmed exact SHA `1e6dc4a52d12a6109fbf541d7917e0e474e9b6d9` with 75/75 public tools.
 
-- compatibility workflow-session and source-card-title normalization
-- the Manifest all-missing-source-cards compatibility bridge
-- deterministic bridge operation identity fallback and exact batch-operation suffix
-- bounded internal dispatch to `create_all_missing_manifest_source_cards`
-- exact HTTP-status coercion and compatibility-bridge response field
-- normal recovery delegation with canonical minimum verified likes
-- exact normal recovery payload and status mapping
+ACTIVE checkpoint — Stage 6AW account directory read service extraction:
 
-Keep canonical brand identity, request-scoped internal tool dispatch, the existing recovery persistence helper, clock, shared text normalization, the Manifest minimum-likes constant, and HTTP transport explicit at the `index.ts` boundary. Extend `operatorPublishedPostLineageAuditService.ts` and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+Extend the account read-service cluster to own `list_accounts` response construction while preserving:
+
+- canonical account directory retrieval
+- exact `accounts` response key
+- autonomous operating-mode declaration
+- the complete human-free autonomy contract in the response
+- read-only behavior without requiring a selected brand
+
+Keep account-directory persistence retrieval, the source-controlled autonomy contract, and HTTP transport explicit at the `index.ts` boundary. Extend `operatorAccountStateService.ts` and its direct regression suite atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1268,7 +1279,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AV
+6. Product-service extraction — ACTIVE at Stage 6AW
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
