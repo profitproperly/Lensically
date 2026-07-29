@@ -183,7 +183,8 @@ for (const [index, testFiles] of completeTestGroups.entries()) {
   durations.push(run(`complete-test-inventory-${index + 1}/${completeTestGroups.length}`, process.execPath, [
     vitestCli,
     "--run",
-    ...testFiles,
+        ...testFiles,
+    "--no-file-parallelism",
     "--reporter=dot",
     "--bail=1",
   ]));
