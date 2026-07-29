@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-6ap-scheduled-post-edit-mutation-service
-repository_base_sha: 1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd
-production_sha: 1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd
+active_checkpoint: stage-6aq-owner-approved-batch-scheduling-service
+repository_base_sha: faddce8ece7915044916eb5d9ae5ad24e4b59b6c
+production_sha: faddce8ece7915044916eb5d9ae5ad24e4b59b6c
 
 
 
@@ -34,7 +34,7 @@ This is the sole authoritative continuation source for all Lensically work. Fres
 ### 10 — ACTIVE — `worker-monolith-refactor`
 
 - Objective: complete the audited staged cleanup and modularization of `lensically-worker/src/index.ts` while preserving production behavior, autonomous operation, scheduling, publishing, analytics, lineage, intelligence, and exact-SHA release safety.
-- Current checkpoint: Stage 6AP scheduled-post edit mutation service extraction.
+- Current checkpoint: Stage 6AQ owner-approved batch scheduling service extraction.
 - Remaining dependency chain: finish Stage 6 product-service extraction, then Stage 7 router/runtime composition, Stage 8 test/release modernization, and Stage 9 final comparison, cleanup, validation, and production release.
 - Completion condition: all nine stages are complete, the final exact SHA is released and independently live-verified, and this ledger advances the next queued job.
 
@@ -1130,19 +1130,33 @@ Completed checkpoint — Stage 6AO scheduled-post retry service extraction:
 - Hardened exact-SHA release and live verification passed in run `30413323414`; older duplicate release `30413321364` was safely cancelled.
 - Live production independently confirmed exact SHA `1bc2c6f0a35da2ad7bd3cd0d9e8798645f6352dd` with 75/75 public tools.
 
-ACTIVE checkpoint — Stage 6AP scheduled-post edit mutation service extraction:
+Completed checkpoint — Stage 6AP scheduled-post edit mutation service extraction:
 
-Extract the deterministic non-retry branch of `edit_scheduled_post` into a focused dependency-injected service while preserving:
+- Added `src/operatorScheduledPostEditMutationService.ts` as the dependency-injected authority for supplied-property detection, edit normalization, workspace-timezone fallback, protected update orchestration, exact failure mapping, linked-draft lineage retrieval, scheduled inventory intent, and exact success response composition.
+- Reduced the non-retry branch of `edit_scheduled_post` in `src/index.ts` to scheduled-post ID admission, canonical app/account/Threads/brand identity, the protected update helper, linked-draft D1 retrieval, spoiler and strategy parsing, inventory persistence, shared normalizers, and HTTP transport.
+- Added `test/operatorScheduledPostEditMutationService.spec.ts`, both workflow lanes, and permanent handler-scoped ownership gates.
+- An interrupted split write briefly committed the service before its direct regression test; mapped validation run `30413596173` blocked the incomplete commit, and completed follow-up push run `30413665512` passed after the test landed.
+- Permanent prevention: every new extracted service and its direct regression test must be created in the same atomic patch set; never commit a service-only intermediate head.
+- Focused validation passed in run `30414284864`.
+- Push validation passed in run `30414276188`.
+- All eight Operator shards passed in run `30414496587`.
+- Hardened exact-SHA release and live verification passed in run `30414551045`.
+- Live production independently confirmed exact SHA `faddce8ece7915044916eb5d9ae5ad24e4b59b6c` with 75/75 public tools.
 
-- property-presence detection for text, date, time, spoiler-all-text, and spoiler phrases
-- normalization of supplied values plus the canonical workspace timezone fallback
-- one protected scheduled-post update-helper invocation with canonical app and Threads identity
-- exact update-failure status and error response mapping
-- account-scoped linked-draft retrieval after a successful update
-- scheduled-post inventory persistence intent using updated text, linked source-card identity, parsed linked strategy, and deterministic edit analysis
-- exact success response for the updated post, linked-draft update count, and linked draft ID
+ACTIVE checkpoint — Stage 6AQ owner-approved batch scheduling service extraction:
 
-Keep scheduled-post ID admission, the protected update helper, linked-draft SQL, inventory persistence, canonical app/account/Threads/brand identity, spoiler parsing, persisted strategy parsing, shared normalizers, and HTTP transport explicit at the `index.ts` boundary. Add deterministic tests and permanent handler-scoped ownership gates before exact-SHA release.
+Extract the deterministic `schedule_owner_approved_batch` planning and orchestration logic into a focused dependency-injected service while preserving:
+
+- owner-approval, timezone, and bounded-post-list normalization
+- exact missing-input admission response
+- the Manifest lineage-preserving scheduling prohibition and exact response contract
+- per-item object admission, text/date/time normalization, ISO-date and 24-hour-time validation
+- sequential scheduling with exact partial-progress failure responses
+- exact scheduled-item accumulation and response composition
+- strategy-memory persistence intent using canonical batch metadata and scheduled-post IDs
+
+Keep canonical app/account/Threads/brand identity, the scheduled-post creation helper, strategy-memory persistence, shared text and JSON normalizers, date/time validators, workspace timezone, and HTTP transport explicit at the `index.ts` boundary. Add the service and its direct regression test atomically, then add permanent handler-scoped ownership gates before exact-SHA release.
+
 
 
 
@@ -1183,7 +1197,7 @@ Remaining work after this checkpoint:
 ### Active job — `worker-monolith-refactor`
 
 5. MCP modularization — COMPLETE AND DEPLOYED
-6. Product-service extraction — ACTIVE at Stage 6AP
+6. Product-service extraction — ACTIVE at Stage 6AQ
 7. Router and runtime composition — QUEUED AFTER STAGE 6
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
@@ -1226,7 +1240,7 @@ None currently recorded.
 5. Resume only the one `ACTIVE` job and its one `Current Action`; do not restart completed checkpoints or promote a queued/captured item.
 6. Treat D1 work state, action-closure receipts, chat history, Growth Mission records, and other documents as evidence or telemetry only.
 7. Do not generate, schedule, delete, or publish posts during Worker engineering unless the owner explicitly requests it.
-8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume. After any client-side safety block, transport interruption, concurrent-writer evidence, or ambiguous mutation response, reconcile repository HEAD and engineering-audit state before retrying; never assume the mutation was not invoked or that the prior head is still current. When identical commands exist in multiple workflow lanes, use lane-specific surrounding context so every atomic replacement matches exactly once. Ownership-return gates must be scoped to the exact handler body or use repository-verified unique fragments, never global shared normalization or response fields that can legitimately remain elsewhere in `index.ts`; verify uniqueness before committing the gate.
+8. On any block: stop, fix the root cause, add prevention or regression coverage, then resume. After any client-side safety block, transport interruption, concurrent-writer evidence, or ambiguous mutation response, reconcile repository HEAD and engineering-audit state before retrying; never assume the mutation was not invoked or that the prior head is still current. When identical commands exist in multiple workflow lanes, use lane-specific surrounding context so every atomic replacement matches exactly once. Ownership-return gates must be scoped to the exact handler body or use repository-verified unique fragments, never global shared normalization or response fields that can legitimately remain elsewhere in `index.ts`; verify uniqueness before committing the gate. Create every new extracted service and its direct regression test in the same atomic patch set; never commit a service-only intermediate head.
 9. Validate and release each bounded implementation checkpoint independently before moving to the next.
 10. Rewrite this file after every meaningful checkpoint, accepted new job, precedence change, completion, or verified interrupt.
 
