@@ -968,7 +968,7 @@ if (operatorGateDraftExecutionRuntimeShell.includes('if (toolName === "run_gates
   lifecycleErrors.push("operator_gate_draft_execution_runtime_dispatch_returned_to_index");
 }
 const operatorScheduledListDispatchStart = source.indexOf(
-  'if (toolName === "list_scheduled_posts")',
+  "const listScheduledPostsHandler = async",
   operatorActiveGateDispatchStart,
 );
 const operatorGateMemoryRuntimeShell = operatorActiveGateDispatchStart >= 0
@@ -989,6 +989,33 @@ if (operatorGateMemoryRuntimeShell.includes('if (toolName === "list_active_gates
     || operatorGateMemoryRuntimeShell.includes('if (toolName === "list_strategy_memory")')
     || operatorGateMemoryRuntimeShell.includes('if (toolName === "save_strategy_memory")')) {
   lifecycleErrors.push("operator_gate_memory_runtime_dispatch_returned_to_index");
+}
+const operatorSchedulingResultsDispatchEnd = source.indexOf(
+  'return operatorJsonResponse({ success: false, error: "unknown_operator_tool"',
+  operatorScheduledListDispatchStart,
+);
+const operatorSchedulingResultsRuntimeShell = operatorScheduledListDispatchStart >= 0
+  && operatorSchedulingResultsDispatchEnd > operatorScheduledListDispatchStart
+  ? source.slice(operatorScheduledListDispatchStart, operatorSchedulingResultsDispatchEnd)
+  : "";
+if (!operatorSchedulingResultsRuntimeShell.includes("const listScheduledPostsHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("const deleteScheduledPostHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("const editScheduledPostHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("const scheduleOwnerApprovedBatchHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("const scheduleApprovedDraftHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("const getPostResultsHandler = async")
+    || !operatorSchedulingResultsRuntimeShell.includes("dispatchOperatorKeyedResponseTool(toolName, {")
+    || !operatorSchedulingResultsRuntimeShell.includes("get_post_results: getPostResultsHandler")
+    || !operatorSchedulingResultsRuntimeShell.includes("if (schedulingResultsRuntimeDispatch.handled)")) {
+  lifecycleErrors.push("operator_scheduling_results_runtime_dispatch_cutover_incomplete");
+}
+if (operatorSchedulingResultsRuntimeShell.includes('if (toolName === "list_scheduled_posts")')
+    || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "delete_scheduled_post")')
+    || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "edit_scheduled_post")')
+    || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "schedule_owner_approved_batch")')
+    || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "schedule_approved_draft")')
+    || operatorSchedulingResultsRuntimeShell.includes('if (toolName === "get_post_results")')) {
+  lifecycleErrors.push("operator_scheduling_results_runtime_dispatch_returned_to_index");
 }
 if (operatorToolAdmissionShell.includes("if (!isGptRequestAuthorized(request, env)")
     || operatorToolAdmissionShell.includes("const canonicalToolName = OPERATOR_MCP_ROUTING_POLICY.canonicalScopedToolName(toolName)")

@@ -13978,7 +13978,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
     return gateMemoryRuntimeDispatch.response;
   }
 
-                if (toolName === "list_scheduled_posts") {
+                  const listScheduledPostsHandler = async (): Promise<Response> => {
     const scheduledPostList = await readOperatorScheduledPostList({ payload }, {
       normalizeText: normalizeOperatorText,
       defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
@@ -13990,10 +13990,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         timezone,
       ),
     });
-    return operatorJsonResponse(scheduledPostList);
-  }
+        return operatorJsonResponse(scheduledPostList);
+  };
 
-        if (toolName === "delete_scheduled_post") {
+  const deleteScheduledPostHandler = async (): Promise<Response> => {
     const scheduledPostDeletion = await deleteOperatorScheduledPost({ payload }, {
       normalizeReasonCode: normalizeScheduledPostDeletionReasonCode,
       allowedReasonCodes: SCHEDULED_POST_DELETION_REASON_CODES,
@@ -14012,10 +14012,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         },
       ),
     });
-    return operatorJsonResponse(scheduledPostDeletion.body, scheduledPostDeletion.statusCode);
-  }
+        return operatorJsonResponse(scheduledPostDeletion.body, scheduledPostDeletion.statusCode);
+  };
 
-  if (toolName === "edit_scheduled_post") {
+  const editScheduledPostHandler = async (): Promise<Response> => {
     const scheduledPostId = Math.trunc(Number(payload.scheduled_post_id ?? 0));
     if (!Number.isInteger(scheduledPostId) || scheduledPostId <= 0) {
       return operatorJsonResponse({ success: false, error: "scheduled_post_id is required" }, 400);
@@ -14108,10 +14108,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         await insertOperatorInventory(env, inventory);
       },
     });
-    return operatorJsonResponse(scheduledPostEdit.body, scheduledPostEdit.statusCode);
-  }
+        return operatorJsonResponse(scheduledPostEdit.body, scheduledPostEdit.statusCode);
+  };
 
-  if (toolName === "schedule_owner_approved_batch") {
+  const scheduleOwnerApprovedBatchHandler = async (): Promise<Response> => {
         const ownerApprovedBatch = await scheduleOperatorOwnerApprovedBatch({
       payload,
       brandKey: brand.brand_key,
@@ -14147,10 +14147,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         });
       },
     });
-    return operatorJsonResponse(ownerApprovedBatch.body, ownerApprovedBatch.statusCode);
-  }
+        return operatorJsonResponse(ownerApprovedBatch.body, ownerApprovedBatch.statusCode);
+  };
 
-  if (toolName === "schedule_approved_draft") {
+  const scheduleApprovedDraftHandler = async (): Promise<Response> => {
         const approvedDraftSchedule = await scheduleOperatorApprovedDraft({
       payload,
       defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
@@ -14220,20 +14220,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         });
       },
     });
-    return operatorJsonResponse(approvedDraftSchedule.body, approvedDraftSchedule.statusCode);
-  }
+        return operatorJsonResponse(approvedDraftSchedule.body, approvedDraftSchedule.statusCode);
+  };
 
-                                
-
-  
-
-                            
-
-  
-
-  
-
-    if (toolName === "get_post_results") {
+  const getPostResultsHandler = async (): Promise<Response> => {
     const postResults = await readOperatorPostResults({
       brandKey: brand.brand_key,
       accountId: brand.account_id,
@@ -14397,9 +14387,20 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       randomUuid: () => crypto.randomUUID(),
       now: () => new Date().toISOString(),
     });
-    return operatorJsonResponse(postResults.body, postResults.status);
-  }
+        return operatorJsonResponse(postResults.body, postResults.status);
+  };
 
+  const schedulingResultsRuntimeDispatch = await dispatchOperatorKeyedResponseTool(toolName, {
+    list_scheduled_posts: listScheduledPostsHandler,
+    delete_scheduled_post: deleteScheduledPostHandler,
+    edit_scheduled_post: editScheduledPostHandler,
+    schedule_owner_approved_batch: scheduleOwnerApprovedBatchHandler,
+    schedule_approved_draft: scheduleApprovedDraftHandler,
+    get_post_results: getPostResultsHandler,
+  });
+  if (schedulingResultsRuntimeDispatch.handled) {
+    return schedulingResultsRuntimeDispatch.response;
+  }
 
   return operatorJsonResponse({ success: false, error: "unknown_operator_tool", tool_name: toolName }, 404);
 }
