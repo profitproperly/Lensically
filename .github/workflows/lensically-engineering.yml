@@ -49,7 +49,6 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-            
       - name: Checkout pushed head
         uses: actions/checkout@v4
         with:
@@ -59,7 +58,6 @@ jobs:
         id: push_scope
         shell: bash
         run: |
-                    
           set -euo pipefail
           deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty' || true)"
           if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
@@ -90,7 +88,6 @@ jobs:
           done < /tmp/lensically-changed-files.txt
           echo "full_validation=${full_validation}" >> "${GITHUB_OUTPUT}"
           echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
-                    
           cat /tmp/lensically-changed-files.txt
 
       - name: Setup Node
