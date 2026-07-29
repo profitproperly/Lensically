@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { planOperatorGateMutation } from "../src/operatorGateMutationPlanningService";
+import {
+  evaluateOperatorGates,
+  planOperatorGateMutation,
+} from "../src/operatorGateMutationPlanningService";
 
 function createDependencies() {
   const normalizeText = vi.fn((value: unknown, _maxLength: number) => {
@@ -203,8 +206,101 @@ describe("operator gate mutation planning", () => {
         gate_id: "gate-new",
         gate_key: "source_guard",
         active: true,
-        created_from_memory_id: null,
+                created_from_memory_id: null,
       },
     });
   });
 });
+
+describe("operator gate evaluation", () => {
+  const normalizeText = (value: unknown, maxLength: number): string | null => {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().slice(0, maxLength);
+    return normalized || null;
+  };
+  const normalizeMachineKey = (value: unknown, fallback = ""): string => {
+    if (typeof value !== "string") return fallback;
+    return value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
+  };
+  const normalizeStage = (value: unknown, fallback: "gate_evaluation") => (
+    typeof value === "string" && value.trim()
+      ? value.trim().toLowerCase()
+      : fallback
+  );
+
+  it("normalizes gate-evaluation input and preserves exact gate-engine results", async () => {
+    const gateResult = {
+      showable: true,
+      gate_results: [{ gate_key: "source_lock_gate", result: "pass" }],
+      blocking_failures: [],
+      warnings: [],
+    };
+    const runGates = vi.fn(async () => gateResult);
+    const draftAnalysis = { lane_key: "Money Reset", preserved_functions: ["payoff"] };
+    const modelGateResults = [{ gate_key: "model_quality", result: "pass" }];
+
+    const result = await evaluateOperatorGates({
+      payload: {
+        source_card_id: "  card-1  ",
+        draft_text: "  Draft body  ",
+        stage: "Gate_Evaluation",
+        content_type: "Mindset / Question",
+        draft_analysis: draftAnalysis,
+        model_gate_results: modelGateResults,
+      },
+    }, {
+      normalizeText,
+      normalizeStage,
+      normalizeMachineKey,
+      runGates,
+    });
+
+    expect(result).toBe(gateResult);
+    expect(runGates).toHaveBeenCalledWith({
+      sourceCardId: "card-1",
+      draftText: "Draft body",
+      stageScope: "gate_evaluation",
+      laneKey: "money_reset",
+      contentType: "mindset_question",
+      draftAnalysis,
+      modelGateResults,
+    });
+  });
+
+  it("preserves explicit lane precedence and rejects invalid structured surfaces", async () => {
+    const runGates = vi.fn(async () => ({
+      showable: false,
+      gate_results: [],
+      blocking_failures: [{ gate_key: "quality", result: "fail" }],
+      warnings: ["repair_required"],
+    }));
+
+    await evaluateOperatorGates({
+      payload: {
+        lane_key: "Direct Lane",
+        draft_analysis: ["not", "an", "object"],
+        model_gate_results: { gate_key: "not-an-array" },
+        source_card_id: 77,
+        draft_text: null,
+        stage: 9,
+        content_type: "",
+      },
+    }, {
+      normalizeText,
+      normalizeStage,
+      normalizeMachineKey,
+      runGates,
+    });
+
+    expect(runGates).toHaveBeenCalledWith({
+      sourceCardId: null,
+      draftText: null,
+      stageScope: "gate_evaluation",
+      laneKey: "direct_lane",
+      contentType: null,
+      draftAnalysis: null,
+      modelGateResults: null,
+    });
+  });
+});
+

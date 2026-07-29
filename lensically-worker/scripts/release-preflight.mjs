@@ -2062,18 +2062,33 @@ if (!operatorActiveGateReadServiceTests.includes("passes null scopes when option
     || !operatorActiveGateReadServiceTests.includes("normalizes every supplied scope and returns the exact gates response")) {
   lifecycleErrors.push("operator_active_gate_read_service_tests_incomplete");
 }
+const operatorGateEvaluationHandlerStart = source.indexOf('if (toolName === "run_gates") {');
+const operatorGateEvaluationHandlerEnd = source.indexOf(
+  'if (toolName === "submit_candidate_draft"',
+  operatorGateEvaluationHandlerStart,
+);
+const operatorGateEvaluationHandler = operatorGateEvaluationHandlerStart >= 0
+  && operatorGateEvaluationHandlerEnd > operatorGateEvaluationHandlerStart
+  ? source.slice(operatorGateEvaluationHandlerStart, operatorGateEvaluationHandlerEnd)
+  : "";
 if (!source.includes('from "./operatorGateMutationPlanningService"')
     || !source.includes("planOperatorGateMutation({")
+    || !source.includes("evaluateOperatorGates({ payload }, {")
     || !source.includes("loadMemory: async (memoryId)")
     || !source.includes("loadExistingGate: async ({ brandScope, gateKey, laneScope, contentTypeScope })")
     || !source.includes("createGateId: () => crypto.randomUUID()")
+    || !source.includes("runGates: (gateInput) => runOperatorGates(env, {")
     || !source.includes('if (gateMutation.mode === "update")')
     || !source.includes("return operatorJsonResponse(gateMutation.body)")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_import_or_binding_missing");
 }
 if (source.includes("let description = normalizeOperatorText(payload.description, 4000, true)")
     || source.includes("const gateKey = normalizeOperatorMachineKey(payload.gate_key)")
-    || source.includes("const gateId = existing?.id ?? crypto.randomUUID()")) {
+    || source.includes("const gateId = existing?.id ?? crypto.randomUUID()")
+    || operatorGateEvaluationHandler.includes("sourceCardId: normalizeOperatorText(payload.source_card_id")
+    || operatorGateEvaluationHandler.includes("draftText: normalizeOperatorText(payload.draft_text")
+    || operatorGateEvaluationHandler.includes("payload.lane_key ?? (payload.draft_analysis")
+    || operatorGateEvaluationHandler.includes("Array.isArray(payload.model_gate_results)")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_returned_to_index");
 }
 if (!operatorGateMutationPlanningService.includes("export async function planOperatorGateMutation")
@@ -2085,14 +2100,22 @@ if (!operatorGateMutationPlanningService.includes("export async function planOpe
     || !operatorGateMutationPlanningService.includes('createdFrom = "strategy_memory"')
     || !operatorGateMutationPlanningService.includes('mode: existing?.id ? "update" : "insert"')
     || !operatorGateMutationPlanningService.includes("sourceMemoryIdsJson")
-    || !operatorGateMutationPlanningService.includes("created_from_memory_id")) {
+    || !operatorGateMutationPlanningService.includes("created_from_memory_id")
+    || !operatorGateMutationPlanningService.includes("export async function evaluateOperatorGates")
+    || !operatorGateMutationPlanningService.includes("dependencies.normalizeText(payload.source_card_id")
+    || !operatorGateMutationPlanningService.includes("dependencies.normalizeStage(payload.stage")
+    || !operatorGateMutationPlanningService.includes("payload.lane_key ?? draftAnalysis?.lane_key")
+    || !operatorGateMutationPlanningService.includes("Array.isArray(payload.model_gate_results)")
+    || !operatorGateMutationPlanningService.includes("return dependencies.runGates({")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_module_incomplete");
 }
 if (!operatorGateMutationPlanningServiceTests.includes("returns memory_not_found for an invalid promotion ID before gate lookup")
     || !operatorGateMutationPlanningServiceTests.includes("returns memory_not_found when the account-scoped promotion source is absent")
     || !operatorGateMutationPlanningServiceTests.includes("returns the exact required-fields rejection before identity lookup")
     || !operatorGateMutationPlanningServiceTests.includes("uses promoted memory fallbacks and builds an exact update plan")
-    || !operatorGateMutationPlanningServiceTests.includes("builds a normalized account-scoped insert plan and exact response")) {
+    || !operatorGateMutationPlanningServiceTests.includes("builds a normalized account-scoped insert plan and exact response")
+    || !operatorGateMutationPlanningServiceTests.includes("normalizes gate-evaluation input and preserves exact gate-engine results")
+    || !operatorGateMutationPlanningServiceTests.includes("preserves explicit lane precedence and rejects invalid structured surfaces")) {
   lifecycleErrors.push("operator_gate_mutation_planning_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorStrategyMemoryListReadService"')

@@ -147,7 +147,10 @@ import {
   planOperatorDraftDecision,
 } from "./operatorDraftDecisionService";
 import { readOperatorActiveGates } from "./operatorActiveGateReadService";
-import { planOperatorGateMutation } from "./operatorGateMutationPlanningService";
+import {
+  evaluateOperatorGates,
+  planOperatorGateMutation,
+} from "./operatorGateMutationPlanningService";
 import { readOperatorStrategyMemoryList } from "./operatorStrategyMemoryListReadService";
 import {
   composeOperatorStrategyMemorySaveResponse,
@@ -14361,16 +14364,21 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
   }
 
-  if (toolName === "run_gates") {
-    const result = await runOperatorGates(env, {
-      brand,
-      sourceCardId: normalizeOperatorText(payload.source_card_id, 120, true),
-      draftText: normalizeOperatorText(payload.draft_text, 20000, true),
-      stageScope: normalizeOperatorStage(payload.stage, "gate_evaluation"),
-      laneKey: normalizeOperatorMachineKey(payload.lane_key ?? (payload.draft_analysis as Record<string, unknown> | undefined)?.lane_key, "") || null,
-      contentType: normalizeOperatorMachineKey(payload.content_type, "") || null,
-      draftAnalysis: payload.draft_analysis && typeof payload.draft_analysis === "object" && !Array.isArray(payload.draft_analysis) ? payload.draft_analysis as Record<string, unknown> : null,
-      modelGateResults: Array.isArray(payload.model_gate_results) ? payload.model_gate_results as Array<Record<string, unknown>> : null,
+    if (toolName === "run_gates") {
+    const result = await evaluateOperatorGates({ payload }, {
+      normalizeText: normalizeOperatorText,
+      normalizeStage: normalizeOperatorStage,
+      normalizeMachineKey: normalizeOperatorMachineKey,
+      runGates: (gateInput) => runOperatorGates(env, {
+        brand,
+        sourceCardId: gateInput.sourceCardId,
+        draftText: gateInput.draftText,
+        stageScope: gateInput.stageScope,
+        laneKey: gateInput.laneKey,
+        contentType: gateInput.contentType,
+        draftAnalysis: gateInput.draftAnalysis,
+        modelGateResults: gateInput.modelGateResults,
+      }),
     });
     return operatorJsonResponse(result);
   }

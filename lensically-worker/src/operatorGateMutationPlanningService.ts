@@ -141,9 +141,57 @@ export async function planOperatorGateMutation<TBrand, TStage>(
       gate_id: gateId,
       gate_key: gateKey,
       active: payload.active !== false,
-      created_from_memory_id: toolName === "promote_memory_to_gate"
+            created_from_memory_id: toolName === "promote_memory_to_gate"
         ? payload.memory_id ?? null
         : null,
     },
   };
 }
+
+export type OperatorGateEvaluationResult = {
+  showable: boolean;
+  gate_results: Record<string, unknown>[];
+  blocking_failures: Record<string, unknown>[];
+  warnings: string[];
+};
+
+export async function evaluateOperatorGates<TStage extends string>(
+  input: { payload: Record<string, unknown> },
+  dependencies: {
+    normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+    normalizeStage(value: unknown, fallback: "gate_evaluation"): TStage;
+    normalizeMachineKey(value: unknown, fallback?: string): string;
+    runGates(gateInput: {
+      sourceCardId: string | null;
+      draftText: string | null;
+      stageScope: TStage;
+      laneKey: string | null;
+      contentType: string | null;
+      draftAnalysis: Record<string, unknown> | null;
+      modelGateResults: Array<Record<string, unknown>> | null;
+    }): Promise<OperatorGateEvaluationResult>;
+  },
+): Promise<OperatorGateEvaluationResult> {
+  const payload = input.payload;
+  const draftAnalysis = payload.draft_analysis
+    && typeof payload.draft_analysis === "object"
+    && !Array.isArray(payload.draft_analysis)
+    ? payload.draft_analysis as Record<string, unknown>
+    : null;
+
+  return dependencies.runGates({
+    sourceCardId: dependencies.normalizeText(payload.source_card_id, 120, true),
+    draftText: dependencies.normalizeText(payload.draft_text, 20000, true),
+    stageScope: dependencies.normalizeStage(payload.stage, "gate_evaluation"),
+    laneKey: dependencies.normalizeMachineKey(
+      payload.lane_key ?? draftAnalysis?.lane_key,
+      "",
+    ) || null,
+    contentType: dependencies.normalizeMachineKey(payload.content_type, "") || null,
+    draftAnalysis,
+    modelGateResults: Array.isArray(payload.model_gate_results)
+      ? payload.model_gate_results as Array<Record<string, unknown>>
+      : null,
+  });
+}
+
