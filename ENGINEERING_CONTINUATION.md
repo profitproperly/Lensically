@@ -7,8 +7,8 @@ branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
 active_checkpoint: stage_9_final_comparison_cleanup_validation_release
-repository_base_sha: 5da4833915e212eebadaeaa2da16daa957d03930
-production_sha: 5da4833915e212eebadaeaa2da16daa957d03930
+repository_base_sha: a3fe743595efc8229125eaff399c8872fab6fde4
+production_sha: a3fe743595efc8229125eaff399c8872fab6fde4
 
 
 
