@@ -15,6 +15,7 @@
 - Before any Lensically continuation decision, call `getEngineeringContinuation`. Root `ENGINEERING_CONTINUATION.md` is the sole canonical ledger for every active, queued, and captured job, with explicit precedence and exactly one current action. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents are non-authoritative evidence only.
 - GitHub `main` is authoritative. Pull current source before local Codex work and preserve unrelated changes.
 - Read the target integration point before editing. Do not restore removed systems because old commits or stale documentation mention them.
+- A deployed MCP schema change that leaves the current chat holding an older closed schema is an expected client-refresh handoff, not a Lensically product blocker, engineering incident, or reason to design a compatibility workaround. Do not keep reading, invoke Recovery, weaken the new schema, add a bridge, or continue engineering around the stale chat. Report the completed work, exact deployed SHA and version, validation and live state, state that the current chat must refresh before further Main calls, stop the turn, and end with the exact standalone line: `refresh the lensically operator mode mcp now`.
 
 ## Repository Shape
 
