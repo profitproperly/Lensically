@@ -173,8 +173,9 @@ jobs:
           
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
+          
           node scripts/d1-migration-release.mjs --check
-                    node scripts/test-cron-release.mjs
+          node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/test-release-acceptance.mjs
           node scripts/validate-release-acceptance.mjs
@@ -276,8 +277,9 @@ jobs:
           
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
+          
           node scripts/d1-migration-release.mjs --check
-                    node scripts/test-cron-release.mjs
+          node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/test-release-acceptance.mjs
           node scripts/validate-release-acceptance.mjs
@@ -368,8 +370,9 @@ jobs:
           
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
+          
           node scripts/d1-migration-release.mjs --check
-                    node scripts/test-cron-release.mjs
+          node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/test-release-acceptance.mjs
           node scripts/validate-release-acceptance.mjs
@@ -574,8 +577,9 @@ jobs:
           
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
+          
           node scripts/d1-migration-release.mjs --check
-                    node scripts/test-cron-release.mjs
+          node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
           node scripts/test-release-acceptance.mjs
           node scripts/validate-release-acceptance.mjs
