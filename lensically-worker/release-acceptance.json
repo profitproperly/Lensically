@@ -1,0 +1,244 @@
+{
+  "version": "lensically-release-acceptance-v1",
+  "status": "accepted",
+  "accepted_at": "2026-07-29T09:11:00Z",
+  "timing_evidence": [
+    {
+      "id": "routine-worker-validation",
+      "category": "routine_worker_validation",
+      "mode": "bounded",
+      "target_seconds": 60,
+      "measured_seconds": 14,
+      "run_id": 30438341493,
+      "job_id": 90531351004,
+      "commit_sha": "53863c243cf90e8370d2e49fe637b5f17e344909",
+      "started_at": "2026-07-29T09:07:41.1488244Z",
+      "completed_at": "2026-07-29T09:07:54.5950027Z",
+      "conclusion": "success",
+      "proof": "Exact-SHA typecheck, lifecycle, focused validation, and release-contract gates."
+    },
+    {
+      "id": "routine-worker-deployment",
+      "category": "routine_worker_deployment",
+      "mode": "bounded",
+      "target_seconds": 60,
+      "measured_seconds": 26,
+      "run_id": 30438059467,
+      "job_id": 90530462587,
+      "commit_sha": "c0d768f3cc728c746eb4f6cd6afa1c5a64de4b37",
+      "started_at": "2026-07-29T09:03:58.9084311Z",
+      "completed_at": "2026-07-29T09:04:24.1311507Z",
+      "conclusion": "success",
+      "proof": "Trigger-neutral routine Worker release with web, migration, and schedule reconciliation skipped."
+    },
+    {
+      "id": "validated-web-artifact-release",
+      "category": "ordinary_web_release",
+      "mode": "bounded",
+      "target_seconds": 120,
+      "measured_seconds": 49,
+      "run_id": 30434835071,
+      "job_id": 90520038810,
+      "commit_sha": "8931e04a39e8a7a5a724b73e8b71294135a87a64",
+      "started_at": "2026-07-29T08:16:13.0754049Z",
+      "completed_at": "2026-07-29T08:17:01.7924876Z",
+      "conclusion": "success",
+      "proof": "Downloaded, verified, restored, and deployed the exact validated web artifact; fallback install and rebuild stayed skipped."
+    },
+    {
+      "id": "small-migration-release",
+      "category": "small_migration_release",
+      "mode": "bounded",
+      "target_seconds": 120,
+      "measured_seconds": 42,
+      "run_id": 30436590783,
+      "job_id": 90525667546,
+      "commit_sha": "1d2ce90c63318df034486c07e127e5a506cb3973",
+      "started_at": "2026-07-29T08:42:37.7904834Z",
+      "completed_at": "2026-07-29T08:43:19.4699152Z",
+      "conclusion": "success",
+      "proof": "Exact production-relative plan, plan-bound apply, exact ledger verification, Worker deploy, and live verification."
+    },
+    {
+      "id": "wrangler-cron-reconciliation",
+      "category": "wrangler_cron_release",
+      "mode": "bounded",
+      "target_seconds": 120,
+      "measured_seconds": 22,
+      "run_id": 30438473242,
+      "job_id": 90531781489,
+      "commit_sha": "53863c243cf90e8370d2e49fe637b5f17e344909",
+      "started_at": "2026-07-29T09:09:35.1203504Z",
+      "completed_at": "2026-07-29T09:09:56.4858260Z",
+      "conclusion": "success",
+      "proof": "Trigger-neutral deploy plus exact schedule comparison returned action=unchanged and issued no update."
+    },
+    {
+      "id": "workflow-infrastructure-lint",
+      "category": "workflow_infrastructure",
+      "mode": "bounded",
+      "target_seconds": 120,
+      "measured_seconds": 4,
+      "run_id": 30437405901,
+      "job_id": 90528284308,
+      "commit_sha": "bb8c43aa03f9a83bf903206333d7e8d882f5894f",
+      "started_at": "2026-07-29T08:54:35.8872680Z",
+      "completed_at": "2026-07-29T08:54:39.7750553Z",
+      "conclusion": "success",
+      "proof": "Dedicated raw indentation, YAML parse, schema, and structural workflow validation."
+    },
+    {
+      "id": "broad-architecture-milestone",
+      "category": "broad_architecture_milestone",
+      "mode": "bounded",
+      "target_seconds": 300,
+      "measured_seconds": 115,
+      "run_id": 30438165230,
+      "job_id": 90530776341,
+      "commit_sha": "53863c243cf90e8370d2e49fe637b5f17e344909",
+      "started_at": "2026-07-29T09:05:17Z",
+      "completed_at": "2026-07-29T09:07:12Z",
+      "conclusion": "success",
+      "proof": "Complete push validation after a release-infrastructure milestone."
+    },
+    {
+      "id": "large-backfill-governance",
+      "category": "large_migration_or_backfill",
+      "mode": "actual_database_work",
+      "contract_path": "scripts/run-d1-backfill.mjs",
+      "receipt_tables": [
+        "lensically_backfill_runs",
+        "lensically_backfill_batch_receipts"
+      ],
+      "proof": "Duration is governed by measured database work, bounded batches, durable cursors, resumability, and explicit-only execution rather than an arbitrary wall-clock target."
+    }
+  ],
+  "source_assertions": [
+    {
+      "id": "validated-web-artifact-reuse",
+      "path": "../.github/workflows/lensically-engineering.yml",
+      "all_of": [
+        "Upload exact validated web artifact",
+        "Download exact validated web artifact",
+        "Restore exact validated web artifact",
+        "Build fallback exact-head web product",
+        "use_validated_artifact"
+      ]
+    },
+    {
+      "id": "planned-migration-release",
+      "path": "../.github/workflows/lensically-engineering.yml",
+      "all_of": [
+        "Plan exact-head database migrations",
+        "Apply exact planned database migrations",
+        "Verify exact production migration ledger",
+        "d1-migration-release.mjs --plan-remote",
+        "d1-migration-release.mjs --apply-remote",
+        "d1-migration-release.mjs --verify-remote"
+      ],
+      "none_of": [
+        "run: npx wrangler d1 migrations apply",
+        "lensically-worker/migrations/*"
+      ]
+    },
+    {
+      "id": "trigger-neutral-cron-ownership",
+      "path": "../.github/workflows/lensically-engineering.yml",
+      "all_of": [
+        "Prepare trigger-neutral Worker deploy config",
+        "--config wrangler.release.generated.json",
+        "Reconcile exact Wrangler cron schedule",
+        "schedule_contract_changed == 'true'"
+      ],
+      "none_of": [
+        "outputs.cron_changed",
+        "workers/scripts/lensically-worker/schedules"
+      ]
+    },
+    {
+      "id": "broad-suite-deduplication",
+      "path": "../.github/workflows/lensically-engineering.yml",
+      "regex_counts": [
+        {
+          "pattern": "node scripts/run-full-validation\\.mjs --check",
+          "count": 4
+        },
+        {
+          "pattern": "node scripts/run-full-validation\\.mjs(?:\\r?\\n|$)",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "complete-fallback-preserved",
+      "path": "../.github/workflows/lensically-engineering.yml",
+      "all_of": [
+        "full_release=true",
+        "Validated web artifact lookup failed; complete fallback remains required.",
+        "steps.release_scope.outputs.full_release == 'true'",
+        "steps.web_release_path.outputs.use_validated_artifact != 'true'"
+      ]
+    },
+    {
+      "id": "fast-workflow-structural-lint",
+      "path": "../.github/workflows/lensically-workflow-lint.yml",
+      "all_of": [
+        "validate-engineering-workflow.rb",
+        "Parse and validate engineering workflow"
+      ]
+    },
+    {
+      "id": "canonical-migration-authority",
+      "path": "scripts/d1-migration-release.mjs",
+      "all_of": [
+        "migration_production_ledger_not_exact_prefix",
+        "migration_applied_file_edited",
+        "migration_plan_identity_changed",
+        "migration_backfill_forbidden_in_normal_directory"
+      ]
+    },
+    {
+      "id": "legacy-migration-planner-retired",
+      "path": "scripts/plan-d1-migration-release.mjs",
+      "all_of": [
+        "LEGACY_MIGRATION_PLANNER_STATUS = \"retired\"",
+        "CANONICAL_MIGRATION_PLANNER = \"scripts/d1-migration-release.mjs\"",
+        "legacy_migration_planner_retired"
+      ],
+      "none_of": [
+        "planMigrationRelease",
+        "wrangler d1 migrations",
+        "migration_release_policy_missing"
+      ]
+    },
+    {
+      "id": "large-backfill-explicit-only",
+      "path": "scripts/run-d1-backfill.mjs",
+      "all_of": [
+        "execution_mode !== \"explicit_only\"",
+        "backfill_explicit_confirmation_mismatch",
+        "lensically_backfill_runs",
+        "lensically_backfill_batch_receipts"
+      ]
+    },
+    {
+      "id": "validation-plan-self-check",
+      "path": "scripts/run-full-validation.mjs",
+      "all_of": [
+        "full_validation_duplicate_files",
+        "full_validation_batch_partition_invalid",
+        "operator-milestone-acceptance",
+        "total_duration_ms"
+      ]
+    }
+  ],
+  "known_non_authoritative_signals": [
+    {
+      "name": "Workers Builds: lensically-worker",
+      "provider": "Cloudflare Workers and Pages GitHub app",
+      "state": "failed_without_actionable_logs",
+      "authority": "non_authoritative",
+      "reason": "Controlled exact-SHA GitHub Actions release, live MCP version, scheduler, runtime, retained website, and database verification are the release source of truth."
+    }
+  ]
+}
