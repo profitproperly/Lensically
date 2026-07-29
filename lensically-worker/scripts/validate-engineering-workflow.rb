@@ -97,10 +97,18 @@ abort("release_fallback_preflight_missing") unless release_gate_run.include?("no
 abort("release_fallback_typecheck_missing") unless release_gate_run.include?("npx tsc --noEmit")
 abort("release_migration_contract_tests_missing") unless release_gate_run.include?("node scripts/test-d1-migration-release.mjs") && release_gate_run.include?("node scripts/test-d1-backfill-runner.mjs") && release_gate_run.include?("node scripts/d1-migration-release.mjs --check")
 
-migration_plan = step_run(jobs, "worker-release", "Plan exact-head database migrations")
-abort("release_migration_plan_missing") unless migration_plan.include?("d1-migration-release.mjs --plan-remote") && migration_plan.include?("deployed_sha") && migration_plan.include?("/tmp/lensically-d1-migration-plan.json")
-migration_apply = step_run(jobs, "worker-release", "Apply exact planned database migrations")
+migration_plan_step = step_for(jobs, "worker-release", "Plan exact-head database migrations")
+migration_plan = migration_plan_step["run"].to_s
+migration_plan_production_sha = migration_plan_step.dig("env", "LENSICALLY_PRODUCTION_SHA").to_s
+abort("release_migration_plan_missing") unless migration_plan.include?("d1-migration-release.mjs --plan-remote") && migration_plan.include?("/tmp/lensically-d1-migration-plan.json")
+abort("release_migration_plan_production_sha_missing") unless migration_plan_production_sha.include?("steps.release_scope.outputs.deployed_sha")
+migration_apply_step = step_for(jobs, "worker-release", "Apply exact planned database migrations")
+migration_apply = migration_apply_step["run"].to_s
+migration_apply_production_sha = migration_apply_step.dig("env", "LENSICALLY_PRODUCTION_SHA").to_s
 abort("release_migration_apply_not_plan_bound") unless migration_apply.include?("d1-migration-release.mjs --apply-remote") && migration_apply.include?("--plan /tmp/lensically-d1-migration-plan.json")
+abort("release_migration_apply_production_sha_missing") unless migration_apply_production_sha.include?("steps.release_scope.outputs.deployed_sha")
+release_scope = step_run(jobs, "worker-release", "Resolve exact-SHA release scope")
+abort("release_scope_deployed_sha_output_missing") unless release_scope.include?('echo "deployed_sha=${deployed_sha}" >> "${GITHUB_OUTPUT}"')
 migration_verify = step_run(jobs, "worker-release", "Verify exact production migration ledger")
 abort("release_migration_verify_missing") unless migration_verify.include?("d1-migration-release.mjs --verify-remote")
 abort("direct_unplanned_migration_apply_returned") if source.include?("run: npx wrangler d1 migrations apply")
