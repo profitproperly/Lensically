@@ -6,9 +6,9 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
-active_checkpoint: stage-7c3-review-batch-claim-extraction
-repository_base_sha: db0afb7e284fcdc26ef4e96ea049838253f50737
-production_sha: db0afb7e284fcdc26ef4e96ea049838253f50737
+active_checkpoint: stage-7d1-workflow-context-source-routing
+repository_base_sha: 2f5acef79b9b32729a73ffcdf5509e19765afb7d
+production_sha: 2f5acef79b9b32729a73ffcdf5509e19765afb7d
 
 
 
@@ -1318,11 +1318,28 @@ Completed subcheckpoint — Stage 7C2 review-batch operations routing:
 - Exact-SHA release passed in run `30425989497`.
 - Live production independently confirmed exact SHA `db0afb7e284fcdc26ef4e96ea049838253f50737` with 75/75 public tools.
 
-ACTIVE subcheckpoint — Stage 7C3 review-batch claim extraction:
+Completed subcheckpoint — Stage 7C3 review-batch claim extraction:
 
-Move the complete inline `claim_manifest_review_batch` workflow into the review-batch state service behind explicit dependencies. Preserve Manifest-only admission, production-date validation, session creation, active-batch reuse and terminal retirement, source-batch draw and rollover, daily claim uniqueness, selection disposition, empty-batch behavior, workflow-stage progression, and serialized response metadata.
+- Moved the complete `claim_manifest_review_batch` workflow into `claimOperatorManifestReviewBatch` in `src/operatorManifestReviewBatchStateService.ts`.
+- Preserved Manifest-only admission, production-date validation, automatic session creation, active-batch idempotent reuse, terminal batch completion, source draw and rollover, bounded claim size, daily uniqueness, selection disposition, empty-batch failure, workflow progression, and response metadata.
+- Routed the claim through the reusable keyed runtime dispatcher with explicit D1 and platform adapters.
+- Added direct regressions for admission, idempotent reuse, terminal completion, bounded claims, source rollover, source failure, and empty-claim handling.
+- Added permanent lifecycle enforcement requiring service ownership and forbidding claim decision logic from returning to `index.ts`.
+- Push validation passed in run `30426517251`.
+- All eight Operator shards passed in run `30426535046`.
+- Exact-SHA release passed in run `30426656571`.
+- Live production independently confirmed exact SHA `2f5acef79b9b32729a73ffcdf5509e19765afb7d` with 75/75 public tools.
 
-Add direct service regressions and permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, and independent live verification. Stage 7C closes only after this extraction is released.
+Completed checkpoint — Stage 7C Account and review runtime dispatch composition:
+
+- Account, Lensically UI, review retirement, hourly coverage, review-batch read/attach/source-resolution/scheduling, and review-batch claim now use extracted runtime composition.
+- Product logic remains in its existing service owners; `handleOperatorTool` retains only explicit platform dependency wiring and ordered dispatcher fallthrough.
+
+ACTIVE checkpoint — Stage 7D1 workflow, context, board, and source-list routing:
+
+Route `start_workflow_session`, `admit_context`, `get_production_board`, `list_source_candidates`, and non-destructive `delete_saved_pattern_source` exclusion through the reusable keyed runtime dispatcher. Preserve service ownership, response ordering, D1 adapters, and the permanently retired destructive deletion path.
+
+Add permanent ownership enforcement, then run focused validation, all eight shards, exact-SHA release, independent live verification, and advance to the next Stage 7 runtime cluster.
 
 
 
@@ -1374,7 +1391,7 @@ Remaining work after this checkpoint:
 
 5. MCP modularization — COMPLETE AND DEPLOYED
 6. Product-service extraction — COMPLETE AND DEPLOYED
-7. Router and runtime composition — ACTIVE at Stage 7C
+7. Router and runtime composition — ACTIVE at Stage 7D
 8. Test and release modernization — QUEUED AFTER STAGE 7
 9. Final comparison and production release — QUEUED AFTER STAGE 8
 
