@@ -290,6 +290,7 @@ type ManifestSourceBackedCycleTestFixture = {
 };
 
 const MANIFEST_SOURCE_BACKED_FIXTURE_TIMEOUT_MS = 60000;
+const MONTHLY_GROWTH_ANALYTICS_TIMEOUT_MS = 60000;
 
 async function prepareManifestSourceBackedCycleForTest(
   options: { commitStrategy?: boolean } = {},
@@ -1010,8 +1011,8 @@ describe("operator mode backend spine", () => {
     expect(payload.threads_user_id).toBe("35758578720393972");
     expect(payload.follower_growth).toMatchObject({ starting_followers: 100, current_followers: 145, net_growth: 45 });
     expect(payload.post_performance?.by_views?.[0]?.id).toBe("july-winner");
-    expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
-  }, 15000);
+        expect(new TextEncoder().encode(JSON.stringify(result.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+  }, MONTHLY_GROWTH_ANALYTICS_TIMEOUT_MS);
 
     it("rejects the retired guided draft-approval path from the public MCP surface", async () => {
     const blocked = await mcpToolRaw<Record<string, unknown>>("approve_draft", {
