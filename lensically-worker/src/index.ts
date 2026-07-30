@@ -15043,9 +15043,10 @@ async function githubRepoApi(env: Env, path: string, init: RequestInit = {}): Pr
 
 async function githubRepoApiRetryable(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
   let result = await githubRepoApi(env, path, init);
-  if (![502, 503, 504].includes(result.status)) return result;
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  result = await githubRepoApi(env, path, init);
+  for (let attempt = 0; shouldRetryGithubMutationResponse(path, result, attempt); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, githubMutationRetryDelayMs(attempt)));
+    result = await githubRepoApi(env, path, init);
+  }
   return result;
 }
 
