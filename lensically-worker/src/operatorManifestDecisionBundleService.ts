@@ -178,7 +178,8 @@ export async function buildManifestDecisionBundle(
        ORDER BY datetime(updated_at) DESC LIMIT 20`,
     ).bind(input.brandKey).all<JsonRecord>(),
     db.prepare(
-      `SELECT id, version, strategy_hash, status, effective_from, created_at
+            `SELECT id, version, contract_version, strategy_hash, status,
+              source_cycle_id, created_at
        FROM operator_manifest_strategy_versions
        WHERE brand_key = ? AND status = 'active'
        ORDER BY version DESC LIMIT 1`,
