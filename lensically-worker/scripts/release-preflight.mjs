@@ -63,6 +63,8 @@ const operatorManifestPersistenceAdmissionService = read("src/operatorManifestPe
 const operatorManifestPersistenceAdmissionServiceTests = read("test/operatorManifestPersistenceAdmissionService.spec.ts");
 const operatorManifestPersistenceService = read("src/operatorManifestPersistenceService.ts");
 const operatorManifestPersistenceServiceTests = read("test/operatorManifestPersistenceService.spec.ts");
+const operatorManifestBatchPersistenceService = read("src/operatorManifestBatchPersistenceService.ts");
+const operatorManifestBatchPersistenceServiceTests = read("test/operatorManifestBatchPersistenceService.spec.ts");
 const operatorManifestScheduledReviewService = read("src/operatorManifestScheduledReviewService.ts");
 const operatorManifestScheduledReviewServiceTests = read("test/operatorManifestScheduledReviewService.spec.ts");
 const operatorManifestCycleObservationService = read("src/operatorManifestCycleObservationService.ts");
@@ -246,7 +248,8 @@ if (!fullValidationRunner.includes('contract: "lensically-full-validation-v1"')
         || !fullValidationRunner.includes('"test/operatorManifestShadowService.spec.ts"')
     || !fullValidationRunner.includes('"test/operatorRepositoryPatchSafety.spec.ts"')
         || !fullValidationRunner.includes('"test/operatorGithubMutationRetry.spec.ts"')
-    || !fullValidationRunner.includes('"test/operatorManifestDecisionBundleService.spec.ts"')
+        || !fullValidationRunner.includes('"test/operatorManifestDecisionBundleService.spec.ts"')
+    || !fullValidationRunner.includes('"test/operatorManifestBatchPersistenceService.spec.ts"')
     || !fullValidationRunner.includes('"test/operatorManifestPersistenceService.spec.ts"')
     || !fullValidationRunner.includes('"test/operatorScheduledPostEditMutationService.spec.ts"')
     || !fullValidationRunner.includes('"manifest-autonomous-cycle.test.ts"')
@@ -704,7 +707,7 @@ const lifecycleBaselineTools = new Set(capabilityLifecycle?.baseline?.active_too
 const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.directory_entry_ids ?? []);
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
-const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}\n${operatorManifestShadowRuntimeServiceTests}`;
+const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}\n${operatorManifestShadowRuntimeServiceTests}\n${operatorManifestBatchPersistenceServiceTests}`;
 const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpManifestShadowRegistry}\n${operatorMcpAutonomousExecutionRegistry}\n${operatorMcpAccountAnalyticsRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
@@ -1671,6 +1674,16 @@ if (!operatorManifestPersistenceService.includes("export async function persistO
     || !operatorManifestPersistenceService.includes("model_hard_ban_pass_evidence_required: false")
     || operatorManifestPersistenceService.includes("canonical_hard_ban_evaluation_incomplete")) {
   lifecycleErrors.push("operator_manifest_persistence_service_module_incomplete");
+}
+if (!operatorManifestBatchPersistenceService.includes("export async function persistOperatorManifestBatch")
+    || !operatorManifestBatchPersistenceService.includes("candidates.length < 1 || candidates.length > 4")
+    || !operatorManifestBatchPersistenceService.includes("deferCoverageReconciliation: true")
+    || !operatorManifestBatchPersistenceService.includes("reconciliation_count: 1")
+    || !operatorManifestBatchPersistenceService.includes("Regenerate only the rejected slots")
+    || !operatorManifestBatchPersistenceServiceTests.includes("persists successful siblings and reconciles coverage once for a bounded four-post batch")
+    || !operatorManifestBatchPersistenceServiceTests.includes("does not reconcile when every candidate is rejected")
+    || !operatorManifestBatchPersistenceServiceTests.includes("rejects batch sizes outside one through four before item persistence")) {
+  lifecycleErrors.push("operator_manifest_batch_persistence_service_incomplete");
 }
 if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate text before source and gate execution")
     || !operatorManifestPersistenceServiceTests.includes("executes canonical hard bans server-side without model-written pass evidence")
