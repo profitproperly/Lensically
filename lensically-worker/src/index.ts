@@ -11556,6 +11556,10 @@ async function persistManifestAutonomousPost(
   env: Env,
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
+  options: {
+    deferCoverageReconciliation?: boolean;
+    batchOperationId?: string;
+  } = {},
 ): Promise<Record<string, unknown>> {
   const admission = await admitOperatorManifestPersistence({
     brandKey: brand.brand_key,
