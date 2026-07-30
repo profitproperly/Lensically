@@ -185,7 +185,8 @@ export async function buildManifestDecisionBundle(
        ORDER BY version DESC LIMIT 1`,
     ).bind(input.brandKey).all<JsonRecord>(),
     db.prepare(
-      `SELECT missing_slots_json, account_position_json, input_strategy_version_id,
+            `SELECT missing_slots_json, account_position_json,
+              strategy_version_id AS input_strategy_version_id,
               exposure_snapshot_id, timezone, horizon_hours, updated_at
        FROM operator_autonomous_growth_cycles
        WHERE id = ? AND brand_key = ? LIMIT 1`,
