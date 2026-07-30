@@ -67,8 +67,7 @@ export interface OperatorManifestPersistenceAdmissionDependencies {
   normalizeMachineKey(value: unknown, fallback: string): string;
   readCycle(brandKey: string, cycleId: string): Promise<JsonRecord | null>;
   appendCycleEvent(input: JsonRecord): Promise<unknown>;
-  getCycleStrategy(cycleId: string, brandKey: string): Promise<JsonRecord | null>;
-  getEvidenceConsumption(cycleId: string, brandKey: string): Promise<JsonRecord>;
+    getCycleStrategy(cycleId: string, brandKey: string): Promise<JsonRecord | null>;
   validateHypothesis(value: unknown): { ok: boolean; value?: JsonRecord; errors?: unknown };
   normalizeSourceContext(value: unknown): { ok: boolean; value?: JsonRecord; errors?: unknown };
   validateFollowerBoundary(value: JsonRecord): { ok: boolean; errors?: unknown };
@@ -188,11 +187,10 @@ export async function admitOperatorManifestPersistence(
       }),
     };
   }
-  const evidenceConsumption = await dependencies.getEvidenceConsumption(cycleId, brandKey);
-  if (evidenceConsumption.complete !== true) {
+    if (!cycleStrategy.decision_bundle_id || !cycleStrategy.decision_bundle_hash) {
     return {
       handled: true,
-      response: await rejectPersist("manifest_analysis_pages_not_fully_consumed", evidenceConsumption),
+      response: await rejectPersist("manifest_consumed_decision_bundle_required"),
     };
   }
   if (!requestedCyclePlanItemId) {
