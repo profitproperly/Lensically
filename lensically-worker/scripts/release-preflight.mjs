@@ -31,6 +31,8 @@ const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyS
 const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegistry.ts");
 const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
 const operatorMcpManifestShadowRegistry = read("src/operatorMcpManifestShadowRegistry.ts");
+const operatorManifestShadowRuntimeService = read("src/operatorManifestShadowRuntimeService.ts");
+const operatorManifestShadowService = read("src/operatorManifestShadowService.ts");
 const operatorManifestShadowRuntimeServiceTests = read("test/operatorManifestShadowRuntimeService.spec.ts");
 const operatorMcpAutonomousExecutionRegistry = read("src/operatorMcpAutonomousExecutionRegistry.ts");
 const operatorMcpAutonomousExecutionRegistryTests = read("test/operatorMcpAutonomousExecutionRegistry.spec.ts");
@@ -782,6 +784,29 @@ if (!operatorMcpToolDirectoryTests.includes("preserves the exact 80-tool public 
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
 }
+if (!source.includes("snapshotDb: env.SHADOW_DB")
+    || source.includes("productionDb: env.DB,\n      shadowDb: env.SHADOW_DB")) {
+  lifecycleErrors.push("manifest_innovation_main_database_boundary_invalid");
+}
+if (!operatorMcpManifestShadowRegistry.includes('evidence_mode: { type: "string", enum: ["snapshot"]')
+    || operatorMcpManifestShadowRegistry.includes('enum: ["snapshot", "live_read"]')) {
+  lifecycleErrors.push("manifest_innovation_snapshot_only_schema_invalid");
+}
+if (operatorManifestShadowRuntimeService.includes("dependencies.productionDb")
+    || operatorManifestShadowRuntimeService.includes('state.test_case === "live_read_zero_mutation"')
+    || !operatorManifestShadowRuntimeService.includes("manifest_innovation_live_access_forbidden")) {
+  lifecycleErrors.push("manifest_innovation_runtime_isolation_invalid");
+}
+if (operatorManifestShadowService.includes("writeManifestShadowBenchmarkReceipt(\n  productionDb")
+    || operatorManifestShadowService.includes("readManifestShadowReceipt(\n  shadowDb: D1Database,\n  productionDb")) {
+  lifecycleErrors.push("manifest_innovation_receipt_boundary_invalid");
+}
+if (!operatorManifestShadowRuntimeServiceTests.includes("forbids live evidence access before an Innovation run begins")
+    || !operatorManifestShadowRuntimeServiceTests.includes("proves a frozen production-shaped cycle with zero Main, production, or Threads access")
+    || !operatorManifestShadowRuntimeServiceTests.includes("returns compact receipts with generated and source text recursively redacted")) {
+  lifecycleErrors.push("manifest_innovation_isolation_regressions_incomplete");
+}
+
 if (!source.includes('from "./operatorMcpEngineeringRegistry"')) {
   lifecycleErrors.push("operator_mcp_engineering_registry_import_missing");
 }
