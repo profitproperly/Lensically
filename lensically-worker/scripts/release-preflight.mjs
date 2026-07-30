@@ -3521,7 +3521,8 @@ const manifestAutonomousGrowthChecks = [
   ["prepare_regression", systemDirectoryTests.includes("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review")],
   ["analysis_page_regression", systemDirectoryTests.includes("reads and durably records one complete rolling evidence page without truncation")],
   ["strategy_regression", systemDirectoryTests.includes("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup")],
-  ["persist_regression", systemDirectoryTests.includes("persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt")],
+    ["persist_regression", systemDirectoryTests.includes("persists one source-card-backed post through the consumed-bundle strategy and shared size-one wrapper")
+    && operatorManifestBatchPersistenceServiceTests.includes("persists successful siblings and reconciles coverage once for a bounded four-post batch")],
   ["scheduled_review_regression", tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")],
   ["winner_decay_regression", tests.includes("preserves a frequent winner until comparable mature performance actually decays")],
 ];
