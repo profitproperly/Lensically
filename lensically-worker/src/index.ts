@@ -117,7 +117,11 @@ import {
 } from "./operatorManifestShadowEvidenceService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
-import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
+import {
+  persistOperatorManifestCandidate,
+  reconcileOperatorManifestPersistenceBatch,
+  type OperatorManifestReconciliationDependencies,
+} from "./operatorManifestPersistenceService";
 import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import {
   githubMutationRetryDelayMs,
