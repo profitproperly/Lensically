@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-innovation-runtime-activation
+active_checkpoint: exact_sha_worker_release
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
 production_sha: 0da4252e6c8cc587ba7352b0ba0b50aa40f013db
@@ -25,11 +25,23 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### COMPLETED — Manifest Innovation Cycle
+### ACTIVE — Manifest Innovation Runtime Activation
+
+job_id: `manifest-innovation-runtime-activation`
+
+Owner objective:
+
+- Deploy the validated shared Worker so the permanent Innovation Cycle is callable through the live Operator MCP.
+- This is runtime activation, not promotion of Innovation changes into the Main Cycle contract.
+- Main production data, historical lineage, generation state, scheduling, publishing, learning, and existing cycle behavior remain untouched.
+- After release, verify the exact Worker identity, existing Main scheduler health, the four Innovation tools, `SHADOW_DB` isolation, zero Threads mutation, and one isolated Innovation smoke cycle.
+- Stop after operational proof. Any adoption of Innovation orchestration by Main remains a separate manual 007-and-M decision.
+
+### COMPLETED — Manifest Innovation Cycle Build and Proof
 
 job_id: `manifest-innovation-cycle-shadow-testbed`
 
-The permanent upstream Innovation Cycle is complete, isolated, end-to-end proven, and idle. No active Lensically engineering job remains.
+The permanent upstream Innovation Cycle is complete, isolated, and end-to-end proven in source. Runtime activation is the only active job.
 
 ## Permanent Operating Model
 
@@ -136,7 +148,13 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 
 ## Current Action
 
-None. The Innovation Cycle sits idle. New Innovation work or promotion into Main requires a new explicit 007-and-M decision and a new canonical job.
+1. Run one explicit exact-SHA Worker release from the current repository head.
+2. Verify the deployed Worker reports that exact SHA and the existing Main scheduler remains healthy without invoking the Main generation cycle.
+3. Verify the live public MCP exposes `prepare_manifest_shadow_cycle`, `commit_manifest_shadow_cycle_strategy`, `persist_manifest_shadow_batch`, and `get_manifest_shadow_cycle_receipt`.
+4. Execute one isolated no-op Innovation smoke cycle against `SHADOW_DB`; prove zero Main database access, zero production receipt writes, and zero Threads requests.
+5. Record the release and smoke receipts, set this job completed, and stop.
+
+Do not invoke, dry-run, canary, schedule through, publish through, or promote the Main Cycle.
 
 ## Other Completed Work
 
