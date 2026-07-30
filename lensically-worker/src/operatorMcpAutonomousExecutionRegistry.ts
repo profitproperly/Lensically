@@ -184,5 +184,49 @@ const OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS: OperatorMcpToolDefinition[] 
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  },
+    },
 ];
+
+const [prepareManifestCycleTool, persistManifestPostTool, reviewManifestPostTool] = OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS;
+const singlePersistProperties = persistManifestPostTool.inputSchema.properties as Record<string, unknown>;
+const manifestBatchCandidateSchema = {
+  type: "object",
+  properties: {
+    operation_id: { type: "string" },
+    cycle_plan_item_id: { type: "string" },
+    post: singlePersistProperties.post,
+    model_evaluation: singlePersistProperties.model_evaluation,
+  },
+  required: ["operation_id", "cycle_plan_item_id", "post", "model_evaluation"],
+  additionalProperties: false,
+};
+
+export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[] = [
+  prepareManifestCycleTool,
+  persistManifestPostTool,
+  {
+    name: "persist_manifest_autonomous_batch",
+    title: "Persist Manifest autonomous batch",
+    description: "Persist one to four exact locked-plan Manifest candidates in one server-bounded call. Every item retains its own operation ID, plan item, source lineage, deterministic backend gates, hypothesis, experiment assignment, decision influence, schedule row, and complete lineage. A failed item does not roll back or hide successful siblings. The server returns exact rejected slots and reasons and reconciles authoritative cycle coverage exactly once after all accepted items. Default generation is eight candidates persisted through two four-item calls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        cycle_id: { type: "string" },
+        cycle_strategy_id: { type: "string" },
+        batch_operation_id: { type: "string" },
+        candidates: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: manifestBatchCandidateSchema,
+        },
+      },
+      required: ["brand_key", "cycle_id", "cycle_strategy_id", "batch_operation_id", "candidates"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  reviewManifestPostTool,
+];
+
