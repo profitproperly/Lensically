@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
   appliedMigrationChangeIsSafe,
-    auditRepositoryMigrations,
+      auditRepositoryMigrations,
+  migrationPathForWorkerGit,
   parseMigrationTimestamp,
   parseWranglerLedgerJson,
     reconcileProductionPrefix,
@@ -31,6 +32,8 @@ function expectFailure(callback, code) {
   });
 }
 
+assert.equal(migrationPathForWorkerGit("lensically-worker/database/migrations/0019_shadow.sql"), "database/migrations/0019_shadow.sql");
+assert.equal(migrationPathForWorkerGit("database/migrations/0019_shadow.sql"), "database/migrations/0019_shadow.sql");
 assert.equal(parseMigrationTimestamp("2026-07-30 17:44:39"), Date.parse("2026-07-30T17:44:39Z"));
 assert.equal(parseMigrationTimestamp(1785433479), 1785433479000);
 assert.equal(parseMigrationTimestamp("1785433479000"), 1785433479000);

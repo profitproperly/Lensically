@@ -251,6 +251,11 @@ export function parseMigrationTimestamp(value) {
   return Date.parse(normalized);
 }
 
+export function migrationPathForWorkerGit(path) {
+  const value = String(path ?? "");
+  return value.startsWith("lensically-worker/") ? value.slice("lensically-worker/".length) : value;
+}
+
 export function appliedMigrationChangeIsSafe(change) {
   const latestCommitMs = parseMigrationTimestamp(change.latestCommitAt);
   const appliedMs = parseMigrationTimestamp(change.appliedAt);
@@ -282,7 +287,7 @@ function assertAppliedMigrationsUnedited(productionSha, productionRows) {
     const appliedByName = new Map(productionRows.map((row) => [row.name, row]));
     const unsafeApplied = [];
   for (const change of changed.filter((entry) => appliedByName.has(basename(entry.path)))) {
-    const latestCommitAt = run("git", ["log", "-1", "--format=%cI", "HEAD", "--", change.path]).trim();
+        const latestCommitAt = run("git", ["log", "-1", "--format=%cI", "HEAD", "--", migrationPathForWorkerGit(change.path)]).trim();
     const appliedAt = appliedByName.get(basename(change.path))?.applied_at ?? null;
     if (!appliedMigrationChangeIsSafe({ status: change.status, latestCommitAt, appliedAt })) {
       unsafeApplied.push({
