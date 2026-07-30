@@ -2,8 +2,9 @@ import { BRAND_KEY_SCHEMA } from "./operatorMcpSchemas";
 import type { OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
 
 export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOL_NAMES = [
-  "prepare_manifest_autonomous_cycle",
+    "prepare_manifest_autonomous_cycle",
   "persist_manifest_autonomous_post",
+  "persist_manifest_autonomous_batch",
   "review_manifest_scheduled_post",
 ] as const;
 
@@ -29,7 +30,7 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[
   {
     name: "persist_manifest_autonomous_post",
     title: "Persist Manifest autonomous post",
-    description: "Persist exactly one source-card-backed Manifest post into the exact slot defined by the single locked cycle strategy and plan item. Every rolling 28-day evidence page must already be consumed. Original model posts are forbidden. The server verifies strategy and plan identity, canonical source lineage, itemized owner hard-ban coverage, source fidelity, exact duplicates, semantic repetition, slot availability, a nonempty passing gate receipt, idempotency, and complete lineage before scheduling. After four actual persists, reconcile coverage with get_hourly_coverage without preparing a second strategy.",
+        description: "Persist exactly one source-card-backed Manifest post into the exact slot defined by the locked cycle strategy and plan item. The strategy must carry the consumed decision-bundle identity. Original model posts are forbidden. The server owns deterministic hard bans, strategy and plan identity, canonical source lineage, source fidelity, exact duplicates, semantic repetition, slot availability, backend gates, idempotency, complete lineage, and the size-one coverage reconciliation. The model remains responsible for wording, adaptation fidelity, novelty judgment, audience reward, placement, and response to genuine candidate failures.",
     inputSchema: {
       type: "object",
       properties: {
@@ -133,8 +134,8 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[
               type: "object",
               properties: {
                 results: {
-                  type: "array",
-                  minItems: 1,
+                                    type: "array",
+                  maxItems: 32,
                   items: {
                     type: "object",
                     properties: {
@@ -154,7 +155,7 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[
               additionalProperties: true,
             },
           },
-          required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment", "gate_summary"],
+                    required: ["generation_passed", "scheduling_passed", "novelty_assessment", "winner_preservation_assessment", "slot_placement_assessment", "recent_exposure_assessment"],
           additionalProperties: true,
         },
         operation_id: { type: "string" },
