@@ -58,13 +58,14 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-    it("preserves the exact 79-tool public surface and retirement policy", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(79);
+        it("preserves the exact 80-tool public surface and retirement policy", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(80);
     expect(isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")).toBe(true);
     expect(isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")).toBe(true);
     expect(isOperatorPublicDirectToolName("persist_manifest_shadow_batch")).toBe(true);
     expect(isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")).toBe(true);
-    expect(isOperatorPublicDirectToolName("prepare_manifest_autonomous_cycle")).toBe(true);
+        expect(isOperatorPublicDirectToolName("prepare_manifest_autonomous_cycle")).toBe(true);
+    expect(isOperatorPublicDirectToolName("persist_manifest_autonomous_batch")).toBe(true);
     expect(isOperatorPublicDirectToolName("engineeringPrecheck")).toBe(true);
     expect(isOperatorPublicDirectToolName("start_workflow_session")).toBe(false);
     expect(RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has("start_workflow_session")).toBe(true);

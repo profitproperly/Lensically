@@ -774,7 +774,7 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 79-tool public surface and retirement policy")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 80-tool public surface and retirement policy")
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("persist_manifest_shadow_batch")')
@@ -992,10 +992,10 @@ if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
     || !operatorMcpRegistryComposition.includes("export function buildComposedOperatorMcpTools")) {
   lifecycleErrors.push("operator_mcp_registry_composition_module_incomplete");
 }
-if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 59-tool account aggregation order")
+if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 60-tool account aggregation order")
     || !operatorMcpRegistryCompositionTests.includes("preserves engineering, admin, and intentional monthly-growth classifications")
     || !operatorMcpRegistryCompositionTests.includes("preserves guided Proceed membership without blocking list_accounts")
-        || !operatorMcpRegistryCompositionTests.includes("builds the exact 116 direct tools with deterministic priority ordering")
+        || !operatorMcpRegistryCompositionTests.includes("builds the exact 117 direct tools with deterministic priority ordering")
     || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }
