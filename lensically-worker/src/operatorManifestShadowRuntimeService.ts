@@ -940,19 +940,29 @@ async function persistShadowBatch(
   const priorEvent = await dependencies.shadowDb.prepare(
     `SELECT payload_json FROM manifest_shadow_stage_events WHERE shadow_run_id = ? AND event_key = ? LIMIT 1`,
   ).bind(runId, `batch:${batchOperationId}`).first<JsonRecord>();
-  if (priorEvent?.payload_json) {
+    if (priorEvent?.payload_json) {
     try {
-      return { body: { success: true, reused: true, ...JSON.parse(String(priorEvent.payload_json)) }, status: 200 };
+      const replayReceipt = JSON.parse(String(priorEvent.payload_json)) as JsonRecord;
+      state.counters.retry_count = Number(state.counters.retry_count ?? 0) + 1;
+      state.counters.payload_bytes = Number(state.counters.payload_bytes ?? 0) + jsonBytes(payload);
+      state.last_client_response_at = dependencies.now().toISOString();
+      let benchmark: JsonRecord | null = null;
+      if (state.completed) benchmark = await finalizeBenchmark(dependencies, state, state.last_client_response_at);
+      await writeState(dependencies.shadowDb, state);
+      return { body: { success: true, reused: true, ...replayReceipt, benchmark }, status: 200 };
     } catch {
       return { body: { success: false, error: "manifest_shadow_batch_receipt_corrupt" }, status: 500 };
     }
   }
   const batchStarted = Date.now();
+  state.counters.batch_call_count = Number(state.counters.batch_call_count ?? 0) + 1;
+  state.counters.payload_bytes = Number(state.counters.payload_bytes ?? 0) + jsonBytes(payload);
   const gapMs = Math.max(0, Date.now() - Date.parse(state.last_client_response_at));
   state.timings.model_client_gap_ms = Number(state.timings.model_client_gap_ms ?? 0) + gapMs;
   const acceptedTexts = new Set(state.accepted_posts.map((post) => normalizeText(post.text)));
   const results: JsonRecord[] = [];
-  for (const candidate of candidates) {
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+    const candidate = candidates[candidateIndex];
     const candidateOperationId = stringValue(candidate.operation_id);
     const slotKey = stringValue(candidate.slot_key);
     if (!candidateOperationId) {
