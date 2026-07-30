@@ -51,6 +51,7 @@ const operatorManifestCycleServiceTests = read("test/operatorManifestCycleServic
 const operatorHourlyCoverageService = read("src/operatorHourlyCoverageService.ts");
 const operatorHourlyCoverageServiceTests = read("test/operatorHourlyCoverageService.spec.ts");
 const operatorManifestPrepareCheckpointService = read("src/operatorManifestPrepareCheckpointService.ts");
+const operatorManifestPreparationOrchestratorService = read("src/operatorManifestPreparationOrchestratorService.ts");
 const operatorManifestPrepareCheckpointServiceTests = read("test/operatorManifestPrepareCheckpointService.spec.ts");
 const operatorManifestCycleConstructionService = read("src/operatorManifestCycleConstructionService.ts");
 const operatorManifestCycleConstructionServiceTests = read("test/operatorManifestCycleConstructionService.spec.ts");
