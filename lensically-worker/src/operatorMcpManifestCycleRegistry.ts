@@ -99,13 +99,15 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "commit_manifest_cycle_strategy",
     title: "Lock Manifest cycle strategy",
-    description: "After every rolling 28-day analysis page has been consumed, persist exactly one account-wide strategy and a complete source-card-backed lineup for every authoritative missing slot. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts or source-independent hypotheses. Replaying an identical strategy is safe; a conflicting second strategy is blocked.",
+        description: "Using the complete versioned decision bundle returned by prepare_manifest_autonomous_cycle, persist exactly one account-wide strategy and a complete source-card-backed lineup for every authoritative missing slot. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts or source-independent hypotheses. A bounded evidence-page detail read is allowed only when the bundle flags genuine ambiguity. Replaying an identical strategy is safe; a conflicting second strategy is blocked.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         cycle_id: { type: "string" },
-        snapshot_id: { type: "string" },
+                snapshot_id: { type: "string" },
+        decision_bundle_id: { type: "string" },
+        decision_bundle_hash: { type: "string" },
         account_conclusion: { type: "object", additionalProperties: true },
         content_focus: { type: "object", additionalProperties: true },
         benchmarks: { type: "object", additionalProperties: true },
@@ -138,7 +140,7 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
           },
         },
       },
-      required: ["brand_key", "cycle_id", "snapshot_id", "account_conclusion", "content_focus", "benchmarks", "strongest_executions", "weakest_executions", "directives", "experiments", "risks", "lineup"],
+            required: ["brand_key", "cycle_id", "snapshot_id", "decision_bundle_id", "decision_bundle_hash", "account_conclusion", "content_focus", "benchmarks", "strongest_executions", "weakest_executions", "directives", "experiments", "risks", "lineup"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

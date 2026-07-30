@@ -503,7 +503,7 @@ export async function constructOperatorManifestAutonomousCycle(
 
   const strategyRequired = missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0;
   const nextAction = strategyRequired
-    ? `Read every remaining analysis page for cycle ${cycleId}, then call commit_manifest_cycle_strategy with the exact locked backend source plan covering all ${missingSlots.length} authoritative missing slots. The model may decide execution wording and placement rationale but may not substitute sources.`
+        ? `Use the complete decision_bundle returned for cycle ${cycleId}, then call commit_manifest_cycle_strategy with its exact bundle ID and hash plus the locked backend source plan covering all ${missingSlots.length} authoritative missing slots. Read at most one evidence detail page only when the bundle explicitly flags genuine ambiguity. The model may decide execution wording and placement rationale but may not substitute sources.`
     : missingSlots.length > 0
       ? "Create or repair the locked source-card inventory, then call prepare_manifest_autonomous_cycle again with the same operation_id so the backend can lock the source plan."
       : "The prepared horizon is covered. Verify the canonical completion receipt, complete lineage, scheduler health, and unresolved delivery incidents before ending.";
@@ -602,7 +602,9 @@ export async function constructOperatorManifestAutonomousCycle(
       one_strategy_per_cycle: true,
       source_backed_generation_only: true,
       original_model_posts_forbidden: true,
-      every_analysis_page_required: true,
+            every_analysis_page_required: false,
+      decision_bundle_required: true,
+      bounded_detail_read_only_when_flagged: true,
       fixed_percentages: false,
       winner_preservation: "Continue using winners while comparable performance remains strong, while spacing them when recent published or scheduled exposure is dense.",
       repetition_distinction: "Mechanism repetition can be productive; clustered execution sameness must be rejected, rewritten, or moved to a later slot.",

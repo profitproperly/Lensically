@@ -199,10 +199,12 @@ export async function handleOperatorManifestCycleServiceTool(
   }
 
   if (toolName === "commit_manifest_cycle_strategy") {
-    const cycleId = normalizeText(payload.cycle_id, 160);
+        const cycleId = normalizeText(payload.cycle_id, 160);
     const snapshotId = normalizeText(payload.snapshot_id, 160);
-    if (!cycleId || !snapshotId) {
-      return result({ success: false, error: "cycle_id_and_snapshot_id_required" }, 400);
+    const decisionBundleId = normalizeText(payload.decision_bundle_id, 160);
+    const decisionBundleHash = normalizeText(payload.decision_bundle_hash, 128);
+    if (!cycleId || !snapshotId || !decisionBundleId || !decisionBundleHash) {
+      return result({ success: false, error: "cycle_snapshot_and_decision_bundle_required" }, 400);
     }
 
     const accountConclusion = asRecord(payload.account_conclusion);
@@ -232,7 +234,9 @@ export async function handleOperatorManifestCycleServiceTool(
             const strategy = await dependencies.commitStrategy({
         cycleId,
         brandKey,
-        snapshotId,
+                snapshotId,
+        decisionBundleId,
+        decisionBundleHash,
         accountConclusion,
         contentFocus,
         benchmarks,
@@ -250,7 +254,9 @@ export async function handleOperatorManifestCycleServiceTool(
         eventType: "cycle_strategy_locked",
         payload: {
           strategy_id: strategy.id ?? null,
-          snapshot_id: snapshotId,
+                    snapshot_id: snapshotId,
+          decision_bundle_id: decisionBundleId,
+          decision_bundle_hash: decisionBundleHash,
           lineup_count: lineup.length,
           source_backed_generation_only: true,
           primary_metric: "24_hour_likes",
