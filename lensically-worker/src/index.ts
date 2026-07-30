@@ -11823,11 +11823,11 @@ async function persistManifestAutonomousPost(
       env.DB,
       input as Parameters<typeof finalizeManifestCycleReceipt>[1],
     ),
-    setCycleStatus: (cycleId, brandKey, status) => env.DB.prepare(
+        setCycleStatus: (cycleId, brandKey, status) => env.DB.prepare(
       `UPDATE operator_autonomous_growth_cycles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_key = ?`,
     ).bind(status, cycleId, brandKey).run(),
     now: () => new Date(),
-    });
+    }, options);
 }
 
 async function reviewManifestScheduledPost(
