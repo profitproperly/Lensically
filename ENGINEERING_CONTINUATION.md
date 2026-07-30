@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
-active_checkpoint: stage_1_in_progress
+active_checkpoint: stage_2_in_progress
 implementation_source_head: bcce3958a903263ba846ab5d473d00e22b744369
 production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
 
@@ -137,7 +137,19 @@ Completed planning inspection:
 
 Scope is now frozen. New enhancements remain deferred unless they are required to satisfy the acceptance contract.
 
-### Stage 1 — Physical Isolation Foundation
+### Stage 1 — Physical Isolation Foundation — COMPLETE
+
+Exact release SHA: `084335b29087e47ec9394ce10ed0b2317f0b3520`.
+
+- Push validation: `30568999405` — SUCCESS.
+- Exact-SHA release: `30569188839` — SUCCESS.
+- Production migration `0019_manifest_shadow_cycle.sql`: applied and verified.
+- Isolated `lensically-shadow-db`: provisioned, migrated from the canonical directory, and bound as `SHADOW_DB`.
+- Production Worker runtime and scheduler: verified healthy after release.
+- Read-only production D1 wrapper, zero-Threads-write adapter, disposable reset/seeding, retention, stale-run recovery, orphan verification, and compact benchmark receipt boundary: source-controlled and tested.
+- Release incidents permanently prevented: YAML patch indentation gate, migration metadata boundary, Wrangler-version-tolerant D1 creation, and partial-release migration reconciliation using applied-time evidence plus Worker-relative Git paths.
+
+Completed contract retained below for audit:
 
 Implement the disposable shadow workspace without changing production Manifest behavior.
 
@@ -387,7 +399,7 @@ Resolution: no UI, dashboard, concurrent runner, generic simulation framework, o
 
 ## Current Action
 
-Execute **Stage 1 — Physical Isolation Foundation** only:
+Execute **Stage 2 — Production-Parity Shadow Runtime**, then continue through Stages 3–8 without pausing unless a verified blocker requires repair:
 
 1. Re-read the current repository head after this plan-lock commit.
 2. Implement the dedicated `SHADOW_DB` binding and canonical dual-database migration verification.
