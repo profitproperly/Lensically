@@ -103,6 +103,14 @@ import {
 } from "./operatorManifestCycleService";
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
 import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
+import {
+  handleOperatorManifestShadowTool,
+  isOperatorManifestShadowToolName,
+} from "./operatorManifestShadowRuntimeService";
+import {
+  buildManifestShadowScenarioSlots,
+  readManifestShadowEvidence,
+} from "./operatorManifestShadowEvidenceService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
 import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
@@ -11941,7 +11949,45 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   });
   if (admission.kind === "response") return admission.response;
   toolName = admission.toolName;
-  const { payload, brand } = admission;
+    const { payload, brand } = admission;
+
+  if (isOperatorManifestShadowToolName(toolName)) {
+    if (!env.SHADOW_DB) {
+      return operatorJsonResponse({ success: false, error: "manifest_shadow_database_unavailable" }, 503);
+    }
+    const shadowResult = await handleOperatorManifestShadowTool({
+      toolName,
+      payload,
+      identity: {
+        brandKey: brand.brand_key,
+        accountId: brand.account_id,
+        threadsUserId: brand.profile.threads_user_id,
+      },
+    }, {
+      productionDb: env.DB,
+      shadowDb: env.SHADOW_DB,
+      codeSha: normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 80, true) ?? "unreleased",
+      now: () => new Date(),
+      buildSlots: async (input) => buildManifestShadowScenarioSlots({
+        now: new Date(),
+        timezone: input.timezone,
+        horizonHours: input.horizonHours,
+        scenario: input.scenario,
+        requestedMissingCount: input.requestedMissingCount,
+      }),
+      loadSourceCandidates: (productionReadOnlyDb, brandKey, asOf) => loadLockedSourceCardSelectionCandidates(
+        productionReadOnlyDb,
+        brandKey,
+        asOf,
+      ),
+      selectSourceLineup: (input) => selectSourceFamilyLineup(input),
+      readEvidence: ({ productionReadOnlyDb, brandKey, threadsUserId, nowIso, evidenceMode }) => readManifestShadowEvidence(
+        productionReadOnlyDb,
+        { brandKey, threadsUserId, nowIso, evidenceMode },
+      ),
+    });
+    return operatorJsonResponse(shadowResult.body, shadowResult.status);
+  }
 
           const manifestRuntimeDispatch = await dispatchOperatorManifestRuntimeTool({
     toolName,
