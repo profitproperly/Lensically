@@ -567,6 +567,17 @@ export async function writeManifestShadowBenchmarkReceipt(
   ).run();
 }
 
+function redactManifestShadowGeneratedText(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactManifestShadowGeneratedText);
+  if (!value || typeof value !== "object") return value;
+  const redacted: JsonRecord = {};
+  for (const [key, nested] of Object.entries(value as JsonRecord)) {
+    if (["text", "post_text", "generated_text", "candidate_text", "primary_source"].includes(key)) continue;
+    redacted[key] = redactManifestShadowGeneratedText(nested);
+  }
+  return redacted;
+}
+
 export async function readManifestShadowReceipt(
   shadowDb: D1Database,
   productionDb: D1Database,
@@ -583,7 +594,12 @@ export async function readManifestShadowReceipt(
     contract_version: MANIFEST_SHADOW_CONTRACT_VERSION,
     run: run ?? null,
     snapshot: snapshot ?? null,
-    stages: stages.results ?? [],
+        stages: (stages.results ?? []).map((stage) => {
+      const { payload_json: payloadJson, ...summary } = stage;
+      let payload: unknown = {};
+      try { payload = JSON.parse(String(payloadJson ?? "{}")); } catch { payload = {}; }
+      return { ...summary, payload: redactManifestShadowGeneratedText(payload) };
+    }),
     diagnostic: diagnostic ? { ...diagnostic, payload: asRecord(JSON.parse(String(diagnostic.payload_json ?? "{}"))) } : null,
     benchmark: benchmark ?? null,
   };
