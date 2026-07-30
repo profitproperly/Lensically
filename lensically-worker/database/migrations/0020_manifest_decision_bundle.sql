@@ -28,6 +28,9 @@ CREATE INDEX IF NOT EXISTS idx_manifest_decision_bundle_snapshot
 CREATE INDEX IF NOT EXISTS idx_manifest_decision_bundle_consumption
   ON operator_manifest_decision_bundles (brand_key, consumed_at, created_at DESC);
 
+ALTER TABLE operator_manifest_cycle_strategies ADD COLUMN decision_bundle_id TEXT;
+ALTER TABLE operator_manifest_cycle_strategies ADD COLUMN decision_bundle_hash TEXT;
+
 CREATE TRIGGER IF NOT EXISTS trg_manifest_decision_bundle_touch_updated_at
 AFTER UPDATE ON operator_manifest_decision_bundles
 FOR EACH ROW
