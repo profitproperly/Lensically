@@ -6,8 +6,8 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
-active_checkpoint: stage_5_four_post_batch_persistence
-implementation_source_head: 0da4252e6c8cc587ba7352b0ba0b50aa40f013db
+active_checkpoint: stage_6_timing_instrumentation_and_acceptance_matrix
+implementation_source_head: 17b6703c82a41ab83602a53707c0972272101ea4
 production_sha: 0da4252e6c8cc587ba7352b0ba0b50aa40f013db
 active_interrupt_id: null
 active_interrupt_state: closed
@@ -249,7 +249,20 @@ Required work:
 6. The model remains responsible for strategy, wording, adaptation fidelity, novelty judgment, audience reward, placement, and responses to real candidate failures.
 7. Remove the requirement for repetitive model-written hard-ban pass evidence when the server can evaluate the exact text itself.
 
-### Stage 5 — Four-Post Batch Persistence
+### Stage 5 — Four-Post Batch Persistence — COMPLETE
+
+Validated source SHA: `17b6703c82a41ab83602a53707c0972272101ea4`.
+
+- Full push validation: `30578558015` — SUCCESS.
+- Single-post production persistence now calls the shared candidate core and the shared reconciliation service as a size-one wrapper.
+- `persist_manifest_autonomous_batch` accepts one to four closed-schema candidates using the exact single-post `post` and `model_evaluation` contracts.
+- Every candidate retains its own operation ID, exact plan item, backend gates, source lineage, hypothesis, experiment assignment, decision influence, schedule row, and result.
+- Successful siblings survive item failure; exact rejected slots and reasons are returned for selective regeneration.
+- Coverage, cycle state, and cycle completion reconcile exactly once after accepted siblings persist.
+- Deterministic hard bans are backend-owned; repetitive model-written pass evidence is no longer required.
+- Public surface: 80 direct tools, 60 account tools, 117 direct definitions, 59 scoped wrappers per brand, 116 internal capabilities, 47 read-only routes, and 69 mutation routes.
+
+Completed contract retained below for audit:
 
 Reduce external round trips while preserving item-level correctness.
 
