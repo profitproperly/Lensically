@@ -156,6 +156,13 @@ export function auditRepositoryMigrations(directory = MIGRATIONS_DIRECTORY) {
   return entries;
 }
 
+export function validateClassificationBoundary(entries) {
+  const firstClassifiedIndex = entries.findIndex((entry) => entry.migrationClass !== "legacy-unclassified");
+  if (firstClassifiedIndex < 0) return;
+  const laterLegacy = entries.slice(firstClassifiedIndex).find((entry) => entry.migrationClass === "legacy-unclassified");
+  if (laterLegacy) fail("migration_classification_boundary_regressed", laterLegacy.name);
+}
+
 export function validateUnappliedMigration(entry) {
   if (!ALLOWED_CLASSES.has(entry.migrationClass)) fail("migration_class_missing_or_invalid", entry.name);
   if (!entry.owner || !/^[a-z0-9][a-z0-9_-]{1,79}$/.test(entry.owner)) fail("migration_owner_missing_or_invalid", entry.name);
@@ -317,6 +324,7 @@ export function verifyRemote() {
 
 function localCheck() {
   const entries = auditRepositoryMigrations();
+  validateClassificationBoundary(entries);
   const classified = entries.filter((entry) => entry.migrationClass !== "legacy-unclassified");
   for (const entry of classified) validateUnappliedMigration(entry);
   return {

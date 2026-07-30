@@ -5,7 +5,8 @@ import { resolve } from "node:path";
 import {
   auditRepositoryMigrations,
   parseWranglerLedgerJson,
-  reconcileProductionPrefix,
+    reconcileProductionPrefix,
+  validateClassificationBoundary,
   validateUnappliedMigration,
 } from "./d1-migration-release.mjs";
 
@@ -42,7 +43,22 @@ withMigrations({
   assert.equal(entries.length, 2);
   assert.equal(entries[0].migrationClass, "legacy-unclassified");
   assert.equal(entries[1].migrationClass, "schema");
+    validateClassificationBoundary(entries);
   validateUnappliedMigration(entries[1]);
+});
+
+withMigrations({
+  "0000_legacy.sql": "CREATE TABLE legacy_table (id INTEGER PRIMARY KEY);\n",
+  "0001_classified.sql": [
+    "-- lensically-migration-class: schema",
+    "-- lensically-migration-owner: release-engineering",
+    "-- lensically-migration-risk: low",
+    "CREATE TABLE classified_table (id INTEGER PRIMARY KEY);",
+  ].join("\n"),
+  "0002_missing_metadata.sql": "CREATE TABLE missing_metadata (id INTEGER PRIMARY KEY);\n",
+}, (directory) => {
+  const entries = auditRepositoryMigrations(directory);
+  expectFailure(() => validateClassificationBoundary(entries), "migration_classification_boundary_regressed");
 });
 
 withMigrations({

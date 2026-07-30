@@ -1,3 +1,7 @@
+-- lensically-migration-class: schema
+-- lensically-migration-owner: release-engineering
+-- lensically-migration-risk: low
+
 -- Manifest Shadow Cycle: physically isolated disposable workspace metadata and compact production receipts.
 
 CREATE TABLE IF NOT EXISTS manifest_shadow_runs (
