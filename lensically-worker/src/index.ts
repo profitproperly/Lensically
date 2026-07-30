@@ -9329,11 +9329,8 @@ export function reconcileManifestAutonomousCoverageState(
   elapsed_unfilled_slots: Array<{ key: string; date: string; time: string }>;
   scheduled_post_ids: number[];
 } {
-  const scheduledIds = new Set<number>();
-  for (const value of existingScheduledPostIds) {
-    const id = Math.trunc(Number(value));
-    if (Number.isInteger(id) && id > 0) scheduledIds.add(id);
-  }
+    const scheduledIds = new Set<number>();
+  void existingScheduledPostIds;
   for (const record of occupied.values()) {
     const id = Math.trunc(Number(record.scheduled_post_id));
     if (Number.isInteger(id) && id > 0) scheduledIds.add(id);
@@ -12218,7 +12215,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         input.cycleId,
         input.brandKey,
       ).run(),
-            readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
+                        readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
         `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
                 family_key, strategic_role, generation_mode, source_kind, source_card_id,
                 source_selection_id, audience_reward, hook_direction, placement_reason,
@@ -12227,6 +12224,153 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
          LIMIT 1`,
       ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>(),
+      repairMissingPlanItem: async ({ cycleId, brandKey, slotKey, operationId, asOf }) => {
+        const existingPlanItem = await env.DB.prepare(
+          `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+                  family_key, strategic_role, generation_mode, source_kind, source_card_id,
+                  source_selection_id, audience_reward, hook_direction, placement_reason,
+                  nearby_avoid_json, exploration_mode, status
+           FROM operator_manifest_cycle_plan_items
+           WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? LIMIT 1`,
+        ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>();
+        if (!existingPlanItem) return null;
+        if (String(existingPlanItem.status ?? "") === "planned") return existingPlanItem;
+        if (String(existingPlanItem.status ?? "") !== "scheduled") return null;
+
+        const lockedPlan = await readLockedSourceSelectionPlan(env.DB, brandKey, cycleId);
+        const displacedPlan = lockedPlan.find((row) => String(row.slot_key ?? "") === slotKey);
+        if (!displacedPlan) return null;
+        const exclusionRows = await env.DB.prepare(
+          `SELECT source_identity_key FROM operator_source_exclusions
+           WHERE brand_key = ? AND active = 1`,
+        ).bind(brandKey).all<{ source_identity_key: string }>();
+        const excludedIdentities = new Set((exclusionRows.results ?? []).map((row) => String(row.source_identity_key)));
+        const alreadyPlannedIdentities = new Set(lockedPlan
+          .filter((row) => String(row.slot_key ?? "") !== slotKey)
+          .map((row) => String(row.source_identity_key ?? "")));
+        const candidates = (await loadLockedSourceCardSelectionCandidates(env.DB, brandKey, asOf))
+          .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
+          .filter((candidate) => !alreadyPlannedIdentities.has(String(candidate.source_identity_key ?? "")))
+          .filter((candidate) => String(candidate.source_identity_key ?? "") !== String(displacedPlan.source_identity_key ?? ""))
+          .filter((candidate) => candidate.lifetime_label !== "disproven");
+        const replacement = selectSourceFamilyLineup({
+          candidates,
+          slot_keys: [slotKey],
+          seed: `${brandKey}:${cycleId}:${slotKey}:displaced:${operationId}`,
+        }).receipts[0];
+        if (!replacement) throw new Error("manifest_cycle_displaced_slot_replacement_missing");
+        const sourceCard = await env.DB.prepare(
+          `SELECT source_selection_id, required_product, recommended_direction
+           FROM operator_source_cards WHERE id = ? AND brand_key = ? AND status = 'locked' LIMIT 1`,
+        ).bind(replacement.source_card_id, brandKey).first<Record<string, unknown>>();
+        const sourceSelectionId = normalizeOperatorText(sourceCard?.source_selection_id, 160, true);
+        if (!sourceSelectionId) throw new Error("manifest_cycle_displaced_slot_source_selection_missing");
+        const selectionOrder = Math.max(1, Math.trunc(Number(displacedPlan.selection_order ?? 1)));
+        const explorationMode = replacement.lifetime_label === "franchise" ? "exploit" : "explore";
+        const generationMode = replacement.lifetime_label === "franchise"
+          ? "franchise_deployment"
+          : "controlled_variation";
+        const receiptJson = normalizeOperatorJson(replacement, {});
+        await env.DB.batch([
+          env.DB.prepare(
+            `UPDATE operator_source_selection_plans
+             SET source_identity_key = ?, source_card_family_id = ?, source_card_id = ?,
+                 engine_version = ?, receipt_json = ?, status = 'locked'
+             WHERE brand_key = ? AND cycle_id = ? AND slot_key = ? AND status = 'locked'`,
+          ).bind(
+            replacement.source_identity_key,
+            replacement.source_card_family_id,
+            replacement.source_card_id,
+            SOURCE_SELECTION_ENGINE_VERSION,
+            receiptJson,
+            brandKey,
+            cycleId,
+            slotKey,
+          ),
+          env.DB.prepare(
+            `INSERT INTO operator_source_selection_receipts (
+              id, brand_key, scope_type, scope_id, slot_key, selection_order,
+              source_identity_key, source_card_family_id, source_card_id, engine_version, receipt_json
+            ) VALUES (?, ?, 'cycle', ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(brand_key, scope_type, scope_id, slot_key) DO UPDATE SET
+              selection_order = excluded.selection_order,
+              source_identity_key = excluded.source_identity_key,
+              source_card_family_id = excluded.source_card_family_id,
+              source_card_id = excluded.source_card_id,
+              engine_version = excluded.engine_version,
+              receipt_json = excluded.receipt_json`,
+          ).bind(
+            crypto.randomUUID(),
+            brandKey,
+            cycleId,
+            slotKey,
+            selectionOrder,
+            replacement.source_identity_key,
+            replacement.source_card_family_id,
+            replacement.source_card_id,
+            SOURCE_SELECTION_ENGINE_VERSION,
+            receiptJson,
+          ),
+          env.DB.prepare(
+            `UPDATE operator_manifest_cycle_plan_items
+             SET family_key = ?, strategic_role = 'displaced_slot_replacement',
+                 generation_mode = ?, source_kind = 'source_card', source_card_id = ?,
+                 source_selection_id = ?, audience_reward = ?, hook_direction = ?,
+                 placement_reason = 'Authoritative replacement for a manually displaced future slot.',
+                 nearby_avoid_json = '[]', exploration_mode = ?, status = 'planned',
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND strategy_id = ? AND cycle_id = ? AND brand_key = ? AND slot_key = ?`,
+          ).bind(
+            replacement.source_card_family_id,
+            generationMode,
+            replacement.source_card_id,
+            sourceSelectionId,
+            normalizeOperatorText(sourceCard?.required_product, 2000, true) ?? "The canonical source-card reward.",
+            normalizeOperatorText(sourceCard?.recommended_direction, 2000, true)
+              ?? "Preserve the canonical hook, structure, premise, and payoff.",
+            explorationMode,
+            existingPlanItem.id,
+            existingPlanItem.strategy_id,
+            cycleId,
+            brandKey,
+            slotKey,
+          ),
+          env.DB.prepare(
+            `UPDATE operator_autonomous_lineup_items
+             SET scheduled_post_id = NULL, status = 'stale', updated_at = CURRENT_TIMESTAMP
+             WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?`,
+          ).bind(cycleId, brandKey, slotKey),
+          env.DB.prepare(
+            `UPDATE operator_manifest_post_hypotheses
+             SET scheduled_post_id = NULL, status = 'superseded', locked_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE cycle_id = ? AND brand_key = ? AND slot_key = ?`,
+          ).bind(cycleId, brandKey, slotKey),
+        ]);
+        await appendManifestCycleEvent(env.DB, {
+          cycleId,
+          brandKey,
+          eventKey: `plan-repair:${slotKey}:${operationId}`,
+          eventType: "cycle_plan_item_repaired",
+          slotKey,
+          payload: {
+            repair_reason: "scheduled_item_no_longer_occupies_locked_future_slot",
+            prior_source_identity_key: displacedPlan.source_identity_key ?? null,
+            replacement_source_identity_key: replacement.source_identity_key,
+            replacement_source_card_id: replacement.source_card_id,
+            source_selection_engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+          },
+        });
+        return env.DB.prepare(
+          `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+                  family_key, strategic_role, generation_mode, source_kind, source_card_id,
+                  source_selection_id, audience_reward, hook_direction, placement_reason,
+                  nearby_avoid_json, exploration_mode, status
+           FROM operator_manifest_cycle_plan_items
+           WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
+           LIMIT 1`,
+        ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>();
+      },
       readLockedSourcePlan: (cycleId, brandKey) => readLockedSourceSelectionPlan(
         env.DB,
         brandKey,

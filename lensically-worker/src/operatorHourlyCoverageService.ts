@@ -38,7 +38,14 @@ export interface OperatorHourlyCoverageServiceDependencies {
     missingSlots: OperatorCoverageSlot[];
     scheduledPostIds: unknown[];
   }): Promise<unknown>;
-    readNextPlanItem(cycleId: string, brandKey: string, slotKey: string): Promise<JsonRecord | null>;
+        readNextPlanItem(cycleId: string, brandKey: string, slotKey: string): Promise<JsonRecord | null>;
+  repairMissingPlanItem(input: {
+    cycleId: string;
+    brandKey: string;
+    slotKey: string;
+    operationId: string;
+    asOf: string;
+  }): Promise<JsonRecord | null>;
   readLockedSourcePlan(cycleId: string, brandKey: string): Promise<JsonRecord[]>;
   readPlanItems(cycleId: string, brandKey: string): Promise<JsonRecord[]>;
 
@@ -165,10 +172,21 @@ export async function handleOperatorHourlyCoverageService(
     });
   }
 
-  const nextSlotKey = coverageState.remaining_missing_slots[0]?.key ?? null;
-    const nextCyclePlanItem = nextSlotKey
+    const nextSlotKey = coverageState.remaining_missing_slots[0]?.key ?? null;
+  let nextCyclePlanItem = nextSlotKey
     ? await dependencies.readNextPlanItem(cycleId, brandKey, nextSlotKey)
     : null;
+  let displacedPlanItemRepaired = false;
+  if (nextSlotKey && !nextCyclePlanItem) {
+    nextCyclePlanItem = await dependencies.repairMissingPlanItem({
+      cycleId,
+      brandKey,
+      slotKey: nextSlotKey,
+      operationId: coverageOperationId,
+      asOf: dependencies.now(),
+    });
+    displacedPlanItemRepaired = Boolean(nextCyclePlanItem);
+  }
   const lockedSourcePlan = (await dependencies.readLockedSourcePlan(cycleId, brandKey)).map((row) => ({
     slot_key: row.slot_key ?? null,
     selection_order: row.selection_order ?? null,
@@ -231,7 +249,8 @@ export async function handleOperatorHourlyCoverageService(
     cycle_elapsed_unfilled_slots: coverageState.elapsed_unfilled_slots,
     cycle_elapsed_unfilled_count: coverageState.elapsed_unfilled_slots.length,
     cycle_scheduled_post_ids: coverageState.scheduled_post_ids,
-        coverage_ledger_drift_repaired: ledgerDrift,
+                coverage_ledger_drift_repaired: ledgerDrift,
+    cycle_displaced_plan_item_repaired: displacedPlanItemRepaired,
     cycle_completion: cycleCompletion,
     cycle_locked_source_plan: lockedSourcePlan,
     cycle_locked_source_plan_count: lockedSourcePlan.length,

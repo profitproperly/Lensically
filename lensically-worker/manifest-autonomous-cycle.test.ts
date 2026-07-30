@@ -69,7 +69,7 @@ describe("Manifest authoritative coverage reconciliation", () => {
     expect(reconciled.elapsed_unfilled_slots).toEqual([
       { key: "2026-07-24T15:00", date: "2026-07-24", time: "15:00" },
     ]);
-    expect(reconciled.scheduled_post_ids).toEqual([705, 716, 748]);
+        expect(reconciled.scheduled_post_ids).toEqual([716, 748]);
   });
 });
 

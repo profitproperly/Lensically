@@ -31,7 +31,8 @@ function createHarness() {
     recordDefect: vi.fn(async () => ({ id: "defect-1" })),
     resolveDefect: vi.fn(async () => ({ id: "defect-1", status: "resolved" })),
     updateCycleCoverage: vi.fn(async () => ({ success: true })),
-        readNextPlanItem: vi.fn(async () => null as JsonRecord | null),
+                readNextPlanItem: vi.fn(async () => null as JsonRecord | null),
+    repairMissingPlanItem: vi.fn(async () => null as JsonRecord | null),
     readLockedSourcePlan: vi.fn(async () => [] as JsonRecord[]),
     readPlanItems: vi.fn(async () => [] as JsonRecord[]),
 
@@ -55,7 +56,8 @@ function createHarness() {
     recordDefect: mocks.recordDefect,
     resolveDefect: mocks.resolveDefect,
     updateCycleCoverage: mocks.updateCycleCoverage,
-        readNextPlanItem: mocks.readNextPlanItem,
+                readNextPlanItem: mocks.readNextPlanItem,
+    repairMissingPlanItem: mocks.repairMissingPlanItem,
     readLockedSourcePlan: mocks.readLockedSourcePlan,
     readPlanItems: mocks.readPlanItems,
 
@@ -177,6 +179,46 @@ describe("Operator hourly coverage product service", () => {
       payload: expect.not.objectContaining({ cycle_locked_source_plan: expect.anything() }),
     }));
 
+  });
+
+    it("repairs a displaced scheduled plan item before returning the next executable slot", async () => {
+    const { dependencies, mocks } = createHarness();
+    const displacedSlot = { key: "2026-07-30T19:00", date: "2026-07-30", time: "19:00" };
+    mocks.readCycle.mockResolvedValueOnce({
+      target_slots: [displacedSlot],
+      missing_slots: [],
+      scheduled_post_ids: [771],
+    });
+    mocks.reconcileCoverage.mockReturnValueOnce({
+      remaining_missing_slots: [displacedSlot],
+      elapsed_unfilled_slots: [],
+      scheduled_post_ids: [],
+    });
+    mocks.readNextPlanItem.mockResolvedValueOnce(null);
+    mocks.repairMissingPlanItem.mockResolvedValueOnce({
+      id: "replacement-plan",
+      slot_key: displacedSlot.key,
+      nearby_avoid_json: "[]",
+      status: "planned",
+    });
+
+    const result = await handleOperatorHourlyCoverageService({
+      brandKey: "manifest_mental",
+      payload: { cycle_id: "cycle-displaced", operation_id: "coverage-displaced" },
+    }, dependencies);
+
+    expect(mocks.repairMissingPlanItem).toHaveBeenCalledWith({
+      cycleId: "cycle-displaced",
+      brandKey: "manifest_mental",
+      slotKey: displacedSlot.key,
+      operationId: "coverage-displaced",
+      asOf: "2026-07-27T22:30:00.000Z",
+    });
+    expect(result).toMatchObject({
+      cycle_displaced_plan_item_repaired: true,
+      cycle_scheduled_post_ids: [],
+      next_cycle_plan_item: { id: "replacement-plan", status: "planned" },
+    });
   });
 
   it("finalizes complete coverage while ignoring elapsed unfilled slots", async () => {
