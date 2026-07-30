@@ -238,10 +238,15 @@ export function reconcileProductionPrefix(repositoryEntries, productionRows) {
 }
 
 export function appliedMigrationChangeIsSafe(change) {
-  return change.status === "A" && Array.isArray(change.commits) && change.commits.length === 1;
+  const latestCommitMs = Date.parse(String(change.latestCommitAt ?? ""));
+  const appliedMs = Date.parse(String(change.appliedAt ?? ""));
+  return change.status === "A"
+    && Number.isFinite(latestCommitMs)
+    && Number.isFinite(appliedMs)
+    && latestCommitMs <= appliedMs;
 }
 
-function assertAppliedMigrationsUnedited(productionSha, appliedNames) {
+function assertAppliedMigrationsUnedited(productionSha, productionRows) {
   if (!/^[a-f0-9]{40}$/i.test(productionSha ?? "")) fail("migration_production_sha_invalid");
   run("git", ["cat-file", "-e", `${productionSha}^{commit}`]);
   try {
@@ -260,14 +265,12 @@ function assertAppliedMigrationsUnedited(productionSha, appliedNames) {
       const [status, ...pathParts] = line.split(/\s+/);
       return { status, path: pathParts[pathParts.length - 1] ?? "" };
     });
-  const appliedSet = new Set(appliedNames);
+    const appliedByName = new Map(productionRows.map((row) => [row.name, row]));
   const unsafeApplied = [];
-  for (const change of changed.filter((entry) => appliedSet.has(basename(entry.path)))) {
-    const commits = run("git", ["log", "--format=%H", `${productionSha}..HEAD`, "--", change.path])
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (!appliedMigrationChangeIsSafe({ status: change.status, commits })) unsafeApplied.push(change.path);
+  for (const change of changed.filter((entry) => appliedByName.has(basename(entry.path)))) {
+    const latestCommitAt = run("git", ["log", "-1", "--format=%cI", "HEAD", "--", change.path]).trim();
+    const appliedAt = appliedByName.get(basename(change.path))?.applied_at ?? null;
+    if (!appliedMigrationChangeIsSafe({ status: change.status, latestCommitAt, appliedAt })) unsafeApplied.push(change.path);
   }
   if (unsafeApplied.length > 0) fail("migration_applied_file_edited", unsafeApplied.join(","));
   return changed.map((entry) => entry.path);
@@ -275,8 +278,8 @@ function assertAppliedMigrationsUnedited(productionSha, appliedNames) {
 
 export function buildMigrationPlan({ productionSha, productionRows, repositoryEntries, sourceSha }) {
   const unapplied = reconcileProductionPrefix(repositoryEntries, productionRows);
-  const appliedNames = productionRows.map((row) => row.name);
-  assertAppliedMigrationsUnedited(productionSha, appliedNames);
+    const appliedNames = productionRows.map((row) => row.name);
+  assertAppliedMigrationsUnedited(productionSha, productionRows);
   for (const entry of unapplied) validateUnappliedMigration(entry);
   const planCore = {
     planVersion: "lensically-d1-release-plan-v1",

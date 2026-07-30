@@ -30,10 +30,22 @@ function expectFailure(callback, code) {
   });
 }
 
-assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: ["one"] }), true);
-assert.equal(appliedMigrationChangeIsSafe({ status: "M", commits: ["one"] }), false);
-assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: ["one", "two"] }), false);
-assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: [] }), false);
+assert.equal(appliedMigrationChangeIsSafe({
+  status: "A",
+  latestCommitAt: "2026-07-30T17:44:00Z",
+  appliedAt: "2026-07-30T17:44:39Z",
+}), true);
+assert.equal(appliedMigrationChangeIsSafe({
+  status: "M",
+  latestCommitAt: "2026-07-30T17:44:00Z",
+  appliedAt: "2026-07-30T17:44:39Z",
+}), false);
+assert.equal(appliedMigrationChangeIsSafe({
+  status: "A",
+  latestCommitAt: "2026-07-30T17:45:00Z",
+  appliedAt: "2026-07-30T17:44:39Z",
+}), false);
+assert.equal(appliedMigrationChangeIsSafe({ status: "A", latestCommitAt: null, appliedAt: null }), false);
 
 withMigrations({
   "0000_legacy.sql": "CREATE TABLE legacy_table (id INTEGER PRIMARY KEY);\n",
