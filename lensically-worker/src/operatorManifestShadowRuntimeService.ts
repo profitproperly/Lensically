@@ -1050,8 +1050,8 @@ async function persistShadowBatch(
     state.missing_slot_keys = state.missing_slot_keys.filter((key) => key !== slotKey);
     results.push(accepted);
   }
-  state.timings.batch_persistence_ms = Number(state.timings.batch_persistence_ms ?? 0) + durationMs(batchStarted);
-  state.timings.batch_reconciliation_ms = Number(state.timings.batch_reconciliation_ms ?? 0) + 1;
+    state.timings.batch_persistence_ms = Number(state.timings.batch_persistence_ms ?? 0) + durationMs(batchStarted);
+  const reconciliationStarted = Date.now();
   state.last_client_response_at = dependencies.now().toISOString();
   state.completed = state.missing_slot_keys.length === 0;
   await writeState(dependencies.shadowDb, state);
@@ -1063,9 +1063,11 @@ async function persistShadowBatch(
     rejected_count: results.filter((item) => item.success !== true).length,
     remaining_missing_count: state.missing_slot_keys.length,
     rejected_slots: results.filter((item) => item.success !== true).map((item) => item.slot_key).filter(Boolean),
-    coverage_reconciled_once: true,
+        coverage_reconciled_once: true,
+    test_case: state.test_case,
+    payload_bytes: jsonBytes(payload),
   };
-  await recordManifestShadowStageEvent(dependencies.shadowDb, {
+    await recordManifestShadowStageEvent(dependencies.shadowDb, {
     run_id: runId,
     stage_key: "batch_persistence",
     event_key: `batch:${batchOperationId}`,
@@ -1074,6 +1076,26 @@ async function persistShadowBatch(
     duration_ms: durationMs(batchStarted),
     payload: responseReceipt,
   });
+  state.timings.batch_reconciliation_ms = Number(state.timings.batch_reconciliation_ms ?? 0) + durationMs(reconciliationStarted);
+  await writeState(dependencies.shadowDb, state);
+  if (state.test_case === "interrupted_replay"
+      && Number(state.counters.interruption_injection_count ?? 0) === 0) {
+    state.counters.interruption_injection_count = 1;
+    await writeState(dependencies.shadowDb, state);
+    return {
+      body: {
+        success: false,
+        expected_failure: true,
+        error: "manifest_shadow_simulated_response_interruption",
+        side_effect_state: "confirmed",
+        shadow_run_id: runId,
+        batch_operation_id: batchOperationId,
+        retryable: true,
+        required_next_action: "Replay the identical batch operation_id and candidates. The durable batch receipt already exists and no item may be duplicated.",
+      },
+      status: 503,
+    };
+  }
   let benchmark: JsonRecord | null = null;
   if (state.completed) {
     benchmark = await finalizeBenchmark(dependencies, state, state.last_client_response_at);
