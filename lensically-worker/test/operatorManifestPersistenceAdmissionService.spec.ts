@@ -142,6 +142,22 @@ function createHarness() {
 }
 
 describe("operatorManifestPersistenceAdmissionService", () => {
+  it("rejects a locked strategy without consumed decision-bundle lineage", async () => {
+    const harness = createHarness();
+    harness.mocks.getCycleStrategy.mockResolvedValue({ id: "strategy-1", directives: ["preserve"] });
+
+    const result = await admitOperatorManifestPersistence({
+      brandKey: "manifest_mental",
+      accountId: "account-1",
+      threadsUserId: "threads-1",
+      payload: harness.payload,
+    }, harness.dependencies);
+
+    expect(result.handled).toBe(true);
+    if (!result.handled) throw new Error("expected handled rejection");
+    expect(result.response.error).toBe("manifest_consumed_decision_bundle_required");
+  });
+
   it("rejects candidates that do not match the locked cycle plan", async () => {
     const harness = createHarness();
     harness.mocks.getCyclePlanItem.mockResolvedValue({
