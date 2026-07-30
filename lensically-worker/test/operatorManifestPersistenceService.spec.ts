@@ -260,7 +260,7 @@ describe("operatorManifestPersistenceService", () => {
     expect(harness.mocks.runGateSuite).not.toHaveBeenCalled();
   });
 
-  it("requires explicit evidence for every canonical owner hard ban", async () => {
+    it("executes canonical hard bans server-side without model-written pass evidence", async () => {
     const harness = createHarness();
     harness.context.modelEvaluation = { gate_summary: { results: [] } };
 
@@ -272,12 +272,17 @@ describe("operatorManifestPersistenceService", () => {
     }, harness.dependencies);
 
     expect(result).toMatchObject({
-      success: false,
-      error: "canonical_hard_ban_evaluation_incomplete",
-      missing_rule_keys: ["no-profanity"],
+      success: true,
+      server_checks: {
+        canonical_hard_bans_server_owned: true,
+        model_hard_ban_pass_evidence_required: false,
+      },
     });
-    expect(harness.mocks.runGateSuite).not.toHaveBeenCalled();
-    expect(harness.mocks.createScheduledPost).not.toHaveBeenCalled();
+    expect(harness.mocks.listHardBans).toHaveBeenCalledWith("manifest_mental");
+    expect(harness.mocks.runGateSuite).toHaveBeenCalledWith(expect.objectContaining({
+      modelGateResults: [],
+    }));
+    expect(harness.mocks.createScheduledPost).toHaveBeenCalledTimes(1);
   });
 
   it("blocks publication and records exact missing lineage stages", async () => {
