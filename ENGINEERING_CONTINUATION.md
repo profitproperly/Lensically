@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
-active_checkpoint: stage_1_in_progress
+active_checkpoint: stage_1_blocked_workflow_dispatch_422
 implementation_source_head: bcce3958a903263ba846ab5d473d00e22b744369
 production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
 
