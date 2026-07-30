@@ -6,10 +6,10 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-runtime-activation
-active_checkpoint: exact_sha_worker_release
+active_checkpoint: awaiting_mcp_refresh_for_innovation_smoke
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: 0da4252e6c8cc587ba7352b0ba0b50aa40f013db
+production_sha: d8b054bd74da62b1fdc8264d13b467ef1323baa6
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -134,8 +134,11 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Final exact-head full source validation: SHA `00b69aee8ef6314f804718445dea0a13b4da2feb`, run `30587192686` — SUCCESS.
 - Final eight-shard deterministic Operator validation: SHA `00b69aee8ef6314f804718445dea0a13b4da2feb`, run `30587204130` — SUCCESS; 8/8 shards passed.
 - The final 48-slot decision bundle preserves every authoritative slot and source identity under the unchanged 24KB contract through deterministic bounded compaction.
-- Production remained exact SHA `0da4252e6c8cc587ba7352b0ba0b50aa40f013db` throughout this implementation.
-- Worker release jobs were skipped. No deployment or Main-cycle invocation occurred.
+- Innovation runtime activation release: SHA `d8b054bd74da62b1fdc8264d13b467ef1323baa6`, run `30591416277` — SUCCESS.
+- The release provisioned, migrated, and bound isolated `SHADOW_DB`, deployed the exact Worker head, and verified production runtime plus the existing scheduler without invoking the Main generation cycle.
+- Post-release Operator smoke: run `30591617902` — SUCCESS.
+- Live Execution Kernel route verification passed 116/116 internal capabilities with 47 read-only and 69 mutation routes, zero mutations executed, at deployed SHA `d8b054bd74da62b1fdc8264d13b467ef1323baa6`.
+- The current ChatGPT connector schema remains cached and does not yet advertise the four newly deployed Innovation tools; one explicit MCP refresh is required before the isolated smoke invocation.
 
 ## Deferred Work — INACTIVE
 
@@ -148,11 +151,10 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 
 ## Current Action
 
-1. Run one explicit exact-SHA Worker release from the current repository head.
-2. Verify the deployed Worker reports that exact SHA and the existing Main scheduler remains healthy without invoking the Main generation cycle.
-3. Verify the live public MCP exposes `prepare_manifest_shadow_cycle`, `commit_manifest_shadow_cycle_strategy`, `persist_manifest_shadow_batch`, and `get_manifest_shadow_cycle_receipt`.
-4. Execute one isolated no-op Innovation smoke cycle against `SHADOW_DB`; prove zero Main database access, zero production receipt writes, and zero Threads requests.
-5. Record the release and smoke receipts, set this job completed, and stop.
+1. Refresh the Lensically Operator Mode MCP so this ChatGPT session loads the newly deployed public tool schema.
+2. Verify the refreshed schema exposes `prepare_manifest_shadow_cycle`, `commit_manifest_shadow_cycle_strategy`, `persist_manifest_shadow_batch`, and `get_manifest_shadow_cycle_receipt`.
+3. Execute one isolated no-op Innovation smoke cycle against `SHADOW_DB`; prove zero Main database access, zero production receipt writes, and zero Threads requests.
+4. Record the isolated smoke receipt, set this job completed, and stop.
 
 Do not invoke, dry-run, canary, schedule through, publish through, or promote the Main Cycle.
 
