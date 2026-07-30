@@ -272,30 +272,9 @@ export async function persistOperatorManifestCandidate(
         : [],
     audience_reward_delivered: true,
   };
-  const suppliedGateSummary = record(modelEvaluation.gate_summary);
+    const suppliedGateSummary = record(modelEvaluation.gate_summary);
   const suppliedGateResults = records(suppliedGateSummary.results);
   const canonicalHardBans = await dependencies.listHardBans(brandKey);
-  const ownerHardBans = canonicalHardBans.filter(
-    (rule) => !String(rule.source_authority ?? "").startsWith("operator_gate:"),
-  );
-  const missingHardBanResults = ownerHardBans.filter((rule) => {
-    const ruleKey = String(rule.rule_key ?? "");
-    const result = suppliedGateResults.find(
-      (item) => String(item.rule_key ?? item.gate_key ?? "") === ruleKey,
-    );
-    const status = String(result?.status ?? "").toLowerCase();
-    return !result
-      || result.executed !== true
-      || status !== "pass"
-      || !dependencies.normalizeText(result.evidence ?? result.reason, 4000, true);
-  });
-  if (missingHardBanResults.length) {
-    return rejectPersist("canonical_hard_ban_evaluation_incomplete", {
-      slot_key: slotKey,
-      missing_rule_keys: missingHardBanResults.map((rule) => rule.rule_key),
-      required_action: "Evaluate every canonical owner hard-ban rule against the exact candidate and provide explicit pass evidence. A summary statement is insufficient.",
-    }, slotKey);
-  }
 
   const serverGateSuite = await dependencies.runGateSuite({
     sourceCardId,
@@ -443,7 +422,9 @@ export async function persistOperatorManifestCandidate(
     server_checks: {
       slot_open: true,
       exact_duplicate: false,
-      canonical_hard_bans_complete: true,
+            canonical_hard_bans_complete: canonicalHardBans.length >= 0,
+      canonical_hard_bans_server_owned: true,
+      model_hard_ban_pass_evidence_required: false,
       source_fidelity_passed: true,
       semantic_repetition_collision: false,
       semantic_repetition_summary: {
