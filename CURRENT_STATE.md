@@ -107,6 +107,18 @@
 
 ## Engineering and Release
 
+### Manifest Innovation Cycle
+
+- Manifest now has two cycle-level rails. The **Innovation Cycle** is the permanent upstream engineering rail; the **Main Cycle** is the protected downstream production rail and authoritative historical truth.
+- The one bootstrap clone is complete. Innovation remains at parity with or ahead of Main and sits idle when no manually approved improvement is active. Main is never cloned again.
+- A new improvement begins only after an explicit 007-and-M decision. Development, fault injection, stress testing, benchmarking, and end-to-end proof occur only in Innovation. There is no autonomous activation, continuous experimentation, automatic promotion, or automatic next challenger.
+- Main is not a test environment. Its server-generated order, mathematics, source exposure, strategies, hypotheses, experiments, generation records, semantic signatures, Content Focus, lineage, learning, and performance evidence are protected from synthetic or partial test artifacts.
+- Innovation uses the canonical production schema and production-shaped lineage inside isolated `SHADOW_DB`. Its runtime composition receives no production `DB`; acceptance is snapshot-only, rejects `live_read`, performs no Threads request, and writes benchmark receipts only inside `SHADOW_DB`.
+- The verified Innovation flow covers preparation, frozen decision bundle, authoritative source plan, strategy lock, generation, deterministic gates, one-to-four candidate persistence, hypotheses, experiments, decision influences, schedule-shaped rows, complete lineage, one batch reconciliation, completion, replay, retention, cleanup, and compact redacted receipts.
+- Exact-head validation `30585818598` passed at source SHA `6792038bd7ba6d72298f2e6264122d3a5b4af382`. The acceptance matrix proves three consecutive no-op runs at or below 30 seconds, three complete 24-slot runs at or below 6 minutes, and three complete 48-slot recovery runs below 10 minutes. The previous 48-slot Main baseline was approximately 3 hours 22 minutes, so the proven recovery ceiling is more than 20 times faster while preserving the required operational contract.
+- Release preflight fails if Innovation regains Main database access, exposes live evidence mode, writes benchmark receipts outside `SHADOW_DB`, loses zero-access/redaction regressions, or restores the retired production-bound composition.
+- No Innovation code has been deployed or promoted into Main. Production remains exact SHA `0da4252e6c8cc587ba7352b0ba0b50aa40f013db`. Any future promotion requires a new explicit 007-and-M engineering decision and a separate job.
+
 - GitHub `main` is the repository source of truth.
 - `ENGINEERING_CONTINUATION.md` is the sole root-level continuation authority for all Lensically work, not only engineering. It contains every accepted incomplete job, deterministic precedence, exactly one active job, and exactly one current action. `getEngineeringContinuation` exposes it directly; D1 work-state tables and action-closure receipts are telemetry and may never override it.
 - Stage 4 database authority is enforced by `lensically-worker/database/schema-authority.json` and `scripts/validate-database-authority.mjs`. Release preflight now inventories runtime DDL owners, blocks undeclared sources or duplicate owners, and freezes retired-table recreation debt until migration extraction removes it.

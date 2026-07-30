@@ -113,7 +113,19 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 - Post evidence uses the post's own metrics. Account follower totals are trajectory data only and must never be attributed to a post, day, batch, or posting period.
 - Source selection and generation use adaptive expected marginal value. Treat recent frequency as audience-exposure context, not fatigue proof. Cooling requires comparable performance decay or degraded execution quality; strong winners continue playing while the Operator develops emerging, adjacent, and original mechanisms.
 
+## Manifest Innovation Cycle
+
+- Maintain exactly two Manifest cycle rails: Innovation upstream and Main downstream. The one bootstrap clone has already been performed; never clone Main again.
+- Innovation is permanently equal to or ahead of Main. When no improvement is active, it remains idle at parity. When 007 and M explicitly authorize an improvement, only Innovation advances until it is fully proven.
+- Main preserves authoritative operational and historical truth. Never use it for experiments, stress tests, dry runs, canaries, fault injection, synthetic schedule rows, benchmark receipts, or acceptance validation.
+- Innovation work is a manual 007-and-M workflow. Never activate it autonomously, run a continuous self-improvement loop, promote automatically, or create a new challenger after completion.
+- Innovation acceptance is physically isolated in `SHADOW_DB`, snapshot-only, production-shaped, and zero-network. The runtime may not receive production `DB`; `live_read` is forbidden; Threads reads and writes are forbidden; test receipts and lineage remain isolated.
+- Preserve parity by reusing canonical schemas and shared domain contracts rather than copying a second Manifest engine. Innovation may add narrow adapters, orchestration, fault injection, isolated persistence, and benchmark receipts, but duplicated strategy, source-selection, gate, lineage, or learning logic is prohibited.
+- Promotion is not part of Innovation development. After complete end-to-end proof, stop. A separate explicit 007-and-M decision may authorize porting only the validated implementation into Main; never promote test data, synthetic history, or Innovation lineage.
+- The current proven envelope is no-op at or below 30 seconds, 24 slots at or below 6 minutes, and 48 slots below 10 minutes, with complete lineage, selective regeneration, idempotent replay, retained-failure cleanup, same-snapshot A/B, compact text-redacted receipts, and zero Main/Threads access.
+
 ## Recovery and Client Boundaries
+
 
 - Recovery remains independently deployed and source-defined. It must not depend on the main gateway, main D1 preparation, account data, or Operator routing.
 - Main `repository_status` is the normal source for the current repository SHA, bounded GitHub checks, commit statuses, and Cloudflare validation state. Use Recovery only for break-glass classes that Main or its deployment plane cannot receive or complete: free-text discovery when the location is unknown, terminal failure diagnostics, exact repair of a blocked Main contract, health inspection, rollback, and smoke verification. Return normal engineering state, work intake, validation, and release to Main immediately after repair.
