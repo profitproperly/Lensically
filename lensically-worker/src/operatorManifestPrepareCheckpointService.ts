@@ -250,9 +250,9 @@ export async function handleOperatorManifestPrepareCheckpoint(
           dependencies.checkpointVersion,
           "delta_learning_reused",
           "cycle_construction",
-          "The latest finalized learning snapshot is fresh and no new due maturity checkpoints were processed. Server orchestration will construct the cycle without rebuilding unchanged intelligence layers.",
+                    "The latest finalized learning snapshot is fresh and no new due maturity checkpoints were processed. Server orchestration will construct the cycle without rebuilding unchanged intelligence layers.",
           {
-            durable_learning_snapshot_id: activeBrief.id,
+            durable_learning_snapshot_id: activeBriefId,
             delta_refresh_required: false,
           },
         );
