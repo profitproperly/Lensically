@@ -69,9 +69,8 @@ function createHarness() {
     normalizeText,
     normalizeMachineKey: (value, fallback) => typeof value === "string" && value.trim() ? value.trim() : fallback,
     readCycle: mocks.readCycle,
-    appendCycleEvent: mocks.appendCycleEvent,
+        appendCycleEvent: mocks.appendCycleEvent,
     getCycleStrategy: mocks.getCycleStrategy,
-    getEvidenceConsumption: mocks.getEvidenceConsumption,
     validateHypothesis: () => ({
       ok: true,
       value: {
