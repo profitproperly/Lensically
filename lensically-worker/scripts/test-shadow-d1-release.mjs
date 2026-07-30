@@ -5,7 +5,8 @@ import {
   SHADOW_DATABASE_BINDING,
   SHADOW_DATABASE_NAME,
   SHADOW_MIGRATIONS_TABLE,
-  injectShadowDatabaseBinding,
+    injectShadowDatabaseBinding,
+  parseCreatedShadowDatabaseId,
   selectShadowDatabaseId,
   verifyShadowBinding,
 } from "./shadow-d1-release.mjs";
@@ -19,6 +20,19 @@ assert.equal(
   "shadow-id-2",
 );
 assert.equal(selectShadowDatabaseId([{ name: "other", uuid: "no" }]), null);
+assert.equal(
+  parseCreatedShadowDatabaseId('{"uuid":"11111111-2222-3333-4444-555555555555"}'),
+  "11111111-2222-3333-4444-555555555555",
+);
+assert.equal(
+  parseCreatedShadowDatabaseId('database_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"'),
+  "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+);
+assert.equal(
+  parseCreatedShadowDatabaseId('Created database ffffffff-1111-2222-3333-444444444444 successfully'),
+  "ffffffff-1111-2222-3333-444444444444",
+);
+assert.equal(parseCreatedShadowDatabaseId("created without an identifier"), null);
 
 const source = {
   name: "lensically-worker",

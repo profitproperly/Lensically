@@ -53,6 +53,28 @@ function parseJsonOutput(output, label) {
   }
 }
 
+export function parseCreatedShadowDatabaseId(output) {
+  const text = String(output ?? "");
+  try {
+    const parsed = parseJsonOutput(text, "create");
+    const structured = String(
+      parsed?.uuid
+        ?? parsed?.id
+        ?? parsed?.database_id
+        ?? parsed?.result?.uuid
+        ?? parsed?.result?.id
+        ?? "",
+    ).trim();
+    if (structured) return structured;
+  } catch {
+    // Wrangler 4 d1 create emits human-readable TOML instead of JSON.
+  }
+  const labeled = text.match(/(?:database_id|uuid|id)\s*[=:]\s*["']?([0-9a-f]{8}-[0-9a-f-]{27,})["']?/i);
+  if (labeled?.[1]) return labeled[1];
+  const bare = text.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i);
+  return bare?.[0] ?? null;
+}
+
 export function selectShadowDatabaseId(listPayload, databaseName = SHADOW_DATABASE_NAME) {
   const rows = Array.isArray(listPayload)
     ? listPayload
@@ -95,18 +117,8 @@ function ensureShadowDatabase() {
   const listed = parseJsonOutput(runWrangler(["d1", "list", "--json"]), "list");
   const existingId = selectShadowDatabaseId(listed);
   if (existingId) return existingId;
-  const created = parseJsonOutput(
-    runWrangler(["d1", "create", SHADOW_DATABASE_NAME, "--json"]),
-    "create",
-  );
-  const createdId = String(
-    created?.uuid
-      ?? created?.id
-      ?? created?.database_id
-      ?? created?.result?.uuid
-      ?? created?.result?.id
-      ?? "",
-  ).trim();
+    const createdOutput = runWrangler(["d1", "create", SHADOW_DATABASE_NAME]);
+  const createdId = parseCreatedShadowDatabaseId(createdOutput);
   if (!createdId) throw new Error("shadow_d1_create_id_missing");
   return createdId;
 }
