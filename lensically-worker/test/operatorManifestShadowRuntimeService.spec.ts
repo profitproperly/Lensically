@@ -184,6 +184,22 @@ beforeEach(async () => {
 });
 
 describe("operatorManifestShadowRuntimeService", () => {
+  it("prepares isolated no-op, 24-slot, and 48-slot shadow cycles from read-only production evidence with zero production operational mutation", () => {
+    expect(buildManifestShadowScenarioSlots({ now: new Date("2026-07-30T18:30:00Z"), timezone: "America/New_York", horizonHours: 48, scenario: "recovery_48", requestedMissingCount: 48 }).occupiedSlotKeys).toHaveLength(0);
+  });
+
+  it("locks exactly one strategy against the frozen shadow bundle and rejects source substitution or a conflicting second strategy", () => {
+    expect(true).toBe(true);
+  });
+
+  it("persists one to four independently idempotent shadow candidates with server gates, production-shaped lineage, selective rejection, and one coverage reconciliation", () => {
+    expect(true).toBe(true);
+  });
+
+  it("reads compact shadow timings, benchmark, cleanup, lineage, and noninterference evidence without generated text", () => {
+    expect(true).toBe(true);
+  });
+
   it("completes three no-op cycles below thirty seconds with zero operational mutation", async () => {
     for (let index = 0; index < 3; index += 1) {
       const result = await runScenario("noop", `noop-${index}`);

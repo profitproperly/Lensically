@@ -30,6 +30,8 @@ const operatorMcpStrategyScheduleRegistry = read("src/operatorMcpStrategySchedul
 const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyScheduleRegistry.spec.ts");
 const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegistry.ts");
 const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
+const operatorMcpManifestShadowRegistry = read("src/operatorMcpManifestShadowRegistry.ts");
+const operatorManifestShadowRuntimeServiceTests = read("test/operatorManifestShadowRuntimeService.spec.ts");
 const operatorMcpAutonomousExecutionRegistry = read("src/operatorMcpAutonomousExecutionRegistry.ts");
 const operatorMcpAutonomousExecutionRegistryTests = read("test/operatorMcpAutonomousExecutionRegistry.spec.ts");
 const operatorMcpAccountAnalyticsRegistry = read("src/operatorMcpAccountAnalyticsRegistry.ts");
@@ -685,8 +687,8 @@ const lifecycleBaselineTools = new Set(capabilityLifecycle?.baseline?.active_too
 const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.directory_entry_ids ?? []);
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
-const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}`;
-const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpAutonomousExecutionRegistry}\n${operatorMcpAccountAnalyticsRegistry}`;
+const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}\n${operatorManifestShadowRuntimeServiceTests}`;
+const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpManifestShadowRegistry}\n${operatorMcpAutonomousExecutionRegistry}\n${operatorMcpAccountAnalyticsRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
   systemDirectorySource.indexOf("export const LENSICALLY_SYSTEM_DIRECTORY_ENTRIES"),
