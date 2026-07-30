@@ -752,7 +752,11 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 75-tool public surface and retirement policy")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 79-tool public surface and retirement policy")
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("persist_manifest_shadow_batch")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")')
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
 }
