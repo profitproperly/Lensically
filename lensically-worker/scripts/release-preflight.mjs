@@ -1517,10 +1517,10 @@ if (!operatorHourlyCoverageServiceTests.includes("preserves generic bounded hour
 
   lifecycleErrors.push("operator_hourly_coverage_service_tests_incomplete");
 }
-if (!source.includes('from "./operatorManifestPrepareCheckpointService"')
-    || !source.includes("handleOperatorManifestPrepareCheckpoint({")
+if (!source.includes('from "./operatorManifestPreparationOrchestratorService"')
+    || !source.includes("orchestrateOperatorManifestPrepareCheckpoint({")
     || !source.includes("if (checkpointResult.handled) return checkpointResult.response;")) {
-  lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_import_or_binding_missing");
+  lifecycleErrors.push("operator_manifest_prepare_orchestrator_import_or_binding_missing");
 }
 if (source.includes('error: "manifest_live_collection_checkpoint_missing"')
     || source.includes('stage_completed: "manifest_intelligence_semantic"')
