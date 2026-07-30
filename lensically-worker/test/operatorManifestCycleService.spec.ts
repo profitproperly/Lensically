@@ -233,9 +233,9 @@ describe("Operator Manifest cycle product service", () => {
       brandKey: "manifest_mental",
       payload: { cycle_id: "cycle-1", snapshot_id: "snapshot-1" },
     }, dependencies);
-    expect(incomplete).toEqual({
+        expect(incomplete).toEqual({
       status: 400,
-      body: { success: false, error: "complete_cycle_strategy_required" },
+      body: { success: false, error: "cycle_snapshot_and_decision_bundle_required" },
     });
 
     const completed = await handleOperatorManifestCycleServiceTool({
