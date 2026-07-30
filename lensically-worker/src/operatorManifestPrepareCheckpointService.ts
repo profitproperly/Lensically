@@ -240,9 +240,9 @@ export async function handleOperatorManifestPrepareCheckpoint(
           timezone,
           horizon_hours: horizonHours,
           state: {
-            runtime_now_iso: runtimeNowIso,
+                        runtime_now_iso: runtimeNowIso,
             threads_snapshot: dependencies.compactThreadsSnapshot(threadsSnapshot),
-            durable_learning_snapshot_id: activeBrief.id,
+            durable_learning_snapshot_id: activeBriefId,
           },
         });
         return continuation(
