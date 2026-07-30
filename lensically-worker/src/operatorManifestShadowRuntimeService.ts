@@ -866,6 +866,7 @@ async function commitShadowStrategy(
       && String(item.source_card_id ?? "") === String(state.locked_source_lineup[index]?.source_card_id ?? "")
     );
   if (!lineupValid) return { body: { success: false, error: "manifest_shadow_locked_lineup_mismatch" }, status: 409 };
+    const strategyStarted = Date.now();
   const strategy = {
     strategy_id: `shadow-strategy-${(await sha256(`${runId}|${stableJson(payload)}`)).slice(0, 32)}`,
     account_conclusion: record(payload.account_conclusion),
@@ -887,8 +888,10 @@ async function commitShadowStrategy(
       ? { body: { success: true, reused: true, shadow_run_id: runId, strategy: state.strategy }, status: 200 }
       : { body: { success: false, error: "manifest_shadow_conflicting_strategy_blocked" }, status: 409 };
   }
-  const gapMs = Math.max(0, Date.now() - Date.parse(state.last_client_response_at));
+    const gapMs = Math.max(0, Date.now() - Date.parse(state.last_client_response_at));
   state.timings.strategy_client_gap_ms = gapMs;
+  state.timings.strategy_ms = durationMs(strategyStarted);
+  state.counters.payload_bytes = Number(state.counters.payload_bytes ?? 0) + jsonBytes(payload);
   state.strategy = strategy;
   state.last_client_response_at = dependencies.now().toISOString();
   await writeState(dependencies.shadowDb, state);
@@ -898,8 +901,14 @@ async function commitShadowStrategy(
     event_key: "strategy_locked",
     status: "completed",
     completed_at: state.last_client_response_at,
-    duration_ms: gapMs,
-    payload: { strategy_id: strategy.strategy_id, lineup_count: suppliedLineup.length, decision_bundle_id: bundleId },
+        duration_ms: Number(state.timings.strategy_ms ?? 0),
+    payload: {
+      strategy_id: strategy.strategy_id,
+      lineup_count: suppliedLineup.length,
+      decision_bundle_id: bundleId,
+      client_gap_ms: gapMs,
+      payload_bytes: jsonBytes(payload),
+    },
   });
   return {
     body: {
