@@ -551,14 +551,18 @@ async function prepareShadowCycle(
 ): Promise<{ body: JsonRecord; status: number }> {
   if (!dependencies.shadowDb) return { body: { success: false, error: "manifest_shadow_database_unavailable" }, status: 503 };
   if (identity.brandKey !== "manifest_mental") return { body: { success: false, error: "manifest_shadow_manifest_only" }, status: 400 };
-  const scenario = machineKey(payload.scenario, "normal_24");
+    const scenario = machineKey(payload.scenario, "normal_24");
   if (!SHADOW_SCENARIOS.has(scenario)) return { body: { success: false, error: "manifest_shadow_scenario_invalid" }, status: 400 };
-  const evidenceMode = payload.evidence_mode === "live_read" ? "live_read" : "snapshot";
+  const testCase = machineKey(payload.test_case, "baseline") as ManifestShadowTestCase;
+  if (!SHADOW_TEST_CASES.has(testCase)) return { body: { success: false, error: "manifest_shadow_test_case_invalid" }, status: 400 };
+  const evidenceMode = testCase === "live_read_zero_mutation" || payload.evidence_mode === "live_read"
+    ? "live_read"
+    : "snapshot";
   const variantKey = machineKey(payload.variant_key, "control");
   const timezone = stringValue(payload.timezone, "America/New_York");
   const requestedMissingCount = scenarioMissingCount(scenario, payload.missing_count);
   const horizonHours = Math.max(requestedMissingCount, Math.min(72, Math.max(1, Math.trunc(Number(payload.horizon_hours ?? Math.max(48, requestedMissingCount))))));
-  const operationRoot = stringValue(payload.operation_id, `${identity.brandKey}:shadow:${scenario}:${variantKey}:${new Date().toISOString().slice(0, 10)}`);
+    const operationRoot = stringValue(payload.operation_id, `${identity.brandKey}:shadow:${scenario}:${testCase}:${variantKey}:${new Date().toISOString().slice(0, 10)}`);
   const now = dependencies.now();
   const nowIso = now.toISOString();
   const runId = `shadow-${(await sha256(operationRoot)).slice(0, 32)}`;
@@ -572,7 +576,8 @@ async function prepareShadowCycle(
         success: true,
         reused: true,
         shadow_run_id: existing.id,
-        status: existing.status,
+                status: existing.status,
+        test_case: state?.test_case ?? testCase,
         decision_bundle_id: state?.decision_bundle_id ?? null,
         decision_bundle: state?.decision_bundle ?? null,
         remaining_missing_count: state?.missing_slot_keys.length ?? null,
@@ -659,7 +664,8 @@ async function prepareShadowCycle(
       brand_key: identity.brandKey,
       account_id: identity.accountId,
       threads_user_id: identity.threadsUserId,
-      scenario,
+            scenario,
+      test_case: testCase,
       evidence_mode: evidenceMode,
       variant_key: variantKey,
       operation_root: operationRoot,
@@ -687,7 +693,19 @@ async function prepareShadowCycle(
         source_selection_ms: durationMs(selectionStarted),
         preparation_ms: durationMs(totalStarted),
       },
-      counters: { external_read_count: evidenceMode === "live_read" ? 1 : 0, retry_count: 0, continuation_count: 0 },
+            counters: {
+        external_read_count: evidenceMode === "live_read" ? 1 : 0,
+        retry_count: 0,
+        continuation_count: 0,
+        payload_bytes: jsonBytes(payload) + jsonBytes(decisionBundle),
+        gate_count: 0,
+        lineage_count: 0,
+        batch_call_count: 0,
+        delta_refresh_count: 0,
+        source_replacement_count: 0,
+        collision_injection_count: 0,
+        interruption_injection_count: 0,
+      },
       threads_mutation_count: 0,
     };
     const snapshot: ManifestShadowSnapshot = {
@@ -731,7 +749,8 @@ async function prepareShadowCycle(
         success: true,
         reused: false,
         shadow_run_id: run.id ?? runId,
-        scenario,
+                scenario,
+        test_case: testCase,
         evidence_mode: evidenceMode,
         variant_key: variantKey,
         code_sha: dependencies.codeSha,
