@@ -34,6 +34,19 @@ export const MANIFEST_SHADOW_DECISION_BUNDLE_VERSION = "manifest-shadow-decision
 export const MANIFEST_SHADOW_BATCH_VERSION = "manifest-shadow-batch-v1";
 
 const SHADOW_SCENARIOS = new Set(["noop", "normal_24", "recovery_48", "custom"]);
+export const MANIFEST_SHADOW_TEST_CASES = [
+  "baseline",
+  "mid_batch_collision",
+  "gate_rejection_regeneration",
+  "interrupted_replay",
+  "stale_delta_refresh",
+  "invalidated_source_replacement",
+  "retained_failure_cleanup",
+  "same_snapshot_ab",
+  "live_read_zero_mutation",
+] as const;
+export type ManifestShadowTestCase = typeof MANIFEST_SHADOW_TEST_CASES[number];
+const SHADOW_TEST_CASES = new Set<string>(MANIFEST_SHADOW_TEST_CASES);
 const REQUIRED_MODEL_ASSESSMENTS = [
   "novelty_assessment",
   "winner_preservation_assessment",
@@ -70,8 +83,9 @@ export type ManifestShadowRuntimeState = {
   run_id: string;
   brand_key: string;
   account_id: string;
-  threads_user_id: string;
+    threads_user_id: string;
   scenario: string;
+  test_case: ManifestShadowTestCase;
   evidence_mode: "snapshot" | "live_read";
   variant_key: string;
   operation_root: string;
@@ -136,6 +150,10 @@ function records(value: unknown): JsonRecord[] {
   return Array.isArray(value)
     ? value.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object" && !Array.isArray(item))
     : [];
+}
+
+function jsonBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value ?? null)).byteLength;
 }
 
 function stringValue(value: unknown, fallback = ""): string {
