@@ -5753,7 +5753,7 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                                                                                                expect(eligibleMutations).toBe(65);
+                                                                                                    expect(eligibleMutations).toBe(69);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 
