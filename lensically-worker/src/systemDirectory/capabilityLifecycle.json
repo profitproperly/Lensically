@@ -485,7 +485,7 @@
       "canonical_handler": "persist_manifest_autonomous_post",
       "route_intent": "persist manifest autonomous post",
       "implementation_mode": "new_handler",
-            "focused_regression": "persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt",
+                        "focused_regression": "persists one source-card-backed post through the consumed-bundle strategy and shared size-one wrapper",
       "release_scope": "operator-content",
                         "live_verification": "The exact deployed Main tool requires a locked strategy carrying the consumed decision-bundle identity; rejects original model posts, mismatched plan items, missing canonical source cards, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, failed backend gates, and incomplete lineage; deterministic hard bans are server-owned and a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently through the shared size-one reconciliation wrapper.",
       "compatibility_bridge": false
