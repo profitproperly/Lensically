@@ -1129,13 +1129,26 @@ function serializeCycleStrategy(row: JsonRecord): JsonRecord {
 
 export async function commitManifestCycleStrategy(db: D1Database, input: {
   cycleId: string; brandKey: string; snapshotId: string;
+  decisionBundleId: string; decisionBundleHash: string;
   accountConclusion: JsonRecord; contentFocus: JsonRecord; benchmarks: JsonRecord;
   strongestExecutions: JsonRecord[]; weakestExecutions: JsonRecord[];
   directives: JsonRecord; experiments: JsonRecord[]; risks: unknown[]; lineup: JsonRecord[];
 }): Promise<JsonRecord> {
-  const consumption = await getManifestEvidenceConsumptionState(db, input.cycleId, input.brandKey);
-  if (consumption.complete !== true || String(consumption.snapshot_id ?? "") !== input.snapshotId) {
-    throw new Error("manifest_analysis_pages_not_fully_consumed");
+    const decisionBundle = await db.prepare(
+    `SELECT id, bundle_hash, snapshot_id, consumed_at
+     FROM operator_manifest_decision_bundles
+     WHERE id = ? AND cycle_id = ? AND brand_key = ? AND snapshot_id = ? LIMIT 1`,
+  ).bind(
+    input.decisionBundleId,
+    input.cycleId,
+    input.brandKey,
+    input.snapshotId,
+  ).first<JsonRecord>();
+  if (!decisionBundle || !decisionBundle.consumed_at) {
+    throw new Error("manifest_decision_bundle_not_consumed");
+  }
+  if (String(decisionBundle.bundle_hash ?? "") !== input.decisionBundleHash) {
+    throw new Error("manifest_decision_bundle_hash_mismatch");
   }
     const followerBoundary = validateManifestFollowerAttributionBoundary({
     account_conclusion: input.accountConclusion,
@@ -1231,7 +1244,9 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   if (receivedKeys.size !== requiredKeys.size || [...requiredKeys].some((key) => !receivedKeys.has(key))) {
     throw new Error("manifest_cycle_lineup_must_cover_every_authoritative_missing_slot");
   }
-  const body = {
+    const body = {
+    decision_bundle_id: input.decisionBundleId,
+    decision_bundle_hash: input.decisionBundleHash,
     account_conclusion: input.accountConclusion,
     content_focus: input.contentFocus,
     benchmarks: input.benchmarks,
@@ -1251,13 +1266,15 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   }
   const strategyId = crypto.randomUUID();
   const lockedAt = new Date().toISOString();
-  await db.prepare(`INSERT INTO operator_manifest_cycle_strategies (
-      id, cycle_id, brand_key, snapshot_id, contract_version, account_conclusion_json,
-      content_focus_json, benchmarks_json, strongest_json, weakest_json, directives_json,
-      experiments_json, risks_json, lineup_json, strategy_hash, status, locked_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?)`)
+    await db.prepare(`INSERT INTO operator_manifest_cycle_strategies (
+      id, cycle_id, brand_key, snapshot_id, contract_version, decision_bundle_id,
+      decision_bundle_hash, account_conclusion_json, content_focus_json, benchmarks_json,
+      strongest_json, weakest_json, directives_json, experiments_json, risks_json,
+      lineup_json, strategy_hash, status, locked_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?)`)
     .bind(
       strategyId, input.cycleId, input.brandKey, input.snapshotId, MANIFEST_CYCLE_STRATEGY_CONTRACT,
+      input.decisionBundleId, input.decisionBundleHash,
       stableManifestJson(input.accountConclusion), stableManifestJson(input.contentFocus),
       stableManifestJson(input.benchmarks), stableManifestJson(input.strongestExecutions),
       stableManifestJson(input.weakestExecutions), stableManifestJson(input.directives),
