@@ -12215,13 +12215,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         input.cycleId,
         input.brandKey,
       ).run(),
-                        readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
-        `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
-                family_key, strategic_role, generation_mode, source_kind, source_card_id,
-                source_selection_id, audience_reward, hook_direction, placement_reason,
-                nearby_avoid_json, exploration_mode, status
-         FROM operator_manifest_cycle_plan_items
-         WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
+                                    readNextPlanItem: (cycleId, brandKey, slotKey) => env.DB.prepare(
+        `SELECT p.id, p.strategy_id, p.cycle_id, p.brand_key, p.slot_key, p.slot_date, p.slot_time,
+                p.family_key, p.strategic_role, p.generation_mode, p.source_kind, p.source_card_id,
+                p.source_selection_id, p.audience_reward, p.hook_direction, p.placement_reason,
+                p.nearby_avoid_json, p.exploration_mode, p.status
+         FROM operator_manifest_cycle_plan_items p
+         JOIN operator_source_cards c ON c.id = p.source_card_id AND c.brand_key = p.brand_key
+         JOIN operator_source_selections s ON s.id = p.source_selection_id AND s.brand_key = p.brand_key
+         LEFT JOIN operator_source_exclusions e
+           ON e.brand_key = p.brand_key AND e.source_identity_key = s.source_identity_key AND e.active = 1
+         WHERE p.cycle_id = ? AND p.brand_key = ? AND p.slot_key = ? AND p.status = 'planned'
+           AND c.status = 'locked' AND e.source_identity_key IS NULL
          LIMIT 1`,
       ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>(),
       repairMissingPlanItem: async ({ cycleId, brandKey, slotKey, operationId, asOf }) => {
@@ -12233,9 +12238,22 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            FROM operator_manifest_cycle_plan_items
            WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? LIMIT 1`,
         ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>();
-        if (!existingPlanItem) return null;
-        if (String(existingPlanItem.status ?? "") === "planned") return existingPlanItem;
-        if (String(existingPlanItem.status ?? "") !== "scheduled") return null;
+                if (!existingPlanItem) return null;
+        const existingStatus = String(existingPlanItem.status ?? "");
+        if (existingStatus !== "planned" && existingStatus !== "scheduled") return null;
+        if (existingStatus === "planned") {
+          const eligibleExistingSource = await env.DB.prepare(
+            `SELECT p.id
+             FROM operator_manifest_cycle_plan_items p
+             JOIN operator_source_cards c ON c.id = p.source_card_id AND c.brand_key = p.brand_key
+             JOIN operator_source_selections s ON s.id = p.source_selection_id AND s.brand_key = p.brand_key
+             LEFT JOIN operator_source_exclusions e
+               ON e.brand_key = p.brand_key AND e.source_identity_key = s.source_identity_key AND e.active = 1
+             WHERE p.id = ? AND c.status = 'locked' AND e.source_identity_key IS NULL
+             LIMIT 1`,
+          ).bind(existingPlanItem.id).first<{ id: string }>();
+          if (eligibleExistingSource?.id) return existingPlanItem;
+        }
 
         const lockedPlan = await readLockedSourceSelectionPlan(env.DB, brandKey, cycleId);
         const displacedPlan = lockedPlan.find((row) => String(row.slot_key ?? "") === slotKey);
@@ -12354,7 +12372,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           eventType: "cycle_plan_item_repaired",
           slotKey,
           payload: {
-            repair_reason: "scheduled_item_no_longer_occupies_locked_future_slot",
+                        repair_reason: existingStatus === "scheduled"
+              ? "scheduled_item_no_longer_occupies_locked_future_slot"
+              : "planned_item_source_became_ineligible_before_persistence",
             prior_source_identity_key: displacedPlan.source_identity_key ?? null,
             replacement_source_identity_key: replacement.source_identity_key,
             replacement_source_card_id: replacement.source_card_id,

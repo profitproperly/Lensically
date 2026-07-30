@@ -221,6 +221,45 @@ describe("Operator hourly coverage product service", () => {
     });
   });
 
+    it("repairs a newly ineligible planned source when the eligible next-item read returns null", async () => {
+    const { dependencies, mocks } = createHarness();
+    const blockedSlot = { key: "2026-07-31T15:00", date: "2026-07-31", time: "15:00" };
+    mocks.readCycle.mockResolvedValueOnce({
+      target_slots: [blockedSlot],
+      missing_slots: [blockedSlot],
+      scheduled_post_ids: [],
+    });
+    mocks.reconcileCoverage.mockReturnValueOnce({
+      remaining_missing_slots: [blockedSlot],
+      elapsed_unfilled_slots: [],
+      scheduled_post_ids: [],
+    });
+    mocks.readNextPlanItem.mockResolvedValueOnce(null);
+    mocks.repairMissingPlanItem.mockResolvedValueOnce({
+      id: "replacement-for-ineligible-source",
+      slot_key: blockedSlot.key,
+      status: "planned",
+      nearby_avoid_json: "[]",
+    });
+
+    const result = await handleOperatorHourlyCoverageService({
+      brandKey: "manifest_mental",
+      payload: { cycle_id: "cycle-ineligible", operation_id: "coverage-ineligible" },
+    }, dependencies);
+
+    expect(mocks.repairMissingPlanItem).toHaveBeenCalledWith({
+      cycleId: "cycle-ineligible",
+      brandKey: "manifest_mental",
+      slotKey: blockedSlot.key,
+      operationId: "coverage-ineligible",
+      asOf: "2026-07-27T22:30:00.000Z",
+    });
+    expect(result).toMatchObject({
+      cycle_displaced_plan_item_repaired: true,
+      next_cycle_plan_item: { id: "replacement-for-ineligible-source" },
+    });
+  });
+
   it("finalizes complete coverage while ignoring elapsed unfilled slots", async () => {
     const { dependencies, mocks } = createHarness();
     const elapsedSlot = { key: "2026-07-27T17:00", date: "2026-07-27", time: "17:00" };
