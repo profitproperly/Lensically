@@ -3480,7 +3480,10 @@ const manifestAutonomousGrowthChecks = [
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_required')
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_strategy_mismatch')
     && operatorManifestPersistenceAdmissionService.includes('manifest_cycle_plan_item_mismatch')],
-    ["hard_ban_enforcement", operatorManifestPersistenceService.includes('canonical_hard_ban_evaluation_incomplete')],
+        ["hard_ban_enforcement", operatorManifestPersistenceService.includes("canonical_hard_bans_server_owned: true")
+      && operatorManifestPersistenceService.includes("model_hard_ban_pass_evidence_required: false")
+      && operatorManifestPersistenceService.includes("dependencies.runGateSuite")
+      && !operatorManifestPersistenceService.includes('canonical_hard_ban_evaluation_incomplete')],
   ["nonempty_gate_execution", operatorManifestPersistenceService.includes('required_candidate_gate_execution_empty') && operatorManifestPersistenceService.includes('candidate_gate_receipt_failed')],
     ["placement_and_exposure_assessment", operatorMcpAutonomousExecutionRegistry.includes('slot_placement_assessment: { type: "string"') && operatorMcpAutonomousExecutionRegistry.includes('recent_exposure_assessment: { type: "string"')],
   ["live_reconciliation", source.includes('refreshManifestAutonomousThreadsSnapshot') && source.includes('buildManifestAutonomousCoverageLedger')],
