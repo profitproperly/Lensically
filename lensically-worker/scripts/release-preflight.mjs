@@ -1657,19 +1657,23 @@ if (source.includes('completion_trigger: "final_post_persisted"')
   lifecycleErrors.push("operator_manifest_persistence_service_returned_to_index");
 }
 if (!operatorManifestPersistenceService.includes("export async function persistOperatorManifestCandidate")
+    || !operatorManifestPersistenceService.includes("export async function reconcileOperatorManifestPersistenceBatch")
     || !operatorManifestPersistenceService.includes("dependencies.findExactDuplicate")
     || !operatorManifestPersistenceService.includes("dependencies.analyzeRepetition")
     || !operatorManifestPersistenceService.includes("dependencies.runGateSuite")
     || !operatorManifestPersistenceService.includes("dependencies.recordGateReceipt")
     || !operatorManifestPersistenceService.includes("dependencies.persistLineageRecords")
     || !operatorManifestPersistenceService.includes("dependencies.readLineageStatus")
-    || !operatorManifestPersistenceService.includes("dependencies.reconcileCoverageState")
-    || !operatorManifestPersistenceService.includes("dependencies.finalizeCycleReceipt")
-    || !operatorManifestPersistenceService.includes('completion_trigger: "final_post_persisted"')) {
+    || !operatorManifestPersistenceService.includes("options.deferCoverageReconciliation === true")
+    || !operatorManifestPersistenceService.includes("reconciliation_count: 1")
+    || !operatorManifestPersistenceService.includes('completion_trigger: input.persistedCandidates.length > 1 ? "final_batch_persisted" : "final_post_persisted"')
+    || !operatorManifestPersistenceService.includes("canonical_hard_bans_server_owned: true")
+    || !operatorManifestPersistenceService.includes("model_hard_ban_pass_evidence_required: false")
+    || operatorManifestPersistenceService.includes("canonical_hard_ban_evaluation_incomplete")) {
   lifecycleErrors.push("operator_manifest_persistence_service_module_incomplete");
 }
 if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate text before source and gate execution")
-    || !operatorManifestPersistenceServiceTests.includes("requires explicit evidence for every canonical owner hard ban")
+    || !operatorManifestPersistenceServiceTests.includes("executes canonical hard bans server-side without model-written pass evidence")
     || !operatorManifestPersistenceServiceTests.includes("blocks publication and records exact missing lineage stages")
     || !operatorManifestPersistenceServiceTests.includes("persists complete lineage and leaves the next authoritative slot open")
     || !operatorManifestPersistenceServiceTests.includes("finalizes the cycle when authoritative coverage is complete")) {
