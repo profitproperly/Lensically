@@ -252,6 +252,16 @@ if (!fullValidationRunner.includes('contract: "lensically-full-validation-v1"')
     || !fullValidationRunner.includes('"test/humanFreeAutonomy.spec.ts"')) {
   errors.push("shared_full_validation_runner_incomplete");
 }
+if (!source.includes('from "./operatorGithubMutationRetry"')
+    || !source.includes("shouldRetryGithubMutationResponse(path, result, attempt)")
+    || !source.includes("githubMutationRetryDelayMs(attempt)")
+    || !operatorGithubMutationRetry.includes("Tree SHA does not exist")
+    || !operatorGithubMutationRetry.includes('path === "/git/commits"')
+    || !operatorGithubMutationRetry.includes("attempt >= 3")
+    || !operatorGithubMutationRetryTests.includes("retries only the transient Git tree visibility race among 422 responses")
+    || !operatorGithubMutationRetryTests.includes("preserves bounded infrastructure retries and stops after three retries")) {
+  errors.push("github_tree_visibility_retry_prevention_incomplete");
+}
 if (sharedFullValidationCalls.length < 6) {
   errors.push(`shared_full_validation_workflow_calls_incomplete:${sharedFullValidationCalls.length}`);
 }
