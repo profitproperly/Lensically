@@ -385,8 +385,9 @@ interface Env {
   THREADS_TOKEN_MANIFEST_MENTAL?: string;
   THREADS_TOKEN_VECTRIX?: string;
     THREADS_TOKEN_DEADMAN?: string;
-  SCHEDULED_POST_SCHEDULER?: DurableObjectNamespace;
+    SCHEDULED_POST_SCHEDULER?: DurableObjectNamespace;
   DB: D1Database;
+  SHADOW_DB?: D1Database;
 }
 
 type ConfiguredThreadsAccount = {

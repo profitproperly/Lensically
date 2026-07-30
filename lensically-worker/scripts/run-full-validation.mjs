@@ -25,7 +25,8 @@ const completeTestFiles = [
   "test/operatorMcpTransport.spec.ts",
   "test/operatorMcpDispatcher.spec.ts",
   "test/operatorMcpToolCallDispatcher.spec.ts",
-  "test/operatorManifestCycleService.spec.ts",
+    "test/operatorManifestCycleService.spec.ts",
+  "test/operatorManifestShadowService.spec.ts",
   "test/operatorHourlyCoverageService.spec.ts",
   "test/operatorManifestPrepareCheckpointService.spec.ts",
   "test/operatorManifestCycleConstructionService.spec.ts",
@@ -77,7 +78,7 @@ const completeTestFiles = [
 ];
 
 const completeTestGroups = Array.from(
-  { length: 6 },
+  { length: Math.ceil(completeTestFiles.length / 11) },
   (_, index) => completeTestFiles.slice(index * 11, (index + 1) * 11),
 );
 
@@ -96,7 +97,8 @@ const operatorMilestoneTitles = [
 
 const requiredFiles = [
   "test/databaseMigrations.spec.ts",
-  "test/operatorMcpRoutingPolicy.spec.ts",
+    "test/operatorMcpRoutingPolicy.spec.ts",
+  "test/operatorManifestShadowService.spec.ts",
   "test/operatorManifestPersistenceService.spec.ts",
   "test/operatorScheduledPostEditMutationService.spec.ts",
   "manifest-autonomous-cycle.test.ts",
@@ -121,8 +123,8 @@ function validatePlan() {
   if (missingRequired.length > 0) fail(`full_validation_required_files_missing:${missingRequired.join(",")}`);
 
   const groupedFiles = completeTestGroups.flat();
-  if (completeTestGroups.length !== 6
-      || completeTestGroups.some((group) => group.length !== 11)
+    if (completeTestGroups.length !== Math.ceil(completeTestFiles.length / 11)
+      || completeTestGroups.some((group, index) => group.length < 1 || group.length > 11 || (index < completeTestGroups.length - 1 && group.length !== 11))
       || groupedFiles.length !== completeTestFiles.length
       || groupedFiles.some((file, index) => file !== completeTestFiles[index])) {
     fail("full_validation_batch_partition_invalid");
@@ -138,7 +140,7 @@ function validatePlan() {
     operator_milestone_test_count: operatorMilestoneTitles.length,
         process_count: completeTestGroups.length + 2,
     complete_test_batch_count: completeTestGroups.length,
-    complete_test_batch_size: completeTestGroups[0].length,
+        complete_test_batch_size: 11,
   };
 }
 
