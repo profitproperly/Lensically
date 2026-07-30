@@ -104,6 +104,10 @@ import {
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
 import { orchestrateOperatorManifestPrepareCheckpoint } from "./operatorManifestPreparationOrchestratorService";
 import {
+  buildManifestDecisionBundle,
+  consumeManifestDecisionBundle,
+} from "./operatorManifestDecisionBundleService";
+import {
   handleOperatorManifestShadowTool,
   isOperatorManifestShadowToolName,
 } from "./operatorManifestShadowRuntimeService";
@@ -11001,7 +11005,7 @@ async function prepareManifestAutonomousCycle(
   >;
 
 
-      return constructOperatorManifestAutonomousCycle({
+            const preparedResult = await constructOperatorManifestAutonomousCycle({
     brandKey: brand.brand_key,
     accountId: brand.account_id,
     threadsUserId: brand.profile.threads_user_id,
@@ -11187,16 +11191,39 @@ async function prepareManifestAutonomousCycle(
       brandKey,
       operationId,
     ),
-    readPreparedCycle: (brandKey, cycleId) => readManifestAutonomousCycle(
+        readPreparedCycle: (brandKey, cycleId) => readManifestAutonomousCycle(
       env,
       brandKey as GptBrandKey,
       cycleId,
     ),
   });
-    
 
+  const preparedCycle = operatorRecord(preparedResult.cycle);
+  const rollingEvidence = operatorRecord(preparedResult.rolling_evidence);
+  const evidenceSnapshot = operatorRecord(rollingEvidence.snapshot);
+  const preparedCycleId = normalizeOperatorText(preparedCycle.id, 160, true);
+  const preparedSnapshotId = normalizeOperatorText(evidenceSnapshot.id, 160, true);
+  if (!preparedCycleId || !preparedSnapshotId) return preparedResult;
 
-      
+  const builtDecisionBundle = await buildManifestDecisionBundle(env.DB, {
+    brandKey: brand.brand_key,
+    cycleId: preparedCycleId,
+    snapshotId: preparedSnapshotId,
+  });
+  const deliveredDecisionBundle = await consumeManifestDecisionBundle(env.DB, {
+    brandKey: brand.brand_key,
+    cycleId: preparedCycleId,
+    snapshotId: preparedSnapshotId,
+    bundleId: String(builtDecisionBundle.id ?? ""),
+    bundleHash: String(builtDecisionBundle.bundle_hash ?? ""),
+  });
+  return {
+    ...preparedResult,
+    decision_bundle: deliveredDecisionBundle,
+    next_action: preparedResult.strategy_required === true
+      ? `Call commit_manifest_cycle_strategy with decision_bundle_id ${String(deliveredDecisionBundle.id ?? "")} and decision_bundle_hash ${String(deliveredDecisionBundle.bundle_hash ?? "")}, plus one model-authored account strategy and the exact locked source lineup. Use one bounded evidence-page detail read only when decision_bundle.requires_detail_read is true.`
+      : preparedResult.next_action,
+  };
   }
 
 
