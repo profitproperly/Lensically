@@ -212,9 +212,11 @@ export async function handleOperatorManifestPrepareCheckpoint(
           dependencies.parseJson(String(activeBrief.brief_json ?? "{}")),
         )
         : {};
+            const activeBriefId = dependencies.normalizeText(activeBrief?.id, 160, true);
       const generatedAtMs = Date.parse(String(activeBrief?.generated_at ?? ""));
       const nowMs = Date.parse(dependencies.now());
       const learningSnapshotFresh = payload.force_full_rebuild !== true
+        && Boolean(activeBriefId)
         && activeBriefPayload.manifest_layers_finalized === true
         && Number(evaluatedSnapshot.processed_due_checkpoint_count ?? 0) === 0
         && Number.isFinite(generatedAtMs)
