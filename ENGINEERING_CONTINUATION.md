@@ -5,7 +5,7 @@ updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
+active_job_id: manifest-innovation-cycle-shadow-testbed
 active_checkpoint: stage_6_timing_instrumentation_and_acceptance_matrix
 implementation_source_head: 17b6703c82a41ab83602a53707c0972272101ea4
 production_sha: 0da4252e6c8cc587ba7352b0ba0b50aa40f013db
@@ -28,15 +28,26 @@ This root file is the sole authority for all incomplete Lensically work. Chat hi
 
 ## Unified Job Queue
 
-### ACTIVE — Manifest Shadow Cycle and Sub-Ten-Minute Optimization
+### ACTIVE — Manifest Innovation Cycle Shadow Testbed
 
-job_id: `manifest-shadow-cycle-and-sub-ten-minute-optimization`
+job_id: `manifest-innovation-cycle-shadow-testbed`
 
 Owner objective:
 
-- Create a reusable end-to-end Manifest cycle testing environment that can repeatedly exercise normal 24-post replenishment and full 48-post recovery without scheduling or publishing test posts and without corrupting production lineage, source exposure, strategy history, hypotheses, experiments, semantic signatures, Content Focus, learning, or performance math.
-- Use the harness to reduce the complete model-orchestrated cycle below ten minutes, including the 48-post recovery case. Normal 24-post operation should be materially faster.
-- Do not restore the autonomous daily generation trigger until the shadow acceptance matrix and one bounded live adoption verification pass.
+- Bootstrap the one permanent Manifest Innovation Cycle from the existing Main Cycle, then keep it as the upstream engineering rail for every future manually authorized cycle improvement.
+- Build, change, stress-test, benchmark, break, repair, and prove cycle innovations entirely inside the isolated Innovation Cycle without exercising, validating, or mutating the Main Cycle.
+- Preserve Main as the protected downstream production rail and authoritative historical truth for server-generated order, mathematics, source exposure, strategies, hypotheses, experiments, generation records, semantic signatures, Content Focus, lineage, learning, and performance evidence.
+- Finish this implementation only after the Innovation Cycle completes the full Manifest cycle end to end, proves production-contract parity, survives the fault matrix, and demonstrates meaningful efficiency improvement. Promotion into Main is a separate future 007-and-M decision and is not part of this job.
+
+### Permanent operating model — Innovation leads; Main follows only after proof
+
+- This implementation performs the only bootstrap clone because Main existed before the Innovation Cycle.
+- After bootstrap, Innovation is permanently equal to or ahead of Main; Main never becomes the source for another clone.
+- When no improvement is active, Innovation and Main remain at functional parity and Innovation sits idle.
+- A new improvement begins only after an explicit manual 007-and-M decision.
+- Only Innovation changes during development and validation. Main remains untouched and may temporarily lag.
+- Once a future Innovation version is fully proven, its validated implementation may be promoted into Main through a separately authorized job. Test data, synthetic history, and shadow lineage are never promoted.
+- No autonomous experimentation loop, automatic activation, automatic promotion, live canary, Main dry run, or Main-cycle acceptance test is permitted.
 
 ### Frozen architectural decision
 
@@ -67,12 +78,13 @@ Version 1 supports exactly one active detailed shadow run at a time.
 
 This disposable model is intentional. Mixing multiple runs inside production-shaped tables would require run-scoping every existing query and would recreate the same contamination risk inside the shadow database. Sequential reset-and-seed preserves exact production schema behavior and keeps the first implementation bounded.
 
-### Evidence modes
+### Evidence boundary
 
-Each run uses one of two explicit modes:
+Every acceptance run uses `snapshot` mode only.
 
-1. `snapshot` — default for repeated speed, strategy, gate, recovery, and refactor tests. Reads a frozen bounded production snapshot and performs no Threads network calls.
-2. `live_read` — bounded acceptance mode. Uses existing read-only Threads collection paths to capture current evidence but still writes only to `SHADOW_DB` and cannot reach scheduling or publishing mutations.
+- Tests consume a frozen, production-shaped evidence snapshot or deterministic fixture already inside the isolated test boundary.
+- Acceptance performs no live Main Cycle call, no live production database read, no Threads network call, and no production receipt write.
+- Any future snapshot refresh from authoritative production evidence requires a separate explicit 007-and-M decision and is not part of this implementation or its acceptance run.
 
 A production snapshot contains only data required by the current Manifest contract:
 
@@ -221,7 +233,7 @@ Required work:
 1. Keep durable preparation checkpoints as internal recovery state.
 2. Add one server orchestrator that advances deterministic preparation phases in sequence until complete or until a real Worker time/subrequest safety threshold requires a continuation.
 3. Normal snapshot preparation target: one external call.
-4. Live-read preparation target: one external call, maximum two when bounded external collection requires continuation.
+4. Acceptance preparation uses only the frozen isolated snapshot; live-read preparation is excluded.
 5. Stop recomputing the complete intelligence stack during every daily cycle.
 6. Make the four daily Insights/learning windows maintain semantic signatures, maturity, comparables, learning observations, portfolio states, experiments, measurement audit, and Content Focus continuously.
 7. Daily preparation consumes the latest valid durable snapshot and refreshes only newly due or stale deltas.
@@ -311,50 +323,50 @@ Required scenarios:
 8. Invalidated planned source requiring authoritative replacement.
 9. Failed shadow run retained for diagnosis and later cleanup.
 10. Same-snapshot A/B operational comparison.
-11. Live-read collection with zero Threads mutations.
-12. Production noninterference verification after every case.
+11. Frozen production-shaped evidence run with zero Main Cycle, production database, or Threads access.
+12. Main noninterference verification after every case, including zero production receipt writes.
 
 Performance acceptance:
 
 - No-op: three consecutive runs at or below 30 seconds.
 - Snapshot 24-slot cycle: three consecutive complete runs at or below 6 minutes.
 - Snapshot 48-slot cycle: three consecutive complete runs below 10 minutes.
-- Live-read 24-slot cycle: one complete run below 10 minutes.
-- Zero unresolved lineage, gate, schedule, cleanup, or contamination defects.
-- No production mutation outside the compact benchmark-receipt table.
-- No Threads mutation request.
+- Zero unresolved lineage, gate, schedule, cleanup, parity, or contamination defects.
+- Zero Main Cycle calls and zero production database reads or writes during acceptance.
+- Zero production benchmark-receipt writes; acceptance receipts remain inside the isolated Innovation Cycle boundary.
+- Zero Threads network or mutation request.
 
 These are wall-clock requirements, not server-only timings. Model/client gaps and tool round trips count.
 
-### Stage 7 — Production Adoption, Canary, and Trigger Restoration
+### Stage 7 — End-to-End Innovation Cycle Proof
 
-Production changes occur only after Stage 6 passes.
+Main remains untouched. This stage validates only the isolated Innovation Cycle.
 
 Required work:
 
-1. Switch production preparation to the accepted shared orchestrator and delta-learning path.
-2. Switch production strategy consumption to the complete decision bundle.
-3. Switch production persistence to the accepted four-post wrapper while keeping item-level idempotency and selective failure handling.
-4. Remove the retired page-by-page normal path, repeated client-driven preparation loop, manual deterministic hard-ban evidence requirement, and duplicated per-post reconciliation path. Git history is the archive.
-5. Run focused validation, exact-head Operator coverage required by the change, one exact-SHA production release, and independent live runtime verification.
-6. Execute one legitimate live canary against real missing inventory. Do not create artificial live slots or junk posts.
-7. Verify exact schedule coverage, scheduler health, complete lineage, zero overdue rows, and benchmark timing.
-8. Restore the autonomous daily generation trigger only after the canary passes.
-9. Keep the existing scheduled-post publishing scheduler enabled throughout unless a concrete scheduler incident independently requires containment.
+1. Execute the complete frozen Stage 6 matrix against the isolated Innovation Cycle.
+2. Prove the full flow from preparation through decision bundle, strategy lock, source plan, generation, deterministic gates, batch persistence, hypotheses, experiments, schedule-shaped shadow rows, complete lineage, reconciliation, completion, replay, and cleanup.
+3. Compare authoritative outputs against the Main Cycle contract through shared-service parity tests and frozen fixtures, never by running Main.
+4. Produce immutable isolated benchmark receipts with exact timings, payloads, counters, code SHA, pass/fail rules, and noninterference proof.
+5. Prove three consecutive no-op, 24-slot, and 48-slot acceptance runs at their frozen thresholds.
+6. Stop after proof. Do not deploy, canary, dry-run, restore a trigger, schedule, publish, or otherwise exercise Main.
 
-### Stage 8 — Closure and Permanent Prevention
+### Stage 8 — Innovation Cycle Closure and Permanent Prevention
 
-1. Update `CURRENT_STATE.md` and `OPERATING_MEMORY.md` only with the final live architecture and reusable constraints.
+1. Update `CURRENT_STATE.md` and `OPERATING_MEMORY.md` with the permanent manually activated Innovation/Main operating model and the verified Innovation Cycle architecture only.
 2. Add release-preflight guards preventing:
    - production-table test flags,
-   - shadow access to production mutation APIs,
-   - Threads writes from shadow code,
-   - duplicate shadow business logic,
-   - intelligence queries reading shadow benchmark tables,
+   - Innovation access to Main or production mutation APIs,
+   - live production reads during Innovation acceptance,
+   - production benchmark-receipt writes during Innovation acceptance,
+   - Threads reads or writes from Innovation acceptance,
+   - duplicate Manifest business logic,
+   - autonomous Innovation activation or promotion,
    - restoration of routine page-by-page strategy consumption,
    - restoration of per-post coverage reconciliation when batch reconciliation is active.
-3. Run automatic cleanup and prove zero expired detail rows and zero orphans.
-4. Compress this continuation entry to a completed receipt with exact SHAs, workflow runs, benchmark results, and live verification.
+3. Run isolated cleanup and prove zero expired detail rows and zero orphans.
+4. Compress this continuation entry to a completed Innovation Cycle receipt with exact source SHAs, validation runs, benchmark results, parity proof, and zero-Main-touch evidence.
+5. Record production adoption and promotion as explicitly deferred work requiring a new manual 007-and-M decision.
 
 ## Stress-Test Findings and Resolutions
 
@@ -417,16 +429,15 @@ Resolution: no UI, dashboard, concurrent runner, generic simulation framework, o
 
 ## Current Action
 
-Execute **Stage 2 — Production-Parity Shadow Runtime**, then continue through Stages 3–8 without pausing unless a verified blocker requires repair:
+Execute **Stage 6 — Timing Instrumentation and Acceptance Matrix**, then continue through shadow-only Stages 7–8 without pausing unless a verified blocker requires repair:
 
-1. Re-read the current repository head after this plan-lock commit.
-2. Implement the dedicated `SHADOW_DB` binding and canonical dual-database migration verification.
-3. Implement the read-only production snapshot boundary, disposable reset/retention schema, shadow-only schedule adapter, and zero-Threads-write guard.
-4. Add focused isolation, schema-parity, cleanup, and noninterference regressions.
-5. Run the smallest complete validation proving Stage 1.
-6. Record the checkpoint here before starting Stage 2.
+1. Complete every real D1-backed Stage 6 scenario and remove placeholder assertions.
+2. Prove compact receipt redaction, isolated receipt persistence, lineage completeness, selective regeneration, idempotent replay, source replacement, retention cleanup, same-snapshot A/B, and zero Main/production/Threads access.
+3. Run exact-head typecheck and the complete source validation suite without deploying the Worker or invoking Main.
+4. Execute the end-to-end Innovation Cycle acceptance matrix and record exact wall-clock results.
+5. Close documentation and prevention only after the Innovation Cycle proves it can replace the Main Cycle contract.
 
-Do not add public Shadow Cycle tools, change production Manifest behavior, restore the autonomous generation trigger, or begin speed optimization before Stage 1 isolation is verified.
+Do not deploy, canary, dry-run, read from, write to, schedule through, publish through, restore, or otherwise exercise the Main Cycle during this job.
 
 ## Completed Work
 
