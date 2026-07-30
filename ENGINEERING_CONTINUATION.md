@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
-status: active
+status: idle
 updated_at: 2026-07-29
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest_autonomous_posting_restoration
-active_checkpoint: full_manifest_cycle_test_and_posting_resume
-repository_base_sha: 18e35d74a72da4286ff55566b3bcb0e21552794a
-production_sha: 18e35d74a72da4286ff55566b3bcb0e21552794a
+active_job_id: none
+active_checkpoint: none
+repository_base_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
+production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
 
 This root file is the sole authority for all incomplete Lensically work. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents may provide evidence but may not establish, reorder, or resume work.
 
@@ -23,18 +23,31 @@ This root file is the sole authority for all incomplete Lensically work. Chat hi
 
 ## Unified Job Queue
 
-### 10 — ACTIVE — `manifest_autonomous_posting_restoration`
-
-- Objective: run one complete Manifest autonomous cycle against live state, restore the required hourly runway without duplicates or backfill, verify authoritative schedule and lineage, confirm scheduler normal mode and posting enablement, and resume autonomous publishing.
-- Current checkpoint: `full_manifest_cycle_test_and_posting_resume`.
-- Owner boundary: the owner explicitly requested that Stage 9 stop before this cycle so the cycle can be run together in the next interaction.
-- Completion condition: the full cycle succeeds, required upcoming hourly slots are populated safely, lineage is verified, the scheduler is healthy in normal mode, and posting is live again.
-
-No other job is queued.
+No Lensically job is active or queued.
 
 ## Current Action
 
-Stop after Stage 9. On the owner's next instruction, run `full_manifest_cycle_test_and_posting_resume` for `manifest_mental`. Do not generate, schedule, delete, publish, or mutate account content before that instruction.
+No current Lensically job is active.
+
+## Completed — Manifest Autonomous Posting Restoration
+
+`manifest_autonomous_posting_restoration` is COMPLETE. The canonical live cycle `eb525a40-375f-4a34-89ee-0a65f83610c0` closed with strategy `c16f4320-6542-439b-9536-8ceeac41907f`.
+
+- Final cycle status: `completed_after_repairs`
+- Authoritative target slots: 48
+- Authoritative occupied slots: 48
+- Remaining missing slots: 0
+- Elapsed unfilled slots: 0
+- Past slots backfilled: FALSE
+- Future scheduled rows in the completion receipt: 46
+- Final post lineage complete: TRUE
+- Cycle defects: 2 total, 2 resolved, 0 unresolved, 0 blocking
+- Saved Pattern 152 and its source card were permanently retired after the owner manually advanced its scheduled row and the cycle detected the displaced future slot.
+- Saved Pattern 10 and its source card were permanently retired under the existing owner ban on the `I bet having` / `I bet if you had money` family.
+- The cycle now automatically repairs a scheduled item displaced from its locked future slot and replaces a planned item whose source becomes ineligible before persistence, using the authoritative backend source selector.
+- Canonical completion receipt: `0c5c96dc-9e1b-4f18-9fab-77e2375b01e1`
+- Exact production SHA: `04e682e8a69fef5222fd713a019682e7edcfda0a`
+- Scheduler: enabled, healthy, operational, publishing enabled, normal mode, fresh heartbeat, zero overdue, zero quarantined posts.
 
 ## Completed — Worker Monolith Refactor
 
@@ -93,7 +106,7 @@ The following stale items are also retired or absorbed:
 2. Call `getEngineeringContinuation`.
 3. Read Authority and Precedence, Unified Job Queue, and Current Action before any other continuation surface.
 4. Call `getRepoStatus` only to reconcile repository and production identity; do not let non-authoritative telemetry replace this queue.
-5. Execute only the one ACTIVE job and checkpoint.
+5. If status is `active`, execute only the one ACTIVE job and checkpoint. If status is `idle`, do not reopen completed work.
 6. Use one coherent change set, proportional validation, one exact-SHA release, and independent live verification.
 7. Do not use Recovery unless Main or its deployment plane cannot receive or complete the required repair.
 8. Rewrite this file after every accepted job, precedence change, meaningful checkpoint, completion, or verified interrupt.
