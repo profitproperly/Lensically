@@ -972,10 +972,10 @@ if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
     || !operatorMcpRegistryComposition.includes("export function buildComposedOperatorMcpTools")) {
   lifecycleErrors.push("operator_mcp_registry_composition_module_incomplete");
 }
-if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 55-tool account aggregation order")
+if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 59-tool account aggregation order")
     || !operatorMcpRegistryCompositionTests.includes("preserves engineering, admin, and intentional monthly-growth classifications")
     || !operatorMcpRegistryCompositionTests.includes("preserves guided Proceed membership without blocking list_accounts")
-    || !operatorMcpRegistryCompositionTests.includes("builds the exact 112 direct tools with deterministic priority ordering")
+        || !operatorMcpRegistryCompositionTests.includes("builds the exact 116 direct tools with deterministic priority ordering")
     || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }

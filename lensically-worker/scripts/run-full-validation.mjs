@@ -25,8 +25,9 @@ const completeTestFiles = [
   "test/operatorMcpTransport.spec.ts",
   "test/operatorMcpDispatcher.spec.ts",
   "test/operatorMcpToolCallDispatcher.spec.ts",
-    "test/operatorManifestCycleService.spec.ts",
+        "test/operatorManifestCycleService.spec.ts",
     "test/operatorManifestShadowService.spec.ts",
+    "test/operatorManifestShadowRuntimeService.spec.ts",
   "test/operatorRepositoryPatchSafety.spec.ts",
   "test/operatorHourlyCoverageService.spec.ts",
   "test/operatorManifestPrepareCheckpointService.spec.ts",
@@ -98,8 +99,9 @@ const operatorMilestoneTitles = [
 
 const requiredFiles = [
   "test/databaseMigrations.spec.ts",
-    "test/operatorMcpRoutingPolicy.spec.ts",
+        "test/operatorMcpRoutingPolicy.spec.ts",
     "test/operatorManifestShadowService.spec.ts",
+    "test/operatorManifestShadowRuntimeService.spec.ts",
   "test/operatorRepositoryPatchSafety.spec.ts",
   "test/operatorManifestPersistenceService.spec.ts",
   "test/operatorScheduledPostEditMutationService.spec.ts",
