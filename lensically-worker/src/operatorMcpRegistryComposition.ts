@@ -107,8 +107,9 @@ const PROCEED_EXEMPT_ACCOUNT_TOOL_NAMES = new Set<string>([
   "list_accounts",
   "prepare_manifest_shadow_cycle",
   "commit_manifest_shadow_cycle_strategy",
-  "persist_manifest_shadow_batch",
+    "persist_manifest_shadow_batch",
   "get_manifest_shadow_cycle_receipt",
+  "persist_manifest_autonomous_batch",
 ]);
 
 export function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
