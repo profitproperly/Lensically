@@ -116,9 +116,8 @@
     "src/index.ts",
     "src/manifestIntelligence.ts",
         "src/manifestIntelligenceEngine.ts",
-                "src/manifestMeasurementAudit.ts",
+                        "src/manifestMeasurementAudit.ts",
     "src/manifestProductIntegration.ts",
-    "src/operatorManifestShadowService.ts",
     "src/sourceFamilySelection.ts"
   ],
   "repository_runtime_ddl_complete": true,

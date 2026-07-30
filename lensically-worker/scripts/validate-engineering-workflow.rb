@@ -86,6 +86,7 @@ abort("fast_validation_upload_step_missing") unless fast_step_names.include?("Up
 worker_release_step_names = jobs.fetch("worker-release").fetch("steps").map { |step| step["name"] }
 required_worker_release_steps = [
   "Prepare trigger-neutral Worker deploy config",
+  "Provision, migrate, and bind isolated Shadow D1",
   "Deploy exact validated Worker head",
   "Reconcile exact Wrangler cron schedule",
   "Verify production runtime, scheduler, retained website, and retired legacy surfaces",
@@ -128,6 +129,10 @@ abort("legacy_migration_path_classifier_returned") if source.include?("lensicall
 
 cron_prepare = step_run(jobs, "worker-release", "Prepare trigger-neutral Worker deploy config")
 abort("trigger_neutral_worker_config_missing") unless cron_prepare.include?("cron-release.mjs --write-deploy-config") && cron_prepare.include?("--config wrangler.jsonc") && cron_prepare.include?("--output wrangler.release.generated.json")
+shadow_prepare = step_run(jobs, "worker-release", "Provision, migrate, and bind isolated Shadow D1")
+abort("shadow_d1_release_missing") unless shadow_prepare.include?("shadow-d1-release.mjs --config wrangler.release.generated.json")
+shadow_step = step_for(jobs, "worker-release", "Provision, migrate, and bind isolated Shadow D1")
+abort("shadow_d1_credentials_missing") unless shadow_step.dig("env", "CLOUDFLARE_API_TOKEN").to_s.include?("secrets.CLOUDFLARE_API_TOKEN") && shadow_step.dig("env", "CLOUDFLARE_ACCOUNT_ID").to_s.include?("secrets.CLOUDFLARE_ACCOUNT_ID")
 worker_deploy = step_run(jobs, "worker-release", "Deploy exact validated Worker head")
 abort("worker_deploy_not_trigger_neutral") unless worker_deploy.include?("--config wrangler.release.generated.json")
 abort("raw_wrangler_worker_deploy_returned") if worker_deploy.include?("--config wrangler.jsonc")

@@ -106,6 +106,7 @@ import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepa
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
 import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
+import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
 import {
   manifestCycleFailureIsDefect as manifestCycleFailureIsDefectService,
@@ -19914,7 +19915,11 @@ async function handleOperatorMcpEngineeringTool(
     if (count !== 1) {
       return { ok: false, error: "find_must_match_once", match_count: count };
     }
-        const nextContent = file.content.replace(find, replace);
+                const nextContent = file.content.replace(find, replace);
+    const patchSafety = validateRepositoryPatchContent(path, nextContent);
+    if (!patchSafety.ok) {
+      return { ok: false, ...patchSafety, path, no_commit_created: true };
+    }
     if (nextContent === file.content) {
       return { ok: true, no_change: true, no_commit_created: true, path, reason: "replacement_produced_identical_content" };
     }
@@ -19969,8 +19974,14 @@ async function handleOperatorMcpEngineeringTool(
     }
     const originalByPath = new Map(loaded.map((entry) => [entry.path, String(entry.file.content ?? "")]));
     const changedFiles = nextFiles.filter((entry) => originalByPath.get(entry.path) !== entry.content);
-    if (changedFiles.length === 0) {
+        if (changedFiles.length === 0) {
       return { ok: true, no_change: true, no_commit_created: true, patch_count: normalizedPatches.length, files_changed: [], reason: "patch_set_produced_identical_content" };
+    }
+    for (const changedFile of changedFiles) {
+      const patchSafety = validateRepositoryPatchContent(changedFile.path, changedFile.content);
+      if (!patchSafety.ok) {
+        return { ok: false, ...patchSafety, path: changedFile.path, no_commit_created: true };
+      }
     }
 
     const diffSummary = normalizeOperatorText(args.summary, 1000, true)

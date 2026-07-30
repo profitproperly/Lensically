@@ -613,7 +613,7 @@ jobs:
         run: node scripts/d1-migration-release.mjs --verify-remote
 
       
-            - name: Prepare trigger-neutral Worker deploy config
+                  - name: Prepare trigger-neutral Worker deploy config
         working-directory: lensically-worker
         run: node scripts/cron-release.mjs --write-deploy-config --config wrangler.jsonc --output wrangler.release.generated.json
 
