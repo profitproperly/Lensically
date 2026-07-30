@@ -1539,9 +1539,17 @@ if (!operatorManifestPrepareCheckpointService.includes("export async function ha
     || !operatorManifestPrepareCheckpointService.includes('phase: "cycle_construction"')) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_module_incomplete");
 }
+if (!operatorManifestPreparationOrchestratorService.includes("export async function orchestrateOperatorManifestPrepareCheckpoint")
+    || !operatorManifestPreparationOrchestratorService.includes("handleOperatorManifestPrepareCheckpoint(input, dependencies)")
+    || !operatorManifestPreparationOrchestratorService.includes("server_safety_continuation: true")
+    || !operatorManifestPreparationOrchestratorService.includes("maxElapsedMs")) {
+  lifecycleErrors.push("operator_manifest_preparation_orchestrator_service_module_incomplete");
+}
 if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission and idempotency mismatch blocking")
     || !operatorManifestPrepareCheckpointServiceTests.includes("checkpoints bounded live collection before evaluator recomputation")
     || !operatorManifestPrepareCheckpointServiceTests.includes("persists bounded learning continuation offsets")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("reuses a fresh finalized learning snapshot when no due maturity checkpoint changed")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("advances routine durable phases server-side until cycle construction")
     || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");
 }
