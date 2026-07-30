@@ -237,9 +237,23 @@ export function reconcileProductionPrefix(repositoryEntries, productionRows) {
   return repositoryEntries.slice(productionNames.length);
 }
 
+export function parseMigrationTimestamp(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 1_000_000_000_000 ? value * 1000 : value;
+  }
+  const text = String(value ?? "").trim();
+  if (!text) return Number.NaN;
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  const normalized = text.includes("T") || text.endsWith("Z")
+    ? text
+    : `${text.replace(" ", "T")}Z`;
+  return Date.parse(normalized);
+}
+
 export function appliedMigrationChangeIsSafe(change) {
-  const latestCommitMs = Date.parse(String(change.latestCommitAt ?? ""));
-  const appliedMs = Date.parse(String(change.appliedAt ?? ""));
+  const latestCommitMs = parseMigrationTimestamp(change.latestCommitAt);
+  const appliedMs = parseMigrationTimestamp(change.appliedAt);
   return change.status === "A"
     && Number.isFinite(latestCommitMs)
     && Number.isFinite(appliedMs)
