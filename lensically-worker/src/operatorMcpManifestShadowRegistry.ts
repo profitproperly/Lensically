@@ -1,5 +1,6 @@
 import { BRAND_KEY_SCHEMA } from "./operatorMcpSchemas";
 import type { OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
+import { MANIFEST_SHADOW_TEST_CASES } from "./operatorManifestShadowRuntimeService";
 
 const SHADOW_LINEUP_ITEM_SCHEMA = {
   type: "object",
@@ -67,7 +68,8 @@ export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-        scenario: { type: "string", enum: ["noop", "normal_24", "recovery_48", "custom"], default: "normal_24" },
+                scenario: { type: "string", enum: ["noop", "normal_24", "recovery_48", "custom"], default: "normal_24" },
+        test_case: { type: "string", enum: [...MANIFEST_SHADOW_TEST_CASES], default: "baseline" },
         evidence_mode: { type: "string", enum: ["snapshot", "live_read"], default: "snapshot" },
         variant_key: { type: "string", default: "control" },
         timezone: { type: "string", default: "America/New_York" },
@@ -76,7 +78,7 @@ export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
         retention_hours: { type: "integer", minimum: 1, maximum: 336, default: 72 },
         operation_id: { type: "string" },
       },
-      required: ["brand_key", "scenario", "evidence_mode", "variant_key", "operation_id"],
+            required: ["brand_key", "scenario", "test_case", "evidence_mode", "variant_key", "operation_id"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
