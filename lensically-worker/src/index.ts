@@ -11830,6 +11830,205 @@ async function persistManifestAutonomousPost(
     }, options);
 }
 
+function manifestPersistenceReconciliationDependencies(
+  env: Env,
+  brand: GptResolvedBrand,
+): OperatorManifestReconciliationDependencies {
+  return {
+    normalizeText: normalizeOperatorText,
+    readCurrentCycle: (_brandKey, cycleId) => readManifestAutonomousCycle(
+      env,
+      brand.brand_key,
+      cycleId,
+    ) as Promise<Record<string, unknown> | null>,
+    occupiedSlots: (targetSlots, timezone) => manifestAutonomousOccupiedSlots(
+      env,
+      brand,
+      targetSlots,
+      timezone,
+    ),
+    localDateTimeParts: operatorLocalDateTimeParts,
+    hourlySlot: operatorHourlySlot,
+    reconcileCoverageState: reconcileManifestAutonomousCoverageState,
+    updateCycleAfterPersist: (input) => env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET status = ?, strategic_thesis_json = ?, missing_slots_json = ?,
+           scheduled_post_ids_json = ?, error_json = '[]', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(
+      input.status,
+      normalizeOperatorJson(input.strategicThesis, {}),
+      normalizeOperatorJson(input.remainingMissing, []),
+      normalizeOperatorJson(input.scheduledPostIds, []),
+      input.cycleId,
+      input.brandKey,
+    ).run(),
+    appendCycleEvent: (input) => appendManifestCycleEvent(
+      env.DB,
+      input as Parameters<typeof appendManifestCycleEvent>[1],
+    ),
+    finalizeCycleReceipt: (input) => finalizeManifestCycleReceipt(
+      env.DB,
+      input as Parameters<typeof finalizeManifestCycleReceipt>[1],
+    ),
+    setCycleStatus: (cycleId, brandKey, status) => env.DB.prepare(
+      `UPDATE operator_autonomous_growth_cycles
+       SET status = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND brand_key = ?`,
+    ).bind(status, cycleId, brandKey).run(),
+    now: () => new Date(),
+  };
+}
+
+async function persistManifestAutonomousBatch(
+  env: Env,
+  brand: GptResolvedBrand,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const batchOperationId = normalizeOperatorText(payload.batch_operation_id, 160, true);
+  const cycleId = normalizeOperatorText(payload.cycle_id, 160, true);
+  const cycleStrategyId = normalizeOperatorText(payload.cycle_strategy_id, 160, true);
+  const candidates = Array.isArray(payload.candidates)
+    ? payload.candidates.filter((candidate): candidate is Record<string, unknown> => (
+      Boolean(candidate) && typeof candidate === "object" && !Array.isArray(candidate)
+    ))
+    : [];
+  if (!batchOperationId || !cycleId || !cycleStrategyId) {
+    return {
+      success: false,
+      error: "batch_operation_cycle_and_strategy_required",
+      retryable: false,
+    };
+  }
+  if (candidates.length < 1 || candidates.length > 4) {
+    return {
+      success: false,
+      error: "manifest_persistence_batch_size_must_be_1_to_4",
+      candidate_count: candidates.length,
+      retryable: false,
+    };
+  }
+
+  const itemResults: Record<string, unknown>[] = [];
+  const persistedCandidates: Array<{
+    operation_id: string;
+    slot_key: string;
+    scheduled_post_id: number;
+  }> = [];
+  const reconciliationContexts: Record<string, unknown>[] = [];
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    const operationId = normalizeOperatorText(candidate.operation_id, 160, true);
+    if (!operationId) {
+      itemResults.push({
+        index,
+        success: false,
+        error: "candidate_operation_id_required",
+        slot_key: null,
+        retryable: false,
+      });
+      continue;
+    }
+    const result = await persistManifestAutonomousPost(env, brand, {
+      ...candidate,
+      operation_id: operationId,
+      cycle_id: cycleId,
+      cycle_strategy_id: cycleStrategyId,
+    }, {
+      deferCoverageReconciliation: true,
+      batchOperationId,
+    });
+    const reconciliationContext = result.batch_reconciliation_context
+      && typeof result.batch_reconciliation_context === "object"
+      && !Array.isArray(result.batch_reconciliation_context)
+      ? result.batch_reconciliation_context as Record<string, unknown>
+      : null;
+    const { batch_reconciliation_context: _internalContext, ...publicResult } = result;
+    itemResults.push({ index, ...publicResult });
+    const scheduledPostId = Number(result.scheduled_post_id ?? 0);
+    const slotKey = normalizeOperatorText(result.slot_key ?? reconciliationContext?.slot_key, 160, true);
+    if (result.success === true && scheduledPostId > 0 && slotKey && reconciliationContext) {
+      persistedCandidates.push({
+        operation_id: operationId,
+        slot_key: slotKey,
+        scheduled_post_id: scheduledPostId,
+      });
+      reconciliationContexts.push(reconciliationContext);
+    }
+  }
+
+  const rejected = itemResults.filter((result) => !(
+    result.success === true && Number(result.scheduled_post_id ?? 0) > 0
+  ));
+  if (!persistedCandidates.length) {
+    return {
+      success: false,
+      partial_success: false,
+      batch_operation_id: batchOperationId,
+      cycle_id: cycleId,
+      requested_count: candidates.length,
+      accepted_count: 0,
+      rejected_count: rejected.length,
+      results: itemResults,
+      rejected_slots: rejected.map((result) => ({
+        index: result.index,
+        slot_key: result.slot_key ?? null,
+        error: result.error ?? result.outcome ?? "candidate_not_persisted",
+      })),
+      reconciliation: null,
+      retryable: true,
+    };
+  }
+
+  const lastContext = reconciliationContexts[reconciliationContexts.length - 1] ?? {};
+  const strategicThesis = lastContext.strategic_thesis
+    && typeof lastContext.strategic_thesis === "object"
+    && !Array.isArray(lastContext.strategic_thesis)
+    ? lastContext.strategic_thesis as Record<string, unknown>
+    : {};
+  const fallbackCycle = lastContext.fallback_cycle
+    && typeof lastContext.fallback_cycle === "object"
+    && !Array.isArray(lastContext.fallback_cycle)
+    ? lastContext.fallback_cycle as Record<string, unknown>
+    : {};
+  const fallbackTimezone = normalizeOperatorText(lastContext.fallback_timezone, 100, true)
+    ?? WORKSPACE_DEFAULT_TIMEZONE;
+  const reconciliation = await reconcileOperatorManifestPersistenceBatch({
+    brandKey: brand.brand_key,
+    cycleId,
+    batchOperationId,
+    persistedCandidates,
+    strategicThesis,
+    outputStrategyVersionId: normalizeOperatorText(lastContext.output_strategy_version_id, 160, true),
+    fallbackCycle,
+    fallbackTimezone,
+  }, manifestPersistenceReconciliationDependencies(env, brand));
+
+  return {
+    success: rejected.length === 0,
+    partial_success: rejected.length > 0,
+    batch_operation_id: batchOperationId,
+    cycle_id: cycleId,
+    requested_count: candidates.length,
+    accepted_count: persistedCandidates.length,
+    rejected_count: rejected.length,
+    results: itemResults,
+    accepted_slots: persistedCandidates.map((candidate) => candidate.slot_key),
+    rejected_slots: rejected.map((result) => ({
+      index: result.index,
+      slot_key: result.slot_key ?? null,
+      error: result.error ?? result.outcome ?? "candidate_not_persisted",
+    })),
+    reconciliation,
+    reconciliation_count: 1,
+    retryable: rejected.length > 0,
+    next_action: rejected.length
+      ? "Regenerate only the rejected slots using their exact server reasons, then submit one bounded batch containing only those replacements."
+      : reconciliation.next_action,
+  };
+}
+
 async function reviewManifestScheduledPost(
   env: Env,
   brand: GptResolvedBrand,
