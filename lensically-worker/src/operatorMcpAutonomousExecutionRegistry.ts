@@ -10,7 +10,7 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOL_NAMES = [
 
 export type OperatorMcpAutonomousExecutionToolName = typeof OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOL_NAMES[number];
 
-export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[] = [
+const OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "prepare_manifest_autonomous_cycle",
     title: "Prepare Manifest autonomous cycle",
