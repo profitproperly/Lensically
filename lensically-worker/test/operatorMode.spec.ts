@@ -268,7 +268,7 @@ type ManifestSourceBackedCycleTestFixture = {
       id: string;
       missing_slots: Array<{ key: string; date: string; time: string }>;
     };
-        rolling_evidence: {
+                rolling_evidence: {
             snapshot: {
         id: string;
         page_count: number;
@@ -281,6 +281,11 @@ type ManifestSourceBackedCycleTestFixture = {
         items: unknown[];
         consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
       };
+    };
+    decision_bundle: {
+      id: string;
+      bundle_hash: string;
+      requires_detail_read: boolean;
     };
   };
   sourceBatchId: string;
@@ -468,8 +473,10 @@ async function prepareManifestSourceBackedCycleForTest(
   }));
   const strategyPayload: Record<string, unknown> = {
         brand_key: "manifest_mental",
-    cycle_id: prepared.cycle.id,
+        cycle_id: prepared.cycle.id,
     snapshot_id: prepared.rolling_evidence.snapshot.id,
+    decision_bundle_id: prepared.decision_bundle.id,
+    decision_bundle_hash: prepared.decision_bundle.bundle_hash,
     account_conclusion: {
       conclusion: "Use the proven source-backed recognition mechanism while varying execution and protecting audience trust.",
       published_post_ids: maturePostIds.slice(0, 5),
