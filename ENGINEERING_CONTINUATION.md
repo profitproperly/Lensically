@@ -7,7 +7,7 @@ branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
 active_checkpoint: stage_1_in_progress
-implementation_source_head: 9e4e6da00bc2a52fe33e2970f0131a023973c8d9
+implementation_source_head: debf4dfbf3969c2a385fa9f848c5f0b80b510b09
 production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
 
 This root file is the sole authority for all incomplete Lensically work. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents may provide evidence but may not establish, reorder, or resume work.
