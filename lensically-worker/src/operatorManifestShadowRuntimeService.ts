@@ -369,8 +369,13 @@ async function persistAcceptedShadowCandidate(
   const generationRunId = `shadow-run-${identity.slice(0, 32)}`;
   const draftId = `shadow-draft-${identity.slice(0, 32)}`;
   const hypothesisId = `shadow-hypothesis-${identity.slice(0, 32)}`;
-  const experimentId = `shadow-experiment-${identity.slice(0, 32)}`;
+    const experimentId = `shadow-experiment-${identity.slice(0, 32)}`;
+  const experimentDefinitionId = `shadow-experiment-definition-${identity.slice(0, 32)}`;
   const decisionInfluenceId = `shadow-decision-${identity.slice(0, 32)}`;
+  const planItemId = `shadow-plan-${(await sha256(`${state.run_id}|${slotKey}`)).slice(0, 32)}`;
+  const gateReceiptId = `shadow-gate-${identity.slice(0, 32)}`;
+  const lineupItemId = `shadow-lineup-${identity.slice(0, 32)}`;
+  const strategyId = stringValue(record(state.strategy).strategy_id);
   const idempotencyKey = `shadow:${state.run_id}:${slotKey}`;
 
     const existingScheduled = await db.prepare(
@@ -435,7 +440,7 @@ async function persistAcceptedShadowCandidate(
       decision_influence_id: decisionInfluenceId,
     }),
   ).run();
-  await db.prepare(
+    await db.prepare(
     `INSERT INTO gpt_post_strategy_tags (
        scheduled_post_id, account_id, threads_user_id, pillar, hook_style,
        format, intent, experiment, novelty_level, metadata_json
@@ -460,6 +465,152 @@ async function persistAcceptedShadowCandidate(
       decision_influence_id: decisionInfluenceId,
     }),
   ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_candidate_gate_receipts (
+       id, cycle_id, strategy_id, plan_item_id, brand_key, slot_key,
+       candidate_hash, receipt_version, results_json, passed
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+     ON CONFLICT(cycle_id, slot_key, candidate_hash) DO NOTHING`,
+  ).bind(
+    gateReceiptId,
+    state.run_id,
+    strategyId,
+    planItemId,
+    state.brand_key,
+    slotKey,
+    identity,
+    MANIFEST_SHADOW_BATCH_VERSION,
+    JSON.stringify(gates),
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_post_hypotheses (
+       id, cycle_id, brand_key, slot_key, hypothesis_version, strategy_version_id,
+       source_kind, source_type, source_identity_key, source_card_id, source_selection_id,
+       internal_source_id, expected_response_type, expected_audience_reward, hook_rationale,
+       premise_rationale, exploration_mode, comparable_post_ids_json,
+       expected_performance_range_json, uncertainty, falsification_conditions_json,
+       candidate_trace_json, model_evaluation_json, scheduled_post_id, status, locked_at
+     ) VALUES (?, ?, ?, ?, ?, ?, 'source_card', ?, ?, ?, ?, ?, 'likes', ?, ?, ?, ?, '[]', '{}', ?, '[]', ?, ?, ?, 'scheduled', ?)
+     ON CONFLICT(cycle_id, slot_key) DO NOTHING`,
+  ).bind(
+    hypothesisId,
+    state.run_id,
+    state.brand_key,
+    slotKey,
+    'manifest-shadow-hypothesis-v1',
+    strategyId,
+    stringValue(lineup?.source_type, 'source_card'),
+    stringValue(lineup?.source_identity_key) || null,
+    sourceCardId,
+    stringValue(record(lineup).source_selection_id) || null,
+    stringValue(lineup?.internal_source_id) || null,
+    stringValue(record(candidate.model_evaluation).winner_preservation_assessment, 'Preserve the selected audience reward.'),
+    stringValue(record(candidate.model_evaluation).novelty_assessment, 'Preserve the locked hook while remaining distinct.'),
+    stringValue(record(candidate.model_evaluation).intelligence_application_assessment, 'Apply the locked strategy and source premise.'),
+    stringValue(record(lineup).exploration_mode, 'hybrid'),
+    'Shadow-only operational expectation; audience performance is not inferred.',
+    JSON.stringify([{ generation_run_id: generationRunId, draft_id: draftId, gate_receipt_id: gateReceiptId }]),
+    JSON.stringify(record(candidate.model_evaluation)),
+    scheduledPostId,
+    state.last_client_response_at,
+  ).run();
+  const experimentKey = stringValue(candidate.experiment_key, `shadow:${state.run_id}:${slotKey}`);
+  await db.prepare(
+    `INSERT INTO operator_manifest_experiments (
+       id, brand_key, experiment_key, family_key, hypothesis_json,
+       comparison_group_json, maturity_windows_json, result_criteria_json,
+       status, experiment_version
+     ) VALUES (?, ?, ?, ?, ?, '{}', '[6,12,18,24]', ?, 'running', ?)
+     ON CONFLICT(brand_key, experiment_key) DO NOTHING`,
+  ).bind(
+    experimentDefinitionId,
+    state.brand_key,
+    experimentKey,
+    stringValue(candidate.family_key, stringValue(lineup?.source_card_family_id, 'unknown')),
+    JSON.stringify({ hypothesis_id: hypothesisId, slot_key: slotKey }),
+    JSON.stringify({ primary_metric: '24_hour_likes', shadow_only: true }),
+    'manifest-shadow-experiment-v1',
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_experiment_assignments (
+       id, experiment_id, brand_key, cycle_id, slot_key, hypothesis_id,
+       scheduled_post_id, variant_key, status
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+     ON CONFLICT(experiment_id, scheduled_post_id) DO NOTHING`,
+  ).bind(
+    experimentId,
+    experimentDefinitionId,
+    state.brand_key,
+    state.run_id,
+    slotKey,
+    hypothesisId,
+    scheduledPostId,
+    state.variant_key,
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_manifest_decision_influences (
+       id, influence_key, brand_key, cycle_id, slot_key, scheduled_post_id,
+       hypothesis_id, strategy_version_id, learning_brief_key, family_key,
+       portfolio_role, experiment_key, saved_pattern_identity_key,
+       decision_changed, decision_change_types_json, decision_summary,
+       evidence_json, influence_version
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+     ON CONFLICT(brand_key, cycle_id, slot_key) DO NOTHING`,
+  ).bind(
+    decisionInfluenceId,
+    `shadow:${state.run_id}:${slotKey}`,
+    state.brand_key,
+    state.run_id,
+    slotKey,
+    scheduledPostId,
+    hypothesisId,
+    strategyId,
+    stringValue(record(state.evidence.learning_brief).brief_key) || null,
+    stringValue(candidate.family_key, stringValue(lineup?.source_card_family_id, 'unknown')),
+    stringValue(record(lineup).strategic_role, 'prospect'),
+    experimentKey,
+    stringValue(lineup?.source_identity_key) || null,
+    JSON.stringify(['innovation_cycle_candidate_admitted']),
+    'The frozen decision bundle, locked source plan, strategy, gates, and model evaluation admitted this candidate.',
+    JSON.stringify({ decision_bundle_id: state.decision_bundle_id, gate_receipt_id: gateReceiptId, model_evaluation: candidate.model_evaluation ?? {} }),
+    'manifest-shadow-decision-influence-v1',
+  ).run();
+  await db.prepare(
+    `INSERT INTO operator_autonomous_lineup_items (
+       id, cycle_id, brand_key, slot_key, slot_date, slot_time, text,
+       generation_mode, family_key, strategic_purpose, strategy_json,
+       cycle_strategy_id, cycle_plan_item_id, gate_receipt_id, source_card_id,
+       source_selection_id, hypothesis_id, generation_run_id, draft_id,
+       scheduled_post_id, status
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+     ON CONFLICT(cycle_id, slot_key) DO UPDATE SET
+       scheduled_post_id = excluded.scheduled_post_id,
+       status = excluded.status`,
+  ).bind(
+    lineupItemId,
+    state.run_id,
+    state.brand_key,
+    slotKey,
+    slot.date,
+    slot.time,
+    text,
+    stringValue(record(lineup).generation_mode, 'controlled_variation'),
+    stringValue(candidate.family_key, stringValue(lineup?.source_card_family_id, 'unknown')),
+    stringValue(candidate.strategic_purpose, 'shadow_validation'),
+    JSON.stringify(state.strategy),
+    strategyId,
+    planItemId,
+    gateReceiptId,
+    sourceCardId,
+    stringValue(record(lineup).source_selection_id) || null,
+    hypothesisId,
+    generationRunId,
+    draftId,
+    scheduledPostId,
+  ).run();
+  await db.prepare(
+    `UPDATE operator_manifest_cycle_plan_items SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+  ).bind(planItemId).run();
 
   return {
     slot_key: slotKey,
@@ -596,7 +747,29 @@ async function finalizeBenchmark(
     passed,
         failed_rule: acceptanceFailure,
   };
-    await writeManifestShadowBenchmarkReceipt(dependencies.shadowDb, benchmark);
+      await writeManifestShadowBenchmarkReceipt(dependencies.shadowDb, benchmark);
+  await dependencies.shadowDb.prepare(
+    `UPDATE operator_autonomous_growth_cycles
+     SET status = ?, missing_slots_json = ?, scheduled_post_ids_json = ?, receipt_id = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+  ).bind(
+    passed ? 'completed' : 'failed',
+    JSON.stringify(state.missing_slot_keys),
+    JSON.stringify(state.accepted_posts.map((post) => post.scheduled_post_id).filter(Boolean)),
+    `shadow-cycle-receipt-${state.run_id}`,
+    state.run_id,
+  ).run();
+  await dependencies.shadowDb.prepare(
+    `UPDATE operator_manifest_cycle_receipts
+     SET status = ?, completion_json = ?, unresolved_issues_json = ?, completed_at = ?
+     WHERE cycle_id = ?`,
+  ).bind(
+    passed ? 'completed' : 'failed',
+    JSON.stringify({ accepted_count: state.accepted_posts.length, remaining_missing_count: state.missing_slot_keys.length, benchmark_id: benchmark.id }),
+    JSON.stringify(acceptanceFailure ? [acceptanceFailure] : []),
+    completedAt,
+    state.run_id,
+  ).run();
   if (passed) await completeManifestShadowRun(dependencies.shadowDb, state.run_id, completedAt);
   return { ...benchmark, passed, production_noninterference_passed: productionNoninterferencePassed };
 }
@@ -805,8 +978,79 @@ async function prepareShadowCycle(
         gate_rejection_injection_count: 0,
         interruption_injection_count: 0,
       },
-      threads_mutation_count: 0,
+            threads_mutation_count: 0,
     };
+    const horizonStartLocal = state.target_slots[0]?.key ?? nowIso;
+    const horizonEndLocal = state.target_slots[state.target_slots.length - 1]?.key ?? nowIso;
+    const evidenceWindowStart = new Date(now.getTime() - 28 * 86400000).toISOString();
+    await dependencies.shadowDb.prepare(
+      `INSERT INTO operator_autonomous_growth_cycles (
+         id, brand_key, operation_id, engine_version, status, timezone, horizon_hours,
+         horizon_start_local, horizon_end_local, target_slots_json, missing_slots_json,
+         account_position_json, strategic_thesis_json, evidence_snapshot_id
+       ) VALUES (?, ?, ?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         missing_slots_json = excluded.missing_slots_json,
+         account_position_json = excluded.account_position_json,
+         evidence_snapshot_id = excluded.evidence_snapshot_id,
+         updated_at = CURRENT_TIMESTAMP`,
+    ).bind(
+      runId,
+      identity.brandKey,
+      operationRoot,
+      MANIFEST_SHADOW_RUNTIME_VERSION,
+      timezone,
+      horizonHours,
+      horizonStartLocal,
+      horizonEndLocal,
+      JSON.stringify(state.target_slots),
+      JSON.stringify(state.missing_slot_keys),
+      JSON.stringify({ evidence, source_selection_summary: selection.summary }),
+      JSON.stringify({ decision_bundle_id: decisionBundleId, test_case: testCase, variant_key: variantKey }),
+      decisionBundleId,
+    ).run();
+    await dependencies.shadowDb.prepare(
+      `INSERT INTO operator_manifest_evidence_snapshots (
+         id, cycle_id, brand_key, snapshot_version, as_of, timezone, window_start, window_end,
+         post_count, mature_count, immature_count, incomplete_count, benchmarks_json,
+         recent_exposure_json, future_schedule_json, hard_bans_json, experiments_json, source_hash
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO NOTHING`,
+    ).bind(
+      decisionBundleId,
+      runId,
+      identity.brandKey,
+      MANIFEST_SHADOW_SNAPSHOT_VERSION,
+      nowIso,
+      timezone,
+      evidenceWindowStart,
+      nowIso,
+      evidence.strongest_posts.length + evidence.weakest_posts.length,
+      evidence.strongest_posts.length + evidence.weakest_posts.length,
+      JSON.stringify(record(evidence.learning_brief)),
+      JSON.stringify(evidence.recent_published),
+      JSON.stringify(evidence.future_scheduled),
+      JSON.stringify(evidence.hard_bans),
+      JSON.stringify(record(evidence.strategy)),
+      snapshotHash,
+    ).run();
+    await dependencies.shadowDb.prepare(
+      `INSERT INTO operator_manifest_cycle_receipts (
+         id, cycle_id, brand_key, operation_id, receipt_version, status,
+         trigger_json, startup_state_json, horizon_plan_json, started_at
+       ) VALUES (?, ?, ?, ?, ?, 'started', ?, ?, ?, ?)
+       ON CONFLICT(cycle_id) DO NOTHING`,
+    ).bind(
+      `shadow-cycle-receipt-${runId}`,
+      runId,
+      identity.brandKey,
+      operationRoot,
+      MANIFEST_SHADOW_RUNTIME_VERSION,
+      JSON.stringify({ source: 'manifest_innovation_cycle', test_case: testCase, variant_key: variantKey }),
+      JSON.stringify({ snapshot_hash: snapshotHash, decision_bundle_id: decisionBundleId }),
+      JSON.stringify({ target_slots: state.target_slots, occupied_slot_keys: state.occupied_slot_keys }),
+      nowIso,
+    ).run();
     const snapshot: ManifestShadowSnapshot = {
       contract_version: MANIFEST_SHADOW_SNAPSHOT_VERSION,
       brand_key: identity.brandKey,
@@ -953,8 +1197,77 @@ async function commitShadowStrategy(
   state.timings.strategy_client_gap_ms = gapMs;
   state.timings.strategy_ms = durationMs(strategyStarted);
   state.counters.payload_bytes = Number(state.counters.payload_bytes ?? 0) + jsonBytes(payload);
-  state.strategy = strategy;
+    state.strategy = strategy;
   state.last_client_response_at = dependencies.now().toISOString();
+  const strategyHash = await sha256(stableJson(strategy));
+  await dependencies.shadowDb.prepare(
+    `INSERT INTO operator_manifest_cycle_strategies (
+       id, cycle_id, brand_key, snapshot_id, contract_version, account_conclusion_json,
+       content_focus_json, benchmarks_json, strongest_json, weakest_json, directives_json,
+       experiments_json, risks_json, lineup_json, strategy_hash, status, locked_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?)
+     ON CONFLICT(cycle_id) DO NOTHING`,
+  ).bind(
+    strategy.strategy_id,
+    runId,
+    state.brand_key,
+    state.decision_bundle_id,
+    MANIFEST_SHADOW_DECISION_BUNDLE_VERSION,
+    JSON.stringify(strategy.account_conclusion),
+    JSON.stringify(strategy.content_focus),
+    JSON.stringify(strategy.benchmarks),
+    JSON.stringify(strategy.strongest_executions),
+    JSON.stringify(strategy.weakest_executions),
+    JSON.stringify(strategy.directives),
+    JSON.stringify(strategy.experiments),
+    JSON.stringify(strategy.risks),
+    JSON.stringify(strategy.lineup),
+    strategyHash,
+    strategy.locked_at,
+  ).run();
+  for (let index = 0; index < suppliedLineup.length; index += 1) {
+    const item = suppliedLineup[index];
+    const slotKey = stringValue(item.slot_key);
+    const slot = state.target_slots.find((candidate) => candidate.key === slotKey);
+    if (!slot) throw new Error(`manifest_shadow_strategy_slot_missing:${slotKey}`);
+    const planItemId = `shadow-plan-${(await sha256(`${runId}|${slotKey}`)).slice(0, 32)}`;
+    await dependencies.shadowDb.prepare(
+      `INSERT INTO operator_manifest_cycle_plan_items (
+         id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+         family_key, strategic_role, generation_mode, source_kind, source_card_id,
+         source_selection_id, audience_reward, hook_direction, placement_reason,
+         nearby_avoid_json, exploration_mode, status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'source_card', ?, ?, ?, ?, ?, '[]', ?, 'planned')
+       ON CONFLICT(cycle_id, slot_key) DO NOTHING`,
+    ).bind(
+      planItemId,
+      strategy.strategy_id,
+      runId,
+      state.brand_key,
+      slotKey,
+      slot.date,
+      slot.time,
+      stringValue(item.family_key, 'unknown'),
+      stringValue(item.strategic_role, 'prospect'),
+      stringValue(item.generation_mode, 'controlled_variation'),
+      stringValue(item.source_card_id) || null,
+      stringValue(item.source_selection_id) || null,
+      stringValue(item.audience_reward, 'Preserve the selected source reward.'),
+      stringValue(item.hook_direction, 'Preserve the selected hook function.'),
+      stringValue(item.placement_reason, 'Exact locked Innovation Cycle order.'),
+      stringValue(item.exploration_mode, 'hybrid'),
+    ).run();
+  }
+  await dependencies.shadowDb.prepare(
+    `UPDATE operator_autonomous_growth_cycles
+     SET status = 'strategy_locked', cycle_strategy_id = ?, strategy_version_id = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+  ).bind(strategy.strategy_id, strategy.strategy_id, runId).run();
+  await dependencies.shadowDb.prepare(
+    `UPDATE operator_manifest_cycle_receipts
+     SET output_strategy_version_id = ?, status = 'strategy_locked'
+     WHERE cycle_id = ?`,
+  ).bind(strategy.strategy_id, runId).run();
   await writeState(dependencies.shadowDb, state);
   await recordManifestShadowStageEvent(dependencies.shadowDb, {
     run_id: runId,
