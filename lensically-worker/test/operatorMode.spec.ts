@@ -282,7 +282,7 @@ type ManifestSourceBackedCycleTestFixture = {
         consumption: { complete: boolean; consumed_page_count: number; required_page_count: number };
       };
     };
-    decision_bundle: {
+        decision_bundle?: {
       id: string;
       bundle_hash: string;
       requires_detail_read: boolean;
@@ -457,6 +457,18 @@ async function prepareManifestSourceBackedCycleForTest(
     }
   }
 
+    const consumedDecisionBundle = await env.DB.prepare(
+    `SELECT id, bundle_hash, requires_detail_read
+     FROM operator_manifest_decision_bundles
+     WHERE cycle_id = ? AND brand_key = 'manifest_mental' AND consumed_at IS NOT NULL
+     LIMIT 1`,
+  ).bind(prepared.cycle.id).first<{
+    id: string;
+    bundle_hash: string;
+    requires_detail_read: number;
+  }>();
+  expect(consumedDecisionBundle).toBeTruthy();
+
   const lineup = prepared.cycle.missing_slots.map((slot, index) => ({
     slot_key: slot.key,
     family_key: "test_source_backed_finger_touch",
@@ -475,8 +487,8 @@ async function prepareManifestSourceBackedCycleForTest(
         brand_key: "manifest_mental",
         cycle_id: prepared.cycle.id,
     snapshot_id: prepared.rolling_evidence.snapshot.id,
-    decision_bundle_id: prepared.decision_bundle.id,
-    decision_bundle_hash: prepared.decision_bundle.bundle_hash,
+        decision_bundle_id: consumedDecisionBundle!.id,
+    decision_bundle_hash: consumedDecisionBundle!.bundle_hash,
     account_conclusion: {
       conclusion: "Use the proven source-backed recognition mechanism while varying execution and protecting audience trust.",
       published_post_ids: maturePostIds.slice(0, 5),
