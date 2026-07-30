@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
+  appliedMigrationChangeIsSafe,
   auditRepositoryMigrations,
   parseWranglerLedgerJson,
     reconcileProductionPrefix,
@@ -28,6 +29,11 @@ function expectFailure(callback, code) {
     return true;
   });
 }
+
+assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: ["one"] }), true);
+assert.equal(appliedMigrationChangeIsSafe({ status: "M", commits: ["one"] }), false);
+assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: ["one", "two"] }), false);
+assert.equal(appliedMigrationChangeIsSafe({ status: "A", commits: [] }), false);
 
 withMigrations({
   "0000_legacy.sql": "CREATE TABLE legacy_table (id INTEGER PRIMARY KEY);\n",

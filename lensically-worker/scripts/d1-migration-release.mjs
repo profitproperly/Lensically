@@ -237,6 +237,10 @@ export function reconcileProductionPrefix(repositoryEntries, productionRows) {
   return repositoryEntries.slice(productionNames.length);
 }
 
+export function appliedMigrationChangeIsSafe(change) {
+  return change.status === "A" && Array.isArray(change.commits) && change.commits.length === 1;
+}
+
 function assertAppliedMigrationsUnedited(productionSha, appliedNames) {
   if (!/^[a-f0-9]{40}$/i.test(productionSha ?? "")) fail("migration_production_sha_invalid");
   run("git", ["cat-file", "-e", `${productionSha}^{commit}`]);
@@ -248,14 +252,25 @@ function assertAppliedMigrationsUnedited(productionSha, appliedNames) {
   } catch {
     fail("migration_production_sha_not_ancestor", productionSha);
   }
-  const changed = run("git", ["diff", "--name-only", productionSha, "HEAD", "--", "database/migrations"])
+    const changed = run("git", ["diff", "--name-status", productionSha, "HEAD", "--", "database/migrations"])
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((line) => {
+      const [status, ...pathParts] = line.split(/\s+/);
+      return { status, path: pathParts[pathParts.length - 1] ?? "" };
+    });
   const appliedSet = new Set(appliedNames);
-  const editedApplied = changed.filter((path) => appliedSet.has(basename(path)));
-  if (editedApplied.length > 0) fail("migration_applied_file_edited", editedApplied.join(","));
-  return changed;
+  const unsafeApplied = [];
+  for (const change of changed.filter((entry) => appliedSet.has(basename(entry.path)))) {
+    const commits = run("git", ["log", "--format=%H", `${productionSha}..HEAD`, "--", change.path])
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (!appliedMigrationChangeIsSafe({ status: change.status, commits })) unsafeApplied.push(change.path);
+  }
+  if (unsafeApplied.length > 0) fail("migration_applied_file_edited", unsafeApplied.join(","));
+  return changed.map((entry) => entry.path);
 }
 
 export function buildMigrationPlan({ productionSha, productionRows, repositoryEntries, sourceSha }) {
