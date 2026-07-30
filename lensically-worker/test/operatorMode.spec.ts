@@ -5643,8 +5643,8 @@ active_checkpoint: stage-6t-published-post-lineage-audit-service
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 111,
-                        total_read_only_capabilities: 46,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 115,
+                        total_read_only_capabilities: 47,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
