@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
-active_checkpoint: stage_1_blocked_workflow_dispatch_422
+active_checkpoint: stage_1_in_progress
 implementation_source_head: bcce3958a903263ba846ab5d473d00e22b744369
 production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
 
@@ -375,6 +375,15 @@ Resolution: no UI, dashboard, concurrent runner, generic simulation framework, o
 - No shadow dashboard.
 - No concurrent shadow runs in Version 1.
 - No unrelated product or account work until this active outcome closes.
+
+## Resolved Interrupt — Workflow Dispatch 422
+
+- Failure: Main workflow dispatch returned HTTP 422 and GitHub created zero-job failed runs because `.github/workflows/lensically-engineering.yml` was syntactically invalid.
+- Root cause: the live exact-text patch handler trims leading whitespace from `find`; a whitespace-led YAML replacement therefore matched inside a step marker, preserved the prior indentation prefix, and added another prefix.
+- Complete repair: replaced the entire YAML block through a non-whitespace anchor and corrected the inherited internal command indentation.
+- Permanent prevention: `operatorRepositoryPatchSafety.ts` now rejects over-indented GitHub Actions step markers and tab-indented YAML before either repository patch tool can commit; focused regression coverage is mandatory in the full validation inventory.
+- Verification: push validation run `30566590320` completed SUCCESS at exact SHA `ebdc0f6f538c86e17b3a62d7aa77e487fbb5b489`.
+- Winning path: YAML changes use a complete block with a non-whitespace anchor, followed by readback before dispatch.
 
 ## Current Action
 
