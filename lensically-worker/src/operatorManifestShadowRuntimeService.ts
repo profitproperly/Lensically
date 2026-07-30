@@ -1029,7 +1029,21 @@ async function persistShadowBatch(
       results.push(rejected);
       continue;
     }
+        const persistenceStarted = Date.now();
     const persisted = await persistAcceptedShadowCandidate(dependencies.shadowDb, state, candidate, gate.results);
+    state.timings.candidate_persistence_ms = Number(state.timings.candidate_persistence_ms ?? 0) + durationMs(persistenceStarted);
+    const lineageStarted = Date.now();
+    const lineageComplete = persisted.publish_lineage_complete === true
+      && persisted.intelligence_lineage_complete === true
+      && Boolean(persisted.scheduled_post_id)
+      && Boolean(persisted.generation_run_id)
+      && Boolean(persisted.draft_id)
+      && Boolean(persisted.hypothesis_id)
+      && Boolean(persisted.experiment_assignment_id)
+      && Boolean(persisted.decision_influence_id);
+    state.timings.lineage_verification_ms = Number(state.timings.lineage_verification_ms ?? 0) + durationMs(lineageStarted);
+    state.counters.lineage_count = Number(state.counters.lineage_count ?? 0) + 1;
+    if (!lineageComplete) throw new Error(`manifest_shadow_lineage_incomplete:${slotKey}`);
     const accepted = { success: true, operation_id: candidateOperationId, ...persisted };
     state.accepted_posts.push(accepted);
     acceptedTexts.add(normalizeText(candidate.text));
