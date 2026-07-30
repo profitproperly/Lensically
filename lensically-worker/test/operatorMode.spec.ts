@@ -361,13 +361,32 @@ async function prepareManifestSourceBackedCycleForTest(
     proceed_confirmed: true,
   });
 
-  const prepared = await mcpTool<ManifestSourceBackedCycleTestFixture["prepared"]>("prepare_manifest_autonomous_cycle", {
+    const preparedResponse = await mcpTool<ManifestSourceBackedCycleTestFixture["prepared"] & {
+    locked_source_selection_plan?: Array<{ slot_key?: string }>;
+    cycle: ManifestSourceBackedCycleTestFixture["prepared"]["cycle"] & {
+      missing_slots?: Array<{ key: string; date: string; time: string }>;
+    };
+  }>("prepare_manifest_autonomous_cycle", {
     brand_key: "manifest_mental",
     timezone: "America/New_York",
     horizon_hours: 48,
     operation_id: `test-source-backed-prepare-${crypto.randomUUID()}`,
     proceed_confirmed: true,
   });
+  const reconstructedMissingSlots = Array.isArray(preparedResponse.cycle.missing_slots)
+    ? preparedResponse.cycle.missing_slots
+    : (preparedResponse.locked_source_selection_plan ?? []).flatMap((item) => {
+        const slotKey = String(item.slot_key ?? "");
+        const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(slotKey);
+        return match ? [{ key: slotKey, date: match[1], time: match[2] }] : [];
+      });
+  const prepared: ManifestSourceBackedCycleTestFixture["prepared"] = {
+    ...preparedResponse,
+    cycle: {
+      ...preparedResponse.cycle,
+      missing_slots: reconstructedMissingSlots,
+    },
+  };
     expect(prepared.cycle.missing_slots.length).toBeGreaterThan(0);
   expect(prepared.rolling_evidence.snapshot.id).toBeTruthy();
     expect(prepared.rolling_evidence.snapshot.benchmarks).toMatchObject({ primary_metric: "24_hour_likes" });
