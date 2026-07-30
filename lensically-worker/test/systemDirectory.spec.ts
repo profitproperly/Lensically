@@ -1453,11 +1453,31 @@ describe("System Directory foundation", () => {
     ]));
   });
 
-  it("persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt", () => {
+    it("persists one source-card-backed post through the consumed-bundle strategy and shared size-one wrapper", () => {
     const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "content.manifest_autonomous_post_persistence");
     expect(entry).toMatchObject({ route_intent: "persist manifest autonomous post" });
-    expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_strategy_id", "plan_item_id"]));
-    expect(entry?.hard_gates).toContain("A nonempty passing owner-rule and backend gate receipt is mandatory.");
+    expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_strategy_id", "cycle_plan_item_id"]));
+    expect(entry?.hard_gates).toEqual(expect.arrayContaining([
+      "The locked strategy must carry the consumed decision-bundle identity.",
+      "Deterministic hard bans, exact duplicates, slot collision, source lineage, repetition, and backend gates are server-owned.",
+    ]));
+  });
+
+  it("persists successful siblings and reconciles coverage once for a bounded four-post batch", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "content.manifest_autonomous_batch_persistence");
+    expect(entry).toMatchObject({
+      route_intent: "persist manifest autonomous batch",
+      payload: {
+        action_size: "bounded_mutation",
+        max_results: 4,
+        required_inputs: ["brand_key", "cycle_id", "cycle_strategy_id", "batch_operation_id", "candidates"],
+      },
+    });
+    expect(entry?.hard_gates).toEqual(expect.arrayContaining([
+      "Candidate count must be one through four.",
+      "One candidate failure cannot roll back or hide successful siblings.",
+      "Authoritative coverage and cycle completion are reconciled exactly once after accepted siblings persist.",
+    ]));
   });
 
   it("routes deployment through the explicit exact-SHA Main workflow", () => {
