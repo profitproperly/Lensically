@@ -519,10 +519,10 @@ export async function completeManifestShadowRun(
 }
 
 export async function writeManifestShadowBenchmarkReceipt(
-  productionDb: D1Database,
+  shadowDb: D1Database,
   input: ManifestShadowBenchmarkInput,
 ): Promise<void> {
-  await productionDb.prepare(
+  await shadowDb.prepare(
     `INSERT INTO manifest_shadow_benchmark_receipts (
        id, shadow_run_id, brand_key, scenario, evidence_mode, variant_key,
        snapshot_hash, code_sha, contract_versions_json, counts_json, timings_json,
@@ -580,7 +580,6 @@ function redactManifestShadowGeneratedText(value: unknown): unknown {
 
 export async function readManifestShadowReceipt(
   shadowDb: D1Database,
-  productionDb: D1Database,
   runId: string,
 ): Promise<JsonRecord> {
   const [run, snapshot, stages, diagnostic, benchmark] = await Promise.all([
@@ -588,7 +587,7 @@ export async function readManifestShadowReceipt(
     shadowDb.prepare(`SELECT id, snapshot_hash, contract_version, source_as_of, payload_bytes, expires_at, created_at FROM manifest_shadow_snapshots WHERE shadow_run_id = ? LIMIT 1`).bind(runId).first<JsonRecord>(),
     shadowDb.prepare(`SELECT stage_key, event_key, status, started_at, completed_at, duration_ms, payload_json, created_at FROM manifest_shadow_stage_events WHERE shadow_run_id = ? ORDER BY datetime(created_at), event_key`).bind(runId).all<JsonRecord>(),
     shadowDb.prepare(`SELECT archive_key, severity, payload_json, expires_at, created_at FROM manifest_shadow_diagnostic_archives WHERE shadow_run_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`).bind(runId).first<JsonRecord>(),
-    productionDb.prepare(`SELECT * FROM manifest_shadow_benchmark_receipts WHERE shadow_run_id = ? LIMIT 1`).bind(runId).first<JsonRecord>(),
+        shadowDb.prepare(`SELECT * FROM manifest_shadow_benchmark_receipts WHERE shadow_run_id = ? LIMIT 1`).bind(runId).first<JsonRecord>(),
   ]);
   return {
     contract_version: MANIFEST_SHADOW_CONTRACT_VERSION,

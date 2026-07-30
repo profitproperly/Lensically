@@ -42,8 +42,8 @@ export const MANIFEST_SHADOW_TEST_CASES = [
   "stale_delta_refresh",
   "invalidated_source_replacement",
   "retained_failure_cleanup",
-  "same_snapshot_ab",
-  "live_read_zero_mutation",
+    "same_snapshot_ab",
+  "frozen_snapshot_zero_main_access",
 ] as const;
 export type ManifestShadowTestCase = typeof MANIFEST_SHADOW_TEST_CASES[number];
 const SHADOW_TEST_CASES = new Set<string>(MANIFEST_SHADOW_TEST_CASES);
@@ -86,7 +86,7 @@ export type ManifestShadowRuntimeState = {
     threads_user_id: string;
   scenario: string;
   test_case: ManifestShadowTestCase;
-  evidence_mode: "snapshot" | "live_read";
+    evidence_mode: "snapshot";
   variant_key: string;
   operation_root: string;
   code_sha: string;
@@ -113,7 +113,7 @@ export type ManifestShadowRuntimeState = {
 };
 
 export interface OperatorManifestShadowRuntimeDependencies {
-  productionDb: D1Database;
+    snapshotDb: D1Database;
   shadowDb: D1Database;
   codeSha: string;
   now(): Date;
@@ -134,11 +134,11 @@ export interface OperatorManifestShadowRuntimeDependencies {
     seed: string;
   }): { selected: SourceSelectionCandidate[]; receipts: SourceSelectionReceipt[]; summary: JsonRecord };
   readEvidence(input: {
-    productionReadOnlyDb: D1Database;
+        snapshotReadOnlyDb: D1Database;
     brandKey: string;
     threadsUserId: string;
     nowIso: string;
-    evidenceMode: "snapshot" | "live_read";
+        evidenceMode: "snapshot";
   }): Promise<ManifestShadowEvidence>;
 }
 
@@ -482,7 +482,7 @@ async function persistAcceptedShadowCandidate(
 
 function manifestShadowLatencyLimitMs(state: ManifestShadowRuntimeState): number {
   if (state.scenario === "noop") return 30_000;
-  if (state.evidence_mode === "live_read" && state.missing_slot_keys.length <= 24) return 600_000;
+  
   if (state.scenario === "normal_24") return 360_000;
   if (state.scenario === "recovery_48") return 599_999;
   return 600_000;
@@ -510,8 +510,10 @@ function manifestShadowAcceptanceFailure(
   if (state.test_case === "gate_rejection_regeneration" && Number(state.counters.gate_rejection_injection_count ?? 0) !== 1) return "gate_rejection_not_observed";
   if (state.test_case === "interrupted_replay" && Number(state.counters.retry_count ?? 0) < 1) return "interrupted_batch_replay_missing";
   if (state.test_case === "stale_delta_refresh" && Number(state.counters.delta_refresh_count ?? 0) !== 1) return "bounded_delta_refresh_missing";
-  if (state.test_case === "invalidated_source_replacement" && Number(state.counters.source_replacement_count ?? 0) !== 1) return "authoritative_source_replacement_missing";
-  if (state.test_case === "live_read_zero_mutation" && state.evidence_mode !== "live_read") return "live_read_evidence_mode_missing";
+    if (state.test_case === "invalidated_source_replacement" && Number(state.counters.source_replacement_count ?? 0) !== 1) return "authoritative_source_replacement_missing";
+  if (Number(state.counters.main_read_count ?? 0) !== 0) return "main_read_detected";
+  if (Number(state.counters.main_write_count ?? 0) !== 0) return "main_write_detected";
+  if (state.test_case === "frozen_snapshot_zero_main_access" && Number(state.counters.external_read_count ?? 0) !== 0) return "frozen_snapshot_external_read_detected";
   return null;
 }
 
@@ -525,17 +527,9 @@ async function finalizeBenchmark(
   const orphanCount = await verifyManifestShadowOrphans(dependencies.shadowDb);
   state.timings.cleanup_ms = durationMs(cleanupStarted);
   state.timings.total_wall_clock_ms = Math.max(0, Date.parse(completedAt) - Date.parse(state.started_at));
-  const afterEvidence = await dependencies.readEvidence({
-    productionReadOnlyDb: createManifestShadowReadOnlyDatabase(dependencies.productionDb),
-    brandKey: state.brand_key,
-    threadsUserId: state.threads_user_id,
-    nowIso: completedAt,
-    evidenceMode: "snapshot",
-  });
-  const beforeFingerprint = stableJson(state.evidence.production_fingerprint);
-  const afterFingerprint = stableJson(afterEvidence.production_fingerprint);
-  const productionNoninterferencePassed = beforeFingerprint === afterFingerprint;
-    const acceptanceFailure = manifestShadowAcceptanceFailure(state, {
+    const productionNoninterferencePassed = Number(state.counters.main_read_count ?? 0) === 0
+    && Number(state.counters.main_write_count ?? 0) === 0;
+  const acceptanceFailure = manifestShadowAcceptanceFailure(state, {
     suppliedFailure: failedRule,
     orphanCount,
     productionNoninterferencePassed,
@@ -602,7 +596,7 @@ async function finalizeBenchmark(
     passed,
         failed_rule: acceptanceFailure,
   };
-  await writeManifestShadowBenchmarkReceipt(dependencies.productionDb, benchmark);
+    await writeManifestShadowBenchmarkReceipt(dependencies.shadowDb, benchmark);
   if (passed) await completeManifestShadowRun(dependencies.shadowDb, state.run_id, completedAt);
   return { ...benchmark, passed, production_noninterference_passed: productionNoninterferencePassed };
 }
@@ -618,9 +612,10 @@ async function prepareShadowCycle(
   if (!SHADOW_SCENARIOS.has(scenario)) return { body: { success: false, error: "manifest_shadow_scenario_invalid" }, status: 400 };
   const testCase = machineKey(payload.test_case, "baseline") as ManifestShadowTestCase;
   if (!SHADOW_TEST_CASES.has(testCase)) return { body: { success: false, error: "manifest_shadow_test_case_invalid" }, status: 400 };
-  const evidenceMode = testCase === "live_read_zero_mutation" || payload.evidence_mode === "live_read"
-    ? "live_read"
-    : "snapshot";
+    if (payload.evidence_mode === "live_read") {
+    return { body: { success: false, error: "manifest_innovation_live_access_forbidden" }, status: 400 };
+  }
+  const evidenceMode = "snapshot" as const;
   const variantKey = machineKey(payload.variant_key, "control");
   const timezone = stringValue(payload.timezone, "America/New_York");
   const requestedMissingCount = scenarioMissingCount(scenario, payload.missing_count);
@@ -663,7 +658,45 @@ async function prepareShadowCycle(
     code_sha: dependencies.codeSha,
     retention_hours: Number(payload.retention_hours ?? 72),
   }, nowIso);
-  try {
+    try {
+    const evidenceStarted = Date.now();
+    const snapshotReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
+    const [slotPlan, loadedCandidates, initialEvidence] = await Promise.all([
+      dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount }),
+      dependencies.loadSourceCandidates(snapshotReadOnlyDb, identity.brandKey, nowIso),
+      dependencies.readEvidence({
+        snapshotReadOnlyDb,
+        brandKey: identity.brandKey,
+        threadsUserId: identity.threadsUserId,
+        nowIso,
+        evidenceMode,
+      }),
+    ]);
+    let candidates = loadedCandidates;
+    let evidence = initialEvidence;
+    let deltaRefreshCount = 0;
+    let additionalExternalReads = 0;
+    if (testCase === "stale_delta_refresh") {
+      evidence = await dependencies.readEvidence({
+        snapshotReadOnlyDb,
+        brandKey: identity.brandKey,
+        threadsUserId: identity.threadsUserId,
+        nowIso: dependencies.now().toISOString(),
+        evidenceMode: "snapshot",
+      });
+      evidence = {
+        ...evidence,
+        freshness: {
+          ...record(evidence.freshness),
+          stale: false,
+          bounded_delta_refresh_required: false,
+          bounded_delta_refresh_performed: true,
+        },
+      };
+      deltaRefreshCount = 1;
+      additionalExternalReads = 1;
+    }
+
     const resetStarted = Date.now();
     const reset = await resetManifestShadowWorkspace(dependencies.shadowDb);
     await dependencies.shadowDb.prepare(
@@ -686,44 +719,6 @@ async function prepareShadowCycle(
       duration_ms: durationMs(resetStarted),
       payload: reset,
     });
-
-    const evidenceStarted = Date.now();
-    const productionReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.productionDb);
-        const [slotPlan, loadedCandidates, initialEvidence] = await Promise.all([
-      dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount }),
-      dependencies.loadSourceCandidates(productionReadOnlyDb, identity.brandKey, nowIso),
-      dependencies.readEvidence({
-        productionReadOnlyDb,
-        brandKey: identity.brandKey,
-        threadsUserId: identity.threadsUserId,
-        nowIso,
-        evidenceMode,
-      }),
-    ]);
-    let candidates = loadedCandidates;
-    let evidence = initialEvidence;
-    let deltaRefreshCount = 0;
-    let additionalExternalReads = 0;
-    if (testCase === "stale_delta_refresh") {
-      evidence = await dependencies.readEvidence({
-        productionReadOnlyDb,
-        brandKey: identity.brandKey,
-        threadsUserId: identity.threadsUserId,
-        nowIso: dependencies.now().toISOString(),
-        evidenceMode: "snapshot",
-      });
-      evidence = {
-        ...evidence,
-        freshness: {
-          ...record(evidence.freshness),
-          stale: false,
-          bounded_delta_refresh_required: false,
-          bounded_delta_refresh_performed: true,
-        },
-      };
-      deltaRefreshCount = 1;
-      additionalExternalReads = 1;
-    }
     const occupied = new Set(slotPlan.occupiedSlotKeys);
     const missingSlots = slotPlan.targetSlots.map((slot) => slot.key).filter((key) => !occupied.has(key)).slice(0, requestedMissingCount);
         const selectionStarted = Date.now();
@@ -795,7 +790,9 @@ async function prepareShadowCycle(
         preparation_ms: durationMs(totalStarted),
       },
             counters: {
-                external_read_count: (evidenceMode === "live_read" ? 1 : 0) + additionalExternalReads,
+                        external_read_count: additionalExternalReads,
+        main_read_count: 0,
+        main_write_count: 0,
         retry_count: 0,
         continuation_count: 0,
         payload_bytes: jsonBytes(payload) + jsonBytes(decisionBundle),
@@ -804,7 +801,8 @@ async function prepareShadowCycle(
         batch_call_count: 0,
                 delta_refresh_count: deltaRefreshCount,
         source_replacement_count: sourceReplacementCount,
-        collision_injection_count: 0,
+                collision_injection_count: 0,
+        gate_rejection_injection_count: 0,
         interruption_injection_count: 0,
       },
       threads_mutation_count: 0,
@@ -1185,7 +1183,7 @@ async function getShadowReceipt(
 ): Promise<{ body: JsonRecord; status: number }> {
   const runId = stringValue(payload.shadow_run_id);
   if (!runId) return { body: { success: false, error: "shadow_run_id_required" }, status: 400 };
-  const receipt = await readManifestShadowReceipt(dependencies.shadowDb, dependencies.productionDb, runId);
+    const receipt = await readManifestShadowReceipt(dependencies.shadowDb, runId);
   const run = record(receipt.run);
   if (run.brand_key && run.brand_key !== identity.brandKey) return { body: { success: false, error: "manifest_shadow_run_not_found" }, status: 404 };
   const state = await readState(dependencies.shadowDb, runId);
