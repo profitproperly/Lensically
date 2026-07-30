@@ -912,7 +912,7 @@ if (!operatorMcpManifestCycleRegistry.includes("export const OPERATOR_MCP_MANIFE
 if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered six-tool Manifest cycle registry")
     || !operatorMcpManifestCycleRegistryTests.includes("preserves pageable canonical cycle receipt reconstruction")
     || !operatorMcpManifestCycleRegistryTests.includes("preserves seven-stage defect evidence and durable repair verification")
-    || !operatorMcpManifestCycleRegistryTests.includes("preserves complete analysis consumption and source-backed strategy locking")) {
+        || !operatorMcpManifestCycleRegistryTests.includes("preserves complete decision-bundle consumption and source-backed strategy locking")) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_tests_incomplete");
 }
 if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAutonomousExecutionRegistry"')) {
