@@ -975,7 +975,47 @@ async function persistShadowBatch(
       results.push({ ...existing, reused: true });
       continue;
     }
+        const injectCollision = state.test_case === "mid_batch_collision"
+      && Number(state.counters.collision_injection_count ?? 0) === 0
+      && candidateIndex === Math.min(1, candidates.length - 1);
+    const injectGateRejection = state.test_case === "gate_rejection_regeneration"
+      && Number(state.counters.gate_rejection_injection_count ?? 0) === 0
+      && candidateIndex === 0;
+    if (injectCollision || injectGateRejection) {
+      const gateKey = injectCollision ? "occupied_slot_collision" : "deterministic_gate_rejection";
+      const injected = {
+        success: false,
+        operation_id: candidateOperationId,
+        slot_key: slotKey || null,
+        error: injectCollision
+          ? "manifest_shadow_mid_batch_occupied_slot_collision"
+          : "manifest_shadow_deterministic_gate_rejection",
+        blocking_failures: [{
+          gate_key: gateKey,
+          executed: true,
+          status: "fail",
+          evidence: { test_case: state.test_case, injected_once: true },
+        }],
+        gate_results: [{
+          gate_key: gateKey,
+          executed: true,
+          status: "fail",
+          evidence: { test_case: state.test_case, injected_once: true },
+        }],
+      };
+      if (injectCollision) {
+        state.counters.collision_injection_count = Number(state.counters.collision_injection_count ?? 0) + 1;
+      } else {
+        state.counters.gate_rejection_injection_count = Number(state.counters.gate_rejection_injection_count ?? 0) + 1;
+      }
+      state.rejected_posts.push(injected);
+      results.push(injected);
+      continue;
+    }
+    const gateStarted = Date.now();
     const gate = deterministicGateCandidate(state, candidate, acceptedTexts);
+    state.timings.gate_ms = Number(state.timings.gate_ms ?? 0) + durationMs(gateStarted);
+    state.counters.gate_count = Number(state.counters.gate_count ?? 0) + gate.results.length;
     if (!gate.passed) {
       const rejected = {
         success: false,
