@@ -19918,7 +19918,7 @@ async function handleOperatorMcpEngineeringTool(
                 const nextContent = file.content.replace(find, replace);
     const patchSafety = validateRepositoryPatchContent(path, nextContent);
     if (!patchSafety.ok) {
-      return { ok: false, ...patchSafety, path, no_commit_created: true };
+            return { ...patchSafety, path, no_commit_created: true };
     }
     if (nextContent === file.content) {
       return { ok: true, no_change: true, no_commit_created: true, path, reason: "replacement_produced_identical_content" };
@@ -19980,7 +19980,7 @@ async function handleOperatorMcpEngineeringTool(
     for (const changedFile of changedFiles) {
       const patchSafety = validateRepositoryPatchContent(changedFile.path, changedFile.content);
       if (!patchSafety.ok) {
-        return { ok: false, ...patchSafety, path: changedFile.path, no_commit_created: true };
+                return { ...patchSafety, path: changedFile.path, no_commit_created: true };
       }
     }
 
