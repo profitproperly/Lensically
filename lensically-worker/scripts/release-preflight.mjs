@@ -1569,6 +1569,15 @@ if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission
     || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");
 }
+if (!operatorManifestDecisionBundleService.includes("export async function buildManifestDecisionBundle")
+    || !operatorManifestDecisionBundleService.includes("export async function consumeManifestDecisionBundle")
+    || !operatorManifestDecisionBundleService.includes("export async function getManifestDecisionBundleConsumptionState")
+    || !operatorManifestDecisionBundleService.includes("MANIFEST_DECISION_BUNDLE_MAX_BYTES = 24_000")
+    || !operatorManifestDecisionBundleService.includes("snapshot_version AS evidence_contract_version")
+    || !operatorManifestDecisionBundleService.includes("manifest_decision_bundle_hash_mismatch")
+    || !operatorManifestDecisionBundleServiceTests.includes("builds, replays, and consumes a bundle from the canonical snapshot_version column")) {
+  lifecycleErrors.push("operator_manifest_decision_bundle_service_incomplete");
+}
 if (!source.includes('from "./operatorManifestCycleConstructionService"')
     || !source.includes("constructOperatorManifestAutonomousCycle({")
     || !source.includes("growthEngineVersion: MANIFEST_AUTONOMOUS_GROWTH_ENGINE_VERSION")) {
