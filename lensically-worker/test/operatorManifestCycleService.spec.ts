@@ -242,8 +242,10 @@ describe("Operator Manifest cycle product service", () => {
       toolName: "commit_manifest_cycle_strategy",
       brandKey: "manifest_mental",
       payload: {
-        cycle_id: "cycle-1",
+                cycle_id: "cycle-1",
         snapshot_id: "snapshot-1",
+        decision_bundle_id: "bundle-1",
+        decision_bundle_hash: "bundle-hash-1",
         account_conclusion: { trajectory: "rising" },
         content_focus: { family: "money" },
         benchmarks: { median_likes: 100 },
