@@ -129,6 +129,139 @@ function numericId(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+export type OperatorManifestPersistedCandidateSummary = {
+  operation_id: string;
+  slot_key: string;
+  scheduled_post_id: number;
+};
+
+export async function reconcileOperatorManifestPersistenceBatch(
+  input: {
+    brandKey: string;
+    cycleId: string;
+    batchOperationId: string;
+    persistedCandidates: OperatorManifestPersistedCandidateSummary[];
+    strategicThesis: JsonRecord;
+    outputStrategyVersionId: string | null;
+    fallbackCycle: JsonRecord;
+    fallbackTimezone: string;
+  },
+  dependencies: OperatorManifestReconciliationDependencies,
+): Promise<JsonRecord> {
+  if (!input.persistedCandidates.length) {
+    throw new Error("manifest_batch_reconciliation_requires_persisted_candidate");
+  }
+  const currentCycle = (await dependencies.readCurrentCycle(input.brandKey, input.cycleId))
+    ?? input.fallbackCycle;
+  const authoritativeTargetSlots = Array.isArray(currentCycle.target_slots)
+    ? currentCycle.target_slots as Array<{ key: string; date: string; time: string }>
+    : [];
+  const cycleTimezone = dependencies.normalizeText(currentCycle.timezone, 100, true)
+    ?? input.fallbackTimezone;
+  const occupiedAfter = await dependencies.occupiedSlots(authoritativeTargetSlots, cycleTimezone);
+  const reconciliationNow = dependencies.now();
+  const localNow = dependencies.localDateTimeParts(reconciliationNow, cycleTimezone);
+  const currentLocalHourKey = `${localNow.date}T${dependencies.hourlySlot(localNow.hour)}`;
+  const coverageState = dependencies.reconcileCoverageState(
+    authoritativeTargetSlots,
+    occupiedAfter,
+    currentLocalHourKey,
+    Array.isArray(currentCycle.scheduled_post_ids) ? currentCycle.scheduled_post_ids : [],
+  );
+  const remainingMissing = coverageState.remaining_missing_slots;
+  const elapsedUnfilledSlots = coverageState.elapsed_unfilled_slots;
+  const scheduledIds = new Set<number>(coverageState.scheduled_post_ids);
+  for (const candidate of input.persistedCandidates) scheduledIds.add(candidate.scheduled_post_id);
+  const scheduledPostIds = Array.from(scheduledIds);
+  await dependencies.updateCycleAfterPersist({
+    cycleId: input.cycleId,
+    brandKey: input.brandKey,
+    status: remainingMissing.length ? "partially_committed" : "coverage_complete",
+    strategicThesis: input.strategicThesis,
+    remainingMissing,
+    scheduledPostIds,
+  });
+  await dependencies.appendCycleEvent({
+    cycleId: input.cycleId,
+    brandKey: input.brandKey,
+    eventKey: `coverage:${input.batchOperationId}`,
+    eventType: "coverage_reconciled",
+    slotKey: input.persistedCandidates.at(-1)?.slot_key ?? null,
+    payload: {
+      batch_operation_id: input.batchOperationId,
+      persisted_slots: input.persistedCandidates.map((candidate) => candidate.slot_key),
+      persisted_scheduled_post_ids: input.persistedCandidates.map((candidate) => candidate.scheduled_post_id),
+      scheduled_post_ids: scheduledPostIds,
+      remaining_missing_slots: remainingMissing,
+      remaining_missing_count: remainingMissing.length,
+      elapsed_unfilled_slots: elapsedUnfilledSlots,
+      elapsed_unfilled_count: elapsedUnfilledSlots.length,
+      authoritative_occupied_count: occupiedAfter.size,
+      reconciliation_count: 1,
+    },
+  });
+
+  let cycleCompletion: JsonRecord | null = null;
+  if (!remainingMissing.length) {
+    const completedAt = reconciliationNow.toISOString();
+    const completion = {
+      completed_slot_keys: input.persistedCandidates.map((candidate) => candidate.slot_key),
+      completion_trigger: input.persistedCandidates.length > 1 ? "final_batch_persisted" : "final_post_persisted",
+      scheduled_post_ids: scheduledPostIds,
+      scheduled_count: scheduledPostIds.length,
+      remaining_missing_count: 0,
+      final_post_lineage_complete: true,
+      output_strategy_version_id: input.outputStrategyVersionId,
+      elapsed_unfilled_slots_ignored: elapsedUnfilledSlots,
+      past_slots_backfilled: false,
+      authoritative_target_slot_count: authoritativeTargetSlots.length,
+      authoritative_occupied_slot_count: occupiedAfter.size,
+      completed_at: completedAt,
+    };
+    cycleCompletion = await dependencies.finalizeCycleReceipt({
+      cycleId: input.cycleId,
+      status: "completed",
+      completion,
+      unresolvedIssues: [],
+      completedAt,
+    });
+    if (cycleCompletion.completed === true) {
+      await dependencies.appendCycleEvent({
+        cycleId: input.cycleId,
+        brandKey: input.brandKey,
+        eventKey: "cycle-completed",
+        eventType: "cycle_completed",
+        payload: cycleCompletion,
+      });
+      await dependencies.setCycleStatus(input.cycleId, input.brandKey, "completed");
+    } else {
+      await dependencies.appendCycleEvent({
+        cycleId: input.cycleId,
+        brandKey: input.brandKey,
+        eventKey: "cycle-completion-blocked",
+        eventType: "cycle_completion_blocked",
+        payload: cycleCompletion,
+      });
+      await dependencies.setCycleStatus(input.cycleId, input.brandKey, "completion_blocked");
+    }
+  }
+
+  return {
+    batch_operation_id: input.batchOperationId,
+    reconciliation_count: 1,
+    remaining_missing_count: remainingMissing.length,
+    remaining_missing_slots: remainingMissing,
+    elapsed_unfilled_slots: elapsedUnfilledSlots,
+    scheduled_post_ids: scheduledPostIds,
+    authoritative_occupied_count: occupiedAfter.size,
+    cycle_completion: cycleCompletion,
+    coverage_reconciliation_required: false,
+    next_action: remainingMissing.length
+      ? "Generate the next bounded candidate chunk from the existing locked cycle plan. Do not prepare a second cycle."
+      : "Verify the canonical cycle completion receipt, complete lineage, scheduler health, and zero unresolved delivery incidents.",
+  };
+}
+
 export async function persistOperatorManifestCandidate(
   input: {
     brandKey: string;
