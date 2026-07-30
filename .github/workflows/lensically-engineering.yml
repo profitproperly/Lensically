@@ -610,10 +610,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/d1-migration-release.mjs --verify-remote
+                run: node scripts/d1-migration-release.mjs --verify-remote
 
-      
-                        - name: Prepare trigger-neutral Worker deploy config
+      - name: Prepare trigger-neutral Worker deploy config
         working-directory: lensically-worker
         run: node scripts/cron-release.mjs --write-deploy-config --config wrangler.jsonc --output wrangler.release.generated.json
 
