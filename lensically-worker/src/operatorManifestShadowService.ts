@@ -220,6 +220,7 @@ export type ManifestShadowBenchmarkInput = {
   shadow_run_id: string;
   brand_key: string;
   scenario: string;
+  test_case: string;
   evidence_mode: "snapshot" | "live_read";
   variant_key: string;
   snapshot_hash: string;
@@ -552,7 +553,7 @@ export async function writeManifestShadowBenchmarkReceipt(
     input.snapshot_hash,
     input.code_sha,
     JSON.stringify(input.contract_versions),
-    JSON.stringify(input.counts),
+        JSON.stringify({ test_case: input.test_case, ...input.counts }),
     JSON.stringify(input.timings),
     input.external_read_count,
     input.retry_count,
