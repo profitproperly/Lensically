@@ -755,7 +755,34 @@ async function prepareShadowCycle(
       metadata: { state },
     };
     const expiresAt = new Date(now.getTime() + Math.max(1, Math.min(336, Number(payload.retention_hours ?? 72))) * 3600000).toISOString();
-    const seeded = await seedManifestShadowSnapshot(dependencies.shadowDb, runId, snapshot, expiresAt);
+        const seeded = await seedManifestShadowSnapshot(dependencies.shadowDb, runId, snapshot, expiresAt);
+    if (testCase === "retained_failure_cleanup") {
+      const failedAt = dependencies.now().toISOString();
+      await failManifestShadowRun(dependencies.shadowDb, {
+        run_id: runId,
+        now_iso: failedAt,
+        error_code: "manifest_shadow_retained_failure_injected",
+        error_message: "The permanent Shadow lab retained this deterministic failed run for diagnostic and cleanup validation.",
+        diagnostics: {
+          stage: "post_snapshot_fault_injection",
+          test_case: testCase,
+          snapshot_hash: snapshotHash,
+          payload_bytes: seeded.payload_bytes,
+        },
+      });
+      return {
+        body: {
+          success: false,
+          expected_failure: true,
+          shadow_run_id: runId,
+          test_case: testCase,
+          error: "manifest_shadow_retained_failure_injected",
+          diagnostic_retained: true,
+          cleanup_required: true,
+        },
+        status: 409,
+      };
+    }
     await recordManifestShadowStageEvent(dependencies.shadowDb, {
       run_id: runId,
       stage_key: "preparation",
