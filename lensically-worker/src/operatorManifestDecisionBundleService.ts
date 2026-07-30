@@ -117,8 +117,8 @@ export async function buildManifestDecisionBundle(
 
   const snapshot = await db.prepare(
     `SELECT id, cycle_id, brand_key, source_hash, page_count, post_count,
-            mature_count, immature_count, incomplete_count, benchmarks_json,
-            evidence_contract_version, created_at
+                        mature_count, immature_count, incomplete_count, benchmarks_json,
+            snapshot_version AS evidence_contract_version, created_at
      FROM operator_manifest_evidence_snapshots
      WHERE id = ? AND cycle_id = ? AND brand_key = ? LIMIT 1`,
   ).bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>();
