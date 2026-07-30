@@ -487,7 +487,18 @@
       "implementation_mode": "new_handler",
             "focused_regression": "persists one source-card-backed post against the locked cycle strategy, exact plan item, and nonempty passing gate receipt",
       "release_scope": "operator-content",
-            "live_verification": "The exact deployed Main tool rejects original model posts, missing or mismatched cycle strategies and plan items, incomplete analysis consumption, missing canonical source cards, empty or failed owner-rule evaluation, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, and incomplete lineage; a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently.",
+                        "live_verification": "The exact deployed Main tool requires a locked strategy carrying the consumed decision-bundle identity; rejects original model posts, mismatched plan items, missing canonical source cards, source-fidelity failures, exact duplicates, semantic collisions, slot conflicts, failed backend gates, and incomplete lineage; deterministic hard bans are server-owned and a passing post stores evidence-to-strategy-to-plan-to-source-to-gate lineage and replays idempotently through the shared size-one reconciliation wrapper.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "content.persist_manifest_autonomous_batch",
+      "directory_entry_id": "content.manifest_autonomous_batch_persistence",
+      "canonical_handler": "persist_manifest_autonomous_batch",
+      "route_intent": "persist manifest autonomous batch",
+      "implementation_mode": "new_handler",
+      "focused_regression": "persists successful siblings and reconciles coverage once for a bounded four-post batch",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main tool accepts one to four closed-schema locked-plan candidates, preserves each item operation ID, gates, source lineage, hypothesis, experiment, decision influence, and schedule result, keeps successful siblings when another candidate fails, returns exact rejected slots and reasons, and performs exactly one authoritative coverage and cycle-completion reconciliation after the batch.",
       "compatibility_bridge": false
     },
         {
