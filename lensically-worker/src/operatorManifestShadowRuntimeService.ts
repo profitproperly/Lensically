@@ -626,7 +626,7 @@ async function prepareShadowCycle(
 
     const evidenceStarted = Date.now();
     const productionReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.productionDb);
-    const [slotPlan, candidates, evidence] = await Promise.all([
+        const [slotPlan, loadedCandidates, initialEvidence] = await Promise.all([
       dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount }),
       dependencies.loadSourceCandidates(productionReadOnlyDb, identity.brandKey, nowIso),
       dependencies.readEvidence({
@@ -637,15 +637,51 @@ async function prepareShadowCycle(
         evidenceMode,
       }),
     ]);
+    let candidates = loadedCandidates;
+    let evidence = initialEvidence;
+    let deltaRefreshCount = 0;
+    let additionalExternalReads = 0;
+    if (testCase === "stale_delta_refresh") {
+      evidence = await dependencies.readEvidence({
+        productionReadOnlyDb,
+        brandKey: identity.brandKey,
+        threadsUserId: identity.threadsUserId,
+        nowIso: dependencies.now().toISOString(),
+        evidenceMode: "snapshot",
+      });
+      evidence = {
+        ...evidence,
+        freshness: {
+          ...record(evidence.freshness),
+          stale: false,
+          bounded_delta_refresh_required: false,
+          bounded_delta_refresh_performed: true,
+        },
+      };
+      deltaRefreshCount = 1;
+      additionalExternalReads = 1;
+    }
     const occupied = new Set(slotPlan.occupiedSlotKeys);
     const missingSlots = slotPlan.targetSlots.map((slot) => slot.key).filter((key) => !occupied.has(key)).slice(0, requestedMissingCount);
-    const selectionStarted = Date.now();
-    const selection = dependencies.selectSourceLineup({
+        const selectionStarted = Date.now();
+    let selection = dependencies.selectSourceLineup({
       candidates,
       slot_keys: missingSlots,
       seed: `${identity.brandKey}:${runId}:${variantKey}`,
     });
+    let sourceReplacementCount = 0;
+    if (testCase === "invalidated_source_replacement" && selection.selected.length) {
+      const invalidatedIdentity = String(selection.selected[0]?.source_identity_key ?? "");
+      candidates = candidates.filter((candidate) => String(candidate.source_identity_key ?? "") !== invalidatedIdentity);
+      selection = dependencies.selectSourceLineup({
+        candidates,
+        slot_keys: missingSlots,
+        seed: `${identity.brandKey}:${runId}:${variantKey}:authoritative-replacement`,
+      });
+      sourceReplacementCount = 1;
+    }
     const lockedLineup = selection.selected as Array<SourceSelectionCandidate & { assigned_slot_key?: string }>;
+    const decisionBundleStarted = Date.now();
     const decisionBundle = buildDecisionBundle({
       runId,
       evidence,
@@ -655,8 +691,9 @@ async function prepareShadowCycle(
     });
     const snapshotHash = await sha256(stableJson({ evidence, candidates, slotPlan }));
     decisionBundle.snapshot_hash = snapshotHash;
-    const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
+        const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
     decisionBundle.bundle_id = decisionBundleId;
+    const decisionBundleMs = durationMs(decisionBundleStarted);
     const state: ManifestShadowRuntimeState = {
       contract_version: MANIFEST_SHADOW_CONTRACT_VERSION,
       runtime_version: MANIFEST_SHADOW_RUNTIME_VERSION,
@@ -690,19 +727,20 @@ async function prepareShadowCycle(
       timings: {
         workspace_reset_ms: Number((await dependencies.shadowDb.prepare(`SELECT duration_ms FROM manifest_shadow_stage_events WHERE shadow_run_id = ? AND event_key = 'workspace_reset'`).bind(runId).first<JsonRecord>())?.duration_ms ?? 0),
         evidence_capture_ms: durationMs(evidenceStarted),
-        source_selection_ms: durationMs(selectionStarted),
+                source_selection_ms: durationMs(selectionStarted),
+        decision_bundle_ms: decisionBundleMs,
         preparation_ms: durationMs(totalStarted),
       },
             counters: {
-        external_read_count: evidenceMode === "live_read" ? 1 : 0,
+                external_read_count: (evidenceMode === "live_read" ? 1 : 0) + additionalExternalReads,
         retry_count: 0,
         continuation_count: 0,
         payload_bytes: jsonBytes(payload) + jsonBytes(decisionBundle),
         gate_count: 0,
         lineage_count: 0,
         batch_call_count: 0,
-        delta_refresh_count: 0,
-        source_replacement_count: 0,
+                delta_refresh_count: deltaRefreshCount,
+        source_replacement_count: sourceReplacementCount,
         collision_injection_count: 0,
         interruption_injection_count: 0,
       },
