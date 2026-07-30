@@ -383,7 +383,7 @@ export async function dispatchOperatorMcpToolCall(
       );
     }
     if (!receipt.created && receipt.existing?.status === "started") {
-      const startedAt = Date.parse(String(receipt.existing.updated_at ?? receipt.existing.created_at ?? ""));
+            const startedAt = Date.parse(String(receipt.existing.created_at ?? receipt.existing.updated_at ?? ""));
       const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
       const leaseMs = dependencies.operationLeaseMs(toolName);
       if (ageMs < leaseMs) {

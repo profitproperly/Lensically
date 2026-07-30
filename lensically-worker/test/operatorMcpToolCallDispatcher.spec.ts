@@ -239,6 +239,35 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(executeAccountTool).not.toHaveBeenCalled();
   });
 
+    it("expires a stale started receipt from immutable creation time even when updated_at is fresh", async () => {
+    const executeAccountTool = vi.fn(async () => ({ ok: true, durable: true }));
+    const dependencies = baseDependencies({
+      executeAccountTool,
+      operatorIdempotencyKey: vi.fn(async () => "idem-stale-started"),
+      operationLeaseMs: vi.fn(() => 120000),
+      beginOperationReceipt: vi.fn(async () => ({
+        existing: {
+          status: "started",
+          request_fingerprint: "fp-stale-started",
+          created_at: "2000-01-01T00:00:00.000Z",
+          updated_at: new Date().toISOString(),
+        },
+        fingerprint: "fp-stale-started",
+        created: false,
+      })),
+    });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 5,
+      params: { name: "mutatingTool", arguments: {} },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: true,
+      durable: true,
+    });
+    expect(executeAccountTool).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves autonomy blocking before handler execution", async () => {
     const executeAccountTool = vi.fn(async () => ({ ok: true }));
     const failOperationReceipt = vi.fn(async () => undefined);
