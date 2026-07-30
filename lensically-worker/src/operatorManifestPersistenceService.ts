@@ -268,8 +268,12 @@ export async function persistOperatorManifestCandidate(
     accountId: string;
     threadsUserId: string;
     context: OperatorManifestPersistenceAdmissionContext;
-  },
+    },
   dependencies: OperatorManifestPersistenceDependencies,
+  options: {
+    deferCoverageReconciliation?: boolean;
+    batchOperationId?: string;
+  } = {},
 ): Promise<JsonRecord> {
   const { brandKey, accountId, threadsUserId, context } = input;
   const {
