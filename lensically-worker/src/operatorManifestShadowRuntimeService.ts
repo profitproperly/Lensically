@@ -355,15 +355,25 @@ async function persistAcceptedShadowCandidate(
   const decisionInfluenceId = `shadow-decision-${identity.slice(0, 32)}`;
   const idempotencyKey = `shadow:${state.run_id}:${slotKey}`;
 
-  await db.prepare(
-    `INSERT INTO scheduled_posts (
-       user_id, threads_user_id, post_text, status, scheduled_time, idempotency_key
-     ) VALUES (?, ?, ?, 'approved', ?, ?)
-     ON CONFLICT(idempotency_key) DO UPDATE SET post_text = excluded.post_text`,
-  ).bind(state.account_id, state.threads_user_id, text, slot.scheduled_utc, idempotencyKey).run();
-  const scheduled = await db.prepare(
+    const existingScheduled = await db.prepare(
     `SELECT id, scheduled_time FROM scheduled_posts WHERE idempotency_key = ? LIMIT 1`,
   ).bind(idempotencyKey).first<JsonRecord>();
+  if (existingScheduled?.id) {
+    await db.prepare(
+      `UPDATE scheduled_posts SET post_text = ?, scheduled_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(text, slot.scheduled_utc, existingScheduled.id).run();
+  } else {
+    await db.prepare(
+      `INSERT INTO scheduled_posts (
+         user_id, threads_user_id, post_text, status, scheduled_time, idempotency_key
+       ) VALUES (?, ?, ?, 'approved', ?, ?)`,
+    ).bind(state.account_id, state.threads_user_id, text, slot.scheduled_utc, idempotencyKey).run();
+  }
+  const scheduled = existingScheduled?.id
+    ? { ...existingScheduled, scheduled_time: slot.scheduled_utc }
+    : await db.prepare(
+      `SELECT id, scheduled_time FROM scheduled_posts WHERE idempotency_key = ? ORDER BY id DESC LIMIT 1`,
+    ).bind(idempotencyKey).first<JsonRecord>();
   const scheduledPostId = Number(scheduled?.id ?? 0);
   if (!scheduledPostId) throw new Error("manifest_shadow_scheduled_post_missing_after_insert");
 
