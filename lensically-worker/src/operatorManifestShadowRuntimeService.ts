@@ -480,6 +480,41 @@ async function persistAcceptedShadowCandidate(
   };
 }
 
+function manifestShadowLatencyLimitMs(state: ManifestShadowRuntimeState): number {
+  if (state.scenario === "noop") return 30_000;
+  if (state.evidence_mode === "live_read" && state.missing_slot_keys.length <= 24) return 600_000;
+  if (state.scenario === "normal_24") return 360_000;
+  if (state.scenario === "recovery_48") return 599_999;
+  return 600_000;
+}
+
+function manifestShadowAcceptanceFailure(
+  state: ManifestShadowRuntimeState,
+  input: {
+    suppliedFailure: string | null;
+    orphanCount: number;
+    productionNoninterferencePassed: boolean;
+  },
+): string | null {
+  if (input.suppliedFailure) return input.suppliedFailure;
+  if (!input.productionNoninterferencePassed) return "production_noninterference_failed";
+  if (state.threads_mutation_count !== 0) return "threads_mutation_detected";
+  if (input.orphanCount !== 0) return "shadow_cleanup_orphans_present";
+  if (state.missing_slot_keys.length !== 0) return "authoritative_coverage_incomplete";
+  const expectedAccepted = Math.max(0, state.target_slots.length - state.occupied_slot_keys.length);
+  if (state.accepted_posts.length !== expectedAccepted) return "accepted_schedule_count_mismatch";
+  if (Number(state.counters.lineage_count ?? 0) !== state.accepted_posts.length) return "accepted_lineage_count_mismatch";
+  if (expectedAccepted > 0 && Number(state.counters.gate_count ?? 0) < expectedAccepted) return "deterministic_gate_execution_missing";
+  if (Number(state.timings.total_wall_clock_ms ?? 0) > manifestShadowLatencyLimitMs(state)) return "wall_clock_latency_threshold_exceeded";
+  if (state.test_case === "mid_batch_collision" && Number(state.counters.collision_injection_count ?? 0) !== 1) return "mid_batch_collision_not_observed";
+  if (state.test_case === "gate_rejection_regeneration" && Number(state.counters.gate_rejection_injection_count ?? 0) !== 1) return "gate_rejection_not_observed";
+  if (state.test_case === "interrupted_replay" && Number(state.counters.retry_count ?? 0) < 1) return "interrupted_batch_replay_missing";
+  if (state.test_case === "stale_delta_refresh" && Number(state.counters.delta_refresh_count ?? 0) !== 1) return "bounded_delta_refresh_missing";
+  if (state.test_case === "invalidated_source_replacement" && Number(state.counters.source_replacement_count ?? 0) !== 1) return "authoritative_source_replacement_missing";
+  if (state.test_case === "live_read_zero_mutation" && state.evidence_mode !== "live_read") return "live_read_evidence_mode_missing";
+  return null;
+}
+
 async function finalizeBenchmark(
   dependencies: OperatorManifestShadowRuntimeDependencies,
   state: ManifestShadowRuntimeState,
@@ -500,16 +535,36 @@ async function finalizeBenchmark(
   const beforeFingerprint = stableJson(state.evidence.production_fingerprint);
   const afterFingerprint = stableJson(afterEvidence.production_fingerprint);
   const productionNoninterferencePassed = beforeFingerprint === afterFingerprint;
-  const passed = failedRule === null
-    && state.missing_slot_keys.length === 0
-    && orphanCount === 0
-    && state.threads_mutation_count === 0
-    && productionNoninterferencePassed;
+    const acceptanceFailure = manifestShadowAcceptanceFailure(state, {
+    suppliedFailure: failedRule,
+    orphanCount,
+    productionNoninterferencePassed,
+  });
+  const passed = acceptanceFailure === null;
+  const benchmarkTimings = {
+    workspace_reset_ms: Number(state.timings.workspace_reset_ms ?? 0),
+    evidence_capture_ms: Number(state.timings.evidence_capture_ms ?? 0),
+    source_selection_ms: Number(state.timings.source_selection_ms ?? 0),
+    decision_bundle_ms: Number(state.timings.decision_bundle_ms ?? 0),
+    preparation_ms: Number(state.timings.preparation_ms ?? 0),
+    strategy_ms: Number(state.timings.strategy_ms ?? 0),
+    strategy_client_gap_ms: Number(state.timings.strategy_client_gap_ms ?? 0),
+    model_client_gap_ms: Number(state.timings.model_client_gap_ms ?? 0),
+    gate_ms: Number(state.timings.gate_ms ?? 0),
+    candidate_persistence_ms: Number(state.timings.candidate_persistence_ms ?? 0),
+    lineage_verification_ms: Number(state.timings.lineage_verification_ms ?? 0),
+    batch_persistence_ms: Number(state.timings.batch_persistence_ms ?? 0),
+    batch_reconciliation_ms: Number(state.timings.batch_reconciliation_ms ?? 0),
+    cleanup_ms: Number(state.timings.cleanup_ms ?? 0),
+    total_wall_clock_ms: Number(state.timings.total_wall_clock_ms ?? 0),
+    latency_limit_ms: manifestShadowLatencyLimitMs(state),
+  };
   const benchmark: ManifestShadowBenchmarkInput = {
     id: crypto.randomUUID(),
     shadow_run_id: state.run_id,
     brand_key: state.brand_key,
-    scenario: state.scenario,
+        scenario: state.scenario,
+    test_case: state.test_case,
     evidence_mode: state.evidence_mode,
     variant_key: state.variant_key,
     snapshot_hash: stringValue(state.decision_bundle.snapshot_hash, state.decision_bundle_id),
@@ -526,18 +581,26 @@ async function finalizeBenchmark(
       generated: state.accepted_posts.length + state.rejected_posts.length,
       accepted: state.accepted_posts.length,
       rejected: state.rejected_posts.length,
-      remaining: state.missing_slot_keys.length,
+            remaining: state.missing_slot_keys.length,
+      batch_calls: Number(state.counters.batch_call_count ?? 0),
+      gates_executed: Number(state.counters.gate_count ?? 0),
+      lineage_verified: Number(state.counters.lineage_count ?? 0),
+      delta_refreshes: Number(state.counters.delta_refresh_count ?? 0),
+      source_replacements: Number(state.counters.source_replacement_count ?? 0),
+      injected_collisions: Number(state.counters.collision_injection_count ?? 0),
+      injected_gate_rejections: Number(state.counters.gate_rejection_injection_count ?? 0),
+      injected_interruptions: Number(state.counters.interruption_injection_count ?? 0),
     },
-    timings: state.timings,
+    timings: benchmarkTimings,
     external_read_count: Number(state.counters.external_read_count ?? 0),
     retry_count: Number(state.counters.retry_count ?? 0),
     continuation_count: Number(state.counters.continuation_count ?? 0),
-    payload_bytes: new TextEncoder().encode(JSON.stringify(state.decision_bundle)).byteLength,
+        payload_bytes: Number(state.counters.payload_bytes ?? jsonBytes(state.decision_bundle)),
     production_noninterference_passed: productionNoninterferencePassed,
     threads_mutation_count: state.threads_mutation_count,
     cleanup_orphan_count: orphanCount,
     passed,
-    failed_rule: failedRule ?? (passed ? null : "shadow_acceptance_incomplete"),
+        failed_rule: acceptanceFailure,
   };
   await writeManifestShadowBenchmarkReceipt(dependencies.productionDb, benchmark);
   if (passed) await completeManifestShadowRun(dependencies.shadowDb, state.run_id, completedAt);
