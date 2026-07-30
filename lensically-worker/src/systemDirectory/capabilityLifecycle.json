@@ -408,9 +408,9 @@
       "canonical_handler": "prepare_manifest_shadow_cycle",
       "route_intent": "prepare manifest shadow cycle",
       "implementation_mode": "new_handler",
-      "focused_regression": "prepares isolated no-op, 24-slot, and 48-slot shadow cycles from read-only production evidence with zero production operational mutation",
+            "focused_regression": "prepares isolated no-op, 24-slot, and 48-slot Innovation cycles without Main database access",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool resets SHADOW_DB, freezes one bounded production evidence snapshot, locks the canonical source plan, returns one complete decision bundle, and proves zero Threads and production operational writes.",
+      "live_verification": "Exact-head source validation executes the isolated Innovation preparation path against frozen production-shaped evidence and proves zero Main database, production, or Threads access. Deployment is explicitly excluded.",
       "compatibility_bridge": false
     },
     {
@@ -419,9 +419,9 @@
       "canonical_handler": "commit_manifest_shadow_cycle_strategy",
       "route_intent": "commit manifest shadow cycle strategy",
       "implementation_mode": "new_handler",
-      "focused_regression": "locks exactly one strategy against the frozen shadow bundle and rejects source substitution or a conflicting second strategy",
+            "focused_regression": "locks one complete strategy and blocks source substitution or conflicting strategy state",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool accepts one complete strategy only when every planned slot and source card matches the frozen decision bundle and safely replays the identical strategy.",
+      "live_verification": "Exact-head source validation proves one Innovation strategy is locked only against the frozen decision bundle and authoritative source lineup, with identical replay and conflicting-state rejection entirely inside SHADOW_DB.",
       "compatibility_bridge": false
     },
     {
@@ -430,9 +430,9 @@
       "canonical_handler": "persist_manifest_shadow_batch",
       "route_intent": "persist manifest shadow batch",
       "implementation_mode": "new_handler",
-      "focused_regression": "persists one to four independently idempotent shadow candidates with server gates, production-shaped lineage, selective rejection, and one coverage reconciliation",
+            "focused_regression": "persists complete production-shaped lineage and one batch reconciliation inside SHADOW_DB",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool persists one to four candidates only in SHADOW_DB, keeps successful siblings when one item fails, returns rejected slots for selective regeneration, and completes 24/48-slot runs without Threads mutation.",
+      "live_verification": "Exact-head source validation persists complete production-shaped Innovation lineage in SHADOW_DB, preserves successful siblings, supports selective regeneration and idempotent replay, and performs no Main or Threads operation.",
       "compatibility_bridge": false
     },
     {
@@ -441,9 +441,9 @@
       "canonical_handler": "get_manifest_shadow_cycle_receipt",
       "route_intent": "get manifest shadow cycle receipt",
       "implementation_mode": "new_handler",
-      "focused_regression": "reads compact shadow timings, benchmark, cleanup, lineage, and noninterference evidence without generated text",
+            "focused_regression": "returns compact receipts with generated and source text recursively redacted",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool returns isolated run state, stage timings, compact permanent benchmark, cleanup evidence, and production noninterference without mutating either workspace.",
+      "live_verification": "Exact-head source validation reads the isolated Innovation receipt from SHADOW_DB, preserves timings, counts, lineage and cleanup evidence, and recursively excludes generated and source text without touching Main.",
       "compatibility_bridge": false
     },
     {
