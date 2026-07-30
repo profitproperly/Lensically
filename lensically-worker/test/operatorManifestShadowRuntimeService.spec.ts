@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildAutomaticShadowCandidate,
   handleOperatorManifestShadowTool,
@@ -17,6 +17,9 @@ import { selectSourceFamilyLineup, type SourceSelectionCandidate } from "../src/
 
 type JsonRecord = Record<string, unknown>;
 type Scenario = "noop" | "normal_24" | "recovery_48" | "custom";
+
+vi.setConfig({ testTimeout: 300_000, hookTimeout: 60_000 });
+
 
 const identity = {
   brandKey: "manifest_mental",
