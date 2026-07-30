@@ -31,12 +31,5 @@ CREATE INDEX IF NOT EXISTS idx_manifest_decision_bundle_consumption
 ALTER TABLE operator_manifest_cycle_strategies ADD COLUMN decision_bundle_id TEXT;
 ALTER TABLE operator_manifest_cycle_strategies ADD COLUMN decision_bundle_hash TEXT;
 
-CREATE TRIGGER IF NOT EXISTS trg_manifest_decision_bundle_touch_updated_at
-AFTER UPDATE ON operator_manifest_decision_bundles
-FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
-BEGIN
-  UPDATE operator_manifest_decision_bundles
-  SET updated_at = CURRENT_TIMESTAMP
-  WHERE id = NEW.id;
-END;
+
+
