@@ -15,7 +15,40 @@ type ScheduledResult = {
   error?: unknown;
 };
 
-export interface OperatorManifestPersistenceDependencies {
+export interface OperatorManifestReconciliationDependencies {
+  normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+  readCurrentCycle(brandKey: string, cycleId: string): Promise<JsonRecord | null>;
+  occupiedSlots(
+    targetSlots: Array<{ key: string; date: string; time: string }>,
+    timezone: string,
+  ): Promise<ReadonlyMap<string, JsonRecord>>;
+  localDateTimeParts(date: Date, timezone: string): { date: string; hour: number };
+  hourlySlot(hour: number): string;
+  reconcileCoverageState(
+    targetSlots: Array<{ key: string; date: string; time: string }>,
+    occupied: ReadonlyMap<string, JsonRecord>,
+    currentLocalHourKey: string,
+    scheduledPostIds: unknown[],
+  ): {
+    remaining_missing_slots: Array<{ key: string; date: string; time: string }>;
+    elapsed_unfilled_slots: Array<{ key: string; date: string; time: string }>;
+    scheduled_post_ids: number[];
+  };
+  updateCycleAfterPersist(input: {
+    cycleId: string;
+    brandKey: string;
+    status: string;
+    strategicThesis: JsonRecord;
+    remainingMissing: Array<{ key: string; date: string; time: string }>;
+    scheduledPostIds: number[];
+  }): Promise<unknown>;
+  appendCycleEvent(input: JsonRecord): Promise<unknown>;
+  finalizeCycleReceipt(input: JsonRecord): Promise<JsonRecord>;
+  setCycleStatus(cycleId: string, brandKey: string, status: string): Promise<unknown>;
+  now(): Date;
+}
+
+export interface OperatorManifestPersistenceDependencies extends OperatorManifestReconciliationDependencies {
   growthEngineVersion: string;
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
   normalizeMachineKey(value: unknown, fallback: string): string;
