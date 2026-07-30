@@ -280,13 +280,22 @@ function assertAppliedMigrationsUnedited(productionSha, productionRows) {
       return { status, path: pathParts[pathParts.length - 1] ?? "" };
     });
     const appliedByName = new Map(productionRows.map((row) => [row.name, row]));
-  const unsafeApplied = [];
+    const unsafeApplied = [];
   for (const change of changed.filter((entry) => appliedByName.has(basename(entry.path)))) {
     const latestCommitAt = run("git", ["log", "-1", "--format=%cI", "HEAD", "--", change.path]).trim();
     const appliedAt = appliedByName.get(basename(change.path))?.applied_at ?? null;
-    if (!appliedMigrationChangeIsSafe({ status: change.status, latestCommitAt, appliedAt })) unsafeApplied.push(change.path);
+    if (!appliedMigrationChangeIsSafe({ status: change.status, latestCommitAt, appliedAt })) {
+      unsafeApplied.push({
+        path: change.path,
+        status: change.status,
+        latestCommitAt,
+        appliedAt,
+        latestCommitMs: parseMigrationTimestamp(latestCommitAt),
+        appliedMs: parseMigrationTimestamp(appliedAt),
+      });
+    }
   }
-  if (unsafeApplied.length > 0) fail("migration_applied_file_edited", unsafeApplied.join(","));
+  if (unsafeApplied.length > 0) fail("migration_applied_file_edited", JSON.stringify(unsafeApplied));
   return changed.map((entry) => entry.path);
 }
 
