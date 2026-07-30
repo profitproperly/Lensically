@@ -934,11 +934,11 @@ if (!operatorMcpAutonomousExecutionRegistry.includes("export const OPERATOR_MCP_
     || !operatorMcpAutonomousExecutionRegistry.includes("export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS")) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_module_incomplete");
 }
-if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact ordered three-tool autonomous execution registry")
+if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact ordered four-tool autonomous execution registry")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves immediate prepare invocation and rolling runway bounds")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves one-post source lineage, hypothesis, and idempotency contracts")
-    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves complete model evaluation and nonempty gate evidence")
-    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves optional owner review and slot-preserving replacement")) {
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves model judgment while deterministic gate evidence remains optional")
+    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves a closed one-to-four batch schema by reusing the exact candidate contracts\")\n    || !operatorMcpAutonomousExecutionRegistryTests.includes(\"preserves optional owner review and slot-preserving replacement")) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_tests_incomplete");
 }
 if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAccountAnalyticsRegistry"')) {
