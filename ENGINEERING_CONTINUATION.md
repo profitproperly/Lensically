@@ -9,6 +9,11 @@ active_job_id: manifest-shadow-cycle-and-sub-ten-minute-optimization
 active_checkpoint: stage_2_in_progress
 implementation_source_head: bcce3958a903263ba846ab5d473d00e22b744369
 production_sha: 04e682e8a69fef5222fd713a019682e7edcfda0a
+active_interrupt_id: github-tree-sha-422-20260730
+active_interrupt_state: repairing
+active_interrupt_precedence: P1 repository mutation boundary; resume the active Manifest optimization only after side-effect reconciliation, root-cause repair, regression prevention, and exact-head validation.
+active_interrupt_evidence: applyRepoPatchSet incident 21964626-6ebe-474c-9ffc-20e3ffa5e808 returned HTTP 422 `Tree SHA does not exist` during commit creation; getRepoStatus proved main remained exactly c0c9f246982eba9c00920784cb29bb0b42be1a88, so no source commit landed.
+
 
 This root file is the sole authority for all incomplete Lensically work. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents may provide evidence but may not establish, reorder, or resume work.
 
