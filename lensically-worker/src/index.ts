@@ -119,6 +119,10 @@ import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycl
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
 import { persistOperatorManifestCandidate } from "./operatorManifestPersistenceService";
 import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
+import {
+  githubMutationRetryDelayMs,
+  shouldRetryGithubMutationResponse,
+} from "./operatorGithubMutationRetry";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
 import {
   manifestCycleFailureIsDefect as manifestCycleFailureIsDefectService,
