@@ -12303,7 +12303,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       now: () => new Date().toISOString(),
     }),
     prepare: (servicePayload) => prepareManifestAutonomousCycle(env, brand, servicePayload),
-    persist: (servicePayload) => persistManifestAutonomousPost(env, brand, servicePayload),
+        persist: (servicePayload) => persistManifestAutonomousPost(env, brand, servicePayload),
+    persistBatch: (servicePayload) => persistManifestAutonomousBatch(env, brand, servicePayload),
     review: (servicePayload) => reviewManifestScheduledPost(env, brand, servicePayload),
     observe: (observedToolName, observedPayload, result) => observeManifestCycleToolResult(
       env,

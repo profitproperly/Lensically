@@ -24,8 +24,9 @@ export type ScopedOperatorMcpCall = {
 };
 
 export const MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS = new Set<string>([
-  "prepare_manifest_autonomous_cycle",
+    "prepare_manifest_autonomous_cycle",
   "persist_manifest_autonomous_post",
+  "persist_manifest_autonomous_batch",
   "get_hourly_coverage",
   "get_manifest_cycle_receipt",
   "get_manifest_intelligence_audit",
@@ -312,7 +313,8 @@ export async function dispatchOperatorManifestRuntimeTool(
       payload: Record<string, unknown>,
     ): Promise<{ body: Record<string, unknown>; status: number }>;
     prepare(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
-    persist(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
+        persist(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
+    persistBatch(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
     review(payload: Record<string, unknown>): Promise<Record<string, unknown>>;
     observe(
       toolName: string,
@@ -373,6 +375,27 @@ export async function dispatchOperatorManifestRuntimeTool(
         success: false,
         cycle_id: payload.cycle_id ?? null,
         error: error instanceof Error ? error.message : "manifest_autonomous_persist_failed",
+        side_effect_state: "unknown",
+        retryable: true,
+      });
+      return { handled: true, body: result, status: 500 };
+    }
+  }
+
+    if (toolName === "persist_manifest_autonomous_batch") {
+    try {
+      const result = await dependencies.persistBatch(payload);
+      return {
+        handled: true,
+        body: await dependencies.observe(toolName, payload, result),
+        status: result.success === false && result.accepted_count === 0 ? 400 : 200,
+      };
+    } catch (error) {
+      const result = await dependencies.observe(toolName, payload, {
+        success: false,
+        batch_operation_id: payload.batch_operation_id ?? null,
+        cycle_id: payload.cycle_id ?? null,
+        error: error instanceof Error ? error.message : "manifest_autonomous_batch_failed",
         side_effect_state: "unknown",
         retryable: true,
       });
