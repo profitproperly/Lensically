@@ -102,7 +102,7 @@ import {
   isOperatorManifestCycleServiceToolName,
 } from "./operatorManifestCycleService";
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
-import { handleOperatorManifestPrepareCheckpoint } from "./operatorManifestPrepareCheckpointService";
+import { orchestrateOperatorManifestPrepareCheckpoint } from "./operatorManifestPreparationOrchestratorService";
 import {
   handleOperatorManifestShadowTool,
   isOperatorManifestShadowToolName,
@@ -10920,7 +10920,7 @@ async function prepareManifestAutonomousCycle(
   brand: GptResolvedBrand,
   payload: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const checkpointResult = await handleOperatorManifestPrepareCheckpoint({
+    const checkpointResult = await orchestrateOperatorManifestPrepareCheckpoint({
     brandKey: brand.brand_key,
     accountId: brand.account_id,
     threadsUserId: brand.profile.threads_user_id,
@@ -10975,8 +10975,8 @@ async function prepareManifestAutonomousCycle(
       input as Parameters<typeof refreshManifestMeasurementAudit>[1],
     ) as Promise<Record<string, unknown>>,
     refreshContentFocus: () => refreshOperatorContentFocus(env, brand.brand_key),
-    readActiveLearningBrief: (brandKey) => env.DB.prepare(
-      `SELECT id, brief_json FROM operator_generation_learning_briefs
+        readActiveLearningBrief: (brandKey) => env.DB.prepare(
+      `SELECT id, brief_json, generated_at FROM operator_generation_learning_briefs
        WHERE brand_key = ? AND active = 1
        ORDER BY datetime(generated_at) DESC LIMIT 1`,
     ).bind(brandKey).first<Record<string, unknown>>(),

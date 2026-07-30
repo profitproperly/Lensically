@@ -206,6 +206,56 @@ export async function handleOperatorManifestPrepareCheckpoint(
           },
         );
       }
+            const activeBrief = await dependencies.readActiveLearningBrief(brandKey);
+      const activeBriefPayload = activeBrief?.id
+        ? dependencies.operatorRecord(
+          dependencies.parseJson(String(activeBrief.brief_json ?? "{}")),
+        )
+        : {};
+      const generatedAtMs = Date.parse(String(activeBrief?.generated_at ?? ""));
+      const nowMs = Date.parse(dependencies.now());
+      const learningSnapshotFresh = payload.force_full_rebuild !== true
+        && activeBriefPayload.manifest_layers_finalized === true
+        && Number(evaluatedSnapshot.processed_due_checkpoint_count ?? 0) === 0
+        && Number.isFinite(generatedAtMs)
+        && Number.isFinite(nowMs)
+        && Math.max(0, nowMs - generatedAtMs) <= 6 * 60 * 60 * 1000;
+      if (learningSnapshotFresh) {
+        const storedEvaluation = dependencies.operatorRecord(evaluatedSnapshot.performance_evaluation);
+        threadsSnapshot = {
+          ...evaluatedSnapshot,
+          performance_evaluation: {
+            ...storedEvaluation,
+            manifest_layers_deferred: false,
+            manifest_layers_finalized: true,
+            durable_snapshot_reused: true,
+          },
+        };
+        await dependencies.writeCheckpoint({
+          brand_key: brandKey,
+          operation_id: explicitOperationId,
+          phase: "cycle_construction",
+          timezone,
+          horizon_hours: horizonHours,
+          state: {
+            runtime_now_iso: runtimeNowIso,
+            threads_snapshot: dependencies.compactThreadsSnapshot(threadsSnapshot),
+            durable_learning_snapshot_id: activeBrief.id,
+          },
+        });
+        return continuation(
+          explicitOperationId,
+          dependencies.checkpointVersion,
+          "delta_learning_reused",
+          "cycle_construction",
+          "The latest finalized learning snapshot is fresh and no new due maturity checkpoints were processed. Server orchestration will construct the cycle without rebuilding unchanged intelligence layers.",
+          {
+            durable_learning_snapshot_id: activeBrief.id,
+            delta_refresh_required: false,
+          },
+        );
+      }
+
       threadsSnapshot = evaluatedSnapshot;
       await dependencies.writeCheckpoint({
         brand_key: brandKey,
