@@ -16,6 +16,7 @@ import { OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS } from "./operatorMcpAccountFound
 import { OPERATOR_MCP_SOURCE_DRAFT_TOOLS } from "./operatorMcpSourceDraftRegistry";
 import { OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS } from "./operatorMcpStrategyScheduleRegistry";
 import { OPERATOR_MCP_MANIFEST_CYCLE_TOOLS } from "./operatorMcpManifestCycleRegistry";
+import { OPERATOR_MCP_MANIFEST_SHADOW_TOOLS } from "./operatorMcpManifestShadowRegistry";
 import { OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS } from "./operatorMcpAutonomousExecutionRegistry";
 import { OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS } from "./operatorMcpAccountAnalyticsRegistry";
 
@@ -28,7 +29,8 @@ export const OPERATOR_MCP_ACCOUNT_TOOLS: readonly OperatorMcpToolDefinition[] = 
   ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS,
   ...OPERATOR_MCP_SOURCE_DRAFT_TOOLS,
   ...OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS,
-  ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
+    ...OPERATOR_MCP_MANIFEST_CYCLE_TOOLS,
+  ...OPERATOR_MCP_MANIFEST_SHADOW_TOOLS,
   ...OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS,
   ...OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS,
 ];
@@ -74,7 +76,11 @@ export const OPERATOR_MCP_DIRECT_PRIORITIES = new Map<string, number>([
   ["record_manifest_cycle_defect", 13],
   ["resolve_manifest_cycle_defect", 13],
   ["get_manifest_cycle_analysis_page", 14],
-  ["commit_manifest_cycle_strategy", 15],
+    ["commit_manifest_cycle_strategy", 15],
+  ["prepare_manifest_shadow_cycle", 15],
+  ["commit_manifest_shadow_cycle_strategy", 16],
+  ["persist_manifest_shadow_batch", 17],
+  ["get_manifest_shadow_cycle_receipt", 15],
   ["prepare_manifest_autonomous_cycle", 16],
   ["persist_manifest_autonomous_post", 17],
   ["review_manifest_scheduled_post", 16],
