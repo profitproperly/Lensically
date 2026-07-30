@@ -12077,7 +12077,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         threadsUserId: brand.profile.threads_user_id,
       },
     }, {
-      productionDb: env.DB,
+            snapshotDb: env.SHADOW_DB,
       shadowDb: env.SHADOW_DB,
       codeSha: normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 80, true) ?? "unreleased",
       now: () => new Date(),
@@ -12094,8 +12094,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         asOf,
       ),
       selectSourceLineup: (input) => selectSourceFamilyLineup(input),
-      readEvidence: ({ productionReadOnlyDb, brandKey, threadsUserId, nowIso, evidenceMode }) => readManifestShadowEvidence(
-        productionReadOnlyDb,
+            readEvidence: ({ snapshotReadOnlyDb, brandKey, threadsUserId, nowIso, evidenceMode }) => readManifestShadowEvidence(
+        snapshotReadOnlyDb,
         { brandKey, threadsUserId, nowIso, evidenceMode },
       ),
     });

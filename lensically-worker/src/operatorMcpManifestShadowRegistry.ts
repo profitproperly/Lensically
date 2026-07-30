@@ -63,14 +63,14 @@ export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "prepare_manifest_shadow_cycle",
     title: "Prepare isolated Manifest Shadow Cycle",
-    description: "Reset and seed the physically isolated Manifest Shadow D1 workspace from one read-only production evidence snapshot, lock the canonical source plan, and return one complete compact decision bundle. No production operational table or Threads mutation is reachable.",
+        description: "Preload one frozen production-shaped snapshot from the isolated Manifest Innovation rail, reset its disposable workspace, lock the canonical source plan, and return one complete compact decision bundle. Main, production, and Threads access are forbidden.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
                 scenario: { type: "string", enum: ["noop", "normal_24", "recovery_48", "custom"], default: "normal_24" },
         test_case: { type: "string", enum: [...MANIFEST_SHADOW_TEST_CASES], default: "baseline" },
-        evidence_mode: { type: "string", enum: ["snapshot", "live_read"], default: "snapshot" },
+                evidence_mode: { type: "string", enum: ["snapshot"], default: "snapshot" },
         variant_key: { type: "string", default: "control" },
         timezone: { type: "string", default: "America/New_York" },
         horizon_hours: { type: "integer", minimum: 1, maximum: 72, default: 48 },
