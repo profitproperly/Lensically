@@ -77,14 +77,21 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
     });
   });
 
-  it("preserves complete analysis consumption and source-backed strategy locking", () => {
+    it("preserves complete decision-bundle consumption and source-backed strategy locking", () => {
     const page = tool("get_manifest_cycle_analysis_page");
     expect(page.inputSchema.required).toEqual(["brand_key", "cycle_id", "snapshot_id", "page_index"]);
     expect(page.description).toContain("page 0 through the final page");
 
     const strategy = tool("commit_manifest_cycle_strategy");
-    expect(strategy.description).toContain("After every rolling 28-day analysis page has been consumed");
+    expect(strategy.description).toContain("complete versioned decision bundle");
+    expect(strategy.description).toContain("bounded evidence-page detail read");
     expect(strategy.description).toContain("Replaying an identical strategy is safe");
+    expect(strategy.inputSchema.required).toContain("decision_bundle_id");
+    expect(strategy.inputSchema.required).toContain("decision_bundle_hash");
+    expect(strategy.inputSchema.properties).toMatchObject({
+      decision_bundle_id: { type: "string" },
+      decision_bundle_hash: { type: "string" },
+    });
     const lineup = (strategy.inputSchema.properties as Record<string, any>).lineup;
     expect(lineup.minItems).toBe(1);
     expect(lineup.items.required).toContain("source_card_id");
