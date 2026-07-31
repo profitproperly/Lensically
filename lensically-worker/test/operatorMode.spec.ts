@@ -3909,8 +3909,23 @@ active_checkpoint: none
         missing_slots: Array<{ key: string }>;
         account_position: { runway: { target_slot_count: number; missing_slot_count: number } };
       };
-      strategy_contract: { fixed_percentages: boolean; winner_preservation: string };
-            persistence_contract: { tool: string; posts_per_call: number; model_orchestrated: boolean; internal_gate_fanout: boolean; internal_runway_scan: boolean; threads_api_during_persistence: boolean; complete_lineage_required: boolean };
+            strategy_contract: { fixed_percentages: boolean; winner_preservation: string };
+      rolling_evidence: { first_page: { retrieval_required: boolean; instruction: string } };
+      persistence_contract: {
+        preferred_tool: string;
+        fallback_tool: string;
+        candidates_per_batch: { minimum: number; maximum: number };
+        generation_wave_size: number;
+        uninterrupted_until_terminal_or_blocked: boolean;
+        regenerate_rejected_slots_only: boolean;
+        model_orchestrated: boolean;
+        preserve_existing_schedule: boolean;
+        exact_missing_slots_only: boolean;
+        internal_gate_fanout: boolean;
+        internal_runway_scan: boolean;
+        threads_api_during_persistence: boolean;
+        complete_lineage_required: boolean;
+      };
     }>("prepare_manifest_autonomous_cycle", {
       brand_key: "manifest_mental",
       timezone: "America/New_York",
@@ -3926,8 +3941,11 @@ active_checkpoint: none
     expect(prepared.cycle.missing_slots.length).toBeLessThanOrEqual(48);
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
         expect(prepared.strategy_contract.winner_preservation).toContain("Continue using winners");
-    expect(prepared.strategy_contract.winner_preservation).toContain("spacing");
-                                expect(prepared.persistence_contract).toMatchObject({
+        expect(prepared.strategy_contract.winner_preservation).toContain("spacing");
+    expect(prepared.rolling_evidence.first_page.retrieval_required).toBe(false);
+    expect(prepared.rolling_evidence.first_page.instruction).toContain("compact Main Cycle decision bundle");
+    expect(prepared.rolling_evidence.first_page.instruction).toContain("never sweep every page by default");
+    expect(prepared.persistence_contract).toMatchObject({
       preferred_tool: "persist_manifest_autonomous_batch",
       fallback_tool: "persist_manifest_autonomous_post",
       candidates_per_batch: { minimum: 1, maximum: 4 },
