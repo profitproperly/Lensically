@@ -372,12 +372,7 @@ Definition of done:
 - Potential optimizations must preserve genuine model judgment, source fidelity, all deterministic gates, exact post inspectability, and total Main/Threads isolation.
 - Do not begin until the owner and M review the genuine post quality and timing breakdown.
 
-`manifest-innovation-to-main-promotion`
 
-- Promotion is not authorized.
-- It requires a new explicit 007-and-M decision after reviewing the completed Innovation proof.
-- It must be opened as a separate canonical job.
-- Until then, Main stays unchanged and Innovation sits idle as the proven upstream rail.
 
 
 
