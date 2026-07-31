@@ -10,9 +10,9 @@ active_checkpoint: stage-8-refresh-mcp-and-run-live-24-parity-acceptance
 validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 production_sha: 206a1839fb88d74d2bcbc0ae3a567ddea1c0f631
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_interrupt_id: 3f53ff37-b04b-4e4f-891c-aaca15323fa3
+active_interrupt_state: open
+active_interrupt_precedence: blocks_active_job
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
@@ -201,6 +201,15 @@ incident_id: `0d15d70f-c1d4-4ba5-9008-d7b6fff2d69c`
 - Repair SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` passed typecheck run `30637365931` and all eight Operator shards in run `30637376463`.
 - Exact-SHA release run `30637485167` succeeded. Fresh live shard `s8` then passed 31/31 mutation preflights with zero failures and zero side effects on production SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631`.
 - Incident closed. Resume `stage-8-refresh-mcp-and-run-live-24-parity-acceptance` without redoing parity implementation.
+
+## ACTIVE INTERRUPT — P1 Main-Mimic Snapshot Persistence Size Boundary
+
+incident_id: `3f53ff37-b04b-4e4f-891c-aaca15323fa3`
+
+- Detected live on production SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` during refreshed `normal_24` Main-mimic preparation.
+- Shadow run `shadow-b7f986a1f5fa17e39b94df2929967d48` failed with `D1_ERROR: string or blob too big: SQLITE_TOOBIG`; side-effect state is `may_have_happened` and must be reconciled before repair.
+- This P1 blocks parity acceptance until the exact oversized write is identified, the evidence persistence boundary is made safely bounded without evidence loss or approximation, partial Shadow state is reconciled, a genuine large-snapshot regression passes, the exact tested SHA is released, and live preparation succeeds.
+- Current interrupt action: inspect the failed run receipt and relevant Shadow persistence statements, identify the precise oversized field/write, implement one durable lossless chunking or normalized-storage fix plus release regression, deploy exact SHA, verify live `normal_24` preparation, close this interrupt, then resume all three acceptance stages without redoing completed parity architecture.
 
 ## ACTIVE — Manifest Innovation Main-Mimic Parity
 
