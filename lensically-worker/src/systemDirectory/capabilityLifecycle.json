@@ -406,7 +406,7 @@
     },
                 {
       "capability_id": "strategy.seed_manifest_shadow_snapshot",
-      "directory_entry_id": "strategy.manifest_shadow_cycle",
+            "directory_entry_id": "strategy.manifest_shadow_seed",
       "canonical_handler": "seed_manifest_shadow_snapshot",
       "route_intent": "seed manifest shadow snapshot",
       "implementation_mode": "new_handler",
@@ -461,7 +461,7 @@
     },
         {
       "capability_id": "strategy.read_manifest_shadow_posts",
-      "directory_entry_id": "strategy.manifest_shadow_receipt",
+            "directory_entry_id": "strategy.manifest_shadow_posts",
       "canonical_handler": "get_manifest_shadow_posts",
       "route_intent": "get manifest shadow posts",
       "implementation_mode": "new_handler",
