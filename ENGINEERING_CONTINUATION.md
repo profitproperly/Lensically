@@ -296,12 +296,26 @@ Definition of done:
 - Main reads during isolated execution: 0. Main writes: 0. External reads: 0. Threads mutations: 0. Cleanup orphans: 0.
 - Benchmark status: passed. The owner ordered a stop for review before any interrupted replay or 48-slot recovery.
 
+## Timed 48-Slot Recovery Review Checkpoint — 2026-07-31
+
+- Clean run: `shadow-7c290a066df1fe3f597ebe79c33aba11`.
+- Benchmark: `b0a0c737-0871-4506-a3c0-ca2087791e7a`.
+- Exact deployed code SHA: `12f94b8f80afdae72d08fc5fd59c26414af255a0`.
+- Frozen snapshot: `644252bbcef3e27f48e7fe3b7d99904b914b5950330439cfe65e116b4430ecdb`.
+- Shared Main/Innovation selector parity passed across 137 eligible families after durable owner-excluded Saved Patterns were removed before selection.
+- Functional recovery passed: 48/48 accepted with complete lineage; 52 candidates generated, 4 selectively rejected for exact opening repetition, and all 4 regenerated successfully without source substitution.
+- Isolation passed: Main reads 0, Main writes 0, Threads mutations 0, external reads 0, and cleanup orphans 0.
+- Quality infrastructure executed 624 gates and verified 48 complete lineage records.
+- Timing failed: 801,028 ms total wall clock (13m 21.028s) against the strict 599,999 ms ceiling, exceeding it by 201,029 ms (3m 21.029s).
+- Dominant time: model/client gap 606,361 ms; strategy/client gap 147,500 ms. Actual candidate persistence was 38,601 ms, reconciliation 5,619 ms, preparation 8,563 ms, and cleanup 165 ms.
+- This is valid functional, parity, isolation, quality, and recovery evidence, but not a passing timing acceptance.
+
 ## Current Action
 
-1. Run one separate clean timed `recovery_48` acceptance now under the owner's explicit instruction.
-2. Start timing at the fresh `prepare_manifest_shadow_cycle` call and include preparation, strategy lock, genuine model generation, twelve four-item persistence batches, gates, lineage verification, reconciliation, and cleanup.
-3. Fail closed unless the frozen snapshot and deterministic selector parity pass, all 48 exact locked source-card-backed slots complete, Main reads and writes remain zero after import, Threads requests and mutations remain zero, cleanup orphans remain zero, and the terminal benchmark passes its strict timing ceiling.
-4. Read the terminal receipt, durably record the result, then stop for owner review. Do not run interrupted replay or close the overall parity job in the same turn.
+1. Stop. Do not run interrupted replay, another 48-slot attempt, or close the overall parity job.
+2. Review the completed 48 posts, selective regenerations, and timing breakdown with the owner.
+3. Resume only after a new explicit owner instruction establishes whether to optimize and rerun the 48-slot timing gate or accept a revised measured ceiling.
+4. Keep `manifest-innovation-main-mimic-parity` open because the strict 48-slot timing definition of done did not pass.
 
 ## Deferred Work — INACTIVE
 
