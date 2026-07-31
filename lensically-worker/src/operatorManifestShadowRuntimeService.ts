@@ -131,9 +131,17 @@ export type ManifestShadowRuntimeState = {
 export interface OperatorManifestShadowRuntimeDependencies {
     snapshotDb: D1Database;
   shadowDb: D1Database;
-    codeSha: string;
+      codeSha: string;
   requireFrozenSeed?: boolean;
   minimumEligibleFamilies?: number;
+  buildDecisionSnapshot?(input: {
+    brandKey: string;
+    accountId: string;
+    threadsUserId: string;
+    capturedAt: string;
+    timezone: string;
+    coverageRules: JsonRecord;
+  }): Promise<ManifestDecisionSnapshot>;
   now(): Date;
   buildSlots(input: {
     timezone: string;
@@ -1004,9 +1012,8 @@ async function prepareShadowCycle(
     retention_hours: Number(payload.retention_hours ?? 72),
   }, nowIso);
   try {
-    const snapshotExportStarted = Date.now();
-    const mainReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
-    const exportedSnapshot = await buildManifestDecisionSnapshot(mainReadOnlyDb, {
+        const snapshotExportStarted = Date.now();
+    const snapshotInput = {
       brandKey: identity.brandKey,
       accountId: identity.accountId,
       threadsUserId: identity.threadsUserId,
@@ -1017,7 +1024,13 @@ async function prepareShadowCycle(
         requested_missing_count: requestedMissingCount,
         scenario,
       },
-    });
+    };
+    const exportedSnapshot = dependencies.buildDecisionSnapshot
+      ? await dependencies.buildDecisionSnapshot(snapshotInput)
+      : await buildManifestDecisionSnapshot(
+          createManifestShadowReadOnlyDatabase(dependencies.snapshotDb),
+          snapshotInput,
+        );
     const snapshotExportMs = durationMs(snapshotExportStarted);
     const slotPlan = await dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount });
 
