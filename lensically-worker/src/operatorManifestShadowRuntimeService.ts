@@ -992,7 +992,7 @@ async function prepareShadowCycle(
     };
   }
 
-  const totalStarted = Date.now();
+    const totalStarted = Date.now();
   const run = await beginManifestShadowRun(dependencies.shadowDb, {
     run_id: runId,
     brand_key: identity.brandKey,
@@ -1003,75 +1003,23 @@ async function prepareShadowCycle(
     code_sha: dependencies.codeSha,
     retention_hours: Number(payload.retention_hours ?? 72),
   }, nowIso);
-    try {
-        const evidenceStarted = Date.now();
-    const snapshotReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
-        let frozenSeed = dependencies.requireFrozenSeed
-      ? await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey)
-      : null;
-    if (dependencies.requireFrozenSeed && !frozenSeed) {
-      const bundled = getManifestShadowBundledSeed();
-      const sourceCandidates = await buildFrozenSeedCandidates(records(bundled.sources));
-      const bundledEvidence = normalizeSeedEvidence(bundled.evidence, bundled.source_as_of);
-      const bundledSnapshotHash = await sha256(stableJson({
-        contract_version: "manifest-shadow-frozen-seed-v1",
-        brand_key: identity.brandKey,
-        source_as_of: bundled.source_as_of,
-        source_candidates: sourceCandidates,
-        evidence: bundledEvidence,
-      }));
-      await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
-        brand_key: identity.brandKey,
-        source_as_of: bundled.source_as_of,
-        snapshot_hash: bundledSnapshotHash,
-        source_candidates: sourceCandidates as unknown as JsonRecord[],
-        evidence: bundledEvidence as unknown as JsonRecord,
-      });
-      frozenSeed = await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey);
-    }
-    if (dependencies.requireFrozenSeed && !frozenSeed) {
-      throw new Error("manifest_shadow_real_seed_required");
-    }
+  try {
+    const snapshotExportStarted = Date.now();
+    const mainReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
+    const exportedSnapshot = await buildManifestDecisionSnapshot(mainReadOnlyDb, {
+      brandKey: identity.brandKey,
+      accountId: identity.accountId,
+      threadsUserId: identity.threadsUserId,
+      capturedAt: nowIso,
+      timezone,
+      coverageRules: {
+        horizon_hours: horizonHours,
+        requested_missing_count: requestedMissingCount,
+        scenario,
+      },
+    });
+    const snapshotExportMs = durationMs(snapshotExportStarted);
     const slotPlan = await dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount });
-    const loadedCandidates = frozenSeed
-      ? records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[]
-      : await dependencies.loadSourceCandidates(snapshotReadOnlyDb, identity.brandKey, nowIso);
-    const initialEvidence = frozenSeed
-      ? normalizeSeedEvidence(frozenSeed.evidence, stringValue(frozenSeed.source_as_of, nowIso))
-      : await dependencies.readEvidence({
-        snapshotReadOnlyDb,
-        brandKey: identity.brandKey,
-        threadsUserId: identity.threadsUserId,
-        nowIso,
-        evidenceMode,
-      });
-    if (dependencies.requireFrozenSeed && loadedCandidates.length < requestedMissingCount) {
-      throw new Error(`manifest_shadow_real_seed_insufficient:${loadedCandidates.length}:${requestedMissingCount}`);
-    }
-    let candidates = loadedCandidates;
-    let evidence = initialEvidence;
-    let deltaRefreshCount = 0;
-    let additionalExternalReads = 0;
-    if (testCase === "stale_delta_refresh") {
-      evidence = await dependencies.readEvidence({
-        snapshotReadOnlyDb,
-        brandKey: identity.brandKey,
-        threadsUserId: identity.threadsUserId,
-        nowIso: dependencies.now().toISOString(),
-        evidenceMode: "snapshot",
-      });
-      evidence = {
-        ...evidence,
-        freshness: {
-          ...record(evidence.freshness),
-          stale: false,
-          bounded_delta_refresh_required: false,
-          bounded_delta_refresh_performed: true,
-        },
-      };
-      deltaRefreshCount = 1;
-      additionalExternalReads = 1;
-    }
 
     const resetStarted = Date.now();
     const reset = await resetManifestShadowWorkspace(dependencies.shadowDb);
@@ -1095,6 +1043,77 @@ async function prepareShadowCycle(
       duration_ms: durationMs(resetStarted),
       payload: reset,
     });
+
+    const snapshotImportStarted = Date.now();
+    const exportedShadowEvidence = manifestDecisionSnapshotToShadowEvidence(exportedSnapshot);
+    await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
+      brand_key: identity.brandKey,
+      source_as_of: exportedSnapshot.captured_at,
+      snapshot_hash: exportedSnapshot.snapshot_hash,
+      source_candidates: exportedSnapshot.source_candidates as unknown as JsonRecord[],
+      evidence: exportedShadowEvidence,
+    });
+    const frozenSeed = await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey);
+    if (!frozenSeed) throw new Error("manifest_decision_snapshot_import_missing");
+    const importedSnapshot = readManifestDecisionSnapshotFromShadowEvidence(frozenSeed.evidence);
+    if (!importedSnapshot) throw new Error("manifest_decision_snapshot_import_unreadable");
+    const {
+      snapshot_hash: importedDeclaredHash,
+      ...importedWithoutHash
+    } = importedSnapshot;
+    const importedComputedHash = await hashManifestDecisionValue(importedWithoutHash);
+    if (
+      frozenSeed.snapshot_hash !== exportedSnapshot.snapshot_hash
+      || importedDeclaredHash !== exportedSnapshot.snapshot_hash
+      || importedComputedHash !== exportedSnapshot.snapshot_hash
+    ) {
+      throw new Error("manifest_decision_snapshot_import_hash_mismatch");
+    }
+    const snapshotImportMs = durationMs(snapshotImportStarted);
+    await recordManifestShadowStageEvent(dependencies.shadowDb, {
+      run_id: runId,
+      stage_key: "decision_snapshot_boundary",
+      event_key: "decision_snapshot_export_import_verified",
+      status: "completed",
+      started_at: nowIso,
+      completed_at: dependencies.now().toISOString(),
+      duration_ms: snapshotExportMs + snapshotImportMs,
+      payload: {
+        snapshot_hash: exportedSnapshot.snapshot_hash,
+        source_candidate_count: exportedSnapshot.source_candidates.length,
+        eligible_family_count: Number(record(exportedSnapshot.eligibility_state).eligible_family_count ?? 0),
+        query_count: exportedSnapshot.query_receipts.length,
+        zero_write_proof: exportedSnapshot.zero_write_proof,
+        snapshot_export_ms: snapshotExportMs,
+        snapshot_import_ms: snapshotImportMs,
+        main_disconnected_after_import: true,
+      },
+    });
+
+    const loadedCandidates = records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[];
+    const initialEvidence = normalizeSeedEvidence(frozenSeed.evidence, stringValue(frozenSeed.source_as_of, nowIso));
+    const minimumEligibleFamilies = Math.max(24, Math.trunc(dependencies.minimumEligibleFamilies ?? 24));
+    const eligibleFamilyCount = Number(record(importedSnapshot.eligibility_state).eligible_family_count ?? 0);
+    if (eligibleFamilyCount < minimumEligibleFamilies) {
+      throw new Error(`manifest_decision_snapshot_candidate_pool_insufficient:${eligibleFamilyCount}:${minimumEligibleFamilies}`);
+    }
+    let candidates = loadedCandidates;
+    let evidence = initialEvidence;
+    let deltaRefreshCount = 0;
+    const additionalExternalReads = 0;
+    if (testCase === "stale_delta_refresh") {
+      evidence = {
+        ...evidence,
+        freshness: {
+          ...record(evidence.freshness),
+          stale: false,
+          bounded_delta_refresh_required: false,
+          bounded_delta_refresh_performed: true,
+          refresh_source: "immutable_imported_snapshot",
+        },
+      };
+      deltaRefreshCount = 1;
+    }
     const occupied = new Set(slotPlan.occupiedSlotKeys);
     const missingSlots = slotPlan.targetSlots.map((slot) => slot.key).filter((key) => !occupied.has(key)).slice(0, requestedMissingCount);
         const selectionStarted = Date.now();
