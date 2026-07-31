@@ -10,9 +10,9 @@ import {
 } from "../src/operatorMcpRegistryComposition";
 
 describe("Operator MCP registry composition", () => {
-        it("preserves the exact 62-tool account aggregation order", () => {
+        it("preserves the exact 63-tool account aggregation order", () => {
     const names = OPERATOR_MCP_ACCOUNT_TOOLS.map((tool) => tool.name);
-    expect(names).toHaveLength(62);
+    expect(names).toHaveLength(63);
     expect(names.slice(0, 3)).toEqual([
       "list_accounts",
       "get_account_state",
@@ -24,10 +24,13 @@ describe("Operator MCP registry composition", () => {
       "commit_manifest_shadow_cycle_strategy",
       "persist_manifest_shadow_batch",
                         "get_manifest_shadow_cycle_receipt",
-      "get_manifest_shadow_posts",
+            "get_manifest_shadow_posts",
+      "get_manifest_locked_lineup_page",
       "persist_manifest_autonomous_batch",
     ]));
-    expect(names.indexOf("prepare_manifest_shadow_cycle")).toBeLessThan(names.indexOf("prepare_manifest_autonomous_cycle"));
+        expect(names.indexOf("prepare_manifest_shadow_cycle")).toBeLessThan(names.indexOf("prepare_manifest_autonomous_cycle"));
+    expect(names.indexOf("get_manifest_cycle_analysis_page")).toBeLessThan(names.indexOf("get_manifest_locked_lineup_page"));
+    expect(names.indexOf("get_manifest_locked_lineup_page")).toBeLessThan(names.indexOf("commit_manifest_cycle_strategy"));
     expect(names.slice(-5)).toEqual([
       "get_post_results",
       "get_monthly_growth_review",
