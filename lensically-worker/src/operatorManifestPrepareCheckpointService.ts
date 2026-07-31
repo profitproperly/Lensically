@@ -95,9 +95,9 @@ export async function handleOperatorManifestPrepareCheckpoint(
 
   const timezone = dependencies.normalizeText(payload.timezone, 100, true)
     ?? dependencies.defaultTimezone;
-  const horizonHours = Math.min(
+    const horizonHours = Math.min(
     Math.max(Math.trunc(Number(payload.horizon_hours ?? dependencies.defaultRunwayHours)), 1),
-    72,
+    48,
   );
   const explicitOperationId = dependencies.normalizeText(payload.operation_id, 240, true);
   const phasedPreparation = Boolean(explicitOperationId) && !dependencies.hasTestRuntimeTokens();
