@@ -3762,12 +3762,24 @@ continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
 active_checkpoint: stage-6t-published-post-lineage-audit-service
 `);
-    expect(parsedContinuation).toEqual({
+        expect(parsedContinuation).toEqual({
       status: "active",
       contract: "canonical-continuation-v1",
       active_job_id: "worker-monolith-refactor",
       active_checkpoint: "stage-6t-published-post-lineage-audit-service",
     });
+    const completedContinuation = parseCanonicalContinuationMetadata(`status: completed
+continuation_contract: canonical-continuation-v1
+active_job_id: null
+active_checkpoint: none
+`);
+    expect(completedContinuation).toEqual({
+      status: "completed",
+      contract: "canonical-continuation-v1",
+      active_job_id: null,
+      active_checkpoint: null,
+    });
+    expect(parseCanonicalContinuationMetadata("status: closing\n").status).toBe("closing");
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
     expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");

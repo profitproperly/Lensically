@@ -15457,11 +15457,15 @@ export function parseCanonicalContinuationMetadata(content: string | null): {
   active_job_id: string | null;
   active_checkpoint: string | null;
 } {
+  const normalizeNullableMetadata = (value: string | undefined): string | null => {
+    const normalized = value?.trim();
+    return normalized && !/^(null|none)$/i.test(normalized) ? normalized : null;
+  };
   return {
-    status: content?.match(/^status:\s*(active|idle|blocked)\s*$/im)?.[1]?.toLowerCase() ?? "unknown",
-    contract: content?.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1] ?? null,
-    active_job_id: content?.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1] ?? null,
-    active_checkpoint: content?.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1] ?? null,
+    status: content?.match(/^status:\s*(active|idle|blocked|closing|completed)\s*$/im)?.[1]?.toLowerCase() ?? "unknown",
+    contract: normalizeNullableMetadata(content?.match(/^continuation_contract:\s*([^\s]+)\s*$/im)?.[1]),
+    active_job_id: normalizeNullableMetadata(content?.match(/^active_job_id:\s*([^\s]+)\s*$/im)?.[1]),
+    active_checkpoint: normalizeNullableMetadata(content?.match(/^active_checkpoint:\s*([^\s]+)\s*$/im)?.[1]),
   };
 }
 
