@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
 status: active
-updated_at: 2026-07-30
+updated_at: 2026-07-31
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-main-mimic-parity
-active_checkpoint: stage-1-audit-main-evidence-contract
-validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
-documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: 4b7e1d1c222ebdc4ef8740a85196bce605004a22
+active_checkpoint: stage-8-refresh-mcp-and-run-live-24-parity-acceptance
+validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
+documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
+production_sha: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -221,9 +221,20 @@ Isolation contract:
 
 - Snapshot export is the only permitted Main contact and must be provably read-only.
 - The benchmark begins only after the snapshot is imported and Main is disconnected.
-- Innovation runtime composition must receive `SHADOW_DB` only.
+- Innovation runtime composition must receive `SHADOW_DB` only after the exported snapshot is copied by value.
 - Innovation must have no Threads client, production scheduler authority, Main receipt writer, or mutation-capable Main provider.
 - Main row counts, hashes, schedules, strategies, learning, histories, and mutation counters must remain unchanged across every acceptance run.
+
+Implementation progress verified on 2026-07-31:
+
+- Canonical `ManifestDecisionSnapshot`, stable hashing, query receipts, before/after zero-write proof, immutable Shadow import, schedule-only overlay, and exact deterministic selector parity receipts are implemented.
+- Main and the Innovation exporter share the same read-only decision candidate provider; Main's label refresh remains an explicit authoritative pre-snapshot step outside the exporter.
+- Innovation production composition binds Main only as `snapshotDb: env.DB` behind `createManifestShadowReadOnlyDatabase`, imports by value into `SHADOW_DB`, disconnects Main, and enforces a minimum of 100 eligible families before generation.
+- Release preflight permanently blocks writable Main methods, direct production composition, Threads access, snapshot hash mismatch, scenario overreach, reduced candidate pools, selector divergence, and missing parity regressions.
+- Exact source SHA `8b52cf2e44983ca5588b7df503433bea6e0d3fa5` passed typecheck/lifecycle, all eight Operator shards, and the complete seven-batch validation inventory.
+- Exact-SHA Worker release run `30635330459` succeeded, including isolated Shadow D1 provisioning and production runtime verification. Post-release Operator smoke run `30635519334` also passed.
+- The first acceptance call from the existing ChatGPT MCP transport returned old code SHA `4b7e1d1c222ebdc4ef8740a85196bce605004a22` and the retired 24-source bundled seed. Shadow run `shadow-94b76e2151513aa8de1a8d5e773ab849` is invalid acceptance evidence and must not be counted or continued.
+- Root cause classification: the active ChatGPT MCP transport remained pinned to the pre-release Worker isolate. Repository, validation, exact-SHA release, and fresh workflow verification all point to the new source head; live acceptance requires a refreshed MCP transport.
 
 Definition of done:
 
@@ -238,11 +249,11 @@ Definition of done:
 
 ## Current Action
 
-1. Inspect the failed Cloudflare check attached to documentation head `6d91d758a457a7b98fefb0f02ad3ea2a63ebf875`; classify it and prove the deployed Worker at `4b7e1d1c222ebdc4ef8740a85196bce605004a22` remains healthy before source changes.
-2. Inventory the exact evidence fields and calculations consumed by Main preparation and source selection.
-3. Map every field to its current owning service/query and identify any read path that also performs writes.
-4. Produce the canonical `ManifestDecisionSnapshot` contract and shared-provider boundary.
-5. Stop at the first blocker, repair its root cause, record prevention, then resume this same job.
+1. Refresh the Lensically Operator Mode MCP transport before invoking any acceptance tool; the current chat transport is pinned to old Worker SHA `4b7e1d1c222ebdc4ef8740a85196bce605004a22`.
+2. Re-run `prepare_manifest_shadow_cycle` with a new stable operation ID for `normal_24`, `baseline`, `snapshot`, 48-hour horizon, and 24 missing slots.
+3. Fail closed unless the returned live `code_sha` is `8b52cf2e44983ca5588b7df503433bea6e0d3fa5`, the exported/imported snapshot hashes match, the zero-write proof passes, at least 100 real eligible families compete, the schedule-only overlay has no forbidden paths, and every selector parity field/hash passes.
+4. Commit the exact locked strategy, generate and persist all 24 genuine source-faithful posts in six four-item batches, read back every post and lineage record, verify zero Main reads during isolated execution, zero Main writes, zero Threads requests/mutations, zero cleanup orphans, and record the durable parity/isolation/quality/timing receipt.
+5. Validate interrupted replay and then 48-slot recovery on the refreshed deployed runtime. Mark this job complete only after all three live acceptance stages pass.
 
 ## Deferred Work — INACTIVE
 
