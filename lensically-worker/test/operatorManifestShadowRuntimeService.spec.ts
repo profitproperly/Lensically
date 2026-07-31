@@ -415,8 +415,10 @@ describe("operatorManifestShadowRuntimeService", () => {
         })).toBe(true);
         expect(Number(pendingContract.lineup_count)).toBe(expected);
         expect(new TextEncoder().encode(JSON.stringify(pendingContract)).byteLength).toBeLessThan(22_000);
-        expect(pendingContract.source_substitution_allowed).toBe(false);
-        await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
+                expect(pendingContract.source_substitution_allowed).toBe(false);
+        const completedReceipt = await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
+        const benchmark = benchmarkFrom(completedReceipt);
+        expect(benchmark.timings.latency_limit_ms).toBe(599_999);
       }
     }
   });

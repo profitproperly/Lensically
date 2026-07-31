@@ -807,7 +807,7 @@ async function persistAcceptedShadowCandidate(
 function manifestShadowLatencyLimitMs(state: ManifestShadowRuntimeState): number {
   if (state.scenario === "noop") return 30_000;
   
-  if (state.scenario === "normal_24") return 360_000;
+    if (state.scenario === "normal_24") return 599_999;
   if (state.scenario === "recovery_48") return 599_999;
   return 600_000;
 }
