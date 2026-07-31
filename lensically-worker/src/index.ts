@@ -112,7 +112,13 @@ import {
   isOperatorManifestShadowToolName,
 } from "./operatorManifestShadowRuntimeService";
 import {
-    buildManifestShadowScenarioSlots,
+  buildManifestDecisionSnapshot,
+} from "./operatorManifestDecisionSnapshotService";
+import {
+  createManifestShadowReadOnlyDatabase,
+} from "./operatorManifestShadowService";
+import {
+  buildManifestShadowScenarioSlots,
   readManifestShadowEvidence,
 } from "./operatorManifestShadowEvidenceService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
@@ -11272,11 +11278,23 @@ async function prepareManifestAutonomousCycle(
       brandKey,
       cycleId,
     ),
-    loadLockedSourceCards: (brandKey, asOf) => loadLockedSourceCardSelectionCandidates(
-      env.DB,
-      brandKey,
-      asOf,
-    ) as Promise<Record<string, unknown>[]>,
+        loadLockedSourceCards: async (brandKey, asOf) => {
+      const decisionSnapshot = await buildManifestDecisionSnapshot(
+        createManifestShadowReadOnlyDatabase(env.DB),
+        {
+          brandKey,
+          accountId: brand.account_id,
+          threadsUserId: brand.profile.threads_user_id,
+          capturedAt: asOf,
+          timezone: deliveryTimezone,
+          coverageRules: {
+            mode: "main_autonomous_prepare",
+            horizon_hours: horizonHours,
+          },
+        },
+      );
+      return decisionSnapshot.source_candidates as Record<string, unknown>[];
+    },
     loadSourceExclusions: async (brandKey) => {
       const rows = await env.DB.prepare(
         `SELECT source_identity_key FROM operator_source_exclusions
@@ -12196,11 +12214,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         accountId: brand.account_id,
         threadsUserId: brand.profile.threads_user_id,
       },
-    }, {
-            snapshotDb: env.SHADOW_DB,
-            shadowDb: env.SHADOW_DB,
+        }, {
+      snapshotDb: env.DB,
+      shadowDb: env.SHADOW_DB,
       codeSha: normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 80, true) ?? "unreleased",
-      requireFrozenSeed: true,
+      requireFrozenSeed: false,
+      minimumEligibleFamilies: 100,
       now: () => new Date(),
       buildSlots: async (input) => buildManifestShadowScenarioSlots({
         now: new Date(),
