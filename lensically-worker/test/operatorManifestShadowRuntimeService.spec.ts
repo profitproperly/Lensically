@@ -704,16 +704,19 @@ describe("operatorManifestShadowRuntimeService", () => {
     }
   });
 
-    it("fails closed when live composition has no genuine frozen seed", async () => {
+      it("bootstraps the live composition from the immutable genuine bundled seed", async () => {
     const harness = dependencyHarness();
     const result = await prepareRun({
       deps: { ...harness.deps, requireFrozenSeed: true },
       scenario: "normal_24",
-      suffix: "real-seed-required",
+      suffix: "bundled-real-seed",
       horizonHours: 48,
     });
-    expect(result.status).toBe(500);
-    expect(result.body.error).toBe("manifest_shadow_real_seed_required");
+    expect(result.status).toBe(200);
+    expect(record(result.body.decision_bundle).genuine_source_seed).toBe(true);
+    expect(rows(record(result.body.decision_bundle).locked_source_lineup)).toHaveLength(24);
+    expect(JSON.stringify(result.body)).not.toContain("Frozen isolated source");
+    expect(harness.audit.snapshot_db_calls).toBe(0);
   });
 
   it("imports genuine source text by value and prepares from Shadow only", async () => {

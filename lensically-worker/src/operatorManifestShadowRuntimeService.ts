@@ -19,6 +19,7 @@ import {
   type ManifestShadowSnapshot,
 } from "./operatorManifestShadowService";
 import type { SourceSelectionCandidate, SourceSelectionReceipt } from "./sourceFamilySelection";
+import { getManifestShadowBundledSeed } from "./operatorManifestShadowBundledSeed";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -984,9 +985,29 @@ async function prepareShadowCycle(
     try {
         const evidenceStarted = Date.now();
     const snapshotReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
-    const frozenSeed = dependencies.requireFrozenSeed
+        let frozenSeed = dependencies.requireFrozenSeed
       ? await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey)
       : null;
+    if (dependencies.requireFrozenSeed && !frozenSeed) {
+      const bundled = getManifestShadowBundledSeed();
+      const sourceCandidates = await buildFrozenSeedCandidates(records(bundled.sources));
+      const bundledEvidence = normalizeSeedEvidence(bundled.evidence, bundled.source_as_of);
+      const bundledSnapshotHash = await sha256(stableJson({
+        contract_version: "manifest-shadow-frozen-seed-v1",
+        brand_key: identity.brandKey,
+        source_as_of: bundled.source_as_of,
+        source_candidates: sourceCandidates,
+        evidence: bundledEvidence,
+      }));
+      await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
+        brand_key: identity.brandKey,
+        source_as_of: bundled.source_as_of,
+        snapshot_hash: bundledSnapshotHash,
+        source_candidates: sourceCandidates as unknown as JsonRecord[],
+        evidence: bundledEvidence as unknown as JsonRecord,
+      });
+      frozenSeed = await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey);
+    }
     if (dependencies.requireFrozenSeed && !frozenSeed) {
       throw new Error("manifest_shadow_real_seed_required");
     }
