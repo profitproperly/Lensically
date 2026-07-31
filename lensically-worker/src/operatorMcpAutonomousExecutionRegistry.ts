@@ -20,7 +20,7 @@ const OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS: OperatorMcpToolDefinition[] 
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         timezone: { type: "string", default: "America/New_York" },
-        horizon_hours: { type: "integer", minimum: 1, maximum: 72, default: 48 },
+                horizon_hours: { type: "integer", minimum: 1, maximum: 48, default: 48 },
       },
       required: ["brand_key"],
       additionalProperties: false,
