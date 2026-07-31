@@ -487,7 +487,7 @@
       "canonical_handler": "get_manifest_cycle_analysis_page",
       "route_intent": "get manifest cycle analysis page",
       "implementation_mode": "new_handler",
-            "focused_regression": "reads one canonical rolling evidence detail page only for decision-bundle ambiguity",
+                  "focused_regression": "preserves bounded evidence-page validation and observed failures",
       "release_scope": "operator-content",
       "live_verification": "The exact deployed Main Cycle tool returns one requested canonical detail page from the rolling 28-day evidence snapshot with full text, maturity, 24-hour likes, metrics, lineage, and classification; routine strategy work uses the compact decision bundle and does not require a complete page sweep.",
       "compatibility_bridge": false

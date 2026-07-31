@@ -711,7 +711,7 @@ const lifecycleBaselineTools = new Set(capabilityLifecycle?.baseline?.active_too
 const lifecycleBaselineDirectoryIds = new Set(capabilityLifecycle?.baseline?.directory_entry_ids ?? []);
 const lifecycleReleaseScopes = new Set(capabilityLifecycle?.allowed_release_scopes ?? []);
 const lifecycleImplementationModes = new Set(capabilityLifecycle?.declaration_schema?.implementation_modes ?? []);
-const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}\n${operatorManifestShadowRuntimeServiceTests}\n${operatorManifestBatchPersistenceServiceTests}`;
+const combinedRegressionTests = `${systemDirectoryTests}\n${tests}\n${humanFreeAutonomyTests}\n${operatorManifestShadowRuntimeServiceTests}\n${operatorManifestBatchPersistenceServiceTests}\n${operatorManifestCycleServiceTests}`;
 const combinedToolDefinitionSource = `${source}\n${operatorMcpEngineeringRegistry}\n${operatorMcpAdminRegistry}\n${operatorMcpAccountFoundationRegistry}\n${operatorMcpSourceDraftRegistry}\n${operatorMcpStrategyScheduleRegistry}\n${operatorMcpManifestCycleRegistry}\n${operatorMcpManifestShadowRegistry}\n${operatorMcpAutonomousExecutionRegistry}\n${operatorMcpAccountAnalyticsRegistry}`;
 const toolDefinitionNames = Array.from(new Set(Array.from(combinedToolDefinitionSource.matchAll(/\{\s*name:\s*"([^"]+)"[\s\S]{0,1600}?\btitle:\s*"[^"]+"[\s\S]{0,1600}?\binputSchema:\s*\{/g), (match) => match[1])));
 const directorySection = systemDirectorySource.slice(
@@ -1556,7 +1556,8 @@ if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page
     || !operatorManifestCycleServiceTests.includes("preserves adjacent Manifest intelligence reads and audit normalization")
     || !operatorManifestCycleServiceTests.includes("preserves complete strategy locking and source-selection metadata")
     || !operatorManifestCycleServiceTests.includes("preserves seven-stage defect validation and receipt requirements")
-    || !operatorManifestCycleServiceTests.includes("preserves final defect resolution and cycle completion reconciliation")) {
+        || !operatorManifestCycleServiceTests.includes("preserves final defect resolution and cycle completion reconciliation")
+    || !operatorManifestCycleServiceTests.includes("returns bounded complete Main Cycle locked-lineup pages with canonical source cues")) {
   lifecycleErrors.push("operator_manifest_cycle_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorHourlyCoverageService"')
