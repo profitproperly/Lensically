@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   MANIFEST_SHADOW_OPERATIONAL_TABLES,
   MANIFEST_SHADOW_SNAPSHOT_VERSION,
@@ -164,7 +164,14 @@ describe("operatorManifestShadowService", () => {
       })),
       evidence: "💎 exact snapshot evidence ".repeat(20_000),
     });
-    const chunks = chunkManifestShadowJsonPayload(payload);
+        const encodeSpy = vi.spyOn(TextEncoder.prototype, "encode");
+    let chunks;
+    try {
+      chunks = chunkManifestShadowJsonPayload(payload);
+      expect(encodeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      encodeSpy.mockRestore();
+    }
     expect(chunks.length).toBeGreaterThan(10);
     expect(chunks.every((chunk) => chunk.byte_length <= MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES)).toBe(true);
     expect(reassembleManifestShadowJsonChunks(chunks, "large_snapshot")).toBe(payload);

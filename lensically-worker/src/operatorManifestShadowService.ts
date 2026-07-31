@@ -168,24 +168,27 @@ export function chunkManifestShadowJsonPayload(
   if (!Number.isInteger(maxBytes) || maxBytes < 4) {
     throw new Error("manifest_shadow_frozen_seed_chunk_limit_invalid");
   }
-  const encoder = new TextEncoder();
-  const chunks: ManifestShadowJsonChunk[] = [];
-  let characters: string[] = [];
-  let byteLength = 0;
-  const flush = () => {
-    const chunkText = characters.join("");
-    chunks.push({ chunk_index: chunks.length, chunk_text: chunkText, byte_length: byteLength });
-    characters = [];
-    byteLength = 0;
-  };
-  for (const character of value) {
-    const characterBytes = encoder.encode(character).byteLength;
-    if (characterBytes > maxBytes) throw new Error("manifest_shadow_frozen_seed_character_too_large");
-    if (characters.length > 0 && byteLength + characterBytes > maxBytes) flush();
-    characters.push(character);
-    byteLength += characterBytes;
+  const encoded = new TextEncoder().encode(value);
+  if (encoded.byteLength === 0) {
+    return [{ chunk_index: 0, chunk_text: "", byte_length: 0 }];
   }
-  if (characters.length > 0 || value.length === 0) flush();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const chunks: ManifestShadowJsonChunk[] = [];
+  let offset = 0;
+  while (offset < encoded.byteLength) {
+    let end = Math.min(offset + maxBytes, encoded.byteLength);
+    if (end < encoded.byteLength) {
+      while (end > offset && (encoded[end] & 0xc0) === 0x80) end -= 1;
+      if (end === offset) throw new Error("manifest_shadow_frozen_seed_character_too_large");
+    }
+    const bytes = encoded.subarray(offset, end);
+    chunks.push({
+      chunk_index: chunks.length,
+      chunk_text: decoder.decode(bytes),
+      byte_length: bytes.byteLength,
+    });
+    offset = end;
+  }
   return chunks;
 }
 
