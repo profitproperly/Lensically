@@ -94,7 +94,9 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
     expect(lineupPage.description).toContain("Do not replace locked sources");
 
     const strategy = tool("commit_manifest_cycle_strategy");
-    expect(strategy.description).toContain("complete versioned decision bundle");
+        expect(strategy.description).toContain("compact versioned decision bundle");
+    expect(strategy.description).toContain("complete paged backend-locked lineup");
+    expect(strategy.description).toContain("without changing any source-to-slot assignment");
     expect(strategy.description).toContain("bounded evidence-page detail read");
     expect(strategy.description).toContain("Replaying an identical strategy is safe");
     expect(strategy.inputSchema.required).toContain("decision_bundle_id");
