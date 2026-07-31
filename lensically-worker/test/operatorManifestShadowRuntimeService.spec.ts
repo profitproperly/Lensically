@@ -407,8 +407,9 @@ describe("operatorManifestShadowRuntimeService", () => {
       if (scenario === "normal_24") {
         const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
         const pendingContract = record(pendingReceipt.pending_strategy_contract);
-        expect(rows(pendingContract.locked_source_lineup)).toHaveLength(24);
+                expect(rows(pendingContract.locked_source_lineup)).toHaveLength(24);
         expect(rows(pendingContract.locked_source_lineup).every((item) => Boolean(item.assigned_slot_key && item.source_card_id && item.source_card_family_id))).toBe(true);
+        expect(new TextEncoder().encode(JSON.stringify(pendingContract)).byteLength).toBeLessThan(18_000);
         expect(pendingContract.source_substitution_allowed).toBe(false);
       }
       if (scenario !== "noop") await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);

@@ -1928,18 +1928,14 @@ function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): 
     decision_bundle_id: state.decision_bundle_id,
     snapshot_hash: state.decision_bundle.snapshot_hash ?? null,
     missing_slot_keys: [...state.missing_slot_keys],
-    locked_source_lineup: state.locked_source_lineup.map((item) => ({
+        locked_source_lineup: state.locked_source_lineup.map((item) => ({
       assigned_slot_key: item.assigned_slot_key ?? null,
       source_identity_key: item.source_identity_key ?? null,
       source_card_id: item.source_card_id ?? null,
       source_card_family_id: item.source_card_family_id ?? null,
-      source_mechanism: item.source_mechanism ?? null,
-      required_product: item.required_product ?? null,
-      recommended_direction: item.recommended_direction ?? null,
-      lifetime_label: item.lifetime_label ?? null,
-      recent_label: item.recent_label ?? null,
-      confidence_label: item.confidence_label ?? null,
-      source_text: typeof item.text === "string" ? item.text.slice(0, 360) : null,
+      source_mechanism: typeof item.source_mechanism === "string" ? item.source_mechanism.slice(0, 120) : null,
+      required_product: typeof item.required_product === "string" ? item.required_product.slice(0, 140) : null,
+      recommended_direction: typeof item.recommended_direction === "string" ? item.recommended_direction.slice(0, 160) : null,
     })),
     source_substitution_allowed: false,
     strategy_commit_tool: "commit_manifest_shadow_cycle_strategy",
@@ -2015,11 +2011,10 @@ async function getShadowReceipt(
     receipt = await readManifestShadowReceipt(dependencies.shadowDb, runId);
     run = record(receipt.run);
   }
-  return {
+    return {
     body: {
       success: true,
       shadow_run_id: runId,
-            receipt,
       pending_strategy_contract: state ? buildPendingShadowStrategyContract(state) : null,
       state_summary: state ? {
                 scenario: state.scenario,
@@ -2034,8 +2029,9 @@ async function getShadowReceipt(
         remaining_missing_count: state.missing_slot_keys.length,
                 completed: state.completed,
         timings: state.timings,
-        counters: state.counters,
+                counters: state.counters,
       } : null,
+      receipt,
     },
     status: 200,
   };
