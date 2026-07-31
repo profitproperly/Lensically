@@ -58,11 +58,13 @@
       "get_manifest_review_batch",
       "get_hourly_coverage",
       "attach_manifest_review_draft",
-            "schedule_manifest_review_batch",
+                        "schedule_manifest_review_batch",
+      "seed_manifest_shadow_snapshot",
       "prepare_manifest_shadow_cycle",
       "commit_manifest_shadow_cycle_strategy",
-      "persist_manifest_shadow_batch",
+            "persist_manifest_shadow_batch",
       "get_manifest_shadow_cycle_receipt",
+      "get_manifest_shadow_posts",
             "get_performance_learning",
       "delete_scheduled_post",
       "edit_scheduled_post",
@@ -402,6 +404,17 @@
       "live_verification": "The exact deployed Main gateway checkpoints one work item with evidence, clears a completed interruption, resumes the frozen active outcome, and refuses analysis-only closure by always returning an action-closure receipt.",
       "compatibility_bridge": false
     },
+                {
+      "capability_id": "strategy.seed_manifest_shadow_snapshot",
+      "directory_entry_id": "strategy.manifest_shadow_cycle",
+      "canonical_handler": "seed_manifest_shadow_snapshot",
+      "route_intent": "seed manifest shadow snapshot",
+      "implementation_mode": "new_handler",
+      "focused_regression": "imports genuine source text by value and prepares from Shadow only",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed tool writes one frozen genuine-source package only into SHADOW_DB; the subsequent benchmark receives no Main database binding and proves zero Main writes and zero Threads mutation.",
+      "compatibility_bridge": false
+    },
         {
       "capability_id": "strategy.prepare_manifest_shadow_cycle",
       "directory_entry_id": "strategy.manifest_shadow_cycle",
@@ -444,6 +457,17 @@
             "focused_regression": "returns compact receipts with generated and source text recursively redacted",
       "release_scope": "operator-content",
       "live_verification": "Exact-head source validation reads the isolated Innovation receipt from SHADOW_DB, preserves timings, counts, lineage and cleanup evidence, and recursively excludes generated and source text without touching Main.",
+      "compatibility_bridge": false
+    },
+        {
+      "capability_id": "strategy.read_manifest_shadow_posts",
+      "directory_entry_id": "strategy.manifest_shadow_receipt",
+      "canonical_handler": "get_manifest_shadow_posts",
+      "route_intent": "get manifest shadow posts",
+      "implementation_mode": "new_handler",
+      "focused_regression": "rejects synthetic placeholder text and exposes accepted post text through readback",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed read-only tool returns every accepted genuine Shadow post in slot order with scheduled-shaped timestamps and complete source lineage, without reading or writing Main or calling Threads.",
       "compatibility_bridge": false
     },
     {
