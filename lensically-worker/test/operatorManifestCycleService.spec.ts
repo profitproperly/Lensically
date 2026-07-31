@@ -382,6 +382,86 @@ describe("Operator Manifest cycle product service", () => {
     }));
     expect(dbState.prepare).toHaveBeenCalledWith(expect.stringContaining("UPDATE operator_autonomous_growth_cycles"));
     expect(dbState.bind).toHaveBeenCalledWith("cycle-1", "manifest_mental");
-    expect(dbState.run).toHaveBeenCalledOnce();
+        expect(dbState.run).toHaveBeenCalledOnce();
+  });
+
+  it("returns bounded complete Main Cycle locked-lineup pages with canonical source cues", async () => {
+    const { dependencies } = createHarness();
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => sql.includes("COUNT(*)")
+        ? {
+            first: vi.fn(async () => ({ total: 13 })),
+          }
+        : {
+            all: vi.fn(async () => ({
+              results: [{
+                slot_key: "2026-07-31T13:00",
+                selection_order: 13,
+                source_identity_key: "saved_pattern:175",
+                source_card_family_id: "family-175",
+                source_card_id: "card-175",
+                engine_version: "selector-v1",
+                receipt_json: JSON.stringify({
+                  lifetime_label: "franchise",
+                  recent_label: "healthy",
+                  score: 1.42,
+                  cooldown_hours: 72,
+                  planned_uses: 1,
+                }),
+                source_title: "Face lights up",
+                primary_source_json: JSON.stringify({ text: "A canonical source premise", likes: 1400 }),
+                source_mechanism: "Recognition and emotional payoff",
+                required_product: "One concise relationship post",
+                recommended_direction: "Preserve the face-lighting-up payoff",
+                transformation_contract_json: JSON.stringify({ preserve: ["recognition", "payoff"] }),
+                pass_conditions_json: JSON.stringify(["Source premise remains recognizable"]),
+                fail_conditions_json: JSON.stringify(["Invented unrelated premise"]),
+                source_selection_id: "selection-175",
+                source_card_version_number: 2,
+                source_type: "saved_pattern",
+                internal_source_id: "175",
+                canonical_source_url: "https://example.com/source/175",
+              }],
+            })),
+          }),
+    }));
+    dependencies.db = { prepare } as unknown as D1Database;
+
+    const page = await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_locked_lineup_page",
+      brandKey: "manifest_mental",
+      payload: { cycle_id: "cycle-1", offset: 12, limit: 99 },
+    }, dependencies);
+
+    expect(page.status).toBe(200);
+    expect(page.body).toMatchObject({
+      success: true,
+      cycle_identity: "Main Cycle",
+      cycle_id: "cycle-1",
+      source_substitution_allowed: false,
+      lineup_page: {
+        offset: 12,
+        limit: 12,
+        total_count: 13,
+        returned_count: 1,
+        next_offset: null,
+        complete: true,
+        items: [{
+          slot_key: "2026-07-31T13:00",
+          source_card_id: "card-175",
+          source_selection_id: "selection-175",
+          primary_source: { text: "A canonical source premise", likes: 1400 },
+          selection_evidence: {
+            lifetime_label: "franchise",
+            recent_label: "healthy",
+            score: 1.42,
+            cooldown_hours: 72,
+            planned_uses: 1,
+          },
+        }],
+      },
+    });
+    expect(String(page.body.next_action)).toContain("complete paged Main Cycle lineup");
   });
 });
+
