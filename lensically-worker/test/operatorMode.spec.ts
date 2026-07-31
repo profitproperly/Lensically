@@ -5840,7 +5840,7 @@ active_checkpoint: none
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                                                                                                    expect(eligibleMutations).toBe(69);
+                                                                                                                                                                                                        expect(eligibleMutations).toBe(70);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 
