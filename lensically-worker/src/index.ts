@@ -12029,8 +12029,9 @@ async function persistManifestAutonomousBatch(
     brandKey: brand.brand_key,
     defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
     payload,
-  }, {
+    }, {
     normalizeText: normalizeOperatorText,
+    nowMs: () => Date.now(),
     persistCandidate: (candidatePayload, options) => persistManifestAutonomousPost(
       env,
       brand,

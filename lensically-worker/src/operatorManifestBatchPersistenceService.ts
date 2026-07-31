@@ -11,6 +11,7 @@ export type OperatorManifestBatchCandidateResult = JsonRecord & {
 
 export interface OperatorManifestBatchPersistenceDependencies {
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+  nowMs(): number;
   persistCandidate(
     payload: JsonRecord,
     options: {
@@ -100,7 +101,7 @@ export async function persistOperatorManifestBatch(
       retryable: false,
     };
   }
-  if (candidates.length < 1 || candidates.length > 4) {
+    if (candidates.length < 1 || candidates.length > 4) {
     return {
       success: false,
       error: "manifest_persistence_batch_size_must_be_1_to_4",
@@ -109,6 +110,7 @@ export async function persistOperatorManifestBatch(
     };
   }
 
+  const startedAtMs = dependencies.nowMs();
   const itemResults: JsonRecord[] = [];
   const persistedCandidates: Array<{
     operation_id: string;
@@ -159,6 +161,8 @@ export async function persistOperatorManifestBatch(
     }
   }
 
+    const persistenceCompletedAtMs = dependencies.nowMs();
+  const candidatePersistenceMs = Math.max(0, persistenceCompletedAtMs - startedAtMs);
   const rejected = itemResults.filter((result) => !(
     result.success === true && Number(result.scheduled_post_id ?? 0) > 0
   ));
@@ -179,14 +183,20 @@ export async function persistOperatorManifestBatch(
       rejected_count: rejected.length,
       results: itemResults,
       rejected_slots: rejectedSlots,
-      reconciliation: null,
+            reconciliation: null,
       reconciliation_count: 0,
+      timing: {
+        policy: "telemetry_only",
+        candidate_persistence_ms: candidatePersistenceMs,
+        reconciliation_ms: 0,
+        total_elapsed_ms: candidatePersistenceMs,
+      },
       retryable: true,
     };
   }
 
   const lastContext = reconciliationContexts[reconciliationContexts.length - 1] ?? {};
-  const reconciliation = await dependencies.reconcileBatch({
+    const reconciliation = await dependencies.reconcileBatch({
     brandKey: input.brandKey,
     cycleId,
     batchOperationId,
@@ -198,9 +208,11 @@ export async function persistOperatorManifestBatch(
       true,
     ),
     fallbackCycle: record(lastContext.fallback_cycle),
-    fallbackTimezone: dependencies.normalizeText(lastContext.fallback_timezone, 100, true)
+        fallbackTimezone: dependencies.normalizeText(lastContext.fallback_timezone, 100, true)
       ?? input.defaultTimezone,
   });
+  const completedAtMs = dependencies.nowMs();
+  const reconciliationMs = Math.max(0, completedAtMs - persistenceCompletedAtMs);
 
   return {
     success: rejected.length === 0,
@@ -213,8 +225,14 @@ export async function persistOperatorManifestBatch(
     results: itemResults,
     accepted_slots: persistedCandidates.map((candidate) => candidate.slot_key),
     rejected_slots: rejectedSlots,
-    reconciliation,
+        reconciliation,
     reconciliation_count: 1,
+    timing: {
+      policy: "telemetry_only",
+      candidate_persistence_ms: candidatePersistenceMs,
+      reconciliation_ms: reconciliationMs,
+      total_elapsed_ms: Math.max(0, completedAtMs - startedAtMs),
+    },
     retryable: rejected.length > 0,
     next_action: rejected.length
       ? "Regenerate only the rejected slots using their exact server reasons, then submit one bounded batch containing only those replacements."

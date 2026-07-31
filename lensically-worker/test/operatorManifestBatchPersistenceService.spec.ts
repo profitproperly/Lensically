@@ -33,6 +33,12 @@ function createDependencies(): {
   persistCandidate: ReturnType<typeof vi.fn>;
   reconcileBatch: ReturnType<typeof vi.fn>;
 } {
+    let clockMs = 1_000;
+  const nowMs = vi.fn(() => {
+    const current = clockMs;
+    clockMs += 10;
+    return current;
+  });
   const persistCandidate = vi.fn(async (payload: JsonRecord) => {
     const operationId = String(payload.operation_id ?? "");
     if (operationId === "candidate-2") {
@@ -77,8 +83,9 @@ function createDependencies(): {
   return {
     persistCandidate,
     reconcileBatch,
-    dependencies: {
+        dependencies: {
       normalizeText,
+      nowMs,
       persistCandidate,
       reconcileBatch,
     },
@@ -116,9 +123,15 @@ describe("operatorManifestBatchPersistenceService", () => {
         error: "semantic_repetition_collision",
       }],
       reconciliation_count: 1,
-      reconciliation: {
+            reconciliation: {
         reconciliation_count: 1,
         remaining_missing_count: 5,
+      },
+      timing: {
+        policy: "telemetry_only",
+        candidate_persistence_ms: 10,
+        reconciliation_ms: 10,
+        total_elapsed_ms: 20,
       },
     });
     expect(harness.persistCandidate).toHaveBeenCalledTimes(3);
@@ -194,8 +207,14 @@ describe("operatorManifestBatchPersistenceService", () => {
       partial_success: false,
       accepted_count: 0,
       rejected_count: 1,
-      reconciliation: null,
+            reconciliation: null,
       reconciliation_count: 0,
+      timing: {
+        policy: "telemetry_only",
+        candidate_persistence_ms: 10,
+        reconciliation_ms: 0,
+        total_elapsed_ms: 10,
+      },
     });
     expect(harness.reconcileBatch).not.toHaveBeenCalled();
   });
