@@ -575,7 +575,16 @@ export async function beginManifestShadowRun(
        id, brand_key, scenario, evidence_mode, variant_key, operation_root,
        code_sha, status, lease_expires_at, details_expires_at, started_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'preparing', datetime(?, '+30 minutes'), datetime(?, '+' || ? || ' hours'), ?)
-     ON CONFLICT(operation_root) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
+          ON CONFLICT(operation_root) DO UPDATE SET
+       code_sha = excluded.code_sha,
+       status = 'preparing',
+       lease_expires_at = excluded.lease_expires_at,
+       details_expires_at = excluded.details_expires_at,
+       started_at = excluded.started_at,
+       completed_at = NULL,
+       failure_code = NULL,
+       failure_message = NULL,
+       updated_at = CURRENT_TIMESTAMP`,
   ).bind(
     input.run_id,
     input.brand_key,

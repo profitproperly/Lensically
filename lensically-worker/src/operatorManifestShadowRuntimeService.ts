@@ -980,28 +980,32 @@ async function prepareShadowCycle(
   const existing = await dependencies.shadowDb.prepare(
     `SELECT id, status FROM manifest_shadow_runs WHERE operation_root = ? LIMIT 1`,
   ).bind(operationRoot).first<JsonRecord>();
+    let replayingIncompletePreparation = false;
   if (existing?.id) {
     const state = await readState(dependencies.shadowDb, String(existing.id));
-    return {
-      body: {
-        success: true,
-        reused: true,
-        shadow_run_id: existing.id,
-                status: existing.status,
-        test_case: state?.test_case ?? testCase,
-        decision_bundle_id: state?.decision_bundle_id ?? null,
-        decision_bundle: state?.decision_bundle ?? null,
-        remaining_missing_count: state?.missing_slot_keys.length ?? null,
-        next_action: state?.strategy
-          ? "Persist one to four exact planned candidates with persist_manifest_shadow_batch."
-          : "Commit one strategy with commit_manifest_shadow_cycle_strategy.",
-      },
-      status: 200,
-    };
+    if (state) {
+      return {
+        body: {
+          success: true,
+          reused: true,
+          shadow_run_id: existing.id,
+          status: existing.status,
+          test_case: state.test_case,
+          decision_bundle_id: state.decision_bundle_id,
+          decision_bundle: state.decision_bundle,
+          remaining_missing_count: state.missing_slot_keys.length,
+          next_action: state.strategy
+            ? "Persist one to four exact planned candidates with persist_manifest_shadow_batch."
+            : "Commit one strategy with commit_manifest_shadow_cycle_strategy.",
+        },
+        status: 200,
+      };
+    }
+    replayingIncompletePreparation = true;
   }
 
     const totalStarted = Date.now();
-  const run = await beginManifestShadowRun(dependencies.shadowDb, {
+    const run = await beginManifestShadowRun(dependencies.shadowDb, {
     run_id: runId,
     brand_key: identity.brandKey,
     scenario,
@@ -1011,6 +1015,22 @@ async function prepareShadowCycle(
     code_sha: dependencies.codeSha,
     retention_hours: Number(payload.retention_hours ?? 72),
   }, nowIso);
+  if (replayingIncompletePreparation) {
+    await recordManifestShadowStageEvent(dependencies.shadowDb, {
+      run_id: runId,
+      stage_key: "preparation_recovery",
+      event_key: "incomplete_preparation_replayed",
+      status: "completed",
+      completed_at: nowIso,
+      duration_ms: 0,
+      payload: {
+        operation_root: operationRoot,
+        prior_status: existing?.status ?? null,
+        durable_runtime_state_found: false,
+        recovery_action: "rebuild_exact_operation_in_place",
+      },
+    });
+  }
   try {
         const snapshotExportStarted = Date.now();
     const snapshotInput = {

@@ -378,7 +378,8 @@ beforeEach(async () => {
   await env.DB.prepare(`DELETE FROM manifest_shadow_diagnostic_archives`).run();
   await env.DB.prepare(`DELETE FROM manifest_shadow_stage_events`).run();
   await env.DB.prepare(`DELETE FROM manifest_shadow_snapshots`).run();
-    await env.DB.prepare(`DELETE FROM manifest_shadow_runs`).run();
+      await env.DB.prepare(`DELETE FROM manifest_shadow_runs`).run();
+  await env.DB.prepare(`DELETE FROM manifest_shadow_frozen_seed_chunks`).run();
   await env.DB.prepare(`DELETE FROM manifest_shadow_frozen_seeds`).run();
 });
 
@@ -412,6 +413,45 @@ describe("operatorManifestShadowRuntimeService", () => {
       }
       if (scenario !== "noop") await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
     }
+  });
+
+    it("rebuilds an exact interrupted preparation when no durable runtime state exists", async () => {
+    const harness = dependencyHarness();
+    const first = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "incomplete-preparation-replay",
+      horizonHours: 48,
+    });
+    expect(first.status).toBe(200);
+    const runId = String(first.body.shadow_run_id);
+    await env.DB.prepare(`DELETE FROM manifest_shadow_snapshots WHERE shadow_run_id = ?`).bind(runId).run();
+    await env.DB.prepare(
+      `UPDATE manifest_shadow_runs
+       SET status = 'preparing', snapshot_hash = NULL, completed_at = NULL
+       WHERE id = ?`,
+    ).bind(runId).run();
+
+    const replay = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "incomplete-preparation-replay",
+      horizonHours: 48,
+    });
+    expect(replay.status).toBe(200);
+    expect(replay.body.success).toBe(true);
+    expect(replay.body.reused).toBe(false);
+    expect(replay.body.shadow_run_id).toBe(runId);
+    expect(replay.body.decision_bundle_id).toBeTruthy();
+    expect(record(replay.body.decision_bundle).locked_source_lineup).toHaveLength(24);
+    expect(harness.audit.source_provider_reads).toBe(2);
+    expect(harness.audit.evidence_provider_reads).toBe(2);
+    const recoveryEvent = await env.DB.prepare(
+      `SELECT status, payload_json FROM manifest_shadow_stage_events
+       WHERE shadow_run_id = ? AND event_key = 'incomplete_preparation_replayed' LIMIT 1`,
+    ).bind(runId).first<JsonRecord>();
+    expect(recoveryEvent?.status).toBe("completed");
+    expect(parseJsonRecord(recoveryEvent?.payload_json).recovery_action).toBe("rebuild_exact_operation_in_place");
   });
 
   it("forbids live evidence access before an Innovation run begins", async () => {
