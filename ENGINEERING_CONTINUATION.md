@@ -11,7 +11,7 @@ validated_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 documentation_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 production_sha: d2166702b0868d32f63cb4eb314dea75984715ec
 active_interrupt_id: 8aadc401-58ba-489a-8891-b61b96ecb6e0
-active_interrupt_state: reconciling
+active_interrupt_state: repairing
 active_interrupt_precedence: P1-manifest-cycle-event-immutable-conflict
 
 
@@ -338,11 +338,13 @@ state: resolved
 incident_id: `8aadc401-58ba-489a-8891-b61b96ecb6e0`
 cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
 batch_operation_id: `manifest-main-live-2026-07-31-batch-wave02-00-03-v1`
-state: reconciling
+state: repairing
 
-- A safe two-candidate Main Cycle persistence call for `2026-08-01T00:00` and `2026-08-01T03:00` returned `manifest_cycle_event_immutable_conflict` with unknown side-effect state.
-- Blind replay is forbidden. The cycle, strategy, exact plan items, and previously scheduled posts remain authoritative.
-- Immediate action: read authoritative cycle coverage and plan-item states to determine which, if any, candidates persisted; then isolate the conflicting event key and payload, repair immutable event idempotency with focused regression ownership, deploy the exact validated SHA, and selectively replay only unresolved slots.
+- A safe two-candidate Main Cycle persistence call for `2026-08-01T00:00` and `2026-08-01T03:00` returned `manifest_cycle_event_immutable_conflict`.
+- Authoritative reconciliation proved midnight persisted as scheduled post `804`; `2026-08-01T03:00` remains planned. Midnight must not be replayed.
+- Exact root cause: the 03:00 candidate reused ordinal operation ID `manifest-main-live-2026-07-31-slot-03-v1`, which had already been bound to the earlier 23:00 rejected candidate. The immutable event ledger correctly refused to let one operation identity represent two slots.
+- Permanent prevention: every remaining Main Cycle candidate and batch operation ID must include its exact local slot date and hour. Ordinal-only slot identities are forbidden. Reconciliation is mandatory before any replay after an immutable conflict.
+- Current action: selectively persist only `2026-08-01T03:00` with a new slot-key-based operation identity, verify the immutable conflict closes through live success, then continue the same cycle.
 - The Innovation Cycle remains untouched.
 
 ## Resolved Interrupt — P1 Main Batch Cloudflare Subrequest Limit
