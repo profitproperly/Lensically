@@ -264,10 +264,10 @@ export async function handleOperatorHourlyCoverageService(
     cycle_scheduled_post_ids: coverageState.scheduled_post_ids,
                 coverage_ledger_drift_repaired: ledgerDrift,
     cycle_displaced_plan_item_repaired: displacedPlanItemRepaired,
-    cycle_completion: cycleCompletion,
-    cycle_locked_source_plan: lockedSourcePlan,
+        cycle_completion: cycleCompletion,
     cycle_locked_source_plan_count: lockedSourcePlan.length,
         next_cycle_plan_item: nextCyclePlanItem
+
 
       ? {
           ...nextCyclePlanItem,
@@ -277,9 +277,9 @@ export async function handleOperatorHourlyCoverageService(
     next_cycle_plan_items: nextCyclePlanItems,
     next_cycle_plan_items_count: nextCyclePlanItems.length,
   };
-    const coverageEventPayload = { ...coverageResponse };
-  delete coverageEventPayload.cycle_locked_source_plan;
+        const coverageEventPayload = { ...coverageResponse };
   delete coverageEventPayload.next_cycle_plan_items;
+
 
   await dependencies.appendCycleEvent({
     cycleId,

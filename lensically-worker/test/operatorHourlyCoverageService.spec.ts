@@ -175,13 +175,9 @@ describe("Operator hourly coverage product service", () => {
       cycle_id: "cycle-1",
       cycle_authoritative_remaining_missing_count: 1,
             coverage_ledger_drift_repaired: true,
-      cycle_locked_source_plan_count: 1,
-      cycle_locked_source_plan: [{
-        slot_key: nextSlot.key,
-        source_card_id: "card-1",
-        source_card_family_id: "family-1",
-      }],
+            cycle_locked_source_plan_count: 1,
             next_cycle_plan_item: { id: "plan-2", nearby_avoid: ["money-question"] },
+
       next_cycle_plan_items_count: 1,
       next_cycle_plan_items: [{ id: "plan-2", source_card_id: "card-1", nearby_avoid: ["money-question"] }],
     });
@@ -189,10 +185,10 @@ describe("Operator hourly coverage product service", () => {
         expect(mocks.appendCycleEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: "coverage:coverage-op-1",
       eventType: "coverage_reconciled",
-      payload: expect.not.objectContaining({
-        cycle_locked_source_plan: expect.anything(),
+            payload: expect.not.objectContaining({
         next_cycle_plan_items: expect.anything(),
       }),
+
     }));
 
 
