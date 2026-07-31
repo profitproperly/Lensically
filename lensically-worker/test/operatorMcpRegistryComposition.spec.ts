@@ -82,7 +82,7 @@ describe("Operator MCP registry composition", () => {
   it("builds all three scoped account wrapper surfaces without brand_key", () => {
     const directTools = buildComposedOperatorMcpTools(false);
     const scopedTools = buildComposedOperatorMcpTools(true);
-                expect(scopedTools).toHaveLength(directTools.length + (61 * 3));
+                    expect(scopedTools).toHaveLength(directTools.length + (62 * 3));
 
     for (const prefix of ["mm", "om", "vx"]) {
       const wrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_post_results`);
@@ -90,7 +90,15 @@ describe("Operator MCP registry composition", () => {
       expect(wrapper?.inputSchema.properties).not.toHaveProperty("brand_key");
       expect(wrapper?.inputSchema.properties).toHaveProperty("proceed_confirmed");
       expect(wrapper?.inputSchema.properties).toHaveProperty("operation_id");
-      expect(wrapper?.annotations).toMatchObject({ readOnlyHint: true });
+            expect(wrapper?.annotations).toMatchObject({ readOnlyHint: true });
+
+      const lineupWrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_manifest_locked_lineup_page`);
+      expect(lineupWrapper).toBeDefined();
+      expect(lineupWrapper?.inputSchema.properties).not.toHaveProperty("brand_key");
+      expect(lineupWrapper?.inputSchema.properties).toHaveProperty("cycle_id");
+      expect(lineupWrapper?.inputSchema.properties).toHaveProperty("offset");
+      expect(lineupWrapper?.inputSchema.properties).toHaveProperty("limit");
+      expect(lineupWrapper?.annotations).toMatchObject({ readOnlyHint: true });
     }
   });
 });
