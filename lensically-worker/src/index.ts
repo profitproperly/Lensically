@@ -979,8 +979,9 @@ function compactManifestRollingEvidence(value: unknown): Record<string, unknown>
       page_index: 0,
       items: [],
       items_included: false,
-      retrieval_tool: "get_manifest_cycle_analysis_page",
-      retrieval_required: Number(snapshot.page_count ?? 0) > 0,
+            retrieval_tool: "get_manifest_cycle_analysis_page",
+      detail_available: Number(snapshot.page_count ?? 0) > 0,
+      retrieval_required: false,
       pagination: {
         page_size: pagination.page_size ?? snapshot.page_size ?? null,
         page_count: pagination.page_count ?? snapshot.page_count ?? 0,
@@ -993,9 +994,9 @@ function compactManifestRollingEvidence(value: unknown): Record<string, unknown>
         required_page_count: consumption.required_page_count ?? snapshot.page_count ?? 0,
         complete: consumption.complete === true,
       },
-      instruction: Number(snapshot.page_count ?? 0) > 0
-        ? "Call get_manifest_cycle_analysis_page starting at page_index 0 and continue through every page. Preparation does not count any page as consumed."
-        : "No post-evidence pages exist for this snapshot; strategy may use the explicit evidence-incomplete state.",
+            instruction: Number(snapshot.page_count ?? 0) > 0
+        ? "Use the compact Main Cycle decision bundle for routine strategy work. Read only the specific evidence detail page identified when decision_bundle.requires_detail_read is true; never sweep every page by default."
+        : "No post-evidence detail pages exist for this snapshot; use the compact decision bundle and its explicit evidence state.",
     },
   };
 }
@@ -1013,15 +1014,38 @@ export function compactManifestAutonomousPreparationPayload(
   const persistence = payload.persistence_contract && typeof payload.persistence_contract === "object" && !Array.isArray(payload.persistence_contract)
     ? payload.persistence_contract as Record<string, unknown>
     : null;
-  const canonicalPersistence = persistence?.tool === "persist_manifest_autonomous_post"
-    ? persistence
+    const canonicalPersistence = persistence?.preferred_tool === "persist_manifest_autonomous_batch"
+    ? {
+        preferred_tool: "persist_manifest_autonomous_batch",
+        fallback_tool: persistence.fallback_tool ?? "persist_manifest_autonomous_post",
+        candidates_per_batch: persistence.candidates_per_batch ?? { minimum: 1, maximum: 4 },
+        generation_wave_size: Number(persistence.generation_wave_size ?? 8),
+        uninterrupted_until_terminal_or_blocked: persistence.uninterrupted_until_terminal_or_blocked !== false,
+        regenerate_rejected_slots_only: persistence.regenerate_rejected_slots_only !== false,
+        model_orchestrated: persistence.model_orchestrated !== false,
+        preserve_existing_schedule: persistence.preserve_existing_schedule !== false,
+        exact_missing_slots_only: persistence.exact_missing_slots_only !== false,
+        source_backed_generation_only: true,
+        internal_gate_fanout: persistence.internal_gate_fanout === true,
+        internal_runway_scan: persistence.internal_runway_scan === true,
+        threads_api_during_persistence: persistence.threads_api_during_persistence === true,
+        complete_lineage_required: persistence.complete_lineage_required !== false,
+      }
     : {
-        tool: "persist_manifest_autonomous_post",
-        posts_per_call: 1,
+        preferred_tool: "persist_manifest_autonomous_batch",
+        fallback_tool: "persist_manifest_autonomous_post",
+        candidates_per_batch: { minimum: 1, maximum: 4 },
+        generation_wave_size: 8,
+        uninterrupted_until_terminal_or_blocked: true,
+        regenerate_rejected_slots_only: true,
         model_orchestrated: true,
         preserve_existing_schedule: true,
         exact_missing_slots_only: true,
         source_backed_generation_only: true,
+        internal_gate_fanout: false,
+        internal_runway_scan: false,
+        threads_api_during_persistence: false,
+        complete_lineage_required: true,
       };
   if (payload.success !== true || !cycle || !rollingEvidence || !cycle.id || !cycle.operation_id) return null;
 
@@ -1264,7 +1288,8 @@ export function compactManifestAutonomousPreparationPayload(
         strategy_version_id: cycle.strategy_version_id ?? null,
         exposure_snapshot_id: cycle.exposure_snapshot_id ?? null,
       },
-      reconciliation_contract: payload.reconciliation_contract ?? {},
+            reconciliation_contract: payload.reconciliation_contract ?? {},
+      persistence_contract: canonicalPersistence,
       payload_contract: {
         server_bounded: true,
         model_payload_sizing: false,
