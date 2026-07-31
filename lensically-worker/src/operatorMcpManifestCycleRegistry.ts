@@ -117,7 +117,7 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "commit_manifest_cycle_strategy",
     title: "Lock Manifest cycle strategy",
-                description: "Using the compact versioned decision bundle returned by the Main Cycle prepare tool and the complete paged backend-locked lineup returned by get_manifest_locked_lineup_page, persist exactly one account-wide strategy without changing any source-to-slot assignment. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts, substitute sources, or form source-independent hypotheses. A bounded evidence-page detail read is allowed only when the bundle flags genuine ambiguity. Replaying an identical strategy is safe; a conflicting second strategy is blocked."
+                description: "Using the compact versioned decision bundle returned by the Main Cycle prepare tool and the complete paged backend-locked lineup returned by get_manifest_locked_lineup_page, persist exactly one account-wide strategy without changing any source-to-slot assignment. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts, substitute sources, or form source-independent hypotheses. A bounded evidence-page detail read is allowed only when the bundle flags genuine ambiguity. Replaying an identical strategy is safe; a conflicting second strategy is blocked.",
     inputSchema: {
       type: "object",
       properties: {

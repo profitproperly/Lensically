@@ -533,7 +533,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "persists successful siblings and reconciles coverage once for a bounded four-post batch",
       "release_scope": "operator-content",
-            "live_verification": "The exact deployed Main Cycle tool accepts one to four closed-schema locked-plan candidates, preserves each item operation ID and complete durable gates, source, hypothesis, experiment, decision, schedule, and lineage evidence, keeps successful siblings when another candidate fails, returns compact accepted identity and lineage proof plus exact rejected slots and reasons, performs exactly one authoritative coverage and cycle-completion reconciliation, and reports persistence and reconciliation timing as telemetry only."
+            "live_verification": "The exact deployed Main Cycle tool accepts one to four closed-schema locked-plan candidates, preserves each item operation ID and complete durable gates, source, hypothesis, experiment, decision, schedule, and lineage evidence, keeps successful siblings when another candidate fails, returns compact accepted identity and lineage proof plus exact rejected slots and reasons, performs exactly one authoritative coverage and cycle-completion reconciliation, and reports persistence and reconciliation timing as telemetry only.",
       "compatibility_bridge": false
     },
         {
