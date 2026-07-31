@@ -274,7 +274,22 @@ describe("Manifest autonomous clock and horizon", () => {
     expect(compacted?.rolling_evidence).toMatchObject({
       snapshot: { id: "snapshot-1", page_count: 51, maturity_refresh: { due_checkpoint_count: 7 } },
     });
-    expect(compacted?.persistence_contract).toMatchObject({ tool: "persist_manifest_autonomous_post", posts_per_call: 1 });
+        expect(compacted?.persistence_contract).toMatchObject({
+      preferred_tool: "persist_manifest_autonomous_batch",
+      fallback_tool: "persist_manifest_autonomous_post",
+      candidates_per_batch: { minimum: 1, maximum: 4 },
+      generation_wave_size: 8,
+      uninterrupted_until_terminal_or_blocked: true,
+      regenerate_rejected_slots_only: true,
+      preserve_existing_schedule: true,
+      exact_missing_slots_only: true,
+      complete_lineage_required: true,
+    });
+    expect((compacted?.rolling_evidence as Record<string, unknown>).first_page).toMatchObject({
+      retrieval_required: false,
+      detail_available: true,
+      instruction: expect.stringContaining("never sweep every page by default"),
+    });
     expect(compacted?.payload_contract).toMatchObject({ server_bounded: true, actionable_autonomous_cycle_preserved: true });
     const contract = compacted?.payload_contract as Record<string, unknown>;
     expect(Number(contract.returned_bytes)).toBeLessThanOrEqual(Number(contract.byte_limit));
