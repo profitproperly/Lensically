@@ -645,8 +645,9 @@ export async function constructOperatorManifestAutonomousCycle(
         "publishing_stalled",
       ],
       stale_operation_refresh: true,
-      after_four_posts_tool: "get_hourly_coverage",
-      collision_behavior: "Treat an occupied slot as nonfatal, preserve it, refresh coverage, move the candidate to the next authoritative missing slot with a new slot operation id, and continue.",
+            after_four_posts_tool: null,
+      batch_coverage_reconciliation: "persist_manifest_autonomous_batch reconciles authoritative Main Cycle coverage exactly once after each accepted one-to-four candidate batch; do not call get_hourly_coverage or prepare a second cycle between accepted batches.",
+      collision_behavior: "Treat an occupied slot as nonfatal, preserve it, use the batch reconciliation result to identify the next authoritative missing slot, regenerate or move only the affected candidate with a new slot operation id, and continue without replaying successful siblings.",
     },
     persistence_contract: {
       tool: "persist_manifest_autonomous_post",
