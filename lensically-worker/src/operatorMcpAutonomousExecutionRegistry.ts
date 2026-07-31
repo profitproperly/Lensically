@@ -207,7 +207,7 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[
   {
     name: "persist_manifest_autonomous_batch",
             title: "Persist Manifest autonomous batch",
-    description: "Persist one to four exact locked-plan Main Cycle candidates in one server-bounded call. Every item retains its own operation ID, plan item, source lineage, deterministic backend gates, hypothesis, experiment assignment, decision influence, schedule row, and complete durable lineage. A failed item does not roll back or hide successful siblings. Successful items return compact identity and lineage proof instead of echoing already persisted evidence; rejected items retain exact slots, reasons, and retryability for selective regeneration. The server reconciles authoritative cycle coverage exactly once after all accepted items and returns candidate-persistence, reconciliation, and total elapsed timing as telemetry only, never as a correctness gate. Default generation is eight candidates persisted through two four-item calls.",
+        description: "Persist one or two exact locked-plan Main Cycle candidates in one server-bounded call. The production limit of two protects Cloudflare Worker subrequest capacity while every item retains its own operation ID, plan item, source lineage, deterministic backend gates, hypothesis, experiment assignment, decision influence, schedule row, and complete durable lineage. A failed item does not roll back or hide successful siblings. Successful items return compact identity and lineage proof instead of echoing already persisted evidence; rejected items retain exact slots, reasons, and retryability for selective regeneration. The server reconciles authoritative cycle coverage exactly once after all accepted items and returns candidate-persistence, reconciliation, and total elapsed timing as telemetry only, never as a correctness gate. Default generation is eight candidates persisted through four two-item calls. This Main Cycle limit does not change the isolated Innovation Cycle batch contract.",
     inputSchema: {
       type: "object",
       properties: {
@@ -218,7 +218,7 @@ export const OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOLS: OperatorMcpToolDefinition[
         candidates: {
           type: "array",
           minItems: 1,
-          maxItems: 4,
+                    maxItems: 2,
           items: manifestBatchCandidateSchema,
         },
       },

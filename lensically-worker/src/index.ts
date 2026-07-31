@@ -1034,7 +1034,7 @@ export function compactManifestAutonomousPreparationPayload(
     : {
         preferred_tool: "persist_manifest_autonomous_batch",
         fallback_tool: "persist_manifest_autonomous_post",
-        candidates_per_batch: { minimum: 1, maximum: 4 },
+                candidates_per_batch: { minimum: 1, maximum: 2 },
         generation_wave_size: 8,
         uninterrupted_until_terminal_or_blocked: true,
         regenerate_rejected_slots_only: true,

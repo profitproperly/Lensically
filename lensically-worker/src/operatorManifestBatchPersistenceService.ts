@@ -101,14 +101,17 @@ export async function persistOperatorManifestBatch(
       retryable: false,
     };
   }
-    if (candidates.length < 1 || candidates.length > 4) {
+        if (candidates.length < 1 || candidates.length > 2) {
     return {
       success: false,
-      error: "manifest_persistence_batch_size_must_be_1_to_4",
+      error: "main_manifest_persistence_batch_size_must_be_1_to_2",
       candidate_count: candidates.length,
+      maximum_safe_candidate_count: 2,
+      prevention_reason: "Cloudflare Worker subrequest budget for production gate, lineage, schedule, and reconciliation writes.",
       retryable: false,
     };
   }
+
 
   const startedAtMs = dependencies.nowMs();
   const itemResults: JsonRecord[] = [];
