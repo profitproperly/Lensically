@@ -147,29 +147,13 @@ export type ManifestShadowFrozenSeedInput = {
   evidence: JsonRecord;
 };
 
-async function ensureManifestShadowFrozenSeedTable(db: D1Database): Promise<void> {
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS manifest_shadow_frozen_seeds (
-       id TEXT PRIMARY KEY,
-       brand_key TEXT NOT NULL UNIQUE,
-       contract_version TEXT NOT NULL,
-       source_as_of TEXT NOT NULL,
-       snapshot_hash TEXT NOT NULL,
-       source_count INTEGER NOT NULL,
-       source_candidates_json TEXT NOT NULL,
-       evidence_json TEXT NOT NULL,
-       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-     )`,
-  ).run();
-}
+
 
 export async function writeManifestShadowFrozenSeed(
   db: D1Database,
   input: ManifestShadowFrozenSeedInput,
 ): Promise<JsonRecord> {
-  await ensureManifestShadowFrozenSeedTable(db);
-  const id = input.id ?? crypto.randomUUID();
+    const id = input.id ?? crypto.randomUUID();
   await db.prepare(
     `INSERT INTO manifest_shadow_frozen_seeds (
        id, brand_key, contract_version, source_as_of, snapshot_hash,
@@ -204,8 +188,7 @@ export async function readManifestShadowFrozenSeed(
   db: D1Database,
   brandKey: string,
 ): Promise<JsonRecord | null> {
-  await ensureManifestShadowFrozenSeedTable(db);
-  const row = await db.prepare(
+    const row = await db.prepare(
     `SELECT * FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
   ).bind(brandKey).first<JsonRecord>();
   if (!row) return null;
