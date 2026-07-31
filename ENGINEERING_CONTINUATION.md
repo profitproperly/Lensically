@@ -298,10 +298,10 @@ Definition of done:
 
 ## Current Action
 
-1. Stop. Do not run interrupted replay or 48-slot recovery.
-2. Review the completed 24-slot quality and timing result with the owner.
-3. Only after a new explicit owner instruction, run one separate clean timed `recovery_48` acceptance and stop again for review.
-4. Keep `manifest-innovation-main-mimic-parity` open until all later owner-authorized definition-of-done stages pass.
+1. Run one separate clean timed `recovery_48` acceptance now under the owner's explicit instruction.
+2. Start timing at the fresh `prepare_manifest_shadow_cycle` call and include preparation, strategy lock, genuine model generation, twelve four-item persistence batches, gates, lineage verification, reconciliation, and cleanup.
+3. Fail closed unless the frozen snapshot and deterministic selector parity pass, all 48 exact locked source-card-backed slots complete, Main reads and writes remain zero after import, Threads requests and mutations remain zero, cleanup orphans remain zero, and the terminal benchmark passes its strict timing ceiling.
+4. Read the terminal receipt, durably record the result, then stop for owner review. Do not run interrupted replay or close the overall parity job in the same turn.
 
 ## Deferred Work — INACTIVE
 
