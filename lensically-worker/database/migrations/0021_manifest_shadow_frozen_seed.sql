@@ -1,3 +1,9 @@
+-- lensically-migration-class: schema
+-- lensically-migration-owner: release-engineering
+-- lensically-migration-risk: low
+
+-- Persistent real-source seed packages for isolated Manifest Innovation runs.
+
 CREATE TABLE IF NOT EXISTS manifest_shadow_frozen_seeds (
   id TEXT PRIMARY KEY,
   brand_key TEXT NOT NULL UNIQUE,
