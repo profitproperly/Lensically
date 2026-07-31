@@ -4,6 +4,7 @@ type JsonRecord = Record<string, unknown>;
 
 export const OPERATOR_MANIFEST_CYCLE_SERVICE_TOOL_NAMES = [
   "get_manifest_cycle_analysis_page",
+  "get_manifest_locked_lineup_page",
     "get_manifest_cycle_receipt",
   "get_manifest_intelligence_foundation",
   "get_performance_learning",
