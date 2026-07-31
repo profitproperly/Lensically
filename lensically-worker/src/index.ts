@@ -112,9 +112,8 @@ import {
   isOperatorManifestShadowToolName,
 } from "./operatorManifestShadowRuntimeService";
 import {
-  buildManifestShadowScenarioSlots,
+    buildManifestShadowScenarioSlots,
   readManifestShadowEvidence,
-  resolveManifestShadowSourceCandidates,
 } from "./operatorManifestShadowEvidenceService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
@@ -12199,8 +12198,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       },
     }, {
             snapshotDb: env.SHADOW_DB,
-      shadowDb: env.SHADOW_DB,
+            shadowDb: env.SHADOW_DB,
       codeSha: normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 80, true) ?? "unreleased",
+      requireFrozenSeed: true,
       now: () => new Date(),
       buildSlots: async (input) => buildManifestShadowScenarioSlots({
         now: new Date(),
@@ -12209,13 +12209,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         scenario: input.scenario,
         requestedMissingCount: input.requestedMissingCount,
       }),
-            loadSourceCandidates: async (productionReadOnlyDb, brandKey, asOf) => resolveManifestShadowSourceCandidates(
-        await loadLockedSourceCardSelectionCandidates(
-          productionReadOnlyDb,
-          brandKey,
-          asOf,
-        ),
+                        loadSourceCandidates: (productionReadOnlyDb, brandKey, asOf) => loadLockedSourceCardSelectionCandidates(
+        productionReadOnlyDb,
         brandKey,
+        asOf,
       ),
       selectSourceLineup: (input) => selectSourceFamilyLineup(input),
             readEvidence: ({ snapshotReadOnlyDb, brandKey, threadsUserId, nowIso, evidenceMode }) => readManifestShadowEvidence(

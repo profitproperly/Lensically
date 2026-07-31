@@ -76,11 +76,13 @@ export const OPERATOR_MCP_DIRECT_PRIORITIES = new Map<string, number>([
   ["record_manifest_cycle_defect", 13],
   ["resolve_manifest_cycle_defect", 13],
   ["get_manifest_cycle_analysis_page", 14],
-    ["commit_manifest_cycle_strategy", 15],
+      ["commit_manifest_cycle_strategy", 15],
+  ["seed_manifest_shadow_snapshot", 14],
   ["prepare_manifest_shadow_cycle", 15],
   ["commit_manifest_shadow_cycle_strategy", 16],
   ["persist_manifest_shadow_batch", 17],
   ["get_manifest_shadow_cycle_receipt", 15],
+  ["get_manifest_shadow_posts", 15],
     ["prepare_manifest_autonomous_cycle", 16],
   ["persist_manifest_autonomous_batch", 17],
   ["persist_manifest_autonomous_post", 18],
@@ -105,10 +107,12 @@ export function isOperatorMcpEngineeringToolName(
 
 const PROCEED_EXEMPT_ACCOUNT_TOOL_NAMES = new Set<string>([
   "list_accounts",
+  "seed_manifest_shadow_snapshot",
   "prepare_manifest_shadow_cycle",
   "commit_manifest_shadow_cycle_strategy",
     "persist_manifest_shadow_batch",
   "get_manifest_shadow_cycle_receipt",
+  "get_manifest_shadow_posts",
   "persist_manifest_autonomous_batch",
 ]);
 

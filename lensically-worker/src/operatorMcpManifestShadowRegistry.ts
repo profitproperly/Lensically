@@ -2,6 +2,25 @@ import { BRAND_KEY_SCHEMA } from "./operatorMcpSchemas";
 import type { OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
 import { MANIFEST_SHADOW_TEST_CASES } from "./operatorManifestShadowRuntimeService";
 
+const SHADOW_SEED_SOURCE_SCHEMA = {
+  type: "object",
+  properties: {
+    source_identity_key: { type: "string" },
+    internal_source_id: { type: "string" },
+    saved_pattern_id: { anyOf: [{ type: "integer" }, { type: "string" }] },
+    text: { type: "string", minLength: 8, maxLength: 3000 },
+    source_url: { type: "string" },
+    source_mechanism: { type: "string" },
+    required_product: { type: "string" },
+    recommended_direction: { type: "string" },
+    semantic_key: { type: "string" },
+    metrics: { type: "object", additionalProperties: true },
+    primary_source: { type: "object", additionalProperties: true },
+  },
+  required: ["source_identity_key", "text"],
+  additionalProperties: false,
+} as const;
+
 const SHADOW_LINEUP_ITEM_SCHEMA = {
   type: "object",
   properties: {
@@ -53,13 +72,32 @@ const SHADOW_CANDIDATE_SCHEMA = {
 } as const;
 
 export const OPERATOR_MCP_MANIFEST_SHADOW_TOOL_NAMES = [
+  "seed_manifest_shadow_snapshot",
   "prepare_manifest_shadow_cycle",
   "commit_manifest_shadow_cycle_strategy",
   "persist_manifest_shadow_batch",
   "get_manifest_shadow_cycle_receipt",
+  "get_manifest_shadow_posts",
 ] as const;
 
 export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
+  {
+    name: "seed_manifest_shadow_snapshot",
+    title: "Seed genuine Manifest Shadow snapshot",
+    description: "Import a frozen package of genuine source text and evidence into isolated SHADOW_DB by value. This tool never writes Main and does not expose a Main database binding to the subsequent benchmark.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        source_as_of: { type: "string" },
+        sources: { type: "array", minItems: 24, maxItems: 192, items: SHADOW_SEED_SOURCE_SCHEMA },
+        evidence: { type: "object", additionalProperties: true },
+      },
+      required: ["brand_key", "source_as_of", "sources", "evidence"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
   {
     name: "prepare_manifest_shadow_cycle",
     title: "Prepare isolated Manifest Shadow Cycle",
@@ -125,10 +163,25 @@ export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "get_manifest_shadow_cycle_receipt",
     title: "Get Manifest Shadow Cycle receipt",
     description: "Read one isolated shadow run, stage timings, compact benchmark, cleanup evidence, and state summary without returning generated post text by default.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        shadow_run_id: { type: "string" },
+      },
+      required: ["brand_key", "shadow_run_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_manifest_shadow_posts",
+    title: "Get exact Manifest Shadow posts",
+    description: "Read every exact accepted post from one isolated Shadow run in slot order, including its source lineage and scheduled-shaped timestamp.",
     inputSchema: {
       type: "object",
       properties: {
