@@ -172,7 +172,7 @@ export function chunkManifestShadowJsonPayload(
   if (encoded.byteLength === 0) {
     return [{ chunk_index: 0, chunk_text: "", byte_length: 0 }];
   }
-  const decoder = new TextDecoder("utf-8", { fatal: true });
+    const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
   const chunks: ManifestShadowJsonChunk[] = [];
   let offset = 0;
   while (offset < encoded.byteLength) {
