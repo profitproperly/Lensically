@@ -31,6 +31,8 @@ const operatorMcpStrategyScheduleRegistryTests = read("test/operatorMcpStrategyS
 const operatorMcpManifestCycleRegistry = read("src/operatorMcpManifestCycleRegistry.ts");
 const operatorMcpManifestCycleRegistryTests = read("test/operatorMcpManifestCycleRegistry.spec.ts");
 const operatorMcpManifestShadowRegistry = read("src/operatorMcpManifestShadowRegistry.ts");
+const operatorManifestDecisionSnapshotService = read("src/operatorManifestDecisionSnapshotService.ts");
+const operatorManifestDecisionSnapshotServiceTests = read("test/operatorManifestDecisionSnapshotService.spec.ts");
 const operatorManifestShadowRuntimeService = read("src/operatorManifestShadowRuntimeService.ts");
 const operatorManifestShadowService = read("src/operatorManifestShadowService.ts");
 const operatorManifestShadowRuntimeServiceTests = read("test/operatorManifestShadowRuntimeService.spec.ts");
@@ -784,9 +786,30 @@ if (!operatorMcpToolDirectoryTests.includes("preserves the exact 80-tool public 
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
 }
-if (!source.includes("snapshotDb: env.SHADOW_DB")
+if (!source.includes("snapshotDb: env.DB")
+    || !source.includes("shadowDb: env.SHADOW_DB")
+    || !source.includes("minimumEligibleFamilies: 100")
+    || !source.includes('from "./operatorManifestDecisionSnapshotService"')
+    || !source.includes('from "./operatorManifestShadowService"')
+    || source.includes("snapshotDb: env.SHADOW_DB")
     || source.includes("productionDb: env.DB,\n      shadowDb: env.SHADOW_DB")) {
   lifecycleErrors.push("manifest_innovation_main_database_boundary_invalid");
+}
+if (!operatorManifestDecisionSnapshotService.includes("MANIFEST_DECISION_SNAPSHOT_VERSION")
+    || !operatorManifestDecisionSnapshotService.includes("buildManifestDecisionSnapshot")
+    || !operatorManifestDecisionSnapshotService.includes("readManifestShadowProductionFingerprint")
+    || !operatorManifestDecisionSnapshotService.includes("manifest_decision_snapshot_zero_write_proof_failed")
+    || !operatorManifestDecisionSnapshotService.includes("buildManifestDecisionScenarioOverlay")
+    || !operatorManifestDecisionSnapshotService.includes("compareManifestDecisionSelectorParity")
+    || !operatorManifestDecisionSnapshotService.includes("candidate_pool_requirement_passed")
+    || !operatorManifestDecisionSnapshotService.includes("ranked_order_match")
+    || !operatorManifestDecisionSnapshotService.includes("selected_lineup_match")) {
+  lifecycleErrors.push("manifest_innovation_decision_snapshot_contract_incomplete");
+}
+if (!operatorManifestDecisionSnapshotServiceTests.includes("builds a 24-slot schedule-only overlay without changing evidence")
+    || !operatorManifestDecisionSnapshotServiceTests.includes("proves exact Main-equivalent selector parity across 120 real families")
+    || !operatorManifestDecisionSnapshotServiceTests.includes("detects selector divergence before generation")) {
+  lifecycleErrors.push("manifest_innovation_decision_snapshot_regressions_incomplete");
 }
 if (!operatorMcpManifestShadowRegistry.includes('evidence_mode: { type: "string", enum: ["snapshot"]')
     || operatorMcpManifestShadowRegistry.includes('enum: ["snapshot", "live_read"]')) {
@@ -794,7 +817,13 @@ if (!operatorMcpManifestShadowRegistry.includes('evidence_mode: { type: "string"
 }
 if (operatorManifestShadowRuntimeService.includes("dependencies.productionDb")
     || operatorManifestShadowRuntimeService.includes('state.test_case === "live_read_zero_mutation"')
-    || !operatorManifestShadowRuntimeService.includes("manifest_innovation_live_access_forbidden")) {
+    || !operatorManifestShadowRuntimeService.includes("manifest_innovation_live_access_forbidden")
+    || !operatorManifestShadowRuntimeService.includes("createManifestShadowReadOnlyDatabase(dependencies.snapshotDb)")
+    || !operatorManifestShadowRuntimeService.includes("manifest_decision_snapshot_import_hash_mismatch")
+    || !operatorManifestShadowRuntimeService.includes("main_disconnected_after_import: true")
+    || !operatorManifestShadowRuntimeService.includes("manifest_decision_snapshot_candidate_pool_insufficient")
+    || !operatorManifestShadowRuntimeService.includes("manifest_decision_scenario_overlay_overreach")
+    || !operatorManifestShadowRuntimeService.includes("manifest_decision_selector_parity_failed")) {
   lifecycleErrors.push("manifest_innovation_runtime_isolation_invalid");
 }
 if (operatorManifestShadowService.includes("writeManifestShadowBenchmarkReceipt(\n  productionDb")
