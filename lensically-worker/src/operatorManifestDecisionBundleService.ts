@@ -504,9 +504,174 @@ export async function buildManifestDecisionBundle(
     bundleJson = stableJson(bundle);
     payloadBytes = new TextEncoder().encode(bundleJson).byteLength;
   }
-  if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
-    throw new Error(`manifest_decision_bundle_too_large:${payloadBytes}`);
+    if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
+    bundleCompactionLevel = 4;
+    const snapshotForBundle = record(bundle.snapshot);
+    const benchmarkScalars = Object.fromEntries(
+      Object.entries(record(snapshotForBundle.benchmarks))
+        .filter(([, value]) => value === null || ["string", "number", "boolean"].includes(typeof value))
+        .slice(0, 24)
+        .map(([key, value]) => [key, typeof value === "string" ? compactText(value, 160) : value]),
+    );
+    const exposure = record(bundle.recent_and_future_exposure);
+    const accountPosition = record(exposure.account_position);
+    const accountScalars = Object.fromEntries(
+      Object.entries(accountPosition)
+        .filter(([, value]) => value === null || ["string", "number", "boolean"].includes(typeof value))
+        .slice(0, 20)
+        .map(([key, value]) => [key, typeof value === "string" ? compactText(value, 160) : value]),
+    );
+    const compactEvidencePost = (post: JsonRecord): JsonRecord => {
+      const classification = record(post.classification);
+      return {
+        published_post_id: post.published_post_id,
+        text: compactText(post.text, 160),
+        published_at: post.published_at,
+        primary_likes: finite(post.primary_likes),
+        family_key: classification.family_key ?? classification.source_card_family_id ?? null,
+        lifetime_label: classification.lifetime_label ?? null,
+        recent_label: classification.recent_label ?? null,
+      };
+    };
+    bundle.snapshot = {
+      source_hash: snapshotForBundle.source_hash,
+      evidence_contract_version: snapshotForBundle.evidence_contract_version,
+      page_count: finite(snapshotForBundle.page_count),
+      post_count: finite(snapshotForBundle.post_count),
+      mature_count: finite(snapshotForBundle.mature_count),
+      immature_count: finite(snapshotForBundle.immature_count),
+      incomplete_count: finite(snapshotForBundle.incomplete_count),
+      benchmarks: benchmarkScalars,
+      page_hashes: records(snapshotForBundle.page_hashes).map((page) => ({
+        page_index: finite(page.page_index),
+        page_hash: page.page_hash,
+      })),
+    };
+    bundle.strongest_mature_posts = records(bundle.strongest_mature_posts).slice(0, 3).map(compactEvidencePost);
+    bundle.weakest_mature_posts = records(bundle.weakest_mature_posts).slice(0, 3).map(compactEvidencePost);
+    bundle.family_performance_and_confidence = records(bundle.family_performance_and_confidence)
+      .sort((left, right) => Number(right.selected_for_cycle === true) - Number(left.selected_for_cycle === true))
+      .slice(0, 12)
+      .map((family) => ({
+        source_card_family_id: family.source_card_family_id,
+        lifetime_label: family.lifetime_label,
+        recent_label: family.recent_label,
+        confidence_label: family.confidence_label,
+        lifetime_index: family.lifetime_index,
+        recent_index: family.recent_index,
+        selected_for_cycle: family.selected_for_cycle === true,
+      }));
+    bundle.recent_and_future_exposure = {
+      exposure_snapshot_id: exposure.exposure_snapshot_id ?? null,
+      account_position: accountScalars,
+      authoritative_missing_slots: records(exposure.authoritative_missing_slots).map((slot) => ({
+        key: slot.key ?? slot.slot_key,
+        date: slot.date ?? null,
+        time: slot.time ?? null,
+      })),
+    };
+    bundle.locked_source_plan = records(bundle.locked_source_plan).map((plan) => ({
+      slot_key: plan.slot_key,
+      selection_order: plan.selection_order,
+      source_identity_key: plan.source_identity_key,
+      source_card_family_id: plan.source_card_family_id,
+      source_card_id: plan.source_card_id,
+      engine_version: plan.engine_version,
+    }));
+    bundle.active_experiments = records(bundle.active_experiments).slice(0, 2).map((experiment) => ({
+      id: experiment.id,
+      experiment_key: experiment.experiment_key,
+      family_key: experiment.family_key,
+      status: experiment.status,
+      follow_up_decision: compactText(experiment.follow_up_decision, 160) || null,
+    }));
+    bundle.unresolved_evidence_gaps = records(bundle.unresolved_evidence_gaps).map((gap) => ({
+      gap_key: gap.gap_key,
+      count: gap.count ?? null,
+      source_card_family_ids: Array.isArray(gap.source_card_family_ids)
+        ? gap.source_card_family_ids.slice(0, 12)
+        : undefined,
+    }));
+    bundle.hard_bans = records(bundle.hard_bans).map((ban) => ({ rule_key: ban.rule_key }));
+    bundle.required_directives = {
+      primary_metric: "24_hour_likes",
+      source_backed_generation_only: true,
+      original_model_sources_forbidden: true,
+      exact_locked_plan_required: true,
+      deterministic_gates_server_owned: true,
+    };
+    const strategyAuthority = record(bundle.current_strategy_authority);
+    bundle.current_strategy_authority = Object.keys(strategyAuthority).length
+      ? {
+          id: strategyAuthority.id,
+          version: strategyAuthority.version,
+          contract_version: strategyAuthority.contract_version,
+          strategy_hash: strategyAuthority.strategy_hash,
+          status: strategyAuthority.status,
+          source_cycle_id: strategyAuthority.source_cycle_id,
+        }
+      : null;
+    bundle.bundle_compaction = {
+      level: 4,
+      reason: "payload_budget",
+      complete_locked_source_plan_preserved: true,
+      detail_pages_available_for_ambiguity: true,
+    };
+    bundleJson = stableJson(bundle);
+    payloadBytes = new TextEncoder().encode(bundleJson).byteLength;
   }
+  if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
+    bundleCompactionLevel = 5;
+    const snapshotForBundle = record(bundle.snapshot);
+    const exposure = record(bundle.recent_and_future_exposure);
+    bundle.snapshot = {
+      source_hash: snapshotForBundle.source_hash,
+      evidence_contract_version: snapshotForBundle.evidence_contract_version,
+      page_count: finite(snapshotForBundle.page_count),
+      post_count: finite(snapshotForBundle.post_count),
+      mature_count: finite(snapshotForBundle.mature_count),
+      immature_count: finite(snapshotForBundle.immature_count),
+      incomplete_count: finite(snapshotForBundle.incomplete_count),
+      page_hashes: records(snapshotForBundle.page_hashes).map((page) => page.page_hash),
+    };
+    const evidenceIdentityOnly = (post: JsonRecord): JsonRecord => ({
+      published_post_id: post.published_post_id,
+      primary_likes: finite(post.primary_likes),
+      family_key: post.family_key ?? null,
+      lifetime_label: post.lifetime_label ?? null,
+      recent_label: post.recent_label ?? null,
+    });
+    bundle.strongest_mature_posts = records(bundle.strongest_mature_posts).slice(0, 3).map(evidenceIdentityOnly);
+    bundle.weakest_mature_posts = records(bundle.weakest_mature_posts).slice(0, 3).map(evidenceIdentityOnly);
+    bundle.family_performance_and_confidence = records(bundle.family_performance_and_confidence)
+      .filter((family) => family.selected_for_cycle === true)
+      .slice(0, 8);
+    bundle.recent_and_future_exposure = {
+      exposure_snapshot_id: exposure.exposure_snapshot_id ?? null,
+      authoritative_missing_slots: records(exposure.authoritative_missing_slots).map((slot) => ({ key: slot.key })),
+    };
+    bundle.locked_source_plan = records(bundle.locked_source_plan).map((plan) => ({
+      slot_key: plan.slot_key,
+      selection_order: plan.selection_order,
+      source_identity_key: plan.source_identity_key,
+      source_card_family_id: plan.source_card_family_id,
+      source_card_id: plan.source_card_id,
+    }));
+    bundle.active_experiments = [];
+    bundle.hard_bans = records(bundle.hard_bans).map((ban) => ban.rule_key);
+    bundle.bundle_compaction = {
+      level: 5,
+      reason: "payload_budget_essential_identity_only",
+      complete_locked_source_plan_preserved: true,
+      detail_pages_required_for_evidence_text: true,
+    };
+    bundleJson = stableJson(bundle);
+    payloadBytes = new TextEncoder().encode(bundleJson).byteLength;
+  }
+  if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
+    throw new Error(`manifest_decision_bundle_too_large_after_essential_compaction:${payloadBytes}`);
+  }
+
 
   const bundleHash = await sha256(bundle);
   const id = crypto.randomUUID();

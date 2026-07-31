@@ -141,15 +141,21 @@ describe("operatorManifestDecisionBundleService", () => {
          ) VALUES (?, ?, ?, 'manifest-evidence-snapshot-test-v1',
            '2026-07-30T19:00:00.000Z', 'America/New_York',
            '2026-07-02T19:00:00.000Z', '2026-07-30T19:00:00.000Z',
-           0, 0, 0, 0, 12, 1, 12000, '{"median_likes":0}', 'snapshot-source-hash-48')`,
-      ).bind(snapshotId, cycleId, brandKey),
-      env.DB.prepare(
+                      0, 0, 0, 0, 12, 64, 12000, ?, 'snapshot-source-hash-48')`,
+      ).bind(
+        snapshotId,
+        cycleId,
+        brandKey,
+        JSON.stringify({ median_likes: 0, production_sized_benchmark_narrative: "b".repeat(30000) }),
+      ),
+      ...Array.from({ length: 64 }, (_, pageIndex) => env.DB.prepare(
         `INSERT INTO operator_manifest_evidence_pages (
            id, snapshot_id, cycle_id, brand_key, page_index, page_contract_version,
            item_count, byte_count, evidence_types_json, items_json
-         ) VALUES (?, ?, ?, ?, 0, 'manifest-evidence-page-test-v1', 0, 2, '[]', '[]')`,
-      ).bind(crypto.randomUUID(), snapshotId, cycleId, brandKey),
+         ) VALUES (?, ?, ?, ?, ?, 'manifest-evidence-page-test-v1', 0, 2, '[]', '[]')`,
+      ).bind(crypto.randomUUID(), snapshotId, cycleId, brandKey, pageIndex)),
       ...missingSlots.map((slot, index) => env.DB.prepare(
+
         `INSERT INTO operator_source_selection_plans (
            id, brand_key, cycle_id, slot_key, selection_order, source_identity_key,
            source_card_family_id, source_card_id, engine_version, receipt_json, status
