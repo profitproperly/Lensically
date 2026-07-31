@@ -92,6 +92,36 @@ function asRecordList(value: unknown): JsonRecord[] {
     : [];
 }
 
+function parseJson(value: unknown, fallback: unknown): unknown {
+  try {
+    return JSON.parse(String(value ?? ""));
+  } catch {
+    return fallback;
+  }
+}
+
+function compactLineupCue(value: unknown, depth = 0): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value.trim().slice(0, 800);
+  if (["number", "boolean"].includes(typeof value)) return value;
+  if (depth >= 2) {
+    if (Array.isArray(value)) return { count: value.length };
+    if (typeof value === "object") return { keys: Object.keys(value as JsonRecord).slice(0, 12) };
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 6).map((item) => compactLineupCue(item, depth + 1));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as JsonRecord)
+        .slice(0, 12)
+        .map(([key, nested]) => [key, compactLineupCue(nested, depth + 1)]),
+    );
+  }
+  return null;
+}
+
 function result(body: JsonRecord, status = 200): OperatorManifestCycleServiceResult {
   return { status, body };
 }
