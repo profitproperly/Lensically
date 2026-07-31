@@ -1,10 +1,8 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  buildAutomaticShadowCandidate,
   handleOperatorManifestShadowTool,
   type ManifestShadowEvidence,
-  type ManifestShadowRuntimeState,
   type ManifestShadowTestCase,
   type OperatorManifestShadowRuntimeDependencies,
 } from "../src/operatorManifestShadowRuntimeService";
@@ -318,7 +316,8 @@ beforeEach(async () => {
   await env.DB.prepare(`DELETE FROM manifest_shadow_diagnostic_archives`).run();
   await env.DB.prepare(`DELETE FROM manifest_shadow_stage_events`).run();
   await env.DB.prepare(`DELETE FROM manifest_shadow_snapshots`).run();
-  await env.DB.prepare(`DELETE FROM manifest_shadow_runs`).run();
+    await env.DB.prepare(`DELETE FROM manifest_shadow_runs`).run();
+  await env.DB.prepare(`DELETE FROM manifest_shadow_frozen_seeds`).run();
 });
 
 describe("operatorManifestShadowRuntimeService", () => {
@@ -705,20 +704,80 @@ describe("operatorManifestShadowRuntimeService", () => {
     }
   });
 
-  it("builds source-faithful automatic benchmark candidates", () => {
-    const state = {
-      run_id: "run",
-      locked_source_lineup: [{
-        assigned_slot_key: "2026-07-31T10:00",
-        source_card_id: "card",
-        source_card_family_id: "family",
-        text: "Universe, make the person reading this financially free.",
-      }],
-    } as unknown as ManifestShadowRuntimeState;
-    expect(buildAutomaticShadowCandidate(state, "2026-07-31T10:00", 0)).toMatchObject({
-      slot_key: "2026-07-31T10:00",
-      source_card_id: "card",
-      family_key: "family",
+    it("fails closed when live composition has no genuine frozen seed", async () => {
+    const harness = dependencyHarness();
+    const result = await prepareRun({
+      deps: { ...harness.deps, requireFrozenSeed: true },
+      scenario: "normal_24",
+      suffix: "real-seed-required",
+      horizonHours: 48,
     });
+    expect(result.status).toBe(500);
+    expect(result.body.error).toBe("manifest_shadow_real_seed_required");
+  });
+
+  it("imports genuine source text by value and prepares from Shadow only", async () => {
+    const harness = dependencyHarness();
+    const deps = { ...harness.deps, requireFrozenSeed: true };
+    const seeded = await handleOperatorManifestShadowTool({
+      toolName: "seed_manifest_shadow_snapshot",
+      payload: {
+        source_as_of: "2026-07-30T18:30:00.000Z",
+        sources: Array.from({ length: 24 }, (_, index) => ({
+          source_identity_key: `real-saved-pattern-${index}`,
+          saved_pattern_id: index + 1,
+          text: `Universe, bring the person reading this a real financial breakthrough worth celebrating ${index + 1}.`,
+          metrics: { likes: 1000 + index },
+          source_url: `https://example.test/source/${index + 1}`,
+        })),
+        evidence: evidence(),
+      },
+      identity,
+    }, deps);
+    expect(seeded.status).toBe(200);
+    expect(seeded.body.source_count).toBe(24);
+
+    const prepared = await prepareRun({
+      deps,
+      scenario: "normal_24",
+      suffix: "real-seeded-preparation",
+      horizonHours: 48,
+    });
+    expect(prepared.status).toBe(200);
+    expect(record(prepared.body.decision_bundle).genuine_source_seed).toBe(true);
+    expect(rows(record(prepared.body.decision_bundle).locked_source_lineup)).toHaveLength(24);
+    expect(harness.audit.snapshot_db_calls).toBe(0);
+  });
+
+  it("rejects synthetic placeholder text and exposes accepted post text through readback", async () => {
+    const harness = dependencyHarness();
+    const prepared = await prepareRun({ deps: harness.deps, suffix: "genuine-text-gate", missingCount: 1 });
+    await commitPrepared(harness.deps, prepared.body);
+    const locked = rows(record(prepared.body.decision_bundle).locked_source_lineup);
+    const rejected = await persistBatch(
+      harness.deps,
+      prepared.body,
+      "synthetic-placeholder-batch",
+      [candidateFor(locked[0], 0, "synthetic-placeholder", "Frozen isolated source 1. Shadow validation candidate 1.")],
+    );
+    expect(rejected.body.rejected_count).toBe(1);
+    expect(rejected.body.remaining_missing_count).toBe(1);
+
+    const accepted = await persistBatch(
+      harness.deps,
+      prepared.body,
+      "genuine-generated-batch",
+      [candidateFor(locked[0], 0, "genuine-generated", "Universe, make the person reading this financially free enough to breathe again.")],
+    );
+    expect(accepted.body.accepted_count).toBe(1);
+    const posts = await handleOperatorManifestShadowTool({
+      toolName: "get_manifest_shadow_posts",
+      payload: { shadow_run_id: prepared.body.shadow_run_id },
+      identity,
+    }, harness.deps);
+    expect(posts.status).toBe(200);
+    expect(posts.body.post_count).toBe(1);
+    expect(rows(posts.body.posts)[0].text).toBe("Universe, make the person reading this financially free enough to breathe again.");
   });
 });
+
