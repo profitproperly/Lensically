@@ -3927,10 +3927,16 @@ active_checkpoint: none
     expect(prepared.strategy_contract).toMatchObject({ fixed_percentages: false });
         expect(prepared.strategy_contract.winner_preservation).toContain("Continue using winners");
     expect(prepared.strategy_contract.winner_preservation).toContain("spacing");
-                expect(prepared.persistence_contract).toMatchObject({
-      tool: "persist_manifest_autonomous_post",
-      posts_per_call: 1,
+                                expect(prepared.persistence_contract).toMatchObject({
+      preferred_tool: "persist_manifest_autonomous_batch",
+      fallback_tool: "persist_manifest_autonomous_post",
+      candidates_per_batch: { minimum: 1, maximum: 4 },
+      generation_wave_size: 8,
+      uninterrupted_until_terminal_or_blocked: true,
+      regenerate_rejected_slots_only: true,
       model_orchestrated: true,
+      preserve_existing_schedule: true,
+      exact_missing_slots_only: true,
       internal_gate_fanout: false,
       internal_runway_scan: false,
       threads_api_during_persistence: false,
