@@ -58,7 +58,16 @@ The permanent upstream Innovation Cycle is complete and physically isolated, act
 
 ## Permanent Operating Model
 
-**Innovation leads; Main follows only after proof.**
+**Innovation Cycle leads; Main Cycle follows only after proof.**
+
+Canonical terminology and separation contract:
+
+- **Innovation Cycle** means the permanent physically isolated test-bed cycle. It remains in `SHADOW_DB`, has no Main Cycle write authority, has no production scheduling authority, and is never moved, connected, converted, or promoted into production.
+- **Main Cycle** means the live production cycle. It reads authoritative account evidence, manages the real hourly 48-hour runway, and owns production scheduling, lineage, learning, and receipts.
+- **Innovation Challenger** means one behavior, rule, orchestration improvement, or architecture being proven inside the Innovation Cycle.
+- **Main Champion** means the currently deployed behavior and architecture inside the Main Cycle.
+- **Promotion** means independently implementing a proven Innovation Challenger's behavior inside the Main Cycle. Promotion transfers proven behavior and prevention, never the Innovation Cycle runtime, database, test data, benchmark history, or isolated lineage.
+- Every engineering continuation, IMP, service description, acceptance receipt, and operator discussion must use `Innovation Cycle` or `Main Cycle` when cycle identity matters. Bare `Innovation` or `Main` shorthand may not define architecture or authority.
 
 - Manifest has exactly two cycle-level rails.
 - The **Innovation Cycle** is the permanent upstream engineering rail.
