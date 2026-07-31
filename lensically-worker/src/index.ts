@@ -12554,8 +12554,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
          JOIN operator_source_selections s ON s.id = p.source_selection_id AND s.brand_key = p.brand_key
          LEFT JOIN operator_source_exclusions e
            ON e.brand_key = p.brand_key AND e.source_identity_key = s.source_identity_key AND e.active = 1
-         WHERE p.cycle_id = ? AND p.brand_key = ? AND p.slot_key = ? AND p.status = 'planned'
-           AND c.status = 'locked' AND e.source_identity_key IS NULL
+                  WHERE p.cycle_id = ? AND p.brand_key = ? AND p.slot_key = ? AND p.status = 'planned'
+           AND c.status = 'locked' AND c.is_current = 1 AND e.source_identity_key IS NULL
+
          LIMIT 1`,
       ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>(),
       repairMissingPlanItem: async ({ cycleId, brandKey, slotKey, operationId, asOf }) => {
@@ -12578,13 +12579,116 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
              JOIN operator_source_selections s ON s.id = p.source_selection_id AND s.brand_key = p.brand_key
              LEFT JOIN operator_source_exclusions e
                ON e.brand_key = p.brand_key AND e.source_identity_key = s.source_identity_key AND e.active = 1
-             WHERE p.id = ? AND c.status = 'locked' AND e.source_identity_key IS NULL
+                          WHERE p.id = ? AND c.status = 'locked' AND c.is_current = 1 AND e.source_identity_key IS NULL
              LIMIT 1`,
           ).bind(existingPlanItem.id).first<{ id: string }>();
           if (eligibleExistingSource?.id) return existingPlanItem;
+
+          const currentSourceVersion = await env.DB.prepare(
+            `SELECT c.id, c.family_id, c.source_selection_id, c.required_product,
+                    c.recommended_direction, s.source_identity_key
+             FROM operator_source_cards c
+             JOIN operator_source_selections s
+               ON s.id = c.source_selection_id AND s.brand_key = c.brand_key
+             LEFT JOIN operator_source_exclusions e
+               ON e.brand_key = c.brand_key AND e.source_identity_key = s.source_identity_key AND e.active = 1
+             WHERE c.brand_key = ? AND c.source_selection_id = ?
+               AND c.status = 'locked' AND c.is_current = 1
+               AND e.source_identity_key IS NULL
+             ORDER BY c.version_number DESC
+             LIMIT 1`,
+          ).bind(brandKey, existingPlanItem.source_selection_id).first<Record<string, unknown>>();
+          const currentSourceCardId = normalizeOperatorText(currentSourceVersion?.id, 160, true);
+          if (currentSourceCardId && currentSourceCardId !== String(existingPlanItem.source_card_id ?? "")) {
+            const currentFamilyId = normalizeOperatorText(currentSourceVersion?.family_id, 160, true)
+              ?? normalizeOperatorText(existingPlanItem.family_key, 160, true)
+              ?? "unknown-family";
+            const currentSourceIdentityKey = normalizeOperatorText(currentSourceVersion?.source_identity_key, 400, true);
+            const versionRefreshReceipt = normalizeOperatorJson({
+              reason: "superseded_source_card_version_refreshed",
+              prior_source_card_id: existingPlanItem.source_card_id ?? null,
+              current_source_card_id: currentSourceCardId,
+              source_selection_id: existingPlanItem.source_selection_id ?? null,
+              source_identity_key: currentSourceIdentityKey,
+            }, {});
+            await env.DB.batch([
+              env.DB.prepare(
+                `UPDATE operator_source_selection_plans
+                 SET source_card_family_id = ?, source_card_id = ?, engine_version = ?,
+                     receipt_json = ?, status = 'locked'
+                 WHERE brand_key = ? AND cycle_id = ? AND slot_key = ? AND status = 'locked'`,
+              ).bind(
+                currentFamilyId,
+                currentSourceCardId,
+                SOURCE_SELECTION_ENGINE_VERSION,
+                versionRefreshReceipt,
+                brandKey,
+                cycleId,
+                slotKey,
+              ),
+              env.DB.prepare(
+                `UPDATE operator_source_selection_receipts
+                 SET source_card_family_id = ?, source_card_id = ?, engine_version = ?, receipt_json = ?
+                 WHERE brand_key = ? AND scope_type = 'cycle' AND scope_id = ? AND slot_key = ?`,
+              ).bind(
+                currentFamilyId,
+                currentSourceCardId,
+                SOURCE_SELECTION_ENGINE_VERSION,
+                versionRefreshReceipt,
+                brandKey,
+                cycleId,
+                slotKey,
+              ),
+              env.DB.prepare(
+                `UPDATE operator_manifest_cycle_plan_items
+                 SET family_key = ?, strategic_role = 'source_version_refresh',
+                     source_card_id = ?, audience_reward = ?, hook_direction = ?,
+                     placement_reason = 'Refreshed to the current locked version of the same canonical source.',
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ? AND strategy_id = ? AND cycle_id = ? AND brand_key = ? AND slot_key = ?`,
+              ).bind(
+                currentFamilyId,
+                currentSourceCardId,
+                normalizeOperatorText(currentSourceVersion?.required_product, 2000, true)
+                  ?? normalizeOperatorText(existingPlanItem.audience_reward, 2000, true)
+                  ?? "The canonical source-card reward.",
+                normalizeOperatorText(currentSourceVersion?.recommended_direction, 2000, true)
+                  ?? normalizeOperatorText(existingPlanItem.hook_direction, 2000, true)
+                  ?? "Preserve the canonical hook, structure, premise, and payoff.",
+                existingPlanItem.id,
+                existingPlanItem.strategy_id,
+                cycleId,
+                brandKey,
+                slotKey,
+              ),
+            ]);
+            await appendManifestCycleEvent(env.DB, {
+              cycleId,
+              brandKey,
+              eventKey: `source-version-refresh:${slotKey}:${operationId}`,
+              eventType: "cycle_plan_source_version_refreshed",
+              slotKey,
+              payload: {
+                prior_source_card_id: existingPlanItem.source_card_id ?? null,
+                current_source_card_id: currentSourceCardId,
+                source_selection_id: existingPlanItem.source_selection_id ?? null,
+                source_identity_key: currentSourceIdentityKey,
+              },
+            });
+            return env.DB.prepare(
+              `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+                      family_key, strategic_role, generation_mode, source_kind, source_card_id,
+                      source_selection_id, audience_reward, hook_direction, placement_reason,
+                      nearby_avoid_json, exploration_mode, status
+               FROM operator_manifest_cycle_plan_items
+               WHERE cycle_id = ? AND brand_key = ? AND slot_key = ? AND status = 'planned'
+               LIMIT 1`,
+            ).bind(cycleId, brandKey, slotKey).first<Record<string, unknown>>();
+          }
         }
 
         const lockedPlan = await readLockedSourceSelectionPlan(env.DB, brandKey, cycleId);
+
         const displacedPlan = lockedPlan.find((row) => String(row.slot_key ?? "") === slotKey);
         if (!displacedPlan) return null;
         const exclusionRows = await env.DB.prepare(

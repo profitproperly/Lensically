@@ -1563,8 +1563,12 @@ if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page
 if (!source.includes('from "./operatorHourlyCoverageService"')
     || !source.includes("get_hourly_coverage: async () =>")
         || !source.includes("handleOperatorHourlyCoverageService({")
-    || !source.includes("SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,")
-    || !source.includes("source_selection_id, audience_reward, hook_direction, placement_reason,")) {
+        || !source.includes("SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,")
+    || !source.includes("source_selection_id, audience_reward, hook_direction, placement_reason,")
+    || !source.includes("c.status = 'locked' AND c.is_current = 1")
+    || !source.includes("superseded_source_card_version_refreshed")
+    || !source.includes("cycle_plan_source_version_refreshed")) {
+
   lifecycleErrors.push("operator_hourly_coverage_service_import_or_binding_missing");
 }
 
