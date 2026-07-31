@@ -78,10 +78,20 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
     });
   });
 
-    it("preserves complete decision-bundle consumption and source-backed strategy locking", () => {
+        it("preserves compact decision-bundle consumption, ambiguity-only detail, and locked-lineup paging", () => {
     const page = tool("get_manifest_cycle_analysis_page");
     expect(page.inputSchema.required).toEqual(["brand_key", "cycle_id", "snapshot_id", "page_index"]);
-    expect(page.description).toContain("page 0 through the final page");
+    expect(page.description).toContain("only when decision_bundle.requires_detail_read is true");
+    expect(page.description).not.toContain("page 0 through the final page");
+
+    const lineupPage = tool("get_manifest_locked_lineup_page");
+    expect(lineupPage.inputSchema.required).toEqual(["brand_key", "cycle_id"]);
+    expect(lineupPage.inputSchema.properties).toMatchObject({
+      offset: { type: "integer", minimum: 0, default: 0 },
+      limit: { type: "integer", minimum: 1, maximum: 12, default: 12 },
+    });
+    expect(lineupPage.description).toContain("Main Cycle");
+    expect(lineupPage.description).toContain("Do not replace locked sources");
 
     const strategy = tool("commit_manifest_cycle_strategy");
     expect(strategy.description).toContain("complete versioned decision bundle");
