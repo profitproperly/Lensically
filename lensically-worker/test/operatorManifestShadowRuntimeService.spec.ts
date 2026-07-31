@@ -838,7 +838,7 @@ describe("operatorManifestShadowRuntimeService", () => {
     const harness = dependencyHarness(clock);
         const prepared = await prepareRun({ deps: harness.deps, scenario: "normal_24", suffix: "latency-terminal", horizonHours: 48 });
     expect(prepared.status).toBe(200);
-    clock.setTime(clock.getTime() + 7 * 60_000);
+        clock.setTime(clock.getTime() + 11 * 60_000);
     const failedReceipt = await completePrepared(harness.deps, prepared.body, "latency-terminal");
     expect(Number(benchmarkFrom(failedReceipt).raw.passed)).toBe(0);
     expect(record(record(failedReceipt.receipt).run).status).toBe("failed");
