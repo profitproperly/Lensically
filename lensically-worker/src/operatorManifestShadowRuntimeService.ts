@@ -7,10 +7,12 @@ import {
   createManifestShadowNoThreadsMutationAdapter,
   createManifestShadowReadOnlyDatabase,
   failManifestShadowRun,
+    readManifestShadowFrozenSeed,
   readManifestShadowReceipt,
   recordManifestShadowStageEvent,
   resetManifestShadowWorkspace,
   seedManifestShadowSnapshot,
+  writeManifestShadowFrozenSeed,
   verifyManifestShadowOrphans,
   writeManifestShadowBenchmarkReceipt,
   type ManifestShadowBenchmarkInput,
@@ -21,10 +23,12 @@ import type { SourceSelectionCandidate, SourceSelectionReceipt } from "./sourceF
 type JsonRecord = Record<string, unknown>;
 
 export const OPERATOR_MANIFEST_SHADOW_TOOL_NAMES = [
+  "seed_manifest_shadow_snapshot",
   "prepare_manifest_shadow_cycle",
   "commit_manifest_shadow_cycle_strategy",
   "persist_manifest_shadow_batch",
   "get_manifest_shadow_cycle_receipt",
+  "get_manifest_shadow_posts",
 ] as const;
 
 export type OperatorManifestShadowToolName = typeof OPERATOR_MANIFEST_SHADOW_TOOL_NAMES[number];
@@ -116,6 +120,7 @@ export interface OperatorManifestShadowRuntimeDependencies {
     snapshotDb: D1Database;
   shadowDb: D1Database;
   codeSha: string;
+  requireFrozenSeed?: boolean;
   now(): Date;
   buildSlots(input: {
     timezone: string;
@@ -186,6 +191,86 @@ function firstLine(value: unknown): string {
 
 function durationMs(startedMs: number): number {
   return Math.max(0, Date.now() - startedMs);
+}
+
+const SYNTHETIC_SHADOW_TEXT = /\b(?:frozen isolated source|shadow validation(?: candidate)?|clean shadow candidate|shadow fixture)\b/i;
+
+function isSyntheticShadowPlaceholder(value: unknown): boolean {
+  return SYNTHETIC_SHADOW_TEXT.test(String(value ?? ""));
+}
+
+function normalizeSeedEvidence(value: unknown, nowIso: string): ManifestShadowEvidence {
+  const input = record(value);
+  return {
+    captured_at: stringValue(input.captured_at, nowIso),
+    strategy: Object.keys(record(input.strategy)).length ? record(input.strategy) : null,
+    learning_brief: Object.keys(record(input.learning_brief)).length ? record(input.learning_brief) : null,
+    content_focus: Object.keys(record(input.content_focus)).length ? record(input.content_focus) : null,
+    hard_bans: records(input.hard_bans),
+    strongest_posts: records(input.strongest_posts),
+    weakest_posts: records(input.weakest_posts),
+    recent_published: records(input.recent_published),
+    future_scheduled: records(input.future_scheduled),
+    evidence_gaps: records(input.evidence_gaps),
+    production_fingerprint: record(input.production_fingerprint),
+    freshness: {
+      evidence_mode: "snapshot",
+      captured_at: stringValue(input.captured_at, nowIso),
+      stale: false,
+      bounded_delta_refresh_required: false,
+      ...record(input.freshness),
+    },
+  };
+}
+
+async function buildFrozenSeedCandidates(sources: JsonRecord[]): Promise<SourceSelectionCandidate[]> {
+  const candidates: SourceSelectionCandidate[] = [];
+  const identities = new Set<string>();
+  for (let index = 0; index < sources.length; index += 1) {
+    const source = sources[index];
+    const text = stringValue(source.text ?? record(source.primary_source).post_text);
+    const sourceIdentityKey = stringValue(source.source_identity_key);
+    if (!text || text.length < 8) throw new Error(`manifest_shadow_seed_source_text_required:${index}`);
+    if (!sourceIdentityKey) throw new Error(`manifest_shadow_seed_source_identity_required:${index}`);
+    if (isSyntheticShadowPlaceholder(text)) throw new Error(`manifest_shadow_seed_placeholder_forbidden:${index}`);
+    if (identities.has(sourceIdentityKey)) throw new Error(`manifest_shadow_seed_source_identity_duplicate:${sourceIdentityKey}`);
+    identities.add(sourceIdentityKey);
+    const identityHash = (await sha256(sourceIdentityKey)).slice(0, 24);
+    const metrics = record(source.metrics);
+    const likes = Math.max(0, Number(metrics.likes ?? 0));
+    candidates.push({
+      source_candidate_id: `shadow-seed-candidate-${identityHash}`,
+      source_identity_key: sourceIdentityKey,
+      source_card_family_id: `shadow-seed-family-${identityHash}`,
+      source_card_id: `shadow-seed-card-${identityHash}`,
+      source_type: "source_card",
+      internal_source_id: stringValue(source.internal_source_id ?? source.saved_pattern_id, identityHash),
+      source_mechanism: source.source_mechanism ?? "source_faithful_saved_pattern_adaptation",
+      required_product: source.required_product ?? "Preserve the source hook, structure, meaning, tone, and payoff.",
+      recommended_direction: source.recommended_direction ?? "Create a close, brand-safe, source-faithful Manifest adaptation without inventing a new premise.",
+      text,
+      metrics,
+      primary_source: {
+        ...record(source.primary_source),
+        post_text: text,
+        source_url: source.source_url ?? record(source.primary_source).source_url ?? null,
+        saved_pattern_id: source.saved_pattern_id ?? source.internal_source_id ?? null,
+      },
+      lifetime_label: likes >= 1000 ? "proven" : "prospect",
+      recent_label: "healthy",
+      confidence_label: likes >= 1000 ? "reliable" : "low",
+      lifetime_sample_size: likes >= 1000 ? 1 : 0,
+      recent_sample_size: 0,
+      lifetime_index: likes >= 1000 ? 1 + Math.log10(likes / 1000 + 1) : 1,
+      recent_index: null,
+      uses_24h: 0,
+      uses_7d: 0,
+      uses_28d: 0,
+      hours_since_last_use: null,
+      semantic_key: stringValue(source.semantic_key, `seed:${identityHash}`),
+    });
+  }
+  return candidates;
 }
 
 async function sha256(value: string): Promise<string> {
@@ -328,7 +413,10 @@ function deterministicGateCandidate(
     expected_source_card_id: lineup?.source_card_id ?? null,
     received_source_card_id: sourceCardId || null,
   });
-  add("candidate_text_present", normalized.length >= 8, { normalized_length: normalized.length });
+    add("candidate_text_present", normalized.length >= 8, { normalized_length: normalized.length });
+  add("genuine_model_generation", !isSyntheticShadowPlaceholder(text), {
+    placeholder_detected: isSyntheticShadowPlaceholder(text),
+  });
   add("exact_duplicate", !acceptedTexts.has(normalized), { duplicate: acceptedTexts.has(normalized) });
 
   const hardBanFailures = state.evidence.hard_bans
@@ -790,6 +878,52 @@ async function finalizeBenchmark(
   return { ...benchmark, passed, production_noninterference_passed: productionNoninterferencePassed };
 }
 
+async function seedShadowSnapshot(
+  payload: JsonRecord,
+  identity: { brandKey: string; accountId: string; threadsUserId: string },
+  dependencies: OperatorManifestShadowRuntimeDependencies,
+): Promise<{ body: JsonRecord; status: number }> {
+  if (identity.brandKey !== "manifest_mental") return { body: { success: false, error: "manifest_shadow_manifest_only" }, status: 400 };
+  const sources = records(payload.sources);
+  if (sources.length < 24) return { body: { success: false, error: "manifest_shadow_seed_requires_24_sources" }, status: 400 };
+  const sourceAsOf = stringValue(payload.source_as_of, dependencies.now().toISOString());
+  try {
+    const sourceCandidates = await buildFrozenSeedCandidates(sources);
+    const evidence = normalizeSeedEvidence(payload.evidence, sourceAsOf);
+    const snapshotHash = await sha256(stableJson({
+      contract_version: "manifest-shadow-frozen-seed-v1",
+      brand_key: identity.brandKey,
+      source_as_of: sourceAsOf,
+      source_candidates: sourceCandidates,
+      evidence,
+    }));
+    const seed = await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
+      brand_key: identity.brandKey,
+      source_as_of: sourceAsOf,
+      snapshot_hash: snapshotHash,
+      source_candidates: sourceCandidates as unknown as JsonRecord[],
+      evidence: evidence as unknown as JsonRecord,
+    });
+    return {
+      body: {
+        success: true,
+        seed,
+        source_count: sourceCandidates.length,
+        snapshot_hash: snapshotHash,
+        main_write_count: 0,
+        threads_mutation_count: 0,
+        next_action: "Prepare a fresh isolated Shadow cycle. The benchmark will read only this frozen Shadow seed.",
+      },
+      status: 200,
+    };
+  } catch (error) {
+    return {
+      body: { success: false, error: error instanceof Error ? error.message : String(error) },
+      status: 400,
+    };
+  }
+}
+
 async function prepareShadowCycle(
   payload: JsonRecord,
   identity: { brandKey: string; accountId: string; threadsUserId: string },
@@ -848,19 +982,30 @@ async function prepareShadowCycle(
     retention_hours: Number(payload.retention_hours ?? 72),
   }, nowIso);
     try {
-    const evidenceStarted = Date.now();
+        const evidenceStarted = Date.now();
     const snapshotReadOnlyDb = createManifestShadowReadOnlyDatabase(dependencies.snapshotDb);
-    const [slotPlan, loadedCandidates, initialEvidence] = await Promise.all([
-      dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount }),
-      dependencies.loadSourceCandidates(snapshotReadOnlyDb, identity.brandKey, nowIso),
-      dependencies.readEvidence({
+    const frozenSeed = dependencies.requireFrozenSeed
+      ? await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey)
+      : null;
+    if (dependencies.requireFrozenSeed && !frozenSeed) {
+      throw new Error("manifest_shadow_real_seed_required");
+    }
+    const slotPlan = await dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount });
+    const loadedCandidates = frozenSeed
+      ? records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[]
+      : await dependencies.loadSourceCandidates(snapshotReadOnlyDb, identity.brandKey, nowIso);
+    const initialEvidence = frozenSeed
+      ? normalizeSeedEvidence(frozenSeed.evidence, stringValue(frozenSeed.source_as_of, nowIso))
+      : await dependencies.readEvidence({
         snapshotReadOnlyDb,
         brandKey: identity.brandKey,
         threadsUserId: identity.threadsUserId,
         nowIso,
         evidenceMode,
-      }),
-    ]);
+      });
+    if (dependencies.requireFrozenSeed && loadedCandidates.length < requestedMissingCount) {
+      throw new Error(`manifest_shadow_real_seed_insufficient:${loadedCandidates.length}:${requestedMissingCount}`);
+    }
     let candidates = loadedCandidates;
     let evidence = initialEvidence;
     let deltaRefreshCount = 0;
@@ -929,14 +1074,19 @@ async function prepareShadowCycle(
     }
     const lockedLineup = selection.selected as Array<SourceSelectionCandidate & { assigned_slot_key?: string }>;
     const decisionBundleStarted = Date.now();
-    const decisionBundle = buildDecisionBundle({
+        const decisionBundle = buildDecisionBundle({
       runId,
       evidence,
       missingSlots,
       lockedLineup,
       selectionSummary: selection.summary,
     });
-    const snapshotHash = await sha256(stableJson({ evidence, candidates, slotPlan }));
+    if (frozenSeed) {
+      decisionBundle.frozen_seed_snapshot_hash = frozenSeed.snapshot_hash ?? null;
+      decisionBundle.frozen_seed_source_as_of = frozenSeed.source_as_of ?? null;
+      decisionBundle.genuine_source_seed = true;
+    }
+    const snapshotHash = await sha256(stableJson({ evidence, candidates, slotPlan, frozen_seed_snapshot_hash: frozenSeed?.snapshot_hash ?? null }));
     decisionBundle.snapshot_hash = snapshotHash;
         const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
     decisionBundle.bundle_id = decisionBundleId;
@@ -1530,6 +1680,47 @@ function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): 
   };
 }
 
+async function getShadowPosts(
+  payload: JsonRecord,
+  identity: { brandKey: string; accountId: string; threadsUserId: string },
+  dependencies: OperatorManifestShadowRuntimeDependencies,
+): Promise<{ body: JsonRecord; status: number }> {
+  const runId = stringValue(payload.shadow_run_id);
+  if (!runId) return { body: { success: false, error: "shadow_run_id_required" }, status: 400 };
+  const run = await dependencies.shadowDb.prepare(
+    `SELECT id, brand_key, status FROM manifest_shadow_runs WHERE id = ? LIMIT 1`,
+  ).bind(runId).first<JsonRecord>();
+  if (!run || run.brand_key !== identity.brandKey) return { body: { success: false, error: "manifest_shadow_run_not_found" }, status: 404 };
+  const state = await readState(dependencies.shadowDb, runId);
+  if (!state) return { body: { success: false, error: "manifest_shadow_state_not_found" }, status: 404 };
+  const posts = [...state.accepted_posts]
+    .sort((left, right) => stringValue(left.slot_key).localeCompare(stringValue(right.slot_key)))
+    .map((post) => ({
+      slot_key: post.slot_key ?? null,
+      scheduled_time_utc: post.scheduled_time_utc ?? null,
+      scheduled_post_id: post.scheduled_post_id ?? null,
+      text: post.text ?? null,
+      source_card_id: post.source_card_id ?? null,
+      source_card_family_id: post.source_card_family_id ?? null,
+      source_identity_key: post.source_identity_key ?? null,
+      publish_lineage_complete: post.publish_lineage_complete === true,
+      intelligence_lineage_complete: post.intelligence_lineage_complete === true,
+    }));
+  return {
+    body: {
+      success: true,
+      shadow_run_id: runId,
+      status: run.status,
+      post_count: posts.length,
+      posts,
+      main_read_count: Number(state.counters.main_read_count ?? 0),
+      main_write_count: Number(state.counters.main_write_count ?? 0),
+      threads_mutation_count: state.threads_mutation_count,
+    },
+    status: 200,
+  };
+}
+
 async function getShadowReceipt(
   payload: JsonRecord,
   identity: { brandKey: string; accountId: string; threadsUserId: string },
@@ -1592,15 +1783,21 @@ export async function handleOperatorManifestShadowTool(
   },
   dependencies: OperatorManifestShadowRuntimeDependencies,
 ): Promise<{ body: JsonRecord; status: number }> {
-  await cleanupManifestShadowMetadata(dependencies.shadowDb, dependencies.now().toISOString());
+    await cleanupManifestShadowMetadata(dependencies.shadowDb, dependencies.now().toISOString());
+  if (input.toolName === "seed_manifest_shadow_snapshot") {
+    return seedShadowSnapshot(input.payload, input.identity, dependencies);
+  }
   if (input.toolName === "prepare_manifest_shadow_cycle") {
     return prepareShadowCycle(input.payload, input.identity, dependencies);
   }
   if (input.toolName === "commit_manifest_shadow_cycle_strategy") {
     return commitShadowStrategy(input.payload, input.identity, dependencies);
   }
-  if (input.toolName === "persist_manifest_shadow_batch") {
+    if (input.toolName === "persist_manifest_shadow_batch") {
     return persistShadowBatch(input.payload, input.identity, dependencies);
+  }
+  if (input.toolName === "get_manifest_shadow_posts") {
+    return getShadowPosts(input.payload, input.identity, dependencies);
   }
   return getShadowReceipt(input.payload, input.identity, dependencies);
 }
@@ -1609,33 +1806,4 @@ export function isOperatorManifestShadowToolName(value: string): value is Operat
   return (OPERATOR_MANIFEST_SHADOW_TOOL_NAMES as readonly string[]).includes(value);
 }
 
-export function buildAutomaticShadowCandidate(
-  state: ManifestShadowRuntimeState,
-  slotKey: string,
-  ordinal: number,
-): JsonRecord {
-  const source = state.locked_source_lineup.find((item) => String(item.assigned_slot_key ?? "") === slotKey);
-  const sourceText = stringValue(source?.text, `The Universe is aligning a meaningful breakthrough for the person reading this ${ordinal + 1}.`);
-  const text = sourceText.length <= 500
-    ? `${sourceText}\n\nShadow validation ${ordinal + 1}`
-    : sourceText.slice(0, 490);
-  return {
-    operation_id: `${state.run_id}:${slotKey}:auto`,
-    slot_key: slotKey,
-    source_card_id: source?.source_card_id ?? null,
-    family_key: source?.source_card_family_id ?? null,
-    text,
-    adaptation_plan: {
-      adaptation_goal: "Source-faithful shadow validation candidate.",
-      preserved_functions: ["hook", "premise", "payoff"],
-      transformed_elements: ["bounded wording"],
-    },
-    model_evaluation: {
-      novelty_assessment: "Distinct from the frozen recent opening inventory.",
-      winner_preservation_assessment: "Preserves the selected source mechanism and payoff.",
-      slot_placement_assessment: `Uses the exact locked slot ${slotKey}.`,
-      recent_exposure_assessment: "Checked against the decision bundle exposure inventory.",
-      intelligence_application_assessment: "Applies the locked source and current strategy directives.",
-    },
-  };
-}
+
