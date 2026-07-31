@@ -9,7 +9,7 @@ active_job_id: null
 active_checkpoint: null
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: d8b054bd74da62b1fdc8264d13b467ef1323baa6
+production_sha: 1c7eb296caa64fd6faa0d8b4eb20a3612290bda4
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -141,6 +141,9 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Refreshed live schema exposed `prepare_manifest_shadow_cycle`, `commit_manifest_shadow_cycle_strategy`, `persist_manifest_shadow_batch`, and `get_manifest_shadow_cycle_receipt`.
 - Isolated no-op Innovation smoke `shadow-44b04fd9fa27e6d1cfacebe4b0c5f432` completed at deployed SHA `d8b054bd74da62b1fdc8264d13b467ef1323baa6` with snapshot `5d798ec4925a330f4c509e4a6ad44eb45d99162932186a9fa45faa2f159f1433`.
 - Durable benchmark receipt `7e151f8c-8f8a-4e3a-b65b-125a572c1cd1` passed in 7,043 ms against the 30-second ceiling with 48/48 occupied, zero generation, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans.
+- Terminal closure exposed a continuation metadata parser defect: `completed` was outside the accepted status enum and literal `null` values were returned as strings. Commit `1c7eb296caa64fd6faa0d8b4eb20a3612290bda4` added `completed` and `closing` support, normalized null sentinels, and added regression coverage.
+- Typecheck run `30592947007` and all 8/8 Operator shards in run `30592956587` passed at exact SHA `1c7eb296caa64fd6faa0d8b4eb20a3612290bda4`.
+- Exact-SHA release run `30593011028` succeeded. Live `getEngineeringContinuation` now returns `status=completed`, `active_job_id=null`, and `active_checkpoint=null`.
 
 ## Deferred Work — INACTIVE
 
