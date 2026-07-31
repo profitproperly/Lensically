@@ -53,7 +53,31 @@ function publicCandidateResult(
   result: OperatorManifestBatchCandidateResult,
 ): JsonRecord {
   const { batch_reconciliation_context: _internalContext, ...publicResult } = result;
-  return { index, ...publicResult };
+  if (result.success !== true) {
+    return { index, ...publicResult };
+  }
+  const lineage = record(result.lineage);
+  return {
+    index,
+    success: true,
+    reused: result.reused === true,
+    operation_id: result.operation_id ?? null,
+    slot_key: result.slot_key ?? null,
+    scheduled_post_id: Number(result.scheduled_post_id ?? 0),
+    scheduled_time_utc: result.scheduled_time_utc ?? null,
+    publish_lineage_complete: result.publish_lineage_complete === true,
+    intelligence_lineage_complete: result.intelligence_lineage_complete === true,
+    lineage: {
+      source_selection_id: lineage.source_selection_id ?? null,
+      source_card_id: lineage.source_card_id ?? null,
+      source_card_family_id: lineage.source_card_family_id ?? null,
+      generation_run_id: lineage.generation_run_id ?? null,
+      draft_id: lineage.draft_id ?? null,
+      hypothesis_id: lineage.hypothesis_id ?? null,
+      strategy_version_id: lineage.strategy_version_id ?? result.strategy_version_id ?? null,
+    },
+    coverage_reconciliation_deferred: result.coverage_reconciliation_deferred === true,
+  };
 }
 
 export async function persistOperatorManifestBatch(
