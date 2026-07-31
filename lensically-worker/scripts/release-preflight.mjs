@@ -3574,8 +3574,9 @@ const manifestAutonomousGrowthChecks = [
     ["source_only_regression", manifestAutonomousTests.includes("rejects model-originated sources and accepts canonical source-card lineage")],
   ["likes_first_regression", manifestAutonomousTests.includes("builds mature likes-first benchmarks and excludes immature evidence")],
   ["byte_bounded_evidence_regression", manifestAutonomousTests.includes("packs every strategy evidence item into complete byte-bounded canonical pages")],
-  ["prepare_regression", systemDirectoryTests.includes("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review")],
-  ["analysis_page_regression", systemDirectoryTests.includes("reads and durably records one complete rolling evidence page without truncation")],
+    ["prepare_regression", systemDirectoryTests.includes("prepares the compact Main Cycle decision bundle and exact fixed-runway deficit without requiring owner review")],
+    ["analysis_page_regression", systemDirectoryTests.includes("reads one ambiguity-only Main Cycle evidence detail page without truncation")],
+  ["locked_lineup_regression", systemDirectoryTests.includes("pages the exact Main Cycle locked lineup without source substitution")],
   ["strategy_regression", systemDirectoryTests.includes("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup")],
     ["persist_regression", systemDirectoryTests.includes("persists one source-card-backed post through the consumed-bundle strategy and shared size-one wrapper")
     && operatorManifestBatchPersistenceServiceTests.includes("persists successful siblings and reconciles coverage once for a bounded four-post batch")],
