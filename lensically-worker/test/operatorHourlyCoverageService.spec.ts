@@ -173,8 +173,10 @@ describe("Operator hourly coverage product service", () => {
     expect(result).toMatchObject({
       observed: true,
       cycle_id: "cycle-1",
-      cycle_authoritative_remaining_missing_count: 1,
+            cycle_authoritative_remaining_missing_count: 1,
+      cycle_authoritative_remaining_missing_slots_truncated: false,
             coverage_ledger_drift_repaired: true,
+
             cycle_locked_source_plan_count: 1,
             next_cycle_plan_item: { id: "plan-2", nearby_avoid: ["money-question"] },
 

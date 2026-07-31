@@ -257,8 +257,10 @@ export async function handleOperatorHourlyCoverageService(
   coverageResponse = {
     ...coverageResult,
     cycle_id: cycleId,
-    cycle_authoritative_remaining_missing_slots: coverageState.remaining_missing_slots,
+        cycle_authoritative_remaining_missing_slots: coverageState.remaining_missing_slots.slice(0, 8),
+    cycle_authoritative_remaining_missing_slots_truncated: coverageState.remaining_missing_slots.length > 8,
     cycle_authoritative_remaining_missing_count: coverageState.remaining_missing_slots.length,
+
     cycle_elapsed_unfilled_slots: coverageState.elapsed_unfilled_slots,
     cycle_elapsed_unfilled_count: coverageState.elapsed_unfilled_slots.length,
     cycle_scheduled_post_ids: coverageState.scheduled_post_ids,
