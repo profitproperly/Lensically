@@ -510,10 +510,12 @@ describe("operatorManifestShadowRuntimeService", () => {
     const persistedSnapshot = parseJsonRecord(snapshotRow?.payload_json);
     const persistedState = record(record(persistedSnapshot.metadata).state);
     expect(rows(persistedState.source_candidates)).toHaveLength(0);
-    expect(record(persistedState.evidence)).toMatchObject({
+        expect(record(persistedState.evidence)).toMatchObject({
       externalized_to_frozen_seed: true,
       source_candidate_count: 120,
     });
+    expect(rows(record(persistedState.evidence).source_candidate_identity_keys)).toHaveLength(0);
+    expect(record(persistedState.evidence).source_candidate_identity_keys).toHaveLength(120);
     expect(Number(snapshotRow?.payload_bytes ?? 0)).toBeLessThan(500_000);
 
     const committed = await commitPrepared(harness.deps, prepared.body);

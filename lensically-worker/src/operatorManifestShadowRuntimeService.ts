@@ -342,8 +342,9 @@ function runtimeStateForPersistence(state: ManifestShadowRuntimeState): Manifest
       externalized_to_frozen_seed: true,
       storage_contract: "manifest-shadow-frozen-seed-v1",
       brand_key: state.brand_key,
-      snapshot_hash: snapshotHash,
+            snapshot_hash: snapshotHash,
       source_candidate_count: state.source_candidates.length,
+      source_candidate_identity_keys: state.source_candidates.map((candidate) => String(candidate.source_identity_key ?? "")),
     } as unknown as ManifestShadowEvidence,
   };
 }
@@ -363,7 +364,21 @@ async function readState(db: D1Database, runId: string): Promise<ManifestShadowR
   if (!expectedHash || actualHash !== expectedHash) {
     throw new Error("manifest_shadow_runtime_frozen_seed_hash_mismatch");
   }
-  const sourceCandidates = records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[];
+    const canonicalCandidates = records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[];
+  const projectedIdentityKeys = Array.isArray(persistedEvidence.source_candidate_identity_keys)
+    ? persistedEvidence.source_candidate_identity_keys.map((value) => String(value ?? ""))
+    : [];
+  let sourceCandidates = canonicalCandidates;
+  if (projectedIdentityKeys.length) {
+    const byIdentity = new Map(
+      canonicalCandidates.map((candidate) => [String(candidate.source_identity_key ?? ""), candidate]),
+    );
+    sourceCandidates = projectedIdentityKeys.map((identityKey) => {
+      const candidate = byIdentity.get(identityKey);
+      if (!candidate) throw new Error("manifest_shadow_runtime_frozen_seed_projection_missing");
+      return candidate;
+    });
+  }
   const expectedSourceCount = Number(persistedEvidence.source_candidate_count ?? sourceCandidates.length);
   if (sourceCandidates.length !== expectedSourceCount) {
     throw new Error("manifest_shadow_runtime_frozen_seed_source_count_mismatch");
