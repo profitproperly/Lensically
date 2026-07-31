@@ -6,10 +6,10 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-to-main-promotion
-active_checkpoint: stage-0-canonical-architecture-and-promotion-contract
-validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
-documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
-production_sha: 206a1839fb88d74d2bcbc0ae3a567ddea1c0f631
+active_checkpoint: stage-8-exact-release-and-live-verification
+validated_source_head: 541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3
+documentation_source_head: 541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3
+production_sha: 12f94b8f80afdae72d08fc5fd59c26414af255a0
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -356,12 +356,25 @@ Definition of done:
 - Production timing receipts separate preparation, model/client, persistence, reconciliation, and completion time without failing an otherwise correct cycle solely for latency.
 - The exact tested SHA is deployed and live Main Cycle verification passes.
 
+## VERIFIED IMPLEMENTATION CHECKPOINT — Main Cycle Champion
+
+Validated source SHA: `541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3`
+
+- The Innovation Cycle remains unchanged and physically isolated as the permanent test bed. No Innovation Cycle runtime, `SHADOW_DB` binding, scenario overlay, benchmark history, or isolated lineage was connected to the Main Cycle.
+- The Main Cycle now enforces its fixed 48-hour runway and computes exactly the actual missing 0-through-48 future slots.
+- Main Cycle preparation reuses fresh finalized intelligence, returns one compact decision bundle, exposes ambiguity-only evidence detail, and provides the exact backend-locked source-to-slot lineup through bounded twelve-item pages with canonical source cues and no source substitution.
+- Main Cycle execution is batch-first: eight-candidate generation waves, one-to-four candidate persistence calls, uninterrupted continuation, batch-owned authoritative coverage reconciliation, preservation of successful siblings, and selective regeneration of rejected or invalidated slots only.
+- Successful persistence responses are compact identity-and-lineage receipts; rejected candidates retain exact diagnostic evidence. Persistence and reconciliation duration are telemetry only and cannot fail a correct cycle solely for latency.
+- Payload compaction preserves the champion contracts instead of reverting to single-post persistence or mandatory complete evidence-page sweeps.
+- Capability lifecycle, system directory, routing policy, exact account/direct/scoped tool inventories, response compaction, dynamic runway, locked lineup, batch recovery, complete lineage, and timing telemetry have permanent regressions.
+- Exact-head push-validation run `30658591149` passed typecheck, lifecycle governance, release preflight, and all seven complete test inventories.
+
 ## Current Action
 
-1. Complete the canonical terminology and separation contract.
-2. Reconcile the exact repository and production baseline.
-3. Map the proven Innovation Challenger behavior to existing Main Cycle services.
-4. Implement the Main Cycle champion in bounded validated stages, stopping on every blocker for root-cause repair and permanent prevention.
+1. Validate the final continuation-only source head without changing the verified implementation.
+2. Deploy only that exact passing SHA through the controlled Worker release workflow.
+3. Verify production code identity, Main Cycle tool/schema availability, locked-lineup read-only classification, and champion runtime contracts without invoking the Innovation Cycle or generating production posts solely for verification.
+4. Record the deployed SHA and live verification, then close or advance the promotion job based on the verified production result.
 
 ## Deferred Work — INACTIVE
 
