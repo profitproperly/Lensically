@@ -10,9 +10,9 @@ active_checkpoint: stage-9-first-natural-main-cycle-observation
 validated_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 documentation_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 production_sha: d2166702b0868d32f63cb4eb314dea75984715ec
-active_interrupt_id: 11b9faa6-089b-48b1-8d48-7f67aa8568b2
-active_interrupt_state: repairing
-active_interrupt_precedence: P1-exact-duplicate-post
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
 
 
@@ -333,21 +333,21 @@ state: resolved
 - Authoritative reconciliation proved all four retry candidates were accepted as scheduled posts `799` through `802` with no replay required.
 - Permanent prevention: Main Cycle candidate `preserved_functions` must replay the source card's canonical statements verbatim; exact duplicates regenerate only the rejected slot.
 
-## Active Interrupt — P1 Exact Duplicate at 03:00
+## Resolved Interrupt — P1 Exact Duplicate at 03:00
 
 incident_id: `11b9faa6-089b-48b1-8d48-7f67aa8568b2`
 cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
 slot_key: `2026-08-01T03:00`
-state: repairing
+state: resolved
 
 - The slot-key-based retry reached deterministic content gating, proving the immutable operation-ID conflict is resolved.
 - Candidate `My hands hold abundance. Everything I create is meant to prosper.` exactly duplicates posted post `761`; no new post was written.
 - Permanent prevention: recommended source-card wording is not assumed unused. Exact-duplicate rejection regenerates only the affected slot while preserving the locked source, plan item, and canonical preserved-function evidence.
-- Current action: submit one fresh close-source adaptation for 03:00 with a new slot-key versioned operation ID, then continue the same cycle.
+- Fresh close-source wording persisted successfully as scheduled post `805` with complete lineage. Continue the same cycle from 39 remaining slots.
 
 ## Resolved Interrupt — P1 Manifest Cycle Event Immutable Conflict
 
-incident_id: `8aadc401-58ba-489a-891-b61b96ecb6e0`
+incident_id: `8aadc401-58ba-489a-8891-b61b96ecb6e0`
 cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
 batch_operation_id: `manifest-main-live-2026-07-31-batch-wave02-00-03-v1`
 state: resolved
