@@ -267,9 +267,16 @@ describe("Operator Manifest cycle construction service", () => {
         primary_performance_metric: "24_hour_likes",
         recent_exposure_window_hours: 72,
       },
-      persistence_contract: {
-        tool: "persist_manifest_autonomous_post",
-        posts_per_call: 1,
+            persistence_contract: {
+        preferred_tool: "persist_manifest_autonomous_batch",
+        fallback_tool: "persist_manifest_autonomous_post",
+        candidates_per_batch: { minimum: 1, maximum: 4 },
+        generation_wave_size: 8,
+        uninterrupted_until_terminal_or_blocked: true,
+        regenerate_rejected_slots_only: true,
+        preserve_existing_schedule: true,
+        exact_missing_slots_only: true,
+        complete_lineage_required: true,
       },
     });
   });
