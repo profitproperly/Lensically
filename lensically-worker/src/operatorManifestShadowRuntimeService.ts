@@ -1926,14 +1926,18 @@ function buildPendingShadowStrategyContract(
   payload: JsonRecord = {},
 ): JsonRecord | null {
   if (state.strategy || state.completed || !state.missing_slot_keys.length) return null;
-  const rawOffset = Number(payload.lineup_offset ?? 0);
-  const lineupOffset = Number.isFinite(rawOffset)
-    ? Math.max(0, Math.min(Math.floor(rawOffset), state.locked_source_lineup.length))
-    : 0;
-  const rawLimit = Number(payload.lineup_limit ?? 24);
+    const rawLimit = Number(payload.lineup_limit ?? 24);
   const lineupLimit = Number.isFinite(rawLimit)
     ? Math.max(1, Math.min(Math.floor(rawLimit), 24))
     : 24;
+  const compatibilityPageMatch = typeof payload.operation_id === "string"
+    ? /(?:^|-)lineup-page-(\d+)(?:-|$)/.exec(payload.operation_id)
+    : null;
+  const compatibilityPage = compatibilityPageMatch ? Math.max(1, Number(compatibilityPageMatch[1])) : 1;
+  const rawOffset = Number(payload.lineup_offset ?? ((compatibilityPage - 1) * lineupLimit));
+  const lineupOffset = Number.isFinite(rawOffset)
+    ? Math.max(0, Math.min(Math.floor(rawOffset), state.locked_source_lineup.length))
+    : 0;
   const lineupPage = state.locked_source_lineup.slice(lineupOffset, lineupOffset + lineupLimit);
   const lineupBySlot = Object.fromEntries(lineupPage.map((item) => [
     String(item.assigned_slot_key ?? ""),

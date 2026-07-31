@@ -432,7 +432,19 @@ describe("operatorManifestShadowRuntimeService", () => {
           expect(Object.keys(secondPage)).toHaveLength(expected - 24);
           expect(Number(secondContract.lineup_offset)).toBe(24);
           expect(secondContract.next_lineup_offset).toBeNull();
-          expect(new Set([...Object.keys(firstPage), ...Object.keys(secondPage)]).size).toBe(expected);
+                    expect(new Set([...Object.keys(firstPage), ...Object.keys(secondPage)]).size).toBe(expected);
+          const cachedSchemaResult = await handleOperatorManifestShadowTool({
+            toolName: "get_manifest_shadow_cycle_receipt",
+            payload: {
+              shadow_run_id: prepared.body.shadow_run_id,
+              operation_id: "cached-client-lineup-page-2-read",
+            },
+            identity,
+          }, harness.deps);
+          expect(cachedSchemaResult.status).toBe(200);
+          const cachedContract = record(cachedSchemaResult.body.pending_strategy_contract);
+          expect(Number(cachedContract.lineup_offset)).toBe(24);
+          expect(Object.keys(record(cachedContract.lineup_by_slot))).toEqual(Object.keys(secondPage));
         }
         const completedReceipt = await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
         const benchmark = benchmarkFrom(completedReceipt);
