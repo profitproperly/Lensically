@@ -1427,21 +1427,43 @@ describe("System Directory foundation", () => {
 
   
   
-  it("prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review", () => {
+    it("prepares the compact Main Cycle decision bundle and exact fixed-runway deficit without requiring owner review", () => {
     const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_autonomous_cycle");
     expect(entry).toMatchObject({ route_intent: "prepare manifest autonomous cycle" });
     expect(entry?.capabilities).toEqual(expect.arrayContaining([
       "capture complete likes-first evidence",
-      "return canonical analysis pages",
+      "return one compact decision bundle",
+      "preserve exact 0-through-48 runway coverage",
     ]));
-    expect(entry?.hard_gates).toContain("No post may be generated during preparation.");
+    expect(entry?.hard_gates).toEqual(expect.arrayContaining([
+      "The Main Cycle runway is fixed at 48 hours and only its actual missing slots may be planned.",
+      "The compact decision bundle is authoritative; evidence detail pages are ambiguity-only.",
+      "No post may be generated during preparation.",
+    ]));
   });
 
-  it("reads and durably records one complete rolling evidence page without truncation", () => {
+    it("reads one ambiguity-only Main Cycle evidence detail page without truncation", () => {
     const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_cycle_analysis_page");
     expect(entry).toMatchObject({ route_intent: "get manifest cycle analysis page" });
-        expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_id", "snapshot_id", "page_index"]));
-    expect(entry?.hard_gates).toContain("Post evidence must not be silently truncated.");
+    expect(entry?.payload.required_inputs).toEqual(expect.arrayContaining(["cycle_id", "snapshot_id", "page_index"]));
+    expect(entry?.hard_gates).toEqual(expect.arrayContaining([
+      "Post evidence must not be silently truncated.",
+      "Routine strategy work must use the compact decision bundle; detail reads occur only for a flagged ambiguity.",
+    ]));
+  });
+
+  it("pages the exact Main Cycle locked lineup without source substitution", () => {
+    const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "strategy.manifest_locked_lineup_page");
+    expect(entry).toMatchObject({
+      route_intent: "get manifest locked lineup page",
+      payload: { action_size: "bounded_read", max_results: 12 },
+    });
+    expect(entry?.capabilities).toEqual(expect.arrayContaining([
+      "return one to twelve locked slots",
+      "include bounded canonical source cues",
+      "prevent individual source-card rereads",
+      "forbid source substitution",
+    ]));
   });
 
   it("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup", () => {
