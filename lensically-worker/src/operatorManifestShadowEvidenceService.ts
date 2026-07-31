@@ -1,6 +1,48 @@
 import type { ManifestShadowEvidence, ManifestShadowSlot } from "./operatorManifestShadowRuntimeService";
+import type { SourceSelectionCandidate } from "./sourceFamilySelection";
 
 type JsonRecord = Record<string, unknown>;
+
+export function buildManifestShadowFrozenSourceCandidates(
+  brandKey: string,
+  count = 96,
+): SourceSelectionCandidate[] {
+  const safeCount = Math.max(48, Math.min(192, Math.floor(count)));
+  return Array.from({ length: safeCount }, (_, index) => ({
+    source_candidate_id: `shadow-fixture-candidate-${index}`,
+    source_identity_key: `shadow-fixture:${brandKey}:${index}`,
+    source_card_family_id: `shadow-fixture-family-${index}`,
+    source_card_id: `shadow-fixture-card-${index}`,
+    source_type: "source_card",
+    internal_source_id: `shadow-fixture-card-${index}`,
+    source_mechanism: "direct_reader_outcome_utility",
+    required_product: "A concrete reader-directed outcome grounded in the locked source.",
+    recommended_direction: "Preserve the frozen source hook, structure, meaning, tone, and payoff with bounded wording variation.",
+    text: `Frozen isolated source ${index + 1} for ${brandKey}.`,
+    metrics: { likes: 1000 + index },
+    primary_source: { post_text: `Frozen isolated source ${index + 1}` },
+    lifetime_label: index < 24 ? "proven" : "promising",
+    recent_label: "stable",
+    confidence_label: "high",
+    lifetime_sample_size: 3 + index,
+    recent_sample_size: 2,
+    lifetime_index: 1.2 + index / 100,
+    recent_index: 1.05,
+    uses_24h: 0,
+    uses_7d: 0,
+    uses_28d: 0,
+    hours_since_last_use: 100 + index,
+    semantic_key: `shadow-fixture-mechanism-${index}`,
+  }));
+}
+
+export function resolveManifestShadowSourceCandidates(
+  loaded: SourceSelectionCandidate[],
+  brandKey: string,
+): SourceSelectionCandidate[] {
+  return loaded.length ? loaded : buildManifestShadowFrozenSourceCandidates(brandKey);
+}
+
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};

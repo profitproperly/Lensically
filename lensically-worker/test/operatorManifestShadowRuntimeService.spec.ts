@@ -8,7 +8,10 @@ import {
   type ManifestShadowTestCase,
   type OperatorManifestShadowRuntimeDependencies,
 } from "../src/operatorManifestShadowRuntimeService";
-import { buildManifestShadowScenarioSlots } from "../src/operatorManifestShadowEvidenceService";
+import {
+  buildManifestShadowScenarioSlots,
+  resolveManifestShadowSourceCandidates,
+} from "../src/operatorManifestShadowEvidenceService";
 import {
   resetManifestShadowWorkspace,
   verifyManifestShadowOrphans,
@@ -319,6 +322,16 @@ beforeEach(async () => {
 });
 
 describe("operatorManifestShadowRuntimeService", () => {
+  it("bootstraps a complete frozen source lineup when the disposable live shadow database is empty", () => {
+    const fallback = resolveManifestShadowSourceCandidates([], "manifest_mental");
+    expect(fallback).toHaveLength(96);
+    expect(new Set(fallback.map((candidate) => candidate.source_card_family_id)).size).toBe(96);
+    expect(fallback.every((candidate) => candidate.source_type === "source_card")).toBe(true);
+
+    const existing = candidates(2);
+    expect(resolveManifestShadowSourceCandidates(existing, "manifest_mental")).toBe(existing);
+  });
+
   it("prepares isolated no-op, 24-slot, and 48-slot Innovation cycles without Main database access", async () => {
     for (const [scenario, expected] of [["noop", 0], ["normal_24", 24], ["recovery_48", 48]] as const) {
       const harness = dependencyHarness();

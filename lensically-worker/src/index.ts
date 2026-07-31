@@ -114,6 +114,7 @@ import {
 import {
   buildManifestShadowScenarioSlots,
   readManifestShadowEvidence,
+  resolveManifestShadowSourceCandidates,
 } from "./operatorManifestShadowEvidenceService";
 import { constructOperatorManifestAutonomousCycle } from "./operatorManifestCycleConstructionService";
 import { admitOperatorManifestPersistence } from "./operatorManifestPersistenceAdmissionService";
@@ -12088,10 +12089,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         scenario: input.scenario,
         requestedMissingCount: input.requestedMissingCount,
       }),
-      loadSourceCandidates: (productionReadOnlyDb, brandKey, asOf) => loadLockedSourceCardSelectionCandidates(
-        productionReadOnlyDb,
+            loadSourceCandidates: async (productionReadOnlyDb, brandKey, asOf) => resolveManifestShadowSourceCandidates(
+        await loadLockedSourceCardSelectionCandidates(
+          productionReadOnlyDb,
+          brandKey,
+          asOf,
+        ),
         brandKey,
-        asOf,
       ),
       selectSourceLineup: (input) => selectSourceFamilyLineup(input),
             readEvidence: ({ snapshotReadOnlyDb, brandKey, threadsUserId, nowIso, evidenceMode }) => readManifestShadowEvidence(
