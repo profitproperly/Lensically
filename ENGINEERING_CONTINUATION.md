@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-innovation-live-24-real-generation-test
-active_checkpoint: prepare-real-source-backed-shadow-run
+active_job_id: null
+active_checkpoint: null
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: 5b1be6dd102bf94935928a4b031ddf75cda307f1
+production_sha: 4b7e1d1c222ebdc4ef8740a85196bce605004a22
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -54,7 +54,7 @@ Owner objective:
 
 job_id: `manifest-innovation-cycle-shadow-testbed`
 
-The permanent upstream Innovation Cycle is complete and isolated in architecture, activated through the live MCP, and operationally proven for the full-runway no-op plus synthetic 24-slot orchestration/persistence. Genuine 24-post model generation remains unproven live.
+The permanent upstream Innovation Cycle is complete and physically isolated, activated through the live MCP, and operationally proven for full-runway no-op, synthetic orchestration/persistence, and genuine 24-post source-faithful model generation through scheduling-shaped persistence.
 
 ## Permanent Operating Model
 
@@ -121,7 +121,9 @@ The passing exact-head matrix enforces wall-clock ceilings, including model/clie
 - Three consecutive no-op runs: each at or below 30 seconds.
 - Three consecutive source-level synthetic 24-slot harness runs: each at or below 6 minutes.
 - Three consecutive source-level synthetic 48-slot recovery harness runs: each below 10 minutes.
-- No clean live benchmark has yet proven 24 genuine model-written, source-faithful Manifest posts within six minutes.
+- Clean live genuine 24-post run `shadow-159ccd7d30906b29aa874bebc998d345` completed in 410,464 ms: 24/24 accepted, zero rejected, 288 gates, 24 complete lineages, and zero Main or Threads access.
+- The genuine run exceeded the six-minute target by 50,464 ms. Functional acceptance passed; the durable benchmark failed only `wall_clock_latency_threshold_exceeded`.
+- Timing attribution: 94,409 ms strategy/client gap, 289,847 ms model/client gap, 19,481 ms candidate persistence, 1,840 ms reconciliation, 6,708 ms preparation, and 160 ms cleanup.
 - Previous Main 48-slot baseline: approximately 3 hours 22 minutes 15 seconds.
 - Proven 48-slot Innovation ceiling: more than 20 times faster than the baseline while preserving the required operational contract.
 
@@ -164,8 +166,12 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Functional recovery run `shadow-6309ec08364337c03c22ffb69021c596` accepted 24/24 with 264 gates, 24 complete lineages, zero Main reads/writes, zero Threads mutations, and zero orphans. Its receipt `6034b5c8-55a2-4e6e-adaf-df7d30161870` failed only the wall-clock rule because live engineering repairs occurred inside the run.
 - Commit `5b1be6dd102bf94935928a4b031ddf75cda307f1` terminalized failed benchmark runs and prevented retained failed runs from blocking the next cycle. Push validation `30596010989`, Operator `30596021551` (8/8), and exact-SHA deploy `30596107493` passed.
 - Clean live MCP synthetic 24-slot run `shadow-8006b68e6344548e4943832215371f19` completed at exact SHA `5b1be6dd102bf94935928a4b031ddf75cda307f1`. Durable benchmark `67fde27d-5d4f-47be-b4b0-fdc29bfa82e4` passed in 292,505 ms with 24/24 synthetic fixture candidates accepted, zero rejected, six bounded batch calls, 264 gates, 24 complete lineages, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans. This receipt proves orchestration and persistence only, not genuine post generation or content quality.
+- Genuine-generation architecture added migration-owned persistent frozen seeds, immutable by-value source import, no Main binding during benchmark execution, a hard `genuine_model_generation` placeholder gate, exact accepted-post readback, and removal of the production dummy-candidate builder.
+- Exact SHA `273ed9131e4ccd6865c96ee266431335f7173cc1` passed typecheck and 8/8 Operator shards and deployed successfully in run `30598616571`.
+- Immutable 24-source bundled Saved Pattern package and direct integrity regression passed at exact SHA `4b7e1d1c222ebdc4ef8740a85196bce605004a22`; typecheck `30598982965`, Operator `30598992493` (8/8), push validation `30598976091`, and deploy `30599041957` succeeded.
+- Live genuine run `shadow-159ccd7d30906b29aa874bebc998d345` used snapshot `4066f51be6f2a90f7ca2b310dd6bf3d39669025a0746a2a82ad56b92f57bfb78` and benchmark `b7e7c019-2021-4380-b515-85c6e161c742`. It generated and scheduling-persisted 24 genuine inspectable posts with 24/24 accepted, zero rejected, six bounded batches, 288 gates, 24 complete lineages, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans. Total time was 410,464 ms; the only failed rule was the six-minute latency threshold.
 
-## ACTIVE — Manifest Innovation Live 24-Post Real Generation Test
+### COMPLETED — Manifest Innovation Live 24-Post Real Generation Test
 
 job_id: `manifest-innovation-live-24-real-generation-test`
 
@@ -178,15 +184,21 @@ Owner objective:
 - Enforce zero Main reads, zero Main writes, zero production receipt writes, and zero Threads requests or mutations.
 - Do not count the synthetic 4m52.505s run toward this objective.
 
-## Current Action
+Verified outcome:
 
-1. Inspect the Innovation runtime generation path and remove synthetic automatic-candidate substitution from the live acceptance route.
-2. Add regression prevention proving live baseline acceptance cannot pass with generic fixture placeholder text.
-3. Validate and deploy the exact tested SHA.
-4. Run a fresh isolated 24-slot shadow cycle with genuine model-written posts.
-5. Show all 24 posts, read the durable benchmark, and close only if quality, lineage, isolation, and timing all pass.
+- 24 genuine source-faithful model-written posts were accepted and scheduling-persisted with complete lineage.
+- Main reads: 0. Main writes: 0. Threads mutations: 0. External reads: 0. Cleanup orphans: 0.
+- Functional acceptance passed. Total wall clock was 6m50.464s, exceeding the six-minute target by 50.464s.
+- All 24 exact posts were preserved from the batch receipts for owner inspection.
 
 ## Deferred Work — INACTIVE
+
+`manifest-innovation-24-real-generation-speed-optimization`
+
+- Analyze and reduce the 410,464 ms genuine-generation runtime toward six minutes or establish a measured lower bound.
+- Primary target is the 289,847 ms model/client gap; persistence, reconciliation, preparation, and cleanup total approximately 28 seconds.
+- Potential optimizations must preserve genuine model judgment, source fidelity, all deterministic gates, exact post inspectability, and total Main/Threads isolation.
+- Do not begin until the owner and M review the genuine post quality and timing breakdown.
 
 `manifest-innovation-to-main-promotion`
 
