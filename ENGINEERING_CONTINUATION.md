@@ -9,7 +9,7 @@ active_job_id: manifest-innovation-main-mimic-parity
 active_checkpoint: stage-8-refresh-mcp-and-run-live-24-parity-acceptance
 validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
-production_sha: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
+production_sha: 206a1839fb88d74d2bcbc0ae3a567ddea1c0f631
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -262,7 +262,7 @@ Definition of done:
 
 1. Refresh the Lensically Operator Mode MCP transport before invoking any acceptance tool; the current chat transport is pinned to old Worker SHA `4b7e1d1c222ebdc4ef8740a85196bce605004a22`.
 2. Re-run `prepare_manifest_shadow_cycle` with a new stable operation ID for `normal_24`, `baseline`, `snapshot`, 48-hour horizon, and 24 missing slots.
-3. Fail closed unless the returned live `code_sha` is `8b52cf2e44983ca5588b7df503433bea6e0d3fa5`, the exported/imported snapshot hashes match, the zero-write proof passes, at least 100 real eligible families compete, the schedule-only overlay has no forbidden paths, and every selector parity field/hash passes.
+3. Fail closed unless the returned live `code_sha` is `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` (the exact deployed descendant containing parity SHA `8b52cf2e44983ca5588b7df503433bea6e0d3fa5` plus only the closed P1 routing repair), the exported/imported snapshot hashes match, the zero-write proof passes, at least 100 real eligible families compete, the schedule-only overlay has no forbidden paths, and every selector parity field/hash passes.
 4. Commit the exact locked strategy, generate and persist all 24 genuine source-faithful posts in six four-item batches, read back every post and lineage record, verify zero Main reads during isolated execution, zero Main writes, zero Threads requests/mutations, zero cleanup orphans, and record the durable parity/isolation/quality/timing receipt.
 5. Validate interrupted replay and then 48-slot recovery on the refreshed deployed runtime. Mark this job complete only after all three live acceptance stages pass.
 
