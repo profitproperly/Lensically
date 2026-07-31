@@ -19,7 +19,16 @@ import {
   type ManifestShadowSnapshot,
 } from "./operatorManifestShadowService";
 import type { SourceSelectionCandidate, SourceSelectionReceipt } from "./sourceFamilySelection";
-import { getManifestShadowBundledSeed } from "./operatorManifestShadowBundledSeed";
+import {
+  buildManifestDecisionScenarioOverlay,
+  buildManifestDecisionSnapshot,
+  compareManifestDecisionSelectorParity,
+  hashManifestDecisionValue,
+  manifestDecisionSnapshotToShadowEvidence,
+  readManifestDecisionSnapshotFromShadowEvidence,
+  type ManifestDecisionSnapshot,
+} from "./operatorManifestDecisionSnapshotService";
+
 
 type JsonRecord = Record<string, unknown>;
 
@@ -80,6 +89,8 @@ export type ManifestShadowEvidence = {
   evidence_gaps: JsonRecord[];
   production_fingerprint: JsonRecord;
   freshness: JsonRecord;
+  decision_snapshot?: JsonRecord;
+  [key: string]: unknown;
 };
 
 export type ManifestShadowRuntimeState = {
@@ -120,8 +131,9 @@ export type ManifestShadowRuntimeState = {
 export interface OperatorManifestShadowRuntimeDependencies {
     snapshotDb: D1Database;
   shadowDb: D1Database;
-  codeSha: string;
+    codeSha: string;
   requireFrozenSeed?: boolean;
+  minimumEligibleFamilies?: number;
   now(): Date;
   buildSlots(input: {
     timezone: string;
@@ -134,11 +146,17 @@ export interface OperatorManifestShadowRuntimeDependencies {
     brandKey: string,
     asOf: string,
   ): Promise<SourceSelectionCandidate[]>;
-  selectSourceLineup(input: {
+    selectSourceLineup(input: {
     candidates: SourceSelectionCandidate[];
     slot_keys: string[];
     seed: string;
-  }): { selected: SourceSelectionCandidate[]; receipts: SourceSelectionReceipt[]; summary: JsonRecord };
+    include_parity_trace?: boolean;
+  }): {
+    selected: SourceSelectionCandidate[];
+    receipts: SourceSelectionReceipt[];
+    summary: JsonRecord;
+    parity_trace?: JsonRecord;
+  };
   readEvidence(input: {
         snapshotReadOnlyDb: D1Database;
     brandKey: string;
@@ -214,13 +232,16 @@ function normalizeSeedEvidence(value: unknown, nowIso: string): ManifestShadowEv
     future_scheduled: records(input.future_scheduled),
     evidence_gaps: records(input.evidence_gaps),
     production_fingerprint: record(input.production_fingerprint),
-    freshness: {
+        freshness: {
       evidence_mode: "snapshot",
       captured_at: stringValue(input.captured_at, nowIso),
       stale: false,
       bounded_delta_refresh_required: false,
       ...record(input.freshness),
     },
+    decision_snapshot: Object.keys(record(input.decision_snapshot)).length
+      ? record(input.decision_snapshot)
+      : undefined,
   };
 }
 
