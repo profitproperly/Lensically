@@ -5736,8 +5736,8 @@ active_checkpoint: none
     }>("runMcpTests", { segment: "s0" });
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 118,
-                        total_read_only_capabilities: 48,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                total_internal_capabilities: 119,
+                        total_read_only_capabilities: 49,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
