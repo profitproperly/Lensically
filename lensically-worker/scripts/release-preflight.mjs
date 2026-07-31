@@ -993,7 +993,7 @@ if (!operatorMcpAutonomousExecutionRegistryTests.includes("preserves the exact o
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves immediate prepare invocation and rolling runway bounds")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves one-post source lineage, hypothesis, and idempotency contracts")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves model judgment while deterministic gate evidence remains optional")
-    || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves a closed one-to-four batch schema by reusing the exact candidate contracts")
+        || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves a closed one-to-two Main batch schema by reusing the exact candidate contracts")
     || !operatorMcpAutonomousExecutionRegistryTests.includes("preserves optional owner review and slot-preserving replacement")) {
   lifecycleErrors.push("operator_mcp_autonomous_execution_registry_tests_incomplete");
 }

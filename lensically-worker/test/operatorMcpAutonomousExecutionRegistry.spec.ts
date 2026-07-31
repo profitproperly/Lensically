@@ -85,7 +85,7 @@ describe("Operator MCP autonomous execution registry", () => {
     expect(evaluation.properties.gate_summary.properties.results.items.required).toEqual(["executed", "status"]);
   });
 
-    it("preserves a closed one-to-four batch schema by reusing the exact candidate contracts", () => {
+        it("preserves a closed one-to-two Main batch schema by reusing the exact candidate contracts", () => {
     const single = tool("persist_manifest_autonomous_post");
     const batch = tool("persist_manifest_autonomous_batch");
     expect(batch.inputSchema.required).toEqual([
@@ -96,7 +96,7 @@ describe("Operator MCP autonomous execution registry", () => {
       "candidates",
     ]);
     const batchProperties = batch.inputSchema.properties as Record<string, any>;
-    expect(batchProperties.candidates).toMatchObject({ type: "array", minItems: 1, maxItems: 4 });
+        expect(batchProperties.candidates).toMatchObject({ type: "array", minItems: 1, maxItems: 2 });
     const candidate = batchProperties.candidates.items;
     expect(candidate.required).toEqual([
       "operation_id",
