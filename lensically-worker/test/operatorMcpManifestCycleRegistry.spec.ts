@@ -11,17 +11,18 @@ function tool(name: string) {
 }
 
 describe("Operator MCP Manifest cycle-strategy registry", () => {
-  it("preserves the exact ordered six-tool Manifest cycle registry", () => {
+    it("preserves the exact ordered seven-tool Main Cycle registry", () => {
     expect(OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES).toEqual([
       "get_manifest_intelligence_foundation",
       "get_manifest_cycle_receipt",
       "record_manifest_cycle_defect",
       "resolve_manifest_cycle_defect",
       "get_manifest_cycle_analysis_page",
+      "get_manifest_locked_lineup_page",
       "commit_manifest_cycle_strategy",
     ]);
     expect(OPERATOR_MCP_MANIFEST_CYCLE_TOOLS.map((definition) => definition.name)).toEqual(OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES);
-    expect(new Set(OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES).size).toBe(6);
+    expect(new Set(OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES).size).toBe(7);
   });
 
   it("preserves pageable canonical cycle receipt reconstruction", () => {
