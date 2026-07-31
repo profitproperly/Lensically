@@ -10,9 +10,10 @@ active_checkpoint: stage-9-first-natural-main-cycle-observation
 validated_source_head: c07e7eb08e0953d8596602064dfa0677e48aa875
 documentation_source_head: c07e7eb08e0953d8596602064dfa0677e48aa875
 production_sha: c07e7eb08e0953d8596602064dfa0677e48aa875
-active_interrupt_id: 9fdb9ac5-1229-442c-9a1f-b32b34e0d578
+active_interrupt_id: ab143e21-8cc5-4855-9881-fdeadf47a167
 active_interrupt_state: repairing
-active_interrupt_precedence: P1-quality-zero-write-batch-rejection
+active_interrupt_precedence: P1-main-batch-cloudflare-subrequest-limit
+
 
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
@@ -320,20 +321,31 @@ Definition of done:
 - Dominant time: model/client gap 606,361 ms; strategy/client gap 147,500 ms. Actual candidate persistence was 38,601 ms, reconciliation 5,619 ms, preparation 8,563 ms, and cleanup 165 ms.
 - This is valid functional, parity, isolation, quality, and recovery evidence, but not a passing timing acceptance.
 
-## Active Interrupt — P1 Exact Source-Evidence Replay
+## Resolved Interrupt — P1 Exact Source-Evidence Replay
 
 incident_id: `9fdb9ac5-1229-442c-9a1f-b32b34e0d578`
 cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
+state: resolved
+
+- The first four-candidate live Main Cycle batch wrote zero posts because three candidates paraphrased canonical preserved-function evidence and one candidate duplicated posted post `759`.
+- The selective retry replayed exact source-card function statements and used a nonduplicate close-mimic variation.
+- Authoritative reconciliation proved all four retry candidates were accepted as scheduled posts `799` through `802` with no replay required.
+- Permanent prevention: Main Cycle candidate `preserved_functions` must replay the source card's canonical statements verbatim; exact duplicates regenerate only the rejected slot.
+
+## Active Interrupt — P1 Main Batch Cloudflare Subrequest Limit
+
+incident_id: `ab143e21-8cc5-4855-9881-fdeadf47a167`
+cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
 state: repairing
 
-- The first four-candidate live Main Cycle batch wrote zero posts: three candidates supplied paraphrased `preserved_functions` instead of replaying the source card's exact canonical `must_preserve_function` statements, and one candidate was an exact duplicate of posted post `759`.
-- Deterministic backend gates worked correctly; no ambiguous or partial side effect occurred.
-- Successful production state remains preserved: scheduled post `798` occupies `2026-07-31T21:00`; 45 exact planned slots remain.
-- Root cause is model-side evidence serialization, not source selection or gate behavior.
-- Permanent prevention: every Main Cycle candidate must copy the source card's canonical preserved-function statements verbatim into `preserved_functions`; paraphrases are forbidden. Exact-duplicate rejection triggers wording regeneration for that slot only while preserving the locked source and plan item.
-- Current repair action: selectively retry the four rejected plan items with exact source evidence and a nonduplicate direct-reader adaptation, verify accepted siblings, then continue the same cycle in bounded waves.
+- The four-candidate selective retry completed all four production writes, but its MCP response failed after execution with Cloudflare's per-Worker subrequest limit.
+- Coverage reconciliation proved scheduled posts `799` through `802`, repaired the coverage ledger, and reduced the authoritative deficit from 45 to 41. Blind replay is forbidden.
+- Root cause: Main Cycle's live persistence path performs enough D1 and lineage work per candidate that four candidates can exceed one Worker's subrequest budget, even though the Innovation Cycle's isolated batch shape supports four.
+- Permanent prevention target: bound Main Cycle persistence to a maximum of two candidates per Worker invocation until a separately proven lower-subrequest implementation exists. The Innovation Cycle remains unchanged at its isolated test-bed batch shape.
+- Current repair action: make the Main Cycle two-candidate limit source-defined, regression-owned, validated, and deployed; resolve this cycle defect with reconciliation evidence; then continue the same 41-slot cycle using two-candidate calls.
 
 ## ACTIVE — Innovation Challenger Promotion to Main Champion
+
 
 
 job_id: `manifest-innovation-to-main-promotion`
