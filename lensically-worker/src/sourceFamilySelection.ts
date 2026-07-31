@@ -531,17 +531,19 @@ export async function loadLockedSourceCardDecisionCandidates(
       `SELECT directives_json FROM operator_manifest_cycle_strategies
        WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
     ).bind(brandKey).first<{ directives_json: string | null }>(),
-    db.prepare(
-      `SELECT source_identity_key, pattern_id FROM operator_source_exclusions
-       WHERE brand_key = ?`,
-    ).bind(brandKey).all<{ source_identity_key: string | null; pattern_id: number | null }>(),
+        db.prepare(
+      `SELECT source_identity_key, internal_source_id FROM operator_source_exclusions
+       WHERE brand_key = ? AND active = 1`,
+    ).bind(brandKey).all<{ source_identity_key: string | null; internal_source_id: string | null }>(), 
   ]);
   let directives: unknown = {};
   try { directives = JSON.parse(String(strategyRow?.directives_json ?? "{}")); } catch { directives = {}; }
   const excludedPatternIds = extractOwnerBannedSavedPatternIds(directives);
   const excludedIdentityKeys = new Set<string>();
-  for (const exclusion of sourceExclusionRows.results ?? []) {
-    if (exclusion.pattern_id !== null && exclusion.pattern_id !== undefined) excludedPatternIds.add(String(exclusion.pattern_id));
+    for (const exclusion of sourceExclusionRows.results ?? []) {
+    if (exclusion.internal_source_id && /^\d+$/.test(String(exclusion.internal_source_id))) {
+      excludedPatternIds.add(String(exclusion.internal_source_id));
+    }
     if (exclusion.source_identity_key) excludedIdentityKeys.add(String(exclusion.source_identity_key));
   }
   const eligibleRows = (rows.results ?? []).filter((row) =>
