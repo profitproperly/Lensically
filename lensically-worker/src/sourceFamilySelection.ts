@@ -99,6 +99,32 @@ function isLiveSavedPatternId(liveIds: Set<string> | null, value: unknown): bool
   return liveIds === null || !/^\d+$/.test(id) || liveIds.has(id);
 }
 
+export function extractOwnerBannedSavedPatternIds(value: unknown): Set<string> {
+  const ids = new Set<string>();
+  const visit = (item: unknown, key = ""): void => {
+    if (typeof item === "string") {
+      if (/saved[ _-]*patterns?/i.test(key) || /saved\s+patterns?/i.test(item)) {
+        for (const match of item.matchAll(/\b\d+\b/g)) ids.add(match[0]);
+      }
+      return;
+    }
+    if (Array.isArray(item)) {
+      for (const child of item) visit(child, key);
+      return;
+    }
+    if (!item || typeof item !== "object") return;
+    for (const [childKey, child] of Object.entries(item as Record<string, unknown>)) {
+      if (/saved[ _-]*pattern/i.test(childKey) && (typeof child === "number" || typeof child === "string")) {
+        const normalized = String(child);
+        if (/^\d+$/.test(normalized)) ids.add(normalized);
+      }
+      visit(child, childKey);
+    }
+  };
+  visit(value);
+  return ids;
+}
+
 function normalizedIndex(value: number, baseline: number): number {
   if (baseline > 0) return Math.max(0, value) / baseline;
   if (value <= 0) return 1;
@@ -499,9 +525,29 @@ export async function loadLockedSourceCardDecisionCandidates(
        AND card.source_selection_id IS NOT NULL`,
 
     ).bind(brandKey).all<Record<string, unknown>>();
-  const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
-    const eligibleRows = (rows.results ?? []).filter((row) =>
+    const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
+  const [strategyRow, sourceExclusionRows] = await Promise.all([
+    db.prepare(
+      `SELECT directives_json FROM operator_manifest_cycle_strategies
+       WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`,
+    ).bind(brandKey).first<{ directives_json: string | null }>(),
+    db.prepare(
+      `SELECT source_identity_key, pattern_id FROM operator_source_exclusions
+       WHERE brand_key = ?`,
+    ).bind(brandKey).all<{ source_identity_key: string | null; pattern_id: number | null }>(),
+  ]);
+  let directives: unknown = {};
+  try { directives = JSON.parse(String(strategyRow?.directives_json ?? "{}")); } catch { directives = {}; }
+  const excludedPatternIds = extractOwnerBannedSavedPatternIds(directives);
+  const excludedIdentityKeys = new Set<string>();
+  for (const exclusion of sourceExclusionRows.results ?? []) {
+    if (exclusion.pattern_id !== null && exclusion.pattern_id !== undefined) excludedPatternIds.add(String(exclusion.pattern_id));
+    if (exclusion.source_identity_key) excludedIdentityKeys.add(String(exclusion.source_identity_key));
+  }
+  const eligibleRows = (rows.results ?? []).filter((row) =>
     isLiveSavedPatternId(liveSavedPatternIds, row.saved_pattern_id)
+    && !excludedPatternIds.has(String(row.saved_pattern_id ?? ""))
+    && !excludedIdentityKeys.has(String(row.source_identity_key ?? ""))
   );
   const candidates = eligibleRows.map((row) => {
     let metrics: Record<string, unknown> = {};
@@ -513,8 +559,9 @@ export async function loadLockedSourceCardDecisionCandidates(
       source_identity_key: String(row.source_identity_key ?? ""),
       source_card_family_id: String(row.source_card_family_id ?? ""),
       source_card_id: String(row.source_card_id ?? ""),
-      source_type: "source_card",
+            source_type: "source_card",
       internal_source_id: String(row.source_card_id ?? ""),
+      saved_pattern_id: String(row.saved_pattern_id ?? ""),
       source_mechanism: row.source_mechanism ?? null,
       required_product: row.required_product ?? null,
       recommended_direction: row.recommended_direction ?? null,
