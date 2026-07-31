@@ -50,8 +50,21 @@ function createDependencies(): {
       operation_id: operationId,
       slot_key: slotKey,
       scheduled_post_id: 90 + suffix,
-      publish_lineage_complete: true,
+            publish_lineage_complete: true,
       intelligence_lineage_complete: true,
+      lineage: {
+        source_selection_id: `selection-${suffix}`,
+        source_card_id: `card-${suffix}`,
+        source_card_family_id: `family-${suffix}`,
+        generation_run_id: `run-${suffix}`,
+        draft_id: `draft-${suffix}`,
+        hypothesis_id: `hypothesis-${suffix}`,
+        strategy_version_id: "strategy-output-1",
+      },
+      semantic_repetition: { verbose: "persisted server evidence" },
+      decision_influence: { verbose: "persisted server evidence" },
+      server_checks: { verbose: "persisted server evidence" },
+      coverage_reconciliation_deferred: true,
       batch_reconciliation_context: reconciliationContext(slotKey),
     };
   });
