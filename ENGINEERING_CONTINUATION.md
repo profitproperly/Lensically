@@ -10,9 +10,9 @@ active_checkpoint: stage-8-refresh-mcp-and-run-live-24-parity-acceptance
 validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 production_sha: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
-active_interrupt_id: 0d15d70f-c1d4-4ba5-9008-d7b6fff2d69c
-active_interrupt_state: open
-active_interrupt_precedence: blocks_active_job
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
@@ -191,15 +191,16 @@ Verified outcome:
 - Functional acceptance passed. Total wall clock was 6m50.464s, exceeding the six-minute target by 50.464s.
 - All 24 exact posts were preserved from the batch receipts for owner inspection.
 
-## ACTIVE INTERRUPT — P1 Execution Kernel Mutation-Preflight Schema Integrity
+## CLOSED INCIDENT — P1 Execution Kernel Mutation-Preflight Schema Integrity
 
 incident_id: `0d15d70f-c1d4-4ba5-9008-d7b6fff2d69c`
 
-- Detected live on refreshed production SHA `8b52cf2e44983ca5588b7df503433bea6e0d3fa5` while running focused MCP shard `s8` before parity acceptance.
-- The capability campaign routed all 118 capabilities correctly and executed zero mutations, but 26 mutation preflights failed closed because the live database lacks `operator_pre_call_routes`.
-- Exact error: `database_integrity_failed:operator_pre_call_routes:D1_ERROR: no such table: operator_pre_call_routes: SQLITE_ERROR`.
-- This P1 blocks normal work until the shared schema/migration root cause is repaired, regression-tested, released by exact SHA, and verified live.
-- Current interrupt action: identify the missing migration/application path, implement one durable universal fix, add a schema-integrity regression that fails release when required pre-call tables are absent, release the exact tested SHA, verify shard `s8`, close this interrupt, then resume `stage-8-refresh-mcp-and-run-live-24-parity-acceptance` without redoing parity implementation.
+- Detected live on production SHA `8b52cf2e44983ca5588b7df503433bea6e0d3fa5`: 26 mutation preflights failed closed because the deliberately retired `operator_pre_call_routes` table was still queried by one legacy lookup.
+- Root cause repaired universally by removing the retired persistent-routing dependency and making source-defined Worker policy the only pre-call routing authority.
+- Permanent regression drops the retired table and requires shard `s8` mutation preflight to pass with zero side effects.
+- Repair SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` passed typecheck run `30637365931` and all eight Operator shards in run `30637376463`.
+- Exact-SHA release run `30637485167` succeeded. Fresh live shard `s8` then passed 31/31 mutation preflights with zero failures and zero side effects on production SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631`.
+- Incident closed. Resume `stage-8-refresh-mcp-and-run-live-24-parity-acceptance` without redoing parity implementation.
 
 ## ACTIVE — Manifest Innovation Main-Mimic Parity
 
