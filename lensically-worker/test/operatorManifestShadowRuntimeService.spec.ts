@@ -14,6 +14,10 @@ import {
   resetManifestShadowWorkspace,
   verifyManifestShadowOrphans,
 } from "../src/operatorManifestShadowService";
+import {
+  hashManifestDecisionValue,
+  type ManifestDecisionSnapshot,
+} from "../src/operatorManifestDecisionSnapshotService";
 import { selectSourceFamilyLineup, type SourceSelectionCandidate } from "../src/sourceFamilySelection";
 
 type JsonRecord = Record<string, unknown>;
@@ -44,7 +48,7 @@ function parseJsonRecord(value: unknown): JsonRecord {
   }
 }
 
-function candidates(count = 96): SourceSelectionCandidate[] {
+function candidates(count = 120): SourceSelectionCandidate[] {
   return Array.from({ length: Math.max(1, count) }, (_, index) => ({
     source_candidate_id: `candidate-${index}`,
     source_identity_key: `identity-${index}`,
@@ -90,6 +94,58 @@ function evidence(): ManifestShadowEvidence {
   };
 }
 
+async function frozenDecisionSnapshot(): Promise<ManifestDecisionSnapshot> {
+  const sourceCandidates = candidates(120);
+  const frozenEvidence = evidence();
+  const withoutHash: Omit<ManifestDecisionSnapshot, "snapshot_hash"> = {
+    contract_version: "manifest-decision-snapshot-v1",
+    provider_version: "manifest-decision-provider-v1",
+    brand_key: identity.brandKey,
+    account_id: identity.accountId,
+    threads_user_id: identity.threadsUserId,
+    captured_at: frozenEvidence.captured_at,
+    timezone: "America/New_York",
+    coverage_rules: { exact_hourly_slots: true, preserve_existing_schedule: true },
+    source_candidates: sourceCandidates,
+    saved_patterns: [],
+    source_cards: [],
+    source_families: [],
+    source_selections: [],
+    source_exclusions: [],
+    mature_metric_windows: [],
+    source_exposure_history: [],
+    strategy: frozenEvidence.strategy,
+    learning_brief: frozenEvidence.learning_brief,
+    content_focus: frozenEvidence.content_focus,
+    portfolio_state: null,
+    experiments: [],
+    hypotheses: [],
+    repetition_evidence: [],
+    follower_checkpoint: null,
+    hard_bans: frozenEvidence.hard_bans,
+    recent_performance: { strongest_count: 1, weakest_count: 1 },
+    strongest_posts: frozenEvidence.strongest_posts,
+    weakest_posts: frozenEvidence.weakest_posts,
+    recent_published: frozenEvidence.recent_published,
+    future_scheduled: frozenEvidence.future_scheduled,
+    eligibility_state: {
+      candidate_count: sourceCandidates.length,
+      eligible_candidate_count: sourceCandidates.length,
+      eligible_family_count: sourceCandidates.length,
+      excluded_candidate_count: 0,
+      excluded_candidates: [],
+    },
+    evidence_gaps: frozenEvidence.evidence_gaps,
+    freshness: frozenEvidence.freshness,
+    query_receipts: [{ query_key: "frozen_test_snapshot", row_count: sourceCandidates.length, read_only: true }],
+    production_fingerprint_before: frozenEvidence.production_fingerprint,
+    production_fingerprint_after: frozenEvidence.production_fingerprint,
+    zero_write_proof: { passed: true, main_write_count: 0, select_only_enforced: true },
+  };
+  return { ...withoutHash, snapshot_hash: await hashManifestDecisionValue(withoutHash) };
+}
+
+
 type DependencyHarness = {
   deps: OperatorManifestShadowRuntimeDependencies;
   audit: {
@@ -116,10 +172,16 @@ function dependencyHarness(now = new Date("2026-07-30T18:30:00.000Z")): Dependen
       return undefined;
     },
   });
-  const deps: OperatorManifestShadowRuntimeDependencies = {
+    const deps: OperatorManifestShadowRuntimeDependencies = {
     snapshotDb: forbiddenSnapshotDb,
     shadowDb: env.DB,
     codeSha: "a".repeat(40),
+    minimumEligibleFamilies: 100,
+    buildDecisionSnapshot: async () => {
+      audit.source_provider_reads += 1;
+      audit.evidence_provider_reads += 1;
+      return frozenDecisionSnapshot();
+    },
     now: () => new Date(now.getTime()),
     buildSlots: async (input) => buildManifestShadowScenarioSlots({ now, ...input }),
     loadSourceCandidates: async () => {
@@ -337,8 +399,10 @@ describe("operatorManifestShadowRuntimeService", () => {
       const prepared = await prepareRun({ deps: harness.deps, scenario, suffix: `prepare-${scenario}`, horizonHours: 48 });
       expect(prepared.status).toBe(200);
       expect(prepared.body.remaining_missing_count).toBe(expected);
-      expect(prepared.body.evidence_mode).toBe("snapshot");
-            expect(harness.audit.snapshot_db_calls).toBe(0);
+            expect(prepared.body.evidence_mode).toBe("snapshot");
+      expect(harness.audit.snapshot_db_calls).toBe(0);
+      expect(harness.audit.source_provider_reads).toBe(1);
+      expect(harness.audit.evidence_provider_reads).toBe(1);
       if (scenario === "normal_24") {
         const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
         const pendingContract = record(pendingReceipt.pending_strategy_contract);
