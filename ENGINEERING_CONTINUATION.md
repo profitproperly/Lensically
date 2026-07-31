@@ -286,11 +286,13 @@ Definition of done:
 
 ## Current Action
 
-1. Refresh the Lensically Operator Mode MCP transport before invoking any acceptance tool; the current chat transport is pinned to old Worker SHA `4b7e1d1c222ebdc4ef8740a85196bce605004a22`.
-2. Re-run `prepare_manifest_shadow_cycle` with a new stable operation ID for `normal_24`, `baseline`, `snapshot`, 48-hour horizon, and 24 missing slots.
-3. Fail closed unless the returned live `code_sha` is `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` (the exact deployed descendant containing parity SHA `8b52cf2e44983ca5588b7df503433bea6e0d3fa5` plus only the closed P1 routing repair), the exported/imported snapshot hashes match, the zero-write proof passes, at least 100 real eligible families compete, the schedule-only overlay has no forbidden paths, and every selector parity field/hash passes.
-4. Commit the exact locked strategy, generate and persist all 24 genuine source-faithful posts in six four-item batches, read back every post and lineage record, verify zero Main reads during isolated execution, zero Main writes, zero Threads requests/mutations, zero cleanup orphans, and record the durable parity/isolation/quality/timing receipt.
-5. Validate interrupted replay and then 48-slot recovery on the refreshed deployed runtime. Mark this job complete only after all three live acceptance stages pass.
+Owner ordering update — 2026-07-31:
+
+1. Discard the turn-timer-interrupted partial 24-slot run as timing evidence and start a new clean `normal_24` / `baseline` / `snapshot` acceptance from zero on live production SHA `4c3f5b9d46059a4d305f75af11b2006bad579614`.
+2. Time only the uninterrupted 24-slot run from preparation through final benchmark receipt. Use 48-hour horizon, exactly 24 missing slots, the genuine frozen Main snapshot, exact selector parity, one locked strategy, and six four-item persistence batches.
+3. Fail closed unless all parity, quality, lineage, isolation, cleanup, and strict-under-ten-minute gates pass. Main reads during isolated execution, Main writes, Threads requests/mutations, and cleanup orphans must all equal zero.
+4. Stop immediately after recording and reporting the final 24-slot receipt. Do not run interrupted replay or 48-slot recovery yet.
+5. After owner and M review the 24-slot result, run a separate clean timed 48-slot recovery and stop again for review. The job remains open until the owner later authorizes the remaining acceptance sequence and every definition-of-done gate passes.
 
 ## Deferred Work — INACTIVE
 
