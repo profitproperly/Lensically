@@ -30,8 +30,8 @@ describe("Operator MCP autonomous execution registry", () => {
     expect(prepare.description).toContain("each batch reconciles authoritative coverage once");
     expect(prepare.inputSchema.required).toEqual(["brand_key"]);
     expect((prepare.inputSchema.properties as Record<string, any>).horizon_hours).toMatchObject({
-      minimum: 1,
-      maximum: 72,
+            minimum: 1,
+      maximum: 48,
       default: 48,
     });
   });
