@@ -319,12 +319,49 @@ Definition of done:
 - Dominant time: model/client gap 606,361 ms; strategy/client gap 147,500 ms. Actual candidate persistence was 38,601 ms, reconciliation 5,619 ms, preparation 8,563 ms, and cleanup 165 ms.
 - This is valid functional, parity, isolation, quality, and recovery evidence, but not a passing timing acceptance.
 
+## ACTIVE — Innovation Challenger Promotion to Main Champion
+
+job_id: `manifest-innovation-to-main-promotion`
+
+Owner objective:
+
+- Keep the **Innovation Cycle** unchanged as the permanent isolated test bed.
+- Independently implement the proven Innovation Challenger behaviors inside the **Main Cycle** so the Main Cycle becomes the new robust and efficient Main Champion.
+- Preserve the Main Cycle's live Threads evidence, production database authority, existing 48-hour runway, historical strategy, learning, lineage, scheduled posts, and publishing contracts.
+- The Main Cycle must calculate the actual missing hourly slots inside its fixed 48-hour runway and generate exactly that count from 0 through 48; 24 and 48 are measured examples, never fixed generation sizes.
+- Remove avoidable Main Cycle client choreography while preserving genuine model writing, source fidelity, deterministic gates, idempotency, selective regeneration, authoritative reconciliation, and complete lineage.
+- Promotion ports proven behavior and permanent prevention only. The Innovation Cycle runtime, `SHADOW_DB`, scenario overlays, test data, benchmark receipts, and isolated lineage remain untouched and never connect to production.
+
+Implementation sequence:
+
+1. Make the terminology and separation contract canonical in continuation, architecture descriptions, runtime descriptions, and regressions.
+2. Inventory the exact proven Innovation Challenger behaviors and map each to the existing Main Cycle production service that must be upgraded.
+3. Upgrade Main Cycle preparation to reuse fresh intelligence, calculate the exact 0-48 runway deficit, produce one compact decision bundle, and expose a complete bounded locked lineup with sufficient source cues.
+4. Upgrade Main Cycle execution to continue through bounded generation waves and four-candidate persistence batches without repeated preparation, coverage reads, or strategy reconstruction.
+5. Upgrade Main Cycle recovery for interruption, ambiguous response, partial batch success, occupied-slot collision, stale evidence delta, safe replay, and selective regeneration without source substitution.
+6. Add Main Cycle timing attribution as telemetry rather than a correctness gate.
+7. Validate source parity, dynamic runway behavior, lineage, recovery, nonduplication, and production safety without invoking the Innovation Cycle as a production writer.
+8. Release the exact validated SHA, verify the Main Cycle champion runtime, preserve the prior Main Cycle path only until the new champion is proven, and then retire duplicate old orchestration.
+
+Definition of done:
+
+- The Innovation Cycle remains physically and operationally unchanged.
+- The Main Cycle independently implements the winning challenger behavior.
+- The Main Cycle fills exactly the real missing slots in its fixed 48-hour runway.
+- Existing valid scheduled posts and all historical production truth are preserved.
+- Routine cycles no longer require complete evidence-page rereads, repeated preparation, or repeated coverage reads between accepted batches.
+- Partial failures preserve successful siblings and regenerate only rejected or invalidated slots.
+- Exact operation replay cannot duplicate production side effects.
+- Every accepted post retains complete source, strategy, generation, gate, hypothesis, experiment, decision, schedule, and intelligence lineage.
+- Production timing receipts separate preparation, model/client, persistence, reconciliation, and completion time without failing an otherwise correct cycle solely for latency.
+- The exact tested SHA is deployed and live Main Cycle verification passes.
+
 ## Current Action
 
-1. Stop. Do not run interrupted replay, another 48-slot attempt, or close the overall parity job.
-2. Review the completed 48 posts, selective regenerations, and timing breakdown with the owner.
-3. Resume only after a new explicit owner instruction establishes whether to optimize and rerun the 48-slot timing gate or accept a revised measured ceiling.
-4. Keep `manifest-innovation-main-mimic-parity` open because the strict 48-slot timing definition of done did not pass.
+1. Complete the canonical terminology and separation contract.
+2. Reconcile the exact repository and production baseline.
+3. Map the proven Innovation Challenger behavior to existing Main Cycle services.
+4. Implement the Main Cycle champion in bounded validated stages, stopping on every blocker for root-cause repair and permanent prevention.
 
 ## Deferred Work — INACTIVE
 
