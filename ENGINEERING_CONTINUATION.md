@@ -6,10 +6,10 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-to-main-promotion
-active_checkpoint: stage-8-exact-release-and-live-verification
-validated_source_head: 541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3
-documentation_source_head: 541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3
-production_sha: 12f94b8f80afdae72d08fc5fd59c26414af255a0
+active_checkpoint: stage-9-first-natural-main-cycle-observation
+validated_source_head: eef92f606d87fe64c28493dcf67a119c9693fc34
+documentation_source_head: eef92f606d87fe64c28493dcf67a119c9693fc34
+production_sha: eef92f606d87fe64c28493dcf67a119c9693fc34
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -369,12 +369,24 @@ Validated source SHA: `541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3`
 - Capability lifecycle, system directory, routing policy, exact account/direct/scoped tool inventories, response compaction, dynamic runway, locked lineup, batch recovery, complete lineage, and timing telemetry have permanent regressions.
 - Exact-head push-validation run `30658591149` passed typecheck, lifecycle governance, release preflight, and all seven complete test inventories.
 
+## DEPLOYED CHECKPOINT — Main Cycle Champion Live
+
+Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
+
+- Exact-SHA release run `30658861485` succeeded. Release identity, exact-head gates, trigger-neutral configuration, isolated Shadow D1 provisioning, Worker deployment, and production runtime verification all passed.
+- No Main Cycle database migration was required. Existing production data, scheduled posts, strategy, learning, lineage, and publishing state were preserved.
+- Live `runMcpTests` route campaign passed all 119 internal capabilities with 49 read-only and 70 mutation-classified routes, zero route failures, zero policy-classification failures, and zero mutations executed.
+- The live operator closure independently reported production commit `eef92f606d87fe64c28493dcf67a119c9693fc34`.
+- The new `get_manifest_locked_lineup_page` capability is live, read-only, statically routed, lifecycle-owned, and available through all account wrapper surfaces.
+- The Innovation Cycle was not invoked, mutated, connected to the Main Cycle, or used as a production writer during implementation, release, or live verification.
+- The Main Cycle Champion is deployed. Its first real generation duration and complete live-cycle behavior must be measured on the next naturally required Main Cycle rather than by creating unnecessary production posts solely for testing.
+
 ## Current Action
 
-1. Validate the final continuation-only source head without changing the verified implementation.
-2. Deploy only that exact passing SHA through the controlled Worker release workflow.
-3. Verify production code identity, Main Cycle tool/schema availability, locked-lineup read-only classification, and champion runtime contracts without invoking the Innovation Cycle or generating production posts solely for verification.
-4. Record the deployed SHA and live verification, then close or advance the promotion job based on the verified production result.
+1. Allow the next naturally required Main Cycle to calculate the real deficit inside the fixed 48-hour runway and execute through the deployed champion path.
+2. Verify its terminal receipt for dynamic missing-slot count, compact decision-bundle use, complete locked-lineup consumption, uninterrupted batch execution, selective regeneration if needed, complete lineage, nonduplication, and timing telemetry.
+3. Do not invoke the Innovation Cycle for production and do not force posts solely to manufacture acceptance evidence.
+4. After one representative natural Main Cycle succeeds, record measured production timing and close the promotion job or repair any concrete champion defect before closure.
 
 ## Deferred Work — INACTIVE
 
