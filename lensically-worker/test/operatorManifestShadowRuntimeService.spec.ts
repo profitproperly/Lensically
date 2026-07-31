@@ -454,6 +454,48 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(parseJsonRecord(recoveryEvent?.payload_json).recovery_action).toBe("rebuild_exact_operation_in_place");
   });
 
+    it("retires an abandoned different-operation preparation but never bypasses durable active state", async () => {
+    const harness = dependencyHarness();
+    const abandoned = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "abandoned-preparation",
+      horizonHours: 48,
+    });
+    expect(abandoned.status).toBe(200);
+    const abandonedRunId = String(abandoned.body.shadow_run_id);
+    await env.DB.prepare(`DELETE FROM manifest_shadow_snapshots WHERE shadow_run_id = ?`).bind(abandonedRunId).run();
+    await env.DB.prepare(
+      `UPDATE manifest_shadow_runs SET status = 'preparing', snapshot_hash = NULL, completed_at = NULL WHERE id = ?`,
+    ).bind(abandonedRunId).run();
+
+    const replacement = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "replacement-after-abandoned",
+      horizonHours: 48,
+    });
+    expect(replacement.status).toBe(200);
+    expect(replacement.body.success).toBe(true);
+    expect(replacement.body.decision_bundle_id).toBeTruthy();
+    const retired = await env.DB.prepare(
+      `SELECT status, failure_code FROM manifest_shadow_runs WHERE id = ? LIMIT 1`,
+    ).bind(abandonedRunId).first<JsonRecord>();
+    expect(retired).toMatchObject({
+      status: "failed",
+      failure_code: "manifest_shadow_incomplete_preparation_abandoned",
+    });
+
+    const blocked = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "must-not-bypass-durable-state",
+      horizonHours: 48,
+    });
+    expect(blocked.status).toBe(500);
+    expect(String(blocked.body.error)).toContain("manifest_shadow_run_already_active");
+  });
+
   it("forbids live evidence access before an Innovation run begins", async () => {
     const harness = dependencyHarness();
     const result = await handleOperatorManifestShadowTool({

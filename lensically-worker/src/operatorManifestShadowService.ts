@@ -562,12 +562,46 @@ export async function beginManifestShadowRun(
 ): Promise<JsonRecord> {
   await recoverStaleManifestShadowRun(db, nowIso);
   await cleanupManifestShadowMetadata(db, nowIso);
-  const active = await db.prepare(
+    const active = await db.prepare(
     `SELECT id, operation_root, status FROM manifest_shadow_runs
      WHERE status IN ('preparing', 'running') LIMIT 1`,
   ).first<JsonRecord>();
   if (active && String(active.operation_root ?? "") !== input.operation_root) {
-    throw new Error(`manifest_shadow_run_already_active:${String(active.id ?? "unknown")}`);
+    const activeRunId = String(active.id ?? "");
+    const snapshot = activeRunId
+      ? await db.prepare(
+          `SELECT payload_json FROM manifest_shadow_snapshots WHERE shadow_run_id = ? LIMIT 1`,
+        ).bind(activeRunId).first<JsonRecord>()
+      : null;
+    let durableRuntimeStateFound = false;
+    if (snapshot?.payload_json) {
+      try {
+        const parsed = asRecord(JSON.parse(String(snapshot.payload_json)));
+        const metadata = asRecord(parsed.metadata);
+        durableRuntimeStateFound = Object.keys(asRecord(metadata.state)).length > 0;
+      } catch {
+        durableRuntimeStateFound = false;
+      }
+    }
+    if (durableRuntimeStateFound) {
+      throw new Error(`manifest_shadow_run_already_active:${activeRunId || "unknown"}`);
+    }
+    if (activeRunId) {
+      await failManifestShadowRun(db, {
+        run_id: activeRunId,
+        now_iso: nowIso,
+        error_code: "manifest_shadow_incomplete_preparation_abandoned",
+        error_message: "Active Shadow preparation had no durable runtime state and was retired before a fresh operation.",
+        diagnostics: {
+          stage: "prepare_recovery",
+          prior_operation_root: active.operation_root ?? null,
+          prior_status: active.status ?? null,
+          durable_runtime_state_found: false,
+          recovery_action: "retire_abandoned_incomplete_preparation",
+          replacement_operation_root: input.operation_root,
+        },
+      });
+    }
   }
   const hours = retentionHours(input.retention_hours);
   await db.prepare(
