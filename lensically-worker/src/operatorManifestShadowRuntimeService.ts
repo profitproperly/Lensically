@@ -1923,20 +1923,30 @@ async function persistShadowBatch(
 
 function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): JsonRecord | null {
   if (state.strategy || state.completed || !state.missing_slot_keys.length) return null;
+  const lineupBySlot = Object.fromEntries(state.locked_source_lineup.map((item) => [
+    String(item.assigned_slot_key ?? ""),
+    {
+      identity: item.source_identity_key ?? null,
+      source_card_id: item.source_card_id ?? null,
+      family_id: item.source_card_family_id ?? null,
+      mechanism: typeof item.source_mechanism === "string" ? item.source_mechanism.slice(0, 90) : null,
+      direction: typeof item.recommended_direction === "string" ? item.recommended_direction.slice(0, 140) : null,
+    },
+  ]));
   return {
     shadow_run_id: state.run_id,
     decision_bundle_id: state.decision_bundle_id,
     snapshot_hash: state.decision_bundle.snapshot_hash ?? null,
-    missing_slot_keys: [...state.missing_slot_keys],
-        locked_source_lineup: state.locked_source_lineup.map((item) => ({
-      assigned_slot_key: item.assigned_slot_key ?? null,
-      source_identity_key: item.source_identity_key ?? null,
-      source_card_id: item.source_card_id ?? null,
-      source_card_family_id: item.source_card_family_id ?? null,
-      source_mechanism: typeof item.source_mechanism === "string" ? item.source_mechanism.slice(0, 120) : null,
-      required_product: typeof item.required_product === "string" ? item.required_product.slice(0, 140) : null,
-      recommended_direction: typeof item.recommended_direction === "string" ? item.recommended_direction.slice(0, 160) : null,
-    })),
+    lineup_count: state.locked_source_lineup.length,
+    lineup_by_slot: lineupBySlot,
+    lineup_order_contract: "Object insertion order is the exact locked strategy order. Convert entries to the commit lineup without sorting or substitution.",
+    field_legend: {
+      identity: "source_identity_key",
+      source_card_id: "source_card_id",
+      family_id: "source_card_family_id",
+      mechanism: "bounded source mechanism cue",
+      direction: "bounded source-backed generation direction",
+    },
     source_substitution_allowed: false,
     strategy_commit_tool: "commit_manifest_shadow_cycle_strategy",
   };

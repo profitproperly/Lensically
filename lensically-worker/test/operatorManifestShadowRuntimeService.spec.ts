@@ -404,15 +404,20 @@ describe("operatorManifestShadowRuntimeService", () => {
       expect(harness.audit.snapshot_db_calls).toBe(0);
       expect(harness.audit.source_provider_reads).toBe(1);
       expect(harness.audit.evidence_provider_reads).toBe(1);
-      if (scenario === "normal_24") {
+            if (scenario !== "noop") {
         const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
         const pendingContract = record(pendingReceipt.pending_strategy_contract);
-                expect(rows(pendingContract.locked_source_lineup)).toHaveLength(24);
-        expect(rows(pendingContract.locked_source_lineup).every((item) => Boolean(item.assigned_slot_key && item.source_card_id && item.source_card_family_id))).toBe(true);
-        expect(new TextEncoder().encode(JSON.stringify(pendingContract)).byteLength).toBeLessThan(18_000);
+        const lineupBySlot = record(pendingContract.lineup_by_slot);
+        expect(Object.keys(lineupBySlot)).toHaveLength(expected);
+        expect(Object.values(lineupBySlot).every((value) => {
+          const item = record(value);
+          return Boolean(item.source_card_id && item.family_id && item.identity);
+        })).toBe(true);
+        expect(Number(pendingContract.lineup_count)).toBe(expected);
+        expect(new TextEncoder().encode(JSON.stringify(pendingContract)).byteLength).toBeLessThan(22_000);
         expect(pendingContract.source_substitution_allowed).toBe(false);
+        await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
       }
-      if (scenario !== "noop") await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
     }
   });
 

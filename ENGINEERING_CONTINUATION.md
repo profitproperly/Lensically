@@ -221,7 +221,9 @@ incident_id: `3f53ff37-b04b-4e4f-891c-aaca15323fa3`
 - Runtime evidence externalization and exact candidate-projection hydration were released at SHA `cceb9e508057cf0eacd5a9220d39b4fab4eb407d`; typecheck, mapped push validation, all eight Operator shards, exact release, and live Main-scale preparation passed.
 - Live run `shadow-2bb59e3784ba4e76faf79eee8bc310d5` completed preparation in 9.163 seconds with snapshot payload 197,333 bytes, 150 eligible families, 24 locked sources, selector parity, matching Main/Innovation output hash `c73cd14d89ac245f186bfbb7ec308e2be71a189f3bcd4f15ee9051560e280c0a`, zero Main writes, and zero Threads mutations.
 - The remaining blocker is the receipt transport contract: diagnostic receipt fields are serialized before a verbose pending strategy contract, causing server payload compaction to truncate the 24-item locked lineup and making exact strategy commit impossible.
-- Current interrupt action: make the pending strategy contract commit-critical and compact, place it before diagnostics in the response, guarantee all 24 or 48 lineup identities fit below the response budget, add size/completeness regression coverage, release exact SHA, reread the existing live run without re-preparing, commit strategy, and continue the three acceptance stages.
+- Commit-critical response ordering and a sub-18KB compact contract were released at SHA `252b5d447cf8c33acef35b46f9cbd6e0546804fd`; all validation and exact release gates passed.
+- Live reread proved a separate transport invariant: the platform caps every response array at 20 items regardless of byte size, so a 24- or 48-item `locked_source_lineup` array is structurally incapable of remaining complete.
+- Current interrupt action: replace commit-critical lineup arrays with one canonical slot-keyed object whose insertion order is the exact strategy order, include compact source identity/card/family plus bounded mechanism/direction cues, add 24- and 48-slot completeness/size regressions, release exact SHA, reread the existing live run without re-preparing, commit strategy, and continue all acceptance stages.
 
 ## ACTIVE — Manifest Innovation Main-Mimic Parity
 
