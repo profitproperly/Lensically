@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-innovation-live-24-slot-test
+active_checkpoint: prepare-shadow-24-slot-cycle
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
 production_sha: 1c7eb296caa64fd6faa0d8b4eb20a3612290bda4
@@ -24,6 +24,18 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 4. Keep one active outcome and reject unrelated scope until it closes.
 
 ## Unified Job Queue
+
+### ACTIVE — Manifest Innovation Live 24-Slot Test
+
+job_id: `manifest-innovation-live-24-slot-test`
+
+Owner objective:
+
+- Execute one live Operator MCP 24-slot replenishment test exclusively inside the isolated Innovation `SHADOW_DB`.
+- Exercise preparation, decision bundle, strategy lock, model generation, deterministic gates, shadow scheduling persistence, complete lineage, reconciliation, cleanup, and durable benchmark receipt.
+- Enforce a total wall-clock ceiling of 6 minutes.
+- Prove zero Main reads, zero Main writes, zero production receipt writes, and zero Threads requests or mutations.
+- Stop after recording the verified result. Do not invoke or promote Main.
 
 ### COMPLETED — Manifest Innovation Runtime Activation
 
@@ -155,6 +167,18 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Until then, Main stays unchanged and Innovation sits idle as the proven upstream rail.
 
 
+
+
+
+## Current Action
+
+1. Prepare the isolated 24-slot Innovation replenishment scenario through `prepare_manifest_shadow_cycle`.
+2. Commit the shadow strategy using the exact returned decision bundle identity and frozen snapshot.
+3. Generate, gate, and persist all required candidates through bounded `persist_manifest_shadow_batch` calls until 24/24 are accepted and scheduled-shaped rows exist.
+4. Read the durable receipt; verify the 6-minute ceiling, complete lineage, zero Main access, zero production receipt writes, zero Threads access, and zero cleanup orphans.
+5. Record the result, clear the active job and Current Action, and stop.
+
+Do not invoke, dry-run, canary, schedule through, publish through, or promote the Main Cycle.
 
 ## Other Completed Work
 
