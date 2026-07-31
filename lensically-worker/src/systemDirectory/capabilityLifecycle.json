@@ -476,7 +476,7 @@
       "canonical_handler": "prepare_manifest_autonomous_cycle",
       "route_intent": "prepare manifest autonomous cycle",
       "implementation_mode": "new_handler",
-            "focused_regression": "prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review",
+            "focused_regression": "prepares the compact Main Cycle decision bundle and exact fixed-runway deficit without requiring owner review",
       "release_scope": "operator-content",
             "live_verification": "The exact deployed Main Cycle tool reconciles live schedule coverage, preserves every valid existing slot, computes the actual 0-through-48 deficit inside the fixed 48-hour runway, reuses fresh finalized intelligence when no due maturity checkpoint changed, returns one compact decision bundle, and requires one unchanged backend-locked source lineup before generation.",
       "compatibility_bridge": false
