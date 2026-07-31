@@ -134,8 +134,113 @@ export async function handleOperatorManifestCycleServiceTool(
   },
   dependencies: OperatorManifestCycleServiceDependencies,
 ): Promise<OperatorManifestCycleServiceResult> {
-  const { toolName, brandKey, payload } = input;
+    const { toolName, brandKey, payload } = input;
   const { db, normalizeText } = dependencies;
+
+  if (toolName === "get_manifest_locked_lineup_page") {
+    const cycleId = normalizeText(payload.cycle_id, 160);
+    const offset = Math.max(0, Math.trunc(Number(payload.offset ?? 0)));
+    const limit = Math.min(12, Math.max(1, Math.trunc(Number(payload.limit ?? 12))));
+    if (!cycleId) {
+      return result({ success: false, error: "autonomous_cycle_id_required" }, 400);
+    }
+    try {
+      const [countRow, rows] = await Promise.all([
+        db.prepare(
+          `SELECT COUNT(*) AS total
+           FROM operator_source_selection_plans
+           WHERE brand_key = ? AND cycle_id = ? AND status = 'locked'`,
+        ).bind(brandKey, cycleId).first<JsonRecord>(),
+        db.prepare(
+          `SELECT
+             p.slot_key,
+             p.selection_order,
+             p.source_identity_key,
+             p.source_card_family_id,
+             p.source_card_id,
+             p.engine_version,
+             p.receipt_json,
+             c.title AS source_title,
+             c.primary_source_json,
+             c.source_mechanism,
+             c.required_product,
+             c.recommended_direction,
+             c.transformation_contract_json,
+             c.pass_conditions_json,
+             c.fail_conditions_json,
+             c.source_selection_id,
+             c.version_number AS source_card_version_number,
+             f.source_type,
+             f.internal_source_id,
+             f.canonical_source_url
+           FROM operator_source_selection_plans p
+           LEFT JOIN operator_source_cards c
+             ON c.id = p.source_card_id AND c.brand_key = p.brand_key
+           LEFT JOIN operator_source_card_families f
+             ON f.id = p.source_card_family_id AND f.brand_key = p.brand_key
+           WHERE p.brand_key = ? AND p.cycle_id = ? AND p.status = 'locked'
+           ORDER BY p.selection_order ASC
+           LIMIT ? OFFSET ?`,
+        ).bind(brandKey, cycleId, limit, offset).all<JsonRecord>(),
+      ]);
+      const totalCount = Math.max(0, Math.trunc(Number(countRow?.total ?? 0)));
+      const items = (rows.results ?? []).map((row) => {
+        const receipt = asRecord(parseJson(row.receipt_json, {}));
+        return {
+          slot_key: row.slot_key,
+          selection_order: Number(row.selection_order ?? 0),
+          source_identity_key: row.source_identity_key,
+          source_card_family_id: row.source_card_family_id,
+          source_card_id: row.source_card_id,
+          source_selection_id: row.source_selection_id ?? null,
+          source_card_version_number: Number(row.source_card_version_number ?? 1),
+          source_type: row.source_type ?? null,
+          internal_source_id: row.internal_source_id ?? null,
+          canonical_source_url: row.canonical_source_url ?? null,
+          source_title: String(row.source_title ?? "").slice(0, 240),
+          primary_source: compactLineupCue(parseJson(row.primary_source_json, {})),
+          source_mechanism: String(row.source_mechanism ?? "").slice(0, 800),
+          required_product: String(row.required_product ?? "").slice(0, 400),
+          recommended_direction: String(row.recommended_direction ?? "").slice(0, 800),
+          transformation_contract: compactLineupCue(parseJson(row.transformation_contract_json, {})),
+          pass_conditions: compactLineupCue(parseJson(row.pass_conditions_json, [])),
+          fail_conditions: compactLineupCue(parseJson(row.fail_conditions_json, [])),
+          selection_evidence: {
+            lifetime_label: receipt.lifetime_label ?? null,
+            recent_label: receipt.recent_label ?? null,
+            score: receipt.score ?? null,
+            cooldown_hours: receipt.cooldown_hours ?? null,
+            planned_uses: receipt.planned_uses ?? null,
+          },
+        };
+      });
+      const nextOffset = offset + items.length;
+      return result({
+        success: true,
+        cycle_identity: "Main Cycle",
+        cycle_id: cycleId,
+        lineup_page: {
+          offset,
+          limit,
+          total_count: totalCount,
+          returned_count: items.length,
+          items,
+          next_offset: nextOffset < totalCount ? nextOffset : null,
+          complete: nextOffset >= totalCount,
+        },
+        source_substitution_allowed: false,
+        next_action: nextOffset < totalCount
+          ? `Call get_manifest_locked_lineup_page again with offset ${nextOffset} and the same cycle_id. Do not fetch individual source cards already represented in these pages.`
+          : "Use the complete paged Main Cycle lineup to author the exact locked slots, then commit one account strategy and continue directly through bounded generation and persistence batches.",
+      });
+    } catch (error) {
+      return result({
+        success: false,
+        cycle_id: cycleId,
+        error: error instanceof Error ? error.message : "manifest_locked_lineup_page_read_failed",
+      }, 400);
+    }
+  }
 
   if (toolName === "get_manifest_cycle_analysis_page") {
     const cycleId = normalizeText(payload.cycle_id, 160);
