@@ -11286,7 +11286,7 @@ async function prepareManifestAutonomousCycle(
           accountId: brand.account_id,
           threadsUserId: brand.profile.threads_user_id,
           capturedAt: asOf,
-          timezone: deliveryTimezone,
+                    timezone,
           coverageRules: {
             mode: "main_autonomous_prepare",
             horizon_hours: horizonHours,
