@@ -12725,13 +12725,19 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         brandKey,
         cycleId,
       ),
-      readPlanItems: async (cycleId, brandKey) => {
+            readPlanItems: async (cycleId, brandKey) => {
 
         const rows = await env.DB.prepare(
-          `SELECT slot_key, status FROM operator_manifest_cycle_plan_items WHERE cycle_id = ? AND brand_key = ?`,
+          `SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,
+                  family_key, strategic_role, generation_mode, source_kind, source_card_id,
+                  source_selection_id, audience_reward, hook_direction, placement_reason,
+                  nearby_avoid_json, exploration_mode, status
+           FROM operator_manifest_cycle_plan_items
+           WHERE cycle_id = ? AND brand_key = ?`,
         ).bind(cycleId, brandKey).all<Record<string, unknown>>();
         return rows.results ?? [];
       },
+
       getCycleReceipt: (cycleId, brandKey) => getManifestCycleReceipt(env.DB, { brandKey, cycleId }),
       finalizeCycleReceipt: (input) => finalizeManifestCycleReceipt(
         env.DB,

@@ -1562,9 +1562,12 @@ if (!operatorManifestCycleServiceTests.includes("preserves bounded evidence-page
 }
 if (!source.includes('from "./operatorHourlyCoverageService"')
     || !source.includes("get_hourly_coverage: async () =>")
-    || !source.includes("handleOperatorHourlyCoverageService({")) {
+        || !source.includes("handleOperatorHourlyCoverageService({")
+    || !source.includes("SELECT id, strategy_id, cycle_id, brand_key, slot_key, slot_date, slot_time,")
+    || !source.includes("source_selection_id, audience_reward, hook_direction, placement_reason,")) {
   lifecycleErrors.push("operator_hourly_coverage_service_import_or_binding_missing");
 }
+
 if (source.includes('const driftDefectKey = `coverage-ledger-drift:')
     || source.includes('errorCode: "manifest_cycle_missing_slot_ledger_drift"')
     || source.includes('completion_trigger: "authoritative_coverage_reconciliation"')) {
