@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-innovation-live-24-real-generation-test
+active_checkpoint: prepare-real-source-backed-shadow-run
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
 production_sha: 5b1be6dd102bf94935928a4b031ddf75cda307f1
@@ -25,15 +25,16 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### COMPLETED — Manifest Innovation Live 24-Slot Test
+### COMPLETED — Manifest Innovation Synthetic 24-Slot Persistence Benchmark
 
 job_id: `manifest-innovation-live-24-slot-test`
 
 Owner objective:
 
 - Execute one live Operator MCP 24-slot replenishment test exclusively inside the isolated Innovation `SHADOW_DB`.
-- Exercise preparation, decision bundle, strategy lock, model generation, deterministic gates, shadow scheduling persistence, complete lineage, reconciliation, cleanup, and durable benchmark receipt.
-- Enforce a total wall-clock ceiling of 6 minutes.
+- Exercise preparation, decision bundle, strategy lock, deterministic synthetic-candidate gates, shadow scheduling persistence, complete lineage, reconciliation, cleanup, and durable benchmark receipt.
+- This benchmark did not execute genuine model-written Manifest posts and therefore does not satisfy the real-generation acceptance requirement.
+- Enforce a total wall-clock ceiling of 6 minutes for the synthetic orchestration and persistence path.
 - Prove zero Main reads, zero Main writes, zero production receipt writes, and zero Threads requests or mutations.
 - Stop after recording the verified result. Do not invoke or promote Main.
 
@@ -53,7 +54,7 @@ Owner objective:
 
 job_id: `manifest-innovation-cycle-shadow-testbed`
 
-The permanent upstream Innovation Cycle is complete, isolated, end-to-end proven in source, activated through the live MCP, and operationally proven for full-runway no-op plus 24-slot replenishment.
+The permanent upstream Innovation Cycle is complete and isolated in architecture, activated through the live MCP, and operationally proven for the full-runway no-op plus synthetic 24-slot orchestration/persistence. Genuine 24-post model generation remains unproven live.
 
 ## Permanent Operating Model
 
@@ -113,13 +114,14 @@ The exact executable D1-backed matrix proves:
 13. Production-shaped cycle, evidence, strategy, plan, gate, generation, draft, hypothesis, experiment, decision, lineup, schedule, completion, and receipt rows inside `SHADOW_DB`.
 14. Zero cleanup orphans.
 
-## Performance Proof — COMPLETE
+## Performance Proof — PARTIAL
 
 The passing exact-head matrix enforces wall-clock ceilings, including model/client gaps and tool round trips:
 
 - Three consecutive no-op runs: each at or below 30 seconds.
-- Three consecutive complete 24-slot runs: each at or below 6 minutes.
-- Three consecutive complete 48-slot recovery runs: each below 10 minutes.
+- Three consecutive source-level synthetic 24-slot harness runs: each at or below 6 minutes.
+- Three consecutive source-level synthetic 48-slot recovery harness runs: each below 10 minutes.
+- No clean live benchmark has yet proven 24 genuine model-written, source-faithful Manifest posts within six minutes.
 - Previous Main 48-slot baseline: approximately 3 hours 22 minutes 15 seconds.
 - Proven 48-slot Innovation ceiling: more than 20 times faster than the baseline while preserving the required operational contract.
 
@@ -161,7 +163,28 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Commit `ef1f02232b8b00d3061511489848e918fcd373cf` added recoverable pending strategy contracts for active runs; typecheck `30595230952`, Operator `30595245837` (8/8), and deploy `30595300538` passed.
 - Functional recovery run `shadow-6309ec08364337c03c22ffb69021c596` accepted 24/24 with 264 gates, 24 complete lineages, zero Main reads/writes, zero Threads mutations, and zero orphans. Its receipt `6034b5c8-55a2-4e6e-adaf-df7d30161870` failed only the wall-clock rule because live engineering repairs occurred inside the run.
 - Commit `5b1be6dd102bf94935928a4b031ddf75cda307f1` terminalized failed benchmark runs and prevented retained failed runs from blocking the next cycle. Push validation `30596010989`, Operator `30596021551` (8/8), and exact-SHA deploy `30596107493` passed.
-- Clean live MCP 24-slot run `shadow-8006b68e6344548e4943832215371f19` completed at exact SHA `5b1be6dd102bf94935928a4b031ddf75cda307f1`. Durable benchmark `67fde27d-5d4f-47be-b4b0-fdc29bfa82e4` passed in 292,505 ms against the 360,000 ms ceiling with 24/24 accepted, zero rejected, six bounded batch calls, 264 gates, 24 complete lineages, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans.
+- Clean live MCP synthetic 24-slot run `shadow-8006b68e6344548e4943832215371f19` completed at exact SHA `5b1be6dd102bf94935928a4b031ddf75cda307f1`. Durable benchmark `67fde27d-5d4f-47be-b4b0-fdc29bfa82e4` passed in 292,505 ms with 24/24 synthetic fixture candidates accepted, zero rejected, six bounded batch calls, 264 gates, 24 complete lineages, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans. This receipt proves orchestration and persistence only, not genuine post generation or content quality.
+
+## ACTIVE — Manifest Innovation Live 24-Post Real Generation Test
+
+job_id: `manifest-innovation-live-24-real-generation-test`
+
+Owner objective:
+
+- Run one clean live Innovation shadow cycle with 24 actual model-written, source-faithful Manifest Mental posts.
+- Use real production-shaped frozen source-card content inside the isolated provider boundary, never generic numbered fixture prose.
+- Exercise strategy, generation, deterministic gates, scheduling-shaped persistence, full lineage, reconciliation, cleanup, and durable benchmark timing.
+- Require all 24 exact posts to be inspectable after completion.
+- Enforce zero Main reads, zero Main writes, zero production receipt writes, and zero Threads requests or mutations.
+- Do not count the synthetic 4m52.505s run toward this objective.
+
+## Current Action
+
+1. Inspect the Innovation runtime generation path and remove synthetic automatic-candidate substitution from the live acceptance route.
+2. Add regression prevention proving live baseline acceptance cannot pass with generic fixture placeholder text.
+3. Validate and deploy the exact tested SHA.
+4. Run a fresh isolated 24-slot shadow cycle with genuine model-written posts.
+5. Show all 24 posts, read the durable benchmark, and close only if quality, lineage, isolation, and timing all pass.
 
 ## Deferred Work — INACTIVE
 
@@ -181,7 +204,7 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 incident_id: `0a596193-9f73-4619-8bb3-d6b4fe22c56c`
 
 - Closed after durable source bootstrap, complete decision-bundle compaction, active-run recovery, and terminal benchmark-state prevention were source-controlled, regression-tested, deployed, and verified live.
-- The clean live 24-slot benchmark passed within the six-minute ceiling with complete scheduling-shaped persistence and lineage.
+- The clean live synthetic 24-slot benchmark passed within the six-minute ceiling with complete scheduling-shaped persistence and lineage. It did not prove genuine model-written post generation.
 - Main and Threads remained untouched throughout all failure, repair, recovery, and clean benchmark paths.
 
 ## Other Completed Work
