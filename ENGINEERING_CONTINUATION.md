@@ -284,15 +284,24 @@ Definition of done:
 - Main reads during isolated execution: 0. Main writes: 0. Threads requests or mutations: 0. Cleanup orphans: 0.
 - A durable parity, isolation, quality, and timing receipt is recorded.
 
+## COMPLETED CHECKPOINT — Clean Timed 24-Slot Main-Mimic Acceptance
+
+- Shadow run: `shadow-6daa09c6a7fc154a71334b09713e0b15`.
+- Benchmark receipt: `bb35f789-a7a5-4e5f-8065-4fe275771f03`.
+- Live production SHA: `4c3f5b9d46059a4d305f75af11b2006bad579614`.
+- Total wall clock: `322731 ms` (`5m 22.731s`), passing the strict `< 600000 ms` acceptance ceiling.
+- Genuine frozen snapshot: 150 eligible families; exported/imported snapshot hash `35eac43ac971e781a9fcd1f5f44eb5afe94758f98e2b36b8fd74b7e4a544fa27`.
+- Main-equivalent and Innovation output hashes matched exactly: `5937b00aeddf7031d933f071c11a0f43c04708219610272b9ddcd055e6cbb774`.
+- 24 generated, 24 accepted, 0 rejected, 0 remaining; six four-item batches; 288 gates executed; 24 complete lineage records.
+- Main reads during isolated execution: 0. Main writes: 0. External reads: 0. Threads mutations: 0. Cleanup orphans: 0.
+- Benchmark status: passed. The owner ordered a stop for review before any interrupted replay or 48-slot recovery.
+
 ## Current Action
 
-Owner ordering update — 2026-07-31:
-
-1. Discard the turn-timer-interrupted partial 24-slot run as timing evidence and start a new clean `normal_24` / `baseline` / `snapshot` acceptance from zero on live production SHA `4c3f5b9d46059a4d305f75af11b2006bad579614`.
-2. Time only the uninterrupted 24-slot run from preparation through final benchmark receipt. Use 48-hour horizon, exactly 24 missing slots, the genuine frozen Main snapshot, exact selector parity, one locked strategy, and six four-item persistence batches.
-3. Fail closed unless all parity, quality, lineage, isolation, cleanup, and strict-under-ten-minute gates pass. Main reads during isolated execution, Main writes, Threads requests/mutations, and cleanup orphans must all equal zero.
-4. Stop immediately after recording and reporting the final 24-slot receipt. Do not run interrupted replay or 48-slot recovery yet.
-5. After owner and M review the 24-slot result, run a separate clean timed 48-slot recovery and stop again for review. The job remains open until the owner later authorizes the remaining acceptance sequence and every definition-of-done gate passes.
+1. Stop. Do not run interrupted replay or 48-slot recovery.
+2. Review the completed 24-slot quality and timing result with the owner.
+3. Only after a new explicit owner instruction, run one separate clean timed `recovery_48` acceptance and stop again for review.
+4. Keep `manifest-innovation-main-mimic-parity` open until all later owner-authorized definition-of-done stages pass.
 
 ## Deferred Work — INACTIVE
 
