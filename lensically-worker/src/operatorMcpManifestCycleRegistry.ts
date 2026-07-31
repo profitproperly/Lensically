@@ -80,10 +80,10 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
+    {
     name: "get_manifest_cycle_analysis_page",
-    title: "Consume Manifest cycle analysis page",
-    description: "Return one complete canonical page from the rolling 28-day Manifest evidence snapshot and durably record that the model consumed it. Preparation returns only the snapshot manifest; call this tool from page 0 through the final page before committing the cycle strategy.",
+    title: "Read Main Cycle evidence detail page",
+    description: "Return one canonical rolling-evidence detail page and record its consumption. The Main Cycle compact decision bundle is authoritative for routine strategy work; use this detail tool only when decision_bundle.requires_detail_read is true and only for the specific ambiguity identified by the bundle.",
     inputSchema: {
       type: "object",
       properties: {
@@ -96,6 +96,23 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "get_manifest_locked_lineup_page",
+    title: "Read Main Cycle locked lineup page",
+    description: "Return one bounded page of the exact backend-locked Main Cycle source-to-slot lineup with canonical source cues, transformation constraints, and source identities. Read from offset 0 until complete once per prepared cycle. Do not replace locked sources and do not fetch individual source cards already represented in these pages.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brand_key: BRAND_KEY_SCHEMA,
+        cycle_id: { type: "string" },
+        offset: { type: "integer", minimum: 0, default: 0 },
+        limit: { type: "integer", minimum: 1, maximum: 12, default: 12 },
+      },
+      required: ["brand_key", "cycle_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "commit_manifest_cycle_strategy",
