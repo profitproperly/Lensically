@@ -469,6 +469,15 @@ export async function loadLockedSourceCardSelectionCandidates(
 ): Promise<SourceSelectionCandidate[]> {
   await ensureSourceFamilySelectionTables(db);
   await refreshSourceFamilyLabels(db, brandKey, nowIso);
+  return loadLockedSourceCardDecisionCandidates(db, brandKey, nowIso);
+}
+
+export async function loadLockedSourceCardDecisionCandidates(
+  db: D1Database,
+  brandKey: string,
+  nowIso = new Date().toISOString(),
+): Promise<SourceSelectionCandidate[]> {
+  await ensureSourceFamilySelectionTables(db);
   const rows = await db.prepare(
 
                 `SELECT fam.id AS source_card_family_id, fam.source_identity_key,

@@ -1,5 +1,5 @@
 import {
-  loadLockedSourceCardSelectionCandidates,
+  loadLockedSourceCardDecisionCandidates,
   type SourceSelectionCandidate,
   type SourceSelectionReceipt,
 } from "./sourceFamilySelection";
@@ -220,7 +220,7 @@ export async function buildManifestDecisionSnapshot(
   const fingerprintBefore = await readManifestShadowProductionFingerprint(db);
   queryReceipts.push({ query_key: "production_fingerprint_before", row_count: Object.keys(fingerprintBefore).length, read_only: true });
 
-  const sourceCandidates = await loadLockedSourceCardSelectionCandidates(db, input.brandKey, input.capturedAt);
+    const sourceCandidates = await loadLockedSourceCardDecisionCandidates(db, input.brandKey, input.capturedAt);
   queryReceipts.push({ query_key: "locked_source_candidates", row_count: sourceCandidates.length, read_only: true });
 
   const evidence = await readManifestShadowEvidence(db, {
