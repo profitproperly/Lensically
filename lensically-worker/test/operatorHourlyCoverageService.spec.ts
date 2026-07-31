@@ -111,7 +111,7 @@ describe("Operator hourly coverage product service", () => {
       nearby_avoid_json: "[\"money-question\"]",
       status: "planned",
     });
-    mocks.readLockedSourcePlan.mockResolvedValueOnce([
+        mocks.readLockedSourcePlan.mockResolvedValueOnce([
       {
         slot_key: nextSlot.key,
         selection_order: 1,
@@ -121,8 +121,19 @@ describe("Operator hourly coverage product service", () => {
         status: "locked",
       },
     ]);
+    mocks.readPlanItems.mockResolvedValueOnce([
+      {
+        id: "plan-2",
+        slot_key: nextSlot.key,
+        source_card_id: "card-1",
+        status: "planned",
+        nearby_avoid_json: "[\"money-question\"]",
+      },
+      { id: "already-scheduled", slot_key: occupiedSlot.key, status: "scheduled" },
+    ]);
 
     const result = await handleOperatorHourlyCoverageService({
+
 
       brandKey: "manifest_mental",
       payload: { cycle_id: "cycle-1", operation_id: "coverage-op-1" },
@@ -170,14 +181,20 @@ describe("Operator hourly coverage product service", () => {
         source_card_id: "card-1",
         source_card_family_id: "family-1",
       }],
-      next_cycle_plan_item: { id: "plan-2", nearby_avoid: ["money-question"] },
+            next_cycle_plan_item: { id: "plan-2", nearby_avoid: ["money-question"] },
+      next_cycle_plan_items_count: 1,
+      next_cycle_plan_items: [{ id: "plan-2", source_card_id: "card-1", nearby_avoid: ["money-question"] }],
     });
 
         expect(mocks.appendCycleEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: "coverage:coverage-op-1",
       eventType: "coverage_reconciled",
-      payload: expect.not.objectContaining({ cycle_locked_source_plan: expect.anything() }),
+      payload: expect.not.objectContaining({
+        cycle_locked_source_plan: expect.anything(),
+        next_cycle_plan_items: expect.anything(),
+      }),
     }));
+
 
   });
 

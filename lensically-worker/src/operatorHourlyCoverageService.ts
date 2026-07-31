@@ -187,7 +187,7 @@ export async function handleOperatorHourlyCoverageService(
     });
     displacedPlanItemRepaired = Boolean(nextCyclePlanItem);
   }
-  const lockedSourcePlan = (await dependencies.readLockedSourcePlan(cycleId, brandKey)).map((row) => ({
+    const lockedSourcePlan = (await dependencies.readLockedSourcePlan(cycleId, brandKey)).map((row) => ({
     slot_key: row.slot_key ?? null,
     selection_order: row.selection_order ?? null,
     source_identity_key: row.source_identity_key ?? null,
@@ -195,13 +195,26 @@ export async function handleOperatorHourlyCoverageService(
     source_card_id: row.source_card_id ?? null,
     status: row.status ?? null,
   }));
+  const planRows = await dependencies.readPlanItems(cycleId, brandKey);
+  const remainingSlotOrder = new Map(
+    coverageState.remaining_missing_slots.map((slot, index) => [slot.key, index] as const),
+  );
+  const nextCyclePlanItems = planRows
+    .filter((row) => remainingSlotOrder.has(String(row.slot_key ?? "")) && String(row.status ?? "") === "planned")
+    .sort((left, right) => (remainingSlotOrder.get(String(left.slot_key ?? "")) ?? Number.MAX_SAFE_INTEGER)
+      - (remainingSlotOrder.get(String(right.slot_key ?? "")) ?? Number.MAX_SAFE_INTEGER))
+    .slice(0, 8)
+    .map((row) => ({
+      ...row,
+      nearby_avoid: dependencies.parseJson(String(row.nearby_avoid_json ?? "[]")) ?? [],
+    }));
   let cycleCompletion: JsonRecord | null = null;
 
 
   if (currentCycle && coverageState.remaining_missing_slots.length === 0) {
     const elapsedKeys = new Set(coverageState.elapsed_unfilled_slots.map((slot) => slot.key));
-    const planRows = await dependencies.readPlanItems(cycleId, brandKey);
     const incompletePlanItems = planRows.filter((row) =>
+
       !elapsedKeys.has(String(row.slot_key ?? ""))
       && String(row.status ?? "") !== "scheduled"
     );
@@ -254,16 +267,20 @@ export async function handleOperatorHourlyCoverageService(
     cycle_completion: cycleCompletion,
     cycle_locked_source_plan: lockedSourcePlan,
     cycle_locked_source_plan_count: lockedSourcePlan.length,
-    next_cycle_plan_item: nextCyclePlanItem
+        next_cycle_plan_item: nextCyclePlanItem
 
       ? {
           ...nextCyclePlanItem,
           nearby_avoid: dependencies.parseJson(String(nextCyclePlanItem.nearby_avoid_json ?? "[]")) ?? [],
         }
       : null,
+    next_cycle_plan_items: nextCyclePlanItems,
+    next_cycle_plan_items_count: nextCyclePlanItems.length,
   };
     const coverageEventPayload = { ...coverageResponse };
   delete coverageEventPayload.cycle_locked_source_plan;
+  delete coverageEventPayload.next_cycle_plan_items;
+
   await dependencies.appendCycleEvent({
     cycleId,
     brandKey,
