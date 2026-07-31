@@ -339,7 +339,14 @@ describe("operatorManifestShadowRuntimeService", () => {
       expect(prepared.status).toBe(200);
       expect(prepared.body.remaining_missing_count).toBe(expected);
       expect(prepared.body.evidence_mode).toBe("snapshot");
-      expect(harness.audit.snapshot_db_calls).toBe(0);
+            expect(harness.audit.snapshot_db_calls).toBe(0);
+      if (scenario === "normal_24") {
+        const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
+        const pendingContract = record(pendingReceipt.pending_strategy_contract);
+        expect(rows(pendingContract.locked_source_lineup)).toHaveLength(24);
+        expect(rows(pendingContract.locked_source_lineup).every((item) => Boolean(item.assigned_slot_key && item.source_card_id && item.source_card_family_id))).toBe(true);
+        expect(pendingContract.source_substitution_allowed).toBe(false);
+      }
       if (scenario !== "noop") await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
     }
   });

@@ -1489,6 +1489,31 @@ async function persistShadowBatch(
   };
 }
 
+function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): JsonRecord | null {
+  if (state.strategy || state.completed || !state.missing_slot_keys.length) return null;
+  return {
+    shadow_run_id: state.run_id,
+    decision_bundle_id: state.decision_bundle_id,
+    snapshot_hash: state.decision_bundle.snapshot_hash ?? null,
+    missing_slot_keys: [...state.missing_slot_keys],
+    locked_source_lineup: state.locked_source_lineup.map((item) => ({
+      assigned_slot_key: item.assigned_slot_key ?? null,
+      source_identity_key: item.source_identity_key ?? null,
+      source_card_id: item.source_card_id ?? null,
+      source_card_family_id: item.source_card_family_id ?? null,
+      source_mechanism: item.source_mechanism ?? null,
+      required_product: item.required_product ?? null,
+      recommended_direction: item.recommended_direction ?? null,
+      lifetime_label: item.lifetime_label ?? null,
+      recent_label: item.recent_label ?? null,
+      confidence_label: item.confidence_label ?? null,
+      source_text: typeof item.text === "string" ? item.text.slice(0, 360) : null,
+    })),
+    source_substitution_allowed: false,
+    strategy_commit_tool: "commit_manifest_shadow_cycle_strategy",
+  };
+}
+
 async function getShadowReceipt(
   payload: JsonRecord,
   identity: { brandKey: string; accountId: string; threadsUserId: string },
@@ -1504,7 +1529,8 @@ async function getShadowReceipt(
     body: {
       success: true,
       shadow_run_id: runId,
-      receipt,
+            receipt,
+      pending_strategy_contract: state ? buildPendingShadowStrategyContract(state) : null,
       state_summary: state ? {
                 scenario: state.scenario,
         test_case: state.test_case,
