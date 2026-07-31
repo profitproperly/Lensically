@@ -486,14 +486,12 @@ describe("operatorManifestShadowRuntimeService", () => {
       failure_code: "manifest_shadow_incomplete_preparation_abandoned",
     });
 
-    const blocked = await prepareRun({
+        await expect(prepareRun({
       deps: harness.deps,
       scenario: "normal_24",
       suffix: "must-not-bypass-durable-state",
       horizonHours: 48,
-    });
-    expect(blocked.status).toBe(500);
-    expect(String(blocked.body.error)).toContain("manifest_shadow_run_already_active");
+    })).rejects.toThrow("manifest_shadow_run_already_active");
   });
 
   it("forbids live evidence access before an Innovation run begins", async () => {
