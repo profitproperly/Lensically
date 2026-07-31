@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-innovation-main-mimic-parity
+active_checkpoint: stage-1-audit-main-evidence-contract
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
 production_sha: 4b7e1d1c222ebdc4ef8740a85196bce605004a22
@@ -190,6 +190,59 @@ Verified outcome:
 - Main reads: 0. Main writes: 0. Threads mutations: 0. External reads: 0. Cleanup orphans: 0.
 - Functional acceptance passed. Total wall clock was 6m50.464s, exceeding the six-minute target by 50.464s.
 - All 24 exact posts were preserved from the batch receipts for owner inspection.
+
+## ACTIVE — Manifest Innovation Main-Mimic Parity
+
+job_id: `manifest-innovation-main-mimic-parity`
+
+Owner objective:
+
+- Make Innovation a controlled execution twin of Main’s generation cycle without granting Innovation any Main mutation, production scheduling, or Threads capability.
+- Export Main’s complete decision evidence through one bounded read-only snapshot boundary, copy it by value into `SHADOW_DB`, disconnect Main, apply only an explicit test-slot overlay, and run the same shared evidence, deterministic selection, strategy, generation, gates, persistence, reconciliation, and lineage contracts.
+- Preserve Main as authoritative and unchanged. No test data, schedule rows, generation records, receipts, or lineage may be written to Main.
+- Use a competitive real candidate pool substantially larger than the requested slots and prove Innovation selects the same sources, order, exclusions, and source-to-slot lineup that Main-equivalent deterministic computation would select.
+- Benchmark snapshot export separately from the isolated generation cycle. Initial genuine 24-slot target is under 10 minutes; optimize toward six minutes only after parity and quality are proven.
+- Do not promote any Innovation implementation into Main under this job.
+
+Required architecture:
+
+1. Define one versioned `ManifestDecisionSnapshot` containing every decision-relevant input Main consumes: Saved Patterns, source cards and versions, source identities and families, lifetime and rolling labels, mature metric windows, exposure history, recent performance, learning brief, Content Focus, strategy, portfolio, experiments, hypotheses, repetition evidence, follower checkpoint inputs, hard bans, eligibility state, timezone, and coverage rules.
+2. Extract or confirm one shared canonical evidence builder used by Main and the read-only exporter. No duplicated Innovation approximation is permitted.
+3. Build a restricted Main snapshot exporter with read-only provider methods, SELECT-only enforcement, no Threads or scheduler adapter, query receipts, stable JSON, snapshot hash, and before/after zero-write proof.
+4. Import the immutable snapshot by value into persistent seed storage in `SHADOW_DB`; verify schema and hash equality and preserve Main identities only as immutable references.
+5. Apply a separate scenario overlay for exactly 24 open slots. The overlay may change scheduler occupancy only; every other evidence field must remain identical and an explicit diff manifest must prove it.
+6. Invoke the exact shared production source-selection engine with the same eligibility, labels, scores, cooldowns, uniqueness, exposure, exploit/explore, and invalidation rules.
+7. Produce a deterministic parity receipt comparing eligible pool, exclusions and reasons, ranked order, selected 24, source-to-slot assignments, and selector output hash. Any mismatch blocks generation.
+8. Run the genuine 24-post Shadow cycle through strategy, source-faithful model generation, all deterministic and model gates, production-shaped generation/draft/hypothesis/experiment/decision/schedule lineage, reconciliation, post readback, cleanup, and benchmark receipt.
+9. Add permanent preflight and regression prevention against Main bindings, writable exporter methods, Threads access, evidence omissions, selector divergence, scenario overreach, reduced candidate pools, synthetic sources, unreadable generated posts, or missing parity evidence.
+10. Validate snapshot integrity, selector parity, genuine 24-post execution, interrupted replay, and 48-slot recovery in that order.
+
+Isolation contract:
+
+- Snapshot export is the only permitted Main contact and must be provably read-only.
+- The benchmark begins only after the snapshot is imported and Main is disconnected.
+- Innovation runtime composition must receive `SHADOW_DB` only.
+- Innovation must have no Threads client, production scheduler authority, Main receipt writer, or mutation-capable Main provider.
+- Main row counts, hashes, schedules, strategies, learning, histories, and mutation counters must remain unchanged across every acceptance run.
+
+Definition of done:
+
+- Exported and imported evidence hashes match exactly.
+- Only declared schedule-overlay fields differ.
+- Main and Innovation share the same evidence builder and deterministic selector.
+- At least 100 real eligible families compete for 24 slots.
+- Main-equivalent and Innovation calculations produce identical eligibility, ranking, selected sources, order, and source-to-slot lineup.
+- Twenty-four genuine posts are inspectable with complete source, strategy, generation, intelligence, and scheduling-shaped lineage.
+- Main reads during isolated execution: 0. Main writes: 0. Threads requests or mutations: 0. Cleanup orphans: 0.
+- A durable parity, isolation, quality, and timing receipt is recorded.
+
+## Current Action
+
+1. Inspect the failed Cloudflare check attached to documentation head `6d91d758a457a7b98fefb0f02ad3ea2a63ebf875`; classify it and prove the deployed Worker at `4b7e1d1c222ebdc4ef8740a85196bce605004a22` remains healthy before source changes.
+2. Inventory the exact evidence fields and calculations consumed by Main preparation and source selection.
+3. Map every field to its current owning service/query and identify any read path that also performs writes.
+4. Produce the canonical `ManifestDecisionSnapshot` contract and shared-provider boundary.
+5. Stop at the first blocker, repair its root cause, record prevention, then resume this same job.
 
 ## Deferred Work — INACTIVE
 
