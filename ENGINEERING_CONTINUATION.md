@@ -5,8 +5,8 @@ updated_at: 2026-07-31
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-innovation-main-mimic-parity
-active_checkpoint: stage-8-refresh-mcp-and-run-live-24-parity-acceptance
+active_job_id: manifest-innovation-to-main-promotion
+active_checkpoint: stage-0-canonical-architecture-and-promotion-contract
 validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 production_sha: 206a1839fb88d74d2bcbc0ae3a567ddea1c0f631
