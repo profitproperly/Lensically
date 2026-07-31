@@ -6,7 +6,8 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOL_NAMES = [
   "get_manifest_cycle_receipt",
   "record_manifest_cycle_defect",
   "resolve_manifest_cycle_defect",
-  "get_manifest_cycle_analysis_page",
+    "get_manifest_cycle_analysis_page",
+  "get_manifest_locked_lineup_page",
   "commit_manifest_cycle_strategy",
 ] as const;
 
