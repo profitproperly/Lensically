@@ -149,16 +149,113 @@ export type ManifestShadowFrozenSeedInput = {
 
 
 
+export const MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES = 48_000;
+
+export type ManifestShadowJsonChunk = {
+  chunk_index: number;
+  chunk_text: string;
+  byte_length: number;
+};
+
+function manifestShadowUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+export function chunkManifestShadowJsonPayload(
+  value: string,
+  maxBytes = MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES,
+): ManifestShadowJsonChunk[] {
+  if (!Number.isInteger(maxBytes) || maxBytes < 4) {
+    throw new Error("manifest_shadow_frozen_seed_chunk_limit_invalid");
+  }
+  const encoder = new TextEncoder();
+  const chunks: ManifestShadowJsonChunk[] = [];
+  let characters: string[] = [];
+  let byteLength = 0;
+  const flush = () => {
+    const chunkText = characters.join("");
+    chunks.push({ chunk_index: chunks.length, chunk_text: chunkText, byte_length: byteLength });
+    characters = [];
+    byteLength = 0;
+  };
+  for (const character of value) {
+    const characterBytes = encoder.encode(character).byteLength;
+    if (characterBytes > maxBytes) throw new Error("manifest_shadow_frozen_seed_character_too_large");
+    if (characters.length > 0 && byteLength + characterBytes > maxBytes) flush();
+    characters.push(character);
+    byteLength += characterBytes;
+  }
+  if (characters.length > 0 || value.length === 0) flush();
+  return chunks;
+}
+
+export function reassembleManifestShadowJsonChunks(
+  input: ManifestShadowJsonChunk[],
+  payloadKind = "payload",
+): string {
+  if (!input.length) throw new Error(`manifest_shadow_frozen_seed_${payloadKind}_chunks_missing`);
+  const ordered = [...input].sort((left, right) => left.chunk_index - right.chunk_index);
+  for (let index = 0; index < ordered.length; index += 1) {
+    const chunk = ordered[index];
+    if (chunk.chunk_index !== index) {
+      throw new Error(`manifest_shadow_frozen_seed_${payloadKind}_chunk_sequence_invalid`);
+    }
+    if (manifestShadowUtf8ByteLength(chunk.chunk_text) !== chunk.byte_length) {
+      throw new Error(`manifest_shadow_frozen_seed_${payloadKind}_chunk_length_mismatch`);
+    }
+    if (chunk.byte_length > MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES) {
+      throw new Error(`manifest_shadow_frozen_seed_${payloadKind}_chunk_oversized`);
+    }
+  }
+  return ordered.map((chunk) => chunk.chunk_text).join("");
+}
+
 export async function writeManifestShadowFrozenSeed(
   db: D1Database,
   input: ManifestShadowFrozenSeedInput,
 ): Promise<JsonRecord> {
-    const id = input.id ?? crypto.randomUUID();
+  const previous = await db.prepare(
+    `SELECT id FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
+  ).bind(input.brand_key).first<{ id?: string }>();
+  const previousId = String(previous?.id ?? "").trim();
+  const requestedId = String(input.id ?? "").trim();
+  const id = requestedId && requestedId !== previousId ? requestedId : crypto.randomUUID();
+  const payloads = [
+    { kind: "source_candidates", chunks: chunkManifestShadowJsonPayload(JSON.stringify(input.source_candidates)) },
+    { kind: "evidence", chunks: chunkManifestShadowJsonPayload(JSON.stringify(input.evidence)) },
+  ] as const;
+
+  await db.prepare(
+    `DELETE FROM manifest_shadow_frozen_seed_chunks
+     WHERE seed_id NOT IN (SELECT id FROM manifest_shadow_frozen_seeds)`,
+  ).run();
+  await db.prepare(`DELETE FROM manifest_shadow_frozen_seed_chunks WHERE seed_id = ?`).bind(id).run();
+  const chunkStatements: D1PreparedStatement[] = [];
+  for (const payload of payloads) {
+    for (const chunk of payload.chunks) {
+      chunkStatements.push(db.prepare(
+        `INSERT INTO manifest_shadow_frozen_seed_chunks (
+           id, seed_id, payload_kind, chunk_index, chunk_text, byte_length
+         ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        `${id}:${payload.kind}:${chunk.chunk_index}`,
+        id,
+        payload.kind,
+        chunk.chunk_index,
+        chunk.chunk_text,
+        chunk.byte_length,
+      ));
+    }
+  }
+  for (let offset = 0; offset < chunkStatements.length; offset += 40) {
+    await db.batch(chunkStatements.slice(offset, offset + 40));
+  }
+
   await db.prepare(
     `INSERT INTO manifest_shadow_frozen_seeds (
        id, brand_key, contract_version, source_as_of, snapshot_hash,
        source_count, source_candidates_json, evidence_json
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ) VALUES (?, ?, ?, ?, ?, ?, '[]', '{}')
      ON CONFLICT(brand_key) DO UPDATE SET
        id = excluded.id,
        contract_version = excluded.contract_version,
@@ -175,9 +272,10 @@ export async function writeManifestShadowFrozenSeed(
     input.source_as_of,
     input.snapshot_hash,
     input.source_candidates.length,
-    JSON.stringify(input.source_candidates),
-    JSON.stringify(input.evidence),
   ).run();
+  if (previousId && previousId !== id) {
+    await db.prepare(`DELETE FROM manifest_shadow_frozen_seed_chunks WHERE seed_id = ?`).bind(previousId).run();
+  }
   return (await db.prepare(
     `SELECT id, brand_key, contract_version, source_as_of, snapshot_hash, source_count, created_at, updated_at
      FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
@@ -188,24 +286,57 @@ export async function readManifestShadowFrozenSeed(
   db: D1Database,
   brandKey: string,
 ): Promise<JsonRecord | null> {
-    const row = await db.prepare(
+  const row = await db.prepare(
     `SELECT * FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
   ).bind(brandKey).first<JsonRecord>();
   if (!row) return null;
-  let sourceCandidates: JsonRecord[] = [];
-  let evidence: JsonRecord = {};
+
+  let chunkRows: JsonRecord[] = [];
   try {
-    const parsed = JSON.parse(String(row.source_candidates_json ?? "[]"));
-    sourceCandidates = Array.isArray(parsed)
-      ? parsed.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object" && !Array.isArray(item))
-      : [];
-  } catch {
-    sourceCandidates = [];
+    const result = await db.prepare(
+      `SELECT payload_kind, chunk_index, chunk_text, byte_length
+       FROM manifest_shadow_frozen_seed_chunks
+       WHERE seed_id = ?
+       ORDER BY payload_kind ASC, chunk_index ASC`,
+    ).bind(row.id).all<JsonRecord>();
+    chunkRows = result.results ?? [];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such table/i.test(message)) throw error;
+  }
+
+  const payloadJson = (payloadKind: "source_candidates" | "evidence", legacyValue: unknown): string => {
+    if (!chunkRows.length) return String(legacyValue ?? (payloadKind === "source_candidates" ? "[]" : "{}"));
+    const chunks = chunkRows
+      .filter((chunk) => String(chunk.payload_kind ?? "") === payloadKind)
+      .map((chunk) => ({
+        chunk_index: Number(chunk.chunk_index),
+        chunk_text: String(chunk.chunk_text ?? ""),
+        byte_length: Number(chunk.byte_length),
+      }));
+    return reassembleManifestShadowJsonChunks(chunks, payloadKind);
+  };
+
+  let sourceCandidates: JsonRecord[];
+  let evidence: JsonRecord;
+  try {
+    const parsed = JSON.parse(payloadJson("source_candidates", row.source_candidates_json));
+    if (!Array.isArray(parsed)) throw new Error("not_array");
+    sourceCandidates = parsed.filter(
+      (item): item is JsonRecord => Boolean(item) && typeof item === "object" && !Array.isArray(item),
+    );
+  } catch (error) {
+    throw new Error(`manifest_shadow_frozen_seed_source_candidates_invalid:${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (sourceCandidates.length !== Number(row.source_count ?? sourceCandidates.length)) {
+    throw new Error("manifest_shadow_frozen_seed_source_count_mismatch");
   }
   try {
-    evidence = asRecord(JSON.parse(String(row.evidence_json ?? "{}")));
-  } catch {
-    evidence = {};
+    const parsed = JSON.parse(payloadJson("evidence", row.evidence_json));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not_object");
+    evidence = parsed as JsonRecord;
+  } catch (error) {
+    throw new Error(`manifest_shadow_frozen_seed_evidence_invalid:${error instanceof Error ? error.message : String(error)}`);
   }
   return {
     ...row,

@@ -5,6 +5,9 @@ import {
   assertManifestShadowReadOnlySql,
   createManifestShadowNoThreadsMutationAdapter,
   createManifestShadowReadOnlyDatabase,
+    MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES,
+  chunkManifestShadowJsonPayload,
+  reassembleManifestShadowJsonChunks,
   resetManifestShadowWorkspace,
   seedManifestShadowSnapshot,
 } from "../src/operatorManifestShadowService";
@@ -128,7 +131,7 @@ describe("operatorManifestShadowService", () => {
     )).rejects.toThrow("manifest_shadow_snapshot_table_forbidden:operator_engineering_audit");
   });
 
-  it("seeds approved rows and records a compact snapshot without production access", async () => {
+    it("seeds approved rows and records a compact snapshot without production access", async () => {
     const database = new FakeDatabase();
     const result = await seedManifestShadowSnapshot(
       database as unknown as D1Database,
@@ -151,5 +154,28 @@ describe("operatorManifestShadowService", () => {
     expect(result.payload_bytes).toBeGreaterThan(0);
     expect(database.runs.some((entry) => entry.sql.includes("INSERT INTO \"users\""))).toBe(true);
     expect(database.runs.some((entry) => entry.sql.includes("manifest_shadow_snapshots"))).toBe(true);
+  });
+
+  it("round-trips Main-scale Unicode evidence through bounded lossless chunks", () => {
+    const payload = JSON.stringify({
+      source_candidates: Array.from({ length: 180 }, (_, index) => ({
+        id: `source-${index}`,
+        text: `Universe evidence ${index} — ${"growth ".repeat(700)}`,
+      })),
+      evidence: "💎 exact snapshot evidence ".repeat(20_000),
+    });
+    const chunks = chunkManifestShadowJsonPayload(payload);
+    expect(chunks.length).toBeGreaterThan(10);
+    expect(chunks.every((chunk) => chunk.byte_length <= MANIFEST_SHADOW_FROZEN_SEED_CHUNK_MAX_BYTES)).toBe(true);
+    expect(reassembleManifestShadowJsonChunks(chunks, "large_snapshot")).toBe(payload);
+  });
+
+  it("fails closed when frozen-seed chunks are missing or corrupted", () => {
+    const chunks = chunkManifestShadowJsonPayload(JSON.stringify({ evidence: "x".repeat(120_000) }));
+    expect(() => reassembleManifestShadowJsonChunks(chunks.filter((chunk) => chunk.chunk_index !== 1), "evidence"))
+      .toThrow("manifest_shadow_frozen_seed_evidence_chunk_sequence_invalid");
+    expect(() => reassembleManifestShadowJsonChunks([
+      { ...chunks[0], byte_length: chunks[0].byte_length + 1 },
+    ], "evidence")).toThrow("manifest_shadow_frozen_seed_evidence_chunk_length_mismatch");
   });
 });
