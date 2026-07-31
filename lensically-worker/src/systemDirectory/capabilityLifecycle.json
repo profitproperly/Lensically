@@ -478,7 +478,7 @@
       "implementation_mode": "new_handler",
             "focused_regression": "prepares the complete rolling 28-day likes-first evidence snapshot and authoritative runway without requiring owner review",
       "release_scope": "operator-content",
-      "live_verification": "After autonomous mode activation, the exact deployed Main tool reconciles live schedule coverage, preserves existing slots, creates the complete rolling 28-day evidence snapshot, returns page 0 plus the page manifest, exposes 72-hour recent exposure and future 48-hour coverage, and requires one locked source-backed strategy before generation.",
+            "live_verification": "The exact deployed Main Cycle tool reconciles live schedule coverage, preserves every valid existing slot, computes the actual 0-through-48 deficit inside the fixed 48-hour runway, reuses fresh finalized intelligence when no due maturity checkpoint changed, returns one compact decision bundle, and requires one unchanged backend-locked source lineup before generation.",
       "compatibility_bridge": false
         },
     {
@@ -487,9 +487,20 @@
       "canonical_handler": "get_manifest_cycle_analysis_page",
       "route_intent": "get manifest cycle analysis page",
       "implementation_mode": "new_handler",
-      "focused_regression": "reads and durably records one complete rolling evidence page without truncation",
+            "focused_regression": "reads one canonical rolling evidence detail page only for decision-bundle ambiguity",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool returns one requested canonical page from the cycle's rolling 28-day evidence snapshot, preserves full post text, maturity, 24-hour likes, supporting metrics, lineage, and classification, and reports whether every required page has been consumed.",
+      "live_verification": "The exact deployed Main Cycle tool returns one requested canonical detail page from the rolling 28-day evidence snapshot with full text, maturity, 24-hour likes, metrics, lineage, and classification; routine strategy work uses the compact decision bundle and does not require a complete page sweep.",
+      "compatibility_bridge": false
+    },
+        {
+      "capability_id": "strategy.read_manifest_locked_lineup_page",
+      "directory_entry_id": "strategy.manifest_locked_lineup_page",
+      "canonical_handler": "get_manifest_locked_lineup_page",
+      "route_intent": "get manifest locked lineup page",
+      "implementation_mode": "new_handler",
+      "focused_regression": "returns bounded complete Main Cycle locked-lineup pages with canonical source cues",
+      "release_scope": "operator-content",
+      "live_verification": "The exact deployed Main Cycle tool pages through one to twelve backend-locked source-to-slot assignments at a time, preserving exact slot, source identity, source card, family, canonical source cues, transformation constraints, and no-substitution authority without individual source-card reads.",
       "compatibility_bridge": false
     },
     {
@@ -500,7 +511,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup",
       "release_scope": "operator-content",
-      "live_verification": "The exact deployed Main tool refuses incomplete evidence consumption, original model sources, missing source cards, incomplete lineups, follower attribution, and conflicting second strategies; it accepts one complete source-backed lineup covering every authoritative missing slot and replays the identical strategy safely.",
+            "live_verification": "The exact deployed Main Cycle tool requires the consumed compact decision-bundle identity and the complete unchanged backend-locked lineup covering every authoritative missing slot; it rejects original model sources, source substitution, missing cards, incomplete lineups, follower attribution, and conflicting second strategies, while replaying an identical strategy safely."
       "compatibility_bridge": false
     },
         {
