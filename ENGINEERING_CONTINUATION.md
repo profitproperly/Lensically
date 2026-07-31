@@ -1,18 +1,18 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-07-30
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-innovation-live-24-slot-test
-active_checkpoint: repair-shadow-decision-bundle-compaction
+active_job_id: null
+active_checkpoint: null
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: d4152e318198e2f995b4cd475f57c582749316a2
-active_interrupt_id: 0a596193-9f73-4619-8bb3-d6b4fe22c56c
-active_interrupt_state: open
-active_interrupt_precedence: P1
+production_sha: 5b1be6dd102bf94935928a4b031ddf75cda307f1
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
@@ -25,7 +25,7 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### ACTIVE — Manifest Innovation Live 24-Slot Test
+### COMPLETED — Manifest Innovation Live 24-Slot Test
 
 job_id: `manifest-innovation-live-24-slot-test`
 
@@ -53,7 +53,7 @@ Owner objective:
 
 job_id: `manifest-innovation-cycle-shadow-testbed`
 
-The permanent upstream Innovation Cycle is complete, isolated, and end-to-end proven in source. Runtime activation is the only active job.
+The permanent upstream Innovation Cycle is complete, isolated, end-to-end proven in source, activated through the live MCP, and operationally proven for full-runway no-op plus 24-slot replenishment.
 
 ## Permanent Operating Model
 
@@ -156,6 +156,12 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 - Terminal closure exposed a continuation metadata parser defect: `completed` was outside the accepted status enum and literal `null` values were returned as strings. Commit `1c7eb296caa64fd6faa0d8b4eb20a3612290bda4` added `completed` and `closing` support, normalized null sentinels, and added regression coverage.
 - Typecheck run `30592947007` and all 8/8 Operator shards in run `30592956587` passed at exact SHA `1c7eb296caa64fd6faa0d8b4eb20a3612290bda4`.
 - Exact-SHA release run `30593011028` succeeded. Live `getEngineeringContinuation` now returns `status=completed`, `active_job_id=null`, and `active_checkpoint=null`.
+- First live 24-slot preparation failed closed with `no_eligible_source_families`, proving zero Main and Threads access before mutation. Commit `d4152e318198e2f995b4cd475f57c582749316a2` added the isolated frozen source-family bootstrap; typecheck `30594396315`, Operator `30594403380` (8/8), and deploy `30594466683` passed.
+- Live preparation then exposed client-safe truncation of the 24-slot decision bundle. Commit `c0cb4052ea6a5203ca52014442b357c84edce156` preserved every authoritative slot and source identity under 24KB; typecheck `30594855382`, Operator `30594866657` (8/8), and deploy `30594936186` passed.
+- Commit `ef1f02232b8b00d3061511489848e918fcd373cf` added recoverable pending strategy contracts for active runs; typecheck `30595230952`, Operator `30595245837` (8/8), and deploy `30595300538` passed.
+- Functional recovery run `shadow-6309ec08364337c03c22ffb69021c596` accepted 24/24 with 264 gates, 24 complete lineages, zero Main reads/writes, zero Threads mutations, and zero orphans. Its receipt `6034b5c8-55a2-4e6e-adaf-df7d30161870` failed only the wall-clock rule because live engineering repairs occurred inside the run.
+- Commit `5b1be6dd102bf94935928a4b031ddf75cda307f1` terminalized failed benchmark runs and prevented retained failed runs from blocking the next cycle. Push validation `30596010989`, Operator `30596021551` (8/8), and exact-SHA deploy `30596107493` passed.
+- Clean live MCP 24-slot run `shadow-8006b68e6344548e4943832215371f19` completed at exact SHA `5b1be6dd102bf94935928a4b031ddf75cda307f1`. Durable benchmark `67fde27d-5d4f-47be-b4b0-fdc29bfa82e4` passed in 292,505 ms against the 360,000 ms ceiling with 24/24 accepted, zero rejected, six bounded batch calls, 264 gates, 24 complete lineages, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, production noninterference passed, and zero cleanup orphans.
 
 ## Deferred Work — INACTIVE
 
@@ -170,26 +176,13 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 
 
 
-## Active Interrupt — P1 Innovation Source-Family Bootstrap Failure
+## Closed Incident — P1 Innovation Live-Path Hardening
 
 incident_id: `0a596193-9f73-4619-8bb3-d6b4fe22c56c`
 
-- The first live `normal_24` preparation failed closed with `no_eligible_source_families` before strategy, generation, scheduling persistence, Main access, or Threads access.
-- Determine the exact source-family bootstrap mismatch between the already passing source-level matrix and the deployed live `SHADOW_DB` path.
-- The empty-source bootstrap root cause was repaired by commit `d4152e318198e2f995b4cd475f57c582749316a2`; typecheck run `30594396315`, Operator run `30594403380` (8/8), and deploy run `30594466683` passed. Live preparation then succeeded with 24 missing slots and 96 eligible isolated families.
-- That successful live preparation exposed a second blocker in the same objective: generic response limiting truncated `decision_bundle.missing_slot_keys` and `decision_bundle.locked_source_lineup` from 24 to 10, preventing the model from committing the exact full locked strategy without guessing.
-- Repair the response compaction path so every authoritative slot/source identity survives within the 24KB contract, add focused regression prevention, validate, deploy the exact tested SHA, verify live, then resume the same 24-slot objective.
-
-## Current Action
-
-1. Resolve P1 incident `0a596193-9f73-4619-8bb3-d6b4fe22c56c` completely under Prevention.
-2. Prepare the isolated 24-slot Innovation replenishment scenario through `prepare_manifest_shadow_cycle`.
-2. Commit the shadow strategy using the exact returned decision bundle identity and frozen snapshot.
-3. Generate, gate, and persist all required candidates through bounded `persist_manifest_shadow_batch` calls until 24/24 are accepted and scheduled-shaped rows exist.
-4. Read the durable receipt; verify the 6-minute ceiling, complete lineage, zero Main access, zero production receipt writes, zero Threads access, and zero cleanup orphans.
-5. Record the result, clear the active job and Current Action, and stop.
-
-Do not invoke, dry-run, canary, schedule through, publish through, or promote the Main Cycle.
+- Closed after durable source bootstrap, complete decision-bundle compaction, active-run recovery, and terminal benchmark-state prevention were source-controlled, regression-tested, deployed, and verified live.
+- The clean live 24-slot benchmark passed within the six-minute ceiling with complete scheduling-shaped persistence and lineage.
+- Main and Threads remained untouched throughout all failure, repair, recovery, and clean benchmark paths.
 
 ## Other Completed Work
 
