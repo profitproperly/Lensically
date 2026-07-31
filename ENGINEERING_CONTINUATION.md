@@ -10,9 +10,9 @@ active_checkpoint: stage-0-canonical-architecture-and-promotion-contract
 validated_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 documentation_source_head: 8b52cf2e44983ca5588b7df503433bea6e0d3fa5
 production_sha: 206a1839fb88d74d2bcbc0ae3a567ddea1c0f631
-active_interrupt_id: 3f53ff37-b04b-4e4f-891c-aaca15323fa3
-active_interrupt_state: open
-active_interrupt_precedence: blocks_active_job
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
