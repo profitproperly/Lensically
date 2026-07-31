@@ -166,12 +166,14 @@ export const OPERATOR_MCP_MANIFEST_SHADOW_TOOLS: OperatorMcpToolDefinition[] = [
     {
     name: "get_manifest_shadow_cycle_receipt",
     title: "Get Manifest Shadow Cycle receipt",
-    description: "Read one isolated shadow run, stage timings, compact benchmark, cleanup evidence, and state summary without returning generated post text by default.",
+        description: "Read one isolated shadow run, stage timings, compact benchmark, cleanup evidence, and state summary without returning generated post text by default. Pending strategy lineups are page-bounded through lineup_offset and lineup_limit.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         shadow_run_id: { type: "string" },
+        lineup_offset: { type: "integer", minimum: 0, maximum: 72, default: 0 },
+        lineup_limit: { type: "integer", minimum: 1, maximum: 24, default: 24 },
       },
       required: ["brand_key", "shadow_run_id"],
       additionalProperties: false,

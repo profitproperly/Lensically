@@ -1921,9 +1921,21 @@ async function persistShadowBatch(
   };
 }
 
-function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): JsonRecord | null {
+function buildPendingShadowStrategyContract(
+  state: ManifestShadowRuntimeState,
+  payload: JsonRecord = {},
+): JsonRecord | null {
   if (state.strategy || state.completed || !state.missing_slot_keys.length) return null;
-  const lineupBySlot = Object.fromEntries(state.locked_source_lineup.map((item) => [
+  const rawOffset = Number(payload.lineup_offset ?? 0);
+  const lineupOffset = Number.isFinite(rawOffset)
+    ? Math.max(0, Math.min(Math.floor(rawOffset), state.locked_source_lineup.length))
+    : 0;
+  const rawLimit = Number(payload.lineup_limit ?? 24);
+  const lineupLimit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(Math.floor(rawLimit), 24))
+    : 24;
+  const lineupPage = state.locked_source_lineup.slice(lineupOffset, lineupOffset + lineupLimit);
+  const lineupBySlot = Object.fromEntries(lineupPage.map((item) => [
     String(item.assigned_slot_key ?? ""),
     {
       identity: item.source_identity_key ?? null,
@@ -1933,13 +1945,20 @@ function buildPendingShadowStrategyContract(state: ManifestShadowRuntimeState): 
       direction: typeof item.recommended_direction === "string" ? item.recommended_direction.slice(0, 140) : null,
     },
   ]));
+  const nextLineupOffset = lineupOffset + lineupPage.length < state.locked_source_lineup.length
+    ? lineupOffset + lineupPage.length
+    : null;
   return {
     shadow_run_id: state.run_id,
     decision_bundle_id: state.decision_bundle_id,
     snapshot_hash: state.decision_bundle.snapshot_hash ?? null,
     lineup_count: state.locked_source_lineup.length,
+    lineup_offset: lineupOffset,
+    lineup_limit: lineupLimit,
+    lineup_returned_count: lineupPage.length,
+    next_lineup_offset: nextLineupOffset,
     lineup_by_slot: lineupBySlot,
-    lineup_order_contract: "Object insertion order is the exact locked strategy order. Convert entries to the commit lineup without sorting or substitution.",
+    lineup_order_contract: "Object insertion order within each page is canonical. Read pages by next_lineup_offset and concatenate without sorting or substitution.",
     field_legend: {
       identity: "source_identity_key",
       source_card_id: "source_card_id",
@@ -2025,7 +2044,7 @@ async function getShadowReceipt(
     body: {
       success: true,
       shadow_run_id: runId,
-      pending_strategy_contract: state ? buildPendingShadowStrategyContract(state) : null,
+            pending_strategy_contract: state ? buildPendingShadowStrategyContract(state, payload) : null,
       state_summary: state ? {
                 scenario: state.scenario,
         test_case: state.test_case,
