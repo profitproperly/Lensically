@@ -305,10 +305,15 @@ async function persistBatch(
   }, deps);
 }
 
-async function readReceipt(deps: OperatorManifestShadowRuntimeDependencies, runId: unknown): Promise<JsonRecord> {
+async function readReceipt(
+  deps: OperatorManifestShadowRuntimeDependencies,
+  runId: unknown,
+  lineupOffset = 0,
+  lineupLimit = 24,
+): Promise<JsonRecord> {
   const result = await handleOperatorManifestShadowTool({
     toolName: "get_manifest_shadow_cycle_receipt",
-    payload: { shadow_run_id: runId },
+    payload: { shadow_run_id: runId, lineup_offset: lineupOffset, lineup_limit: lineupLimit },
     identity,
   }, deps);
   expect(result.status).toBe(200);
@@ -405,17 +410,30 @@ describe("operatorManifestShadowRuntimeService", () => {
       expect(harness.audit.source_provider_reads).toBe(1);
       expect(harness.audit.evidence_provider_reads).toBe(1);
             if (scenario !== "noop") {
-        const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
+                const pendingReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id);
         const pendingContract = record(pendingReceipt.pending_strategy_contract);
-        const lineupBySlot = record(pendingContract.lineup_by_slot);
-        expect(Object.keys(lineupBySlot)).toHaveLength(expected);
-        expect(Object.values(lineupBySlot).every((value) => {
+        const firstPage = record(pendingContract.lineup_by_slot);
+        const expectedFirstPageCount = Math.min(expected, 24);
+        expect(Object.keys(firstPage)).toHaveLength(expectedFirstPageCount);
+        expect(Object.values(firstPage).every((value) => {
           const item = record(value);
           return Boolean(item.source_card_id && item.family_id && item.identity);
         })).toBe(true);
         expect(Number(pendingContract.lineup_count)).toBe(expected);
+        expect(Number(pendingContract.lineup_offset)).toBe(0);
+        expect(Number(pendingContract.lineup_returned_count)).toBe(expectedFirstPageCount);
         expect(new TextEncoder().encode(JSON.stringify(pendingContract)).byteLength).toBeLessThan(22_000);
-                expect(pendingContract.source_substitution_allowed).toBe(false);
+        expect(pendingContract.source_substitution_allowed).toBe(false);
+        if (expected > 24) {
+          expect(Number(pendingContract.next_lineup_offset)).toBe(24);
+          const secondReceipt = await readReceipt(harness.deps, prepared.body.shadow_run_id, 24, 24);
+          const secondContract = record(secondReceipt.pending_strategy_contract);
+          const secondPage = record(secondContract.lineup_by_slot);
+          expect(Object.keys(secondPage)).toHaveLength(expected - 24);
+          expect(Number(secondContract.lineup_offset)).toBe(24);
+          expect(secondContract.next_lineup_offset).toBeNull();
+          expect(new Set([...Object.keys(firstPage), ...Object.keys(secondPage)]).size).toBe(expected);
+        }
         const completedReceipt = await completePrepared(harness.deps, prepared.body, `prepare-${scenario}`);
         const benchmark = benchmarkFrom(completedReceipt);
         expect(benchmark.timings.latency_limit_ms).toBe(599_999);
