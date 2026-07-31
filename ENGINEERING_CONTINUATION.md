@@ -10,9 +10,9 @@ active_checkpoint: prepare-shadow-24-slot-cycle
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
 production_sha: 1c7eb296caa64fd6faa0d8b4eb20a3612290bda4
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_interrupt_id: 0a596193-9f73-4619-8bb3-d6b4fe22c56c
+active_interrupt_state: open
+active_interrupt_precedence: P1
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
@@ -170,9 +170,18 @@ The full matrix separately prevents incomplete lineage, hidden partial failure, 
 
 
 
+## Active Interrupt — P1 Innovation Source-Family Bootstrap Failure
+
+incident_id: `0a596193-9f73-4619-8bb3-d6b4fe22c56c`
+
+- The first live `normal_24` preparation failed closed with `no_eligible_source_families` before strategy, generation, scheduling persistence, Main access, or Threads access.
+- Determine the exact source-family bootstrap mismatch between the already passing source-level matrix and the deployed live `SHADOW_DB` path.
+- Repair the shared cause, add focused regression prevention, validate, deploy the exact tested SHA, verify live, then resume the same idempotent 24-slot objective.
+
 ## Current Action
 
-1. Prepare the isolated 24-slot Innovation replenishment scenario through `prepare_manifest_shadow_cycle`.
+1. Resolve P1 incident `0a596193-9f73-4619-8bb3-d6b4fe22c56c` completely under Prevention.
+2. Prepare the isolated 24-slot Innovation replenishment scenario through `prepare_manifest_shadow_cycle`.
 2. Commit the shadow strategy using the exact returned decision bundle identity and frozen snapshot.
 3. Generate, gate, and persist all required candidates through bounded `persist_manifest_shadow_batch` calls until 24/24 are accepted and scheduled-shaped rows exist.
 4. Read the durable receipt; verify the 6-minute ceiling, complete lineage, zero Main access, zero production receipt writes, zero Threads access, and zero cleanup orphans.
