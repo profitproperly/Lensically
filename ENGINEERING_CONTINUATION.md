@@ -6,10 +6,10 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-live-24-slot-test
-active_checkpoint: prepare-shadow-24-slot-cycle
+active_checkpoint: repair-shadow-decision-bundle-compaction
 validated_source_head: 00b69aee8ef6314f804718445dea0a13b4da2feb
 documentation_source_head: 039af835af59da39e2a7afad2e57ffbac06344cb
-production_sha: 1c7eb296caa64fd6faa0d8b4eb20a3612290bda4
+production_sha: d4152e318198e2f995b4cd475f57c582749316a2
 active_interrupt_id: 0a596193-9f73-4619-8bb3-d6b4fe22c56c
 active_interrupt_state: open
 active_interrupt_precedence: P1
@@ -176,7 +176,9 @@ incident_id: `0a596193-9f73-4619-8bb3-d6b4fe22c56c`
 
 - The first live `normal_24` preparation failed closed with `no_eligible_source_families` before strategy, generation, scheduling persistence, Main access, or Threads access.
 - Determine the exact source-family bootstrap mismatch between the already passing source-level matrix and the deployed live `SHADOW_DB` path.
-- Repair the shared cause, add focused regression prevention, validate, deploy the exact tested SHA, verify live, then resume the same idempotent 24-slot objective.
+- The empty-source bootstrap root cause was repaired by commit `d4152e318198e2f995b4cd475f57c582749316a2`; typecheck run `30594396315`, Operator run `30594403380` (8/8), and deploy run `30594466683` passed. Live preparation then succeeded with 24 missing slots and 96 eligible isolated families.
+- That successful live preparation exposed a second blocker in the same objective: generic response limiting truncated `decision_bundle.missing_slot_keys` and `decision_bundle.locked_source_lineup` from 24 to 10, preventing the model from committing the exact full locked strategy without guessing.
+- Repair the response compaction path so every authoritative slot/source identity survives within the 24KB contract, add focused regression prevention, validate, deploy the exact tested SHA, verify live, then resume the same 24-slot objective.
 
 ## Current Action
 
