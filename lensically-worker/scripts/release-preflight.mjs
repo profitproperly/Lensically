@@ -1741,13 +1741,13 @@ if (!operatorManifestPersistenceService.includes("export async function persistO
   lifecycleErrors.push("operator_manifest_persistence_service_module_incomplete");
 }
 if (!operatorManifestBatchPersistenceService.includes("export async function persistOperatorManifestBatch")
-    || !operatorManifestBatchPersistenceService.includes("candidates.length < 1 || candidates.length > 4")
+        || !operatorManifestBatchPersistenceService.includes("candidates.length < 1 || candidates.length > 2")
     || !operatorManifestBatchPersistenceService.includes("deferCoverageReconciliation: true")
     || !operatorManifestBatchPersistenceService.includes("reconciliation_count: 1")
     || !operatorManifestBatchPersistenceService.includes("Regenerate only the rejected slots")
         || !operatorManifestBatchPersistenceServiceTests.includes("preserves successful siblings and reconciles once for a safe two-post Main batch")
     || !operatorManifestBatchPersistenceServiceTests.includes("does not reconcile when every candidate is rejected")
-    || !operatorManifestBatchPersistenceServiceTests.includes("rejects batch sizes outside one through four before item persistence")) {
+        || !operatorManifestBatchPersistenceServiceTests.includes("rejects Main batch sizes above two before item persistence")) {
   lifecycleErrors.push("operator_manifest_batch_persistence_service_incomplete");
 }
 if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate text before source and gate execution")
