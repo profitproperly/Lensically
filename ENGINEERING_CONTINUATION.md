@@ -7,12 +7,13 @@ branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-innovation-to-main-promotion
 active_checkpoint: stage-9-first-natural-main-cycle-observation
-validated_source_head: c07e7eb08e0953d8596602064dfa0677e48aa875
-documentation_source_head: c07e7eb08e0953d8596602064dfa0677e48aa875
-production_sha: c07e7eb08e0953d8596602064dfa0677e48aa875
-active_interrupt_id: ab143e21-8cc5-4855-9881-fdeadf47a167
-active_interrupt_state: repairing
-active_interrupt_precedence: P1-main-batch-cloudflare-subrequest-limit
+validated_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
+documentation_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
+production_sha: d2166702b0868d32f63cb4eb314dea75984715ec
+active_interrupt_id: 8aadc401-58ba-489a-8891-b61b96ecb6e0
+active_interrupt_state: reconciling
+active_interrupt_precedence: P1-manifest-cycle-event-immutable-conflict
+
 
 
 
@@ -332,7 +333,20 @@ state: resolved
 - Authoritative reconciliation proved all four retry candidates were accepted as scheduled posts `799` through `802` with no replay required.
 - Permanent prevention: Main Cycle candidate `preserved_functions` must replay the source card's canonical statements verbatim; exact duplicates regenerate only the rejected slot.
 
-## Active Interrupt — P1 Main Batch Cloudflare Subrequest Limit
+## Active Interrupt — P1 Manifest Cycle Event Immutable Conflict
+
+incident_id: `8aadc401-58ba-489a-8891-b61b96ecb6e0`
+cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
+batch_operation_id: `manifest-main-live-2026-07-31-batch-wave02-00-03-v1`
+state: reconciling
+
+- A safe two-candidate Main Cycle persistence call for `2026-08-01T00:00` and `2026-08-01T03:00` returned `manifest_cycle_event_immutable_conflict` with unknown side-effect state.
+- Blind replay is forbidden. The cycle, strategy, exact plan items, and previously scheduled posts remain authoritative.
+- Immediate action: read authoritative cycle coverage and plan-item states to determine which, if any, candidates persisted; then isolate the conflicting event key and payload, repair immutable event idempotency with focused regression ownership, deploy the exact validated SHA, and selectively replay only unresolved slots.
+- The Innovation Cycle remains untouched.
+
+## Resolved Interrupt — P1 Main Batch Cloudflare Subrequest Limit
+
 
 incident_id: `ab143e21-8cc5-4855-9881-fdeadf47a167`
 cycle_id: `e77c0da4-9b95-46b0-be46-1956e50a5072`
