@@ -647,6 +647,21 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(Number(benchmarkFrom(receipt).raw.passed)).toBe(1);
   });
 
+    it("terminalizes a failed latency benchmark and permits the next isolated run", async () => {
+    const clock = new Date("2026-07-30T18:30:00.000Z");
+    const harness = dependencyHarness(clock);
+    const prepared = await prepareRun({ deps: harness.deps, suffix: "latency-terminal", missingCount: 1, horizonHours: 2 });
+    expect(prepared.status).toBe(200);
+    clock.setTime(clock.getTime() + 7 * 60_000);
+    const failedReceipt = await completePrepared(harness.deps, prepared.body, "latency-terminal");
+    expect(Number(benchmarkFrom(failedReceipt).raw.passed)).toBe(0);
+    expect(record(record(failedReceipt.receipt).run).status).toBe("failed");
+
+    const next = await prepareRun({ deps: harness.deps, suffix: "after-latency-terminal", missingCount: 1, horizonHours: 2 });
+    expect(next.status).toBe(200);
+    expect(next.body.success).toBe(true);
+  });
+
   it("completes three no-op cycles at or below thirty seconds", async () => {
     for (let index = 0; index < 3; index += 1) {
       const result = await runScenario("noop", `noop-${index}`);

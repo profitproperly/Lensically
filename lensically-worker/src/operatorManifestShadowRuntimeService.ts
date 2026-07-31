@@ -770,7 +770,23 @@ async function finalizeBenchmark(
     completedAt,
     state.run_id,
   ).run();
-  if (passed) await completeManifestShadowRun(dependencies.shadowDb, state.run_id, completedAt);
+    if (passed) {
+    await completeManifestShadowRun(dependencies.shadowDb, state.run_id, completedAt);
+  } else {
+    await failManifestShadowRun(dependencies.shadowDb, {
+      run_id: state.run_id,
+      now_iso: completedAt,
+      error_code: acceptanceFailure ?? "manifest_shadow_benchmark_failed",
+      error_message: `Shadow acceptance failed: ${acceptanceFailure ?? "unknown_rule"}`,
+      diagnostics: {
+        benchmark_id: benchmark.id,
+        failed_rule: acceptanceFailure,
+        counts: benchmark.counts,
+        timings: benchmark.timings,
+        production_noninterference_passed: productionNoninterferencePassed,
+      },
+    });
+  }
   return { ...benchmark, passed, production_noninterference_passed: productionNoninterferencePassed };
 }
 
@@ -1521,10 +1537,27 @@ async function getShadowReceipt(
 ): Promise<{ body: JsonRecord; status: number }> {
   const runId = stringValue(payload.shadow_run_id);
   if (!runId) return { body: { success: false, error: "shadow_run_id_required" }, status: 400 };
-    const receipt = await readManifestShadowReceipt(dependencies.shadowDb, runId);
-  const run = record(receipt.run);
+        let receipt = await readManifestShadowReceipt(dependencies.shadowDb, runId);
+  let run = record(receipt.run);
   if (run.brand_key && run.brand_key !== identity.brandKey) return { body: { success: false, error: "manifest_shadow_run_not_found" }, status: 404 };
   const state = await readState(dependencies.shadowDb, runId);
+  const benchmark = record(receipt.benchmark);
+  if (state?.completed && ["preparing", "running"].includes(stringValue(run.status)) && benchmark.id) {
+    const benchmarkPassed = benchmark.passed === true || Number(benchmark.passed ?? 0) === 1;
+    if (benchmarkPassed) {
+      await completeManifestShadowRun(dependencies.shadowDb, runId, dependencies.now().toISOString());
+    } else {
+      await failManifestShadowRun(dependencies.shadowDb, {
+        run_id: runId,
+        now_iso: dependencies.now().toISOString(),
+        error_code: stringValue(benchmark.failed_rule, "manifest_shadow_benchmark_failed"),
+        error_message: `Shadow acceptance failed: ${stringValue(benchmark.failed_rule, "unknown_rule")}`,
+        diagnostics: { benchmark_id: benchmark.id, repaired_terminal_state: true },
+      });
+    }
+    receipt = await readManifestShadowReceipt(dependencies.shadowDb, runId);
+    run = record(receipt.run);
+  }
   return {
     body: {
       success: true,
