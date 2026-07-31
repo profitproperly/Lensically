@@ -595,8 +595,8 @@ describe("operatorManifestShadowRuntimeService", () => {
     const benchmark = benchmarkFrom(receipt);
     expect(Number(benchmark.raw.passed)).toBe(1);
     expect(Number(benchmark.counts.delta_refreshes)).toBe(1);
-    expect(Number(benchmark.raw.external_read_count)).toBe(1);
-    expect(harness.audit.evidence_provider_reads).toBe(2);
+        expect(Number(benchmark.raw.external_read_count)).toBe(0);
+    expect(harness.audit.evidence_provider_reads).toBe(1);
     expect(harness.audit.snapshot_db_calls).toBe(0);
   });
 
