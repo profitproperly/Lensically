@@ -584,13 +584,33 @@ export function selectSourceFamilyLineup(input: {
   candidates: SourceSelectionCandidate[];
   slot_keys: string[];
   seed: string;
-}): { selected: SourceSelectionCandidate[]; receipts: SourceSelectionReceipt[]; summary: Record<string, unknown> } {
+  include_parity_trace?: boolean;
+}): {
+  selected: SourceSelectionCandidate[];
+  receipts: SourceSelectionReceipt[];
+  summary: Record<string, unknown>;
+  parity_trace?: Record<string, unknown>;
+} {
   const active = input.candidates.filter((candidate) =>
     candidate.lifetime_label !== "disproven"
     && Boolean(candidate.source_identity_key)
     && Boolean(candidate.source_card_id)
     && Boolean(candidate.source_card_family_id)
   );
+  const exclusions = input.candidates
+    .filter((candidate) => !active.includes(candidate))
+    .map((candidate) => ({
+      source_identity_key: candidate.source_identity_key ?? null,
+      source_card_id: candidate.source_card_id ?? null,
+      source_card_family_id: candidate.source_card_family_id ?? null,
+      reason: candidate.lifetime_label === "disproven"
+        ? "lifetime_disproven"
+        : !candidate.source_identity_key
+          ? "source_identity_missing"
+          : !candidate.source_card_id
+            ? "source_card_missing"
+            : "source_family_missing",
+    }));
   if (!active.length && input.slot_keys.length) throw new Error("no_eligible_source_families");
   const eligibleFamilyCount = new Set(active.map((candidate) => String(candidate.source_card_family_id))).size;
   const cooldownHours = Math.min(24, Math.max(1, eligibleFamilyCount));
@@ -600,8 +620,9 @@ export function selectSourceFamilyLineup(input: {
   const usedSources = new Set<string>();
   const plannedCounts = new Map<string, number>();
   const plannedLastSlot = new Map<string, string>();
-  const recentSemanticKeys: string[] = [];
+    const recentSemanticKeys: string[] = [];
   const relaxationCounts: Record<string, number> = { strict: 0, half: 0, exhausted: 0 };
+  const slotRankings: Record<string, unknown>[] = [];
 
   for (let slotIndex = 0; slotIndex < input.slot_keys.length; slotIndex += 1) {
     const slotKey = input.slot_keys[slotIndex];
@@ -668,11 +689,19 @@ export function selectSourceFamilyLineup(input: {
       }
       if (scored.length) break;
     }
-    scored.sort((left, right) =>
+        scored.sort((left, right) =>
       right.receipt.score - left.receipt.score
       || right.receipt.deterministic_tiebreak - left.receipt.deterministic_tiebreak
       || left.receipt.source_identity_key.localeCompare(right.receipt.source_identity_key)
     );
+    if (input.include_parity_trace) {
+      slotRankings.push({
+        slot_key: slotKey,
+        ranked_source_identity_keys: scored.map((entry) => entry.receipt.source_identity_key),
+        ranked_source_card_ids: scored.map((entry) => entry.receipt.source_card_id),
+        cooldown_relaxation: scored[0]?.receipt.cooldown_relaxation ?? null,
+      });
+    }
     const winner = scored[0];
     if (!winner) throw new Error(`source_selection_exhausted:${slotIndex}`);
     const receipt = {
@@ -698,7 +727,7 @@ export function selectSourceFamilyLineup(input: {
     counts[label] = Number(counts[label] ?? 0) + 1;
     return counts;
   }, {});
-  return {
+    return {
     selected,
     receipts,
     summary: {
@@ -713,6 +742,26 @@ export function selectSourceFamilyLineup(input: {
       cooldown_relaxations: relaxationCounts,
       selected_lifetime_labels: labelCounts,
     },
+    parity_trace: input.include_parity_trace
+      ? {
+          engine_version: SOURCE_SELECTION_ENGINE_VERSION,
+          eligible_pool: active.map((candidate) => ({
+            source_identity_key: candidate.source_identity_key ?? null,
+            source_card_id: candidate.source_card_id ?? null,
+            source_card_family_id: candidate.source_card_family_id ?? null,
+            lifetime_label: candidate.lifetime_label ?? "untested",
+            recent_label: candidate.recent_label ?? "no_recent_data",
+          })).sort((left, right) => String(left.source_identity_key).localeCompare(String(right.source_identity_key))),
+          exclusions,
+          slot_rankings: slotRankings,
+          selected_source_to_slot: receipts.map((receipt) => ({
+            slot_key: receipt.slot_key,
+            source_identity_key: receipt.source_identity_key,
+            source_card_id: receipt.source_card_id,
+            source_card_family_id: receipt.source_card_family_id,
+          })),
+        }
+      : undefined,
   };
 }
 
