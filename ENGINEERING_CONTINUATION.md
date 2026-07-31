@@ -364,7 +364,7 @@ Implementation sequence:
 1. Make the terminology and separation contract canonical in continuation, architecture descriptions, runtime descriptions, and regressions.
 2. Inventory the exact proven Innovation Challenger behaviors and map each to the existing Main Cycle production service that must be upgraded.
 3. Upgrade Main Cycle preparation to reuse fresh intelligence, calculate the exact 0-48 runway deficit, produce one compact decision bundle, and expose a complete bounded locked lineup with sufficient source cues.
-4. Upgrade Main Cycle execution to continue through bounded generation waves and four-candidate persistence batches without repeated preparation, coverage reads, or strategy reconstruction.
+4. Upgrade Main Cycle execution to continue through bounded generation waves and safe two-candidate production persistence calls without repeated preparation, coverage reads, or strategy reconstruction. The Innovation Cycle remains unchanged at its isolated challenger batch shape.
 5. Upgrade Main Cycle recovery for interruption, ambiguous response, partial batch success, occupied-slot collision, stale evidence delta, safe replay, and selective regeneration without source substitution.
 6. Add Main Cycle timing attribution as telemetry rather than a correctness gate.
 7. Validate source parity, dynamic runway behavior, lineage, recovery, nonduplication, and production safety without invoking the Innovation Cycle as a production writer.
@@ -390,7 +390,7 @@ Validated source SHA: `541dc3db782b07c3ef7e6e4f0f3b67e62b7594d3`
 - The Innovation Cycle remains unchanged and physically isolated as the permanent test bed. No Innovation Cycle runtime, `SHADOW_DB` binding, scenario overlay, benchmark history, or isolated lineage was connected to the Main Cycle.
 - The Main Cycle now enforces its fixed 48-hour runway and computes exactly the actual missing 0-through-48 future slots.
 - Main Cycle preparation reuses fresh finalized intelligence, returns one compact decision bundle, exposes ambiguity-only evidence detail, and provides the exact backend-locked source-to-slot lineup through bounded twelve-item pages with canonical source cues and no source substitution.
-- Main Cycle execution is batch-first: eight-candidate generation waves, one-to-four candidate persistence calls, uninterrupted continuation, batch-owned authoritative coverage reconciliation, preservation of successful siblings, and selective regeneration of rejected or invalidated slots only.
+- Main Cycle execution is batch-first: eight-candidate generation waves, safe one-to-two candidate production persistence calls, uninterrupted continuation, batch-owned authoritative coverage reconciliation, preservation of successful siblings, and selective regeneration of rejected or invalidated slots only. The Innovation Cycle remains unchanged.
 - Successful persistence responses are compact identity-and-lineage receipts; rejected candidates retain exact diagnostic evidence. Persistence and reconciliation duration are telemetry only and cannot fail a correct cycle solely for latency.
 - Payload compaction preserves the champion contracts instead of reverting to single-post persistence or mandatory complete evidence-page sweeps.
 - Capability lifecycle, system directory, routing policy, exact account/direct/scoped tool inventories, response compaction, dynamic runway, locked lineup, batch recovery, complete lineage, and timing telemetry have permanent regressions.

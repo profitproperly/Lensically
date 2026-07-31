@@ -1485,18 +1485,19 @@ describe("System Directory foundation", () => {
     ]));
   });
 
-  it("persists successful siblings and reconciles coverage once for a bounded four-post batch", () => {
+    it("persists safe Main siblings and reconciles coverage once for a bounded two-post batch", () => {
     const entry = LENSICALLY_SYSTEM_DIRECTORY_ENTRIES.find((item) => item.id === "content.manifest_autonomous_batch_persistence");
     expect(entry).toMatchObject({
       route_intent: "persist manifest autonomous batch",
       payload: {
         action_size: "bounded_mutation",
-        max_results: 4,
+                max_results: 2,
         required_inputs: ["brand_key", "cycle_id", "cycle_strategy_id", "batch_operation_id", "candidates"],
       },
     });
     expect(entry?.hard_gates).toEqual(expect.arrayContaining([
-      "Candidate count must be one through four.",
+            "Main Cycle candidate count must be one through two per Worker invocation.",
+      "The isolated Innovation Cycle batch contract is unchanged.",
       "One candidate failure cannot roll back or hide successful siblings.",
       "Authoritative coverage and cycle completion are reconciled exactly once after accepted siblings persist.",
     ]));

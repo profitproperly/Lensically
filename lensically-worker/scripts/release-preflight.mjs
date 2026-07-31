@@ -1745,7 +1745,7 @@ if (!operatorManifestBatchPersistenceService.includes("export async function per
     || !operatorManifestBatchPersistenceService.includes("deferCoverageReconciliation: true")
     || !operatorManifestBatchPersistenceService.includes("reconciliation_count: 1")
     || !operatorManifestBatchPersistenceService.includes("Regenerate only the rejected slots")
-    || !operatorManifestBatchPersistenceServiceTests.includes("persists successful siblings and reconciles coverage once for a bounded four-post batch")
+        || !operatorManifestBatchPersistenceServiceTests.includes("preserves successful siblings and reconciles once for a safe two-post Main batch")
     || !operatorManifestBatchPersistenceServiceTests.includes("does not reconcile when every candidate is rejected")
     || !operatorManifestBatchPersistenceServiceTests.includes("rejects batch sizes outside one through four before item persistence")) {
   lifecycleErrors.push("operator_manifest_batch_persistence_service_incomplete");
@@ -3587,7 +3587,7 @@ const manifestAutonomousGrowthChecks = [
   ["locked_lineup_regression", systemDirectoryTests.includes("pages the exact Main Cycle locked lineup without source substitution")],
   ["strategy_regression", systemDirectoryTests.includes("locks exactly one likes-first account strategy and a complete source-backed missing-slot lineup")],
     ["persist_regression", systemDirectoryTests.includes("persists one source-card-backed post through the consumed-bundle strategy and shared size-one wrapper")
-    && operatorManifestBatchPersistenceServiceTests.includes("persists successful siblings and reconciles coverage once for a bounded four-post batch")],
+        && operatorManifestBatchPersistenceServiceTests.includes("preserves successful siblings and reconciles once for a safe two-post Main batch")],
   ["scheduled_review_regression", tests.includes("reviews a scheduled autonomous post without making the owner an operational dependency")],
   ["winner_decay_regression", tests.includes("preserves a frequent winner until comparable mature performance actually decays")],
 ];

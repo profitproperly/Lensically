@@ -93,7 +93,7 @@ function createDependencies(): {
 }
 
 describe("operatorManifestBatchPersistenceService", () => {
-  it("persists successful siblings and reconciles coverage once for a bounded four-post batch", async () => {
+    it("preserves successful siblings and reconciles once for a safe two-post Main batch", async () => {
     const harness = createDependencies();
     const result = await persistOperatorManifestBatch({
       brandKey: "manifest_mental",
@@ -103,9 +103,8 @@ describe("operatorManifestBatchPersistenceService", () => {
         cycle_id: "cycle-1",
         cycle_strategy_id: "strategy-1",
         candidates: [
-          { operation_id: "candidate-1", cycle_plan_item_id: "plan-1", post: {}, model_evaluation: {} },
+                    { operation_id: "candidate-1", cycle_plan_item_id: "plan-1", post: {}, model_evaluation: {} },
           { operation_id: "candidate-2", cycle_plan_item_id: "plan-2", post: {}, model_evaluation: {} },
-          { operation_id: "candidate-3", cycle_plan_item_id: "plan-3", post: {}, model_evaluation: {} },
         ],
       },
     }, harness.dependencies);
@@ -113,10 +112,10 @@ describe("operatorManifestBatchPersistenceService", () => {
     expect(result).toMatchObject({
       success: false,
       partial_success: true,
-      requested_count: 3,
-      accepted_count: 2,
+            requested_count: 2,
+      accepted_count: 1,
       rejected_count: 1,
-      accepted_slots: ["2026-07-30T19:00", "2026-07-30T21:00"],
+      accepted_slots: ["2026-07-30T19:00"],
       rejected_slots: [{
         index: 1,
         slot_key: "2026-07-30T20:00",
@@ -134,7 +133,7 @@ describe("operatorManifestBatchPersistenceService", () => {
         total_elapsed_ms: 20,
       },
     });
-    expect(harness.persistCandidate).toHaveBeenCalledTimes(3);
+        expect(harness.persistCandidate).toHaveBeenCalledTimes(2);
     for (const call of harness.persistCandidate.mock.calls) {
       expect(call[1]).toEqual({
         deferCoverageReconciliation: true,
@@ -146,16 +145,15 @@ describe("operatorManifestBatchPersistenceService", () => {
       brandKey: "manifest_mental",
       cycleId: "cycle-1",
       batchOperationId: "batch-1",
-      persistedCandidates: [
+            persistedCandidates: [
         { operation_id: "candidate-1", slot_key: "2026-07-30T19:00", scheduled_post_id: 91 },
-        { operation_id: "candidate-3", slot_key: "2026-07-30T21:00", scheduled_post_id: 93 },
       ],
     }));
         for (const item of result.results as JsonRecord[]) {
       expect(item).not.toHaveProperty("batch_reconciliation_context");
     }
     const accepted = (result.results as JsonRecord[]).filter((item) => item.success === true);
-    expect(accepted).toHaveLength(2);
+        expect(accepted).toHaveLength(1);
     for (const item of accepted) {
       expect(item).not.toHaveProperty("semantic_repetition");
       expect(item).not.toHaveProperty("decision_influence");
@@ -219,7 +217,7 @@ describe("operatorManifestBatchPersistenceService", () => {
     expect(harness.reconcileBatch).not.toHaveBeenCalled();
   });
 
-  it("rejects batch sizes outside one through four before item persistence", async () => {
+    it("rejects Main batch sizes above two before item persistence", async () => {
     const harness = createDependencies();
     const result = await persistOperatorManifestBatch({
       brandKey: "manifest_mental",
@@ -228,14 +226,15 @@ describe("operatorManifestBatchPersistenceService", () => {
         batch_operation_id: "batch-too-large",
         cycle_id: "cycle-1",
         cycle_strategy_id: "strategy-1",
-        candidates: Array.from({ length: 5 }, (_, index) => ({ operation_id: `candidate-${index}` })),
+                candidates: Array.from({ length: 3 }, (_, index) => ({ operation_id: `candidate-${index}` })),
       },
     }, harness.dependencies);
 
     expect(result).toMatchObject({
       success: false,
-      error: "manifest_persistence_batch_size_must_be_1_to_4",
-      candidate_count: 5,
+            error: "main_manifest_persistence_batch_size_must_be_1_to_2",
+      candidate_count: 3,
+      maximum_safe_candidate_count: 2,
       retryable: false,
     });
     expect(harness.persistCandidate).not.toHaveBeenCalled();
