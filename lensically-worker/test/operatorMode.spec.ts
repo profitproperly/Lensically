@@ -5,7 +5,8 @@ import worker, {
     activateNextApprovedScheduledPostCanary,
   auditedScheduledRetirementPostStateVerified,
 
-        buildManifestRollingHourlySlots,
+            buildManifestRollingHourlySlots,
+    compactManifestShadowPreparationPayload,
     buildOperatorContentFocusDailyDecisions,
   buildOperatorMaturityObservation,
   buildOperatorPostFingerprint,
@@ -3780,6 +3781,61 @@ active_checkpoint: none
       active_checkpoint: null,
     });
     expect(parseCanonicalContinuationMetadata("status: closing\n").status).toBe("closing");
+        const shadowMissingSlots = Array.from({ length: 24 }, (_, index) => `2026-08-01T${String(index).padStart(2, "0")}:00`);
+    const shadowLineup = shadowMissingSlots.map((slotKey, index) => ({
+      assigned_slot_key: slotKey,
+      source_identity_key: `shadow-fixture:manifest_mental:${index}`,
+      source_card_id: `shadow-fixture-card-${index}`,
+      source_card_family_id: `shadow-fixture-family-${index}`,
+      source_mechanism: "direct_reader_outcome_utility",
+      required_product: "Concrete reader-directed outcome.",
+      recommended_direction: "Preserve the frozen source mechanism and payoff.",
+      lifetime_label: "prospect",
+      recent_label: "healthy",
+      confidence_label: "reliable",
+      source_text: `Frozen isolated source ${index}.`,
+      selection_receipt: { oversized_diagnostic: "x".repeat(1200), score: index },
+    }));
+    const oversizedShadowPreparation = {
+      success: true,
+      shadow_run_id: "shadow-test-24",
+      scenario: "normal_24",
+      test_case: "baseline",
+      evidence_mode: "snapshot",
+      variant_key: "payload-regression",
+      code_sha: "a".repeat(40),
+      snapshot_hash: "b".repeat(64),
+      decision_bundle_id: "shadow-bundle-test-24",
+      decision_bundle: {
+        version: "manifest-shadow-decision-bundle-v1",
+        run_id: "shadow-test-24",
+        primary_metric: "24_hour_likes",
+        missing_slot_keys: shadowMissingSlots,
+        locked_source_lineup: shadowLineup,
+        selection_summary: { selected_count: 24 },
+        evidence_gaps: [],
+        freshness: { stale: false },
+        snapshot_hash: "b".repeat(64),
+        bundle_id: "shadow-bundle-test-24",
+      },
+      target_count: 48,
+      occupied_count: 24,
+      remaining_missing_count: 24,
+      preparation_complete: true,
+      next_action: "Commit the exact locked strategy.",
+    };
+    const compactShadow = compactManifestShadowPreparationPayload(
+      oversizedShadowPreparation,
+      new TextEncoder().encode(JSON.stringify(oversizedShadowPreparation)).byteLength,
+    );
+    expect(compactShadow).not.toBeNull();
+    expect((compactShadow?.decision_bundle as Record<string, unknown>).missing_slot_keys).toHaveLength(24);
+    expect((compactShadow?.decision_bundle as Record<string, unknown>).locked_source_lineup).toHaveLength(24);
+    expect(((compactShadow?.payload_contract as Record<string, unknown>).all_missing_slots_preserved)).toBe(true);
+    expect(((compactShadow?.payload_contract as Record<string, unknown>).all_locked_source_lineup_preserved)).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(compactShadow)).byteLength).toBeLessThanOrEqual(24000);
+    expect(JSON.stringify(compactShadow)).not.toContain("oversized_diagnostic");
+
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
     expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");

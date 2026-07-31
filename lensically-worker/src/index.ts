@@ -1534,11 +1534,131 @@ export function compactManifestAutonomousPreparationPayload(
     : null;
 }
 
+export function compactManifestShadowPreparationPayload(
+  payload: Record<string, unknown>,
+  originalBytes: number,
+): Record<string, unknown> | null {
+  const decisionBundle = payload.decision_bundle && typeof payload.decision_bundle === "object" && !Array.isArray(payload.decision_bundle)
+    ? payload.decision_bundle as Record<string, unknown>
+    : null;
+  if (payload.success !== true || !payload.shadow_run_id || !payload.decision_bundle_id || !decisionBundle) return null;
+
+  const missingSlotKeys = Array.isArray(decisionBundle.missing_slot_keys)
+    ? decisionBundle.missing_slot_keys.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+  const lockedSourceLineup = (Array.isArray(decisionBundle.locked_source_lineup) ? decisionBundle.locked_source_lineup : [])
+    .map((value) => {
+      const item = value && typeof value === "object" && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+      const sourceText = typeof item.source_text === "string" ? item.source_text.slice(0, 360) : null;
+      return {
+        assigned_slot_key: item.assigned_slot_key ?? null,
+        source_identity_key: item.source_identity_key ?? null,
+        source_card_id: item.source_card_id ?? null,
+        source_card_family_id: item.source_card_family_id ?? null,
+        source_mechanism: item.source_mechanism ?? null,
+        required_product: item.required_product ?? null,
+        recommended_direction: item.recommended_direction ?? null,
+        lifetime_label: item.lifetime_label ?? null,
+        recent_label: item.recent_label ?? null,
+        confidence_label: item.confidence_label ?? null,
+        source_text: sourceText,
+      };
+    })
+    .filter((item) => Boolean(item.assigned_slot_key && item.source_card_id && item.source_card_family_id));
+
+  const compactDecisionBundle: Record<string, unknown> = {
+    version: decisionBundle.version ?? null,
+    run_id: decisionBundle.run_id ?? payload.shadow_run_id,
+    primary_metric: decisionBundle.primary_metric ?? null,
+    missing_slot_keys: missingSlotKeys,
+    locked_source_lineup: lockedSourceLineup,
+    selection_summary: compactOperatorPayloadValue(decisionBundle.selection_summary ?? {}, "decision_bundle.selection_summary", {
+      arrayItems: 8, stringChars: 180, objectKeys: 24, maxDepth: 4,
+    }, []),
+    current_strategy: compactOperatorPayloadValue(decisionBundle.current_strategy ?? null, "decision_bundle.current_strategy", {
+      arrayItems: 4, stringChars: 180, objectKeys: 20, maxDepth: 3,
+    }, []),
+    learning_brief: compactOperatorPayloadValue(decisionBundle.learning_brief ?? null, "decision_bundle.learning_brief", {
+      arrayItems: 4, stringChars: 180, objectKeys: 20, maxDepth: 3,
+    }, []),
+    content_focus: compactOperatorPayloadValue(decisionBundle.content_focus ?? null, "decision_bundle.content_focus", {
+      arrayItems: 4, stringChars: 180, objectKeys: 20, maxDepth: 3,
+    }, []),
+    strongest_posts: compactOperatorPayloadValue(decisionBundle.strongest_posts ?? [], "decision_bundle.strongest_posts", {
+      arrayItems: 6, stringChars: 180, objectKeys: 16, maxDepth: 3,
+    }, []),
+    weakest_posts: compactOperatorPayloadValue(decisionBundle.weakest_posts ?? [], "decision_bundle.weakest_posts", {
+      arrayItems: 6, stringChars: 180, objectKeys: 16, maxDepth: 3,
+    }, []),
+    recent_published: compactOperatorPayloadValue(decisionBundle.recent_published ?? [], "decision_bundle.recent_published", {
+      arrayItems: 6, stringChars: 180, objectKeys: 16, maxDepth: 3,
+    }, []),
+    future_scheduled: compactOperatorPayloadValue(decisionBundle.future_scheduled ?? [], "decision_bundle.future_scheduled", {
+      arrayItems: 6, stringChars: 180, objectKeys: 16, maxDepth: 3,
+    }, []),
+    hard_bans: compactOperatorPayloadValue(decisionBundle.hard_bans ?? [], "decision_bundle.hard_bans", {
+      arrayItems: 12, stringChars: 180, objectKeys: 16, maxDepth: 3,
+    }, []),
+    evidence_gaps: decisionBundle.evidence_gaps ?? [],
+    freshness: decisionBundle.freshness ?? {},
+    model_source_substitution_allowed: false,
+    every_page_call_required: decisionBundle.every_page_call_required === true,
+    bounded_detail_read_allowed: decisionBundle.bounded_detail_read_allowed !== false,
+    deterministic_gates_server_owned: decisionBundle.deterministic_gates_server_owned !== false,
+    snapshot_hash: decisionBundle.snapshot_hash ?? payload.snapshot_hash ?? null,
+    bundle_id: decisionBundle.bundle_id ?? payload.decision_bundle_id,
+  };
+
+  const compacted: Record<string, unknown> = {
+    success: true,
+    reused: payload.reused === true,
+    shadow_run_id: payload.shadow_run_id,
+    scenario: payload.scenario ?? null,
+    test_case: payload.test_case ?? null,
+    evidence_mode: payload.evidence_mode ?? null,
+    variant_key: payload.variant_key ?? null,
+    code_sha: payload.code_sha ?? null,
+    snapshot_hash: payload.snapshot_hash ?? null,
+    decision_bundle_id: payload.decision_bundle_id,
+    decision_bundle: compactDecisionBundle,
+    target_count: payload.target_count ?? null,
+    occupied_count: payload.occupied_count ?? null,
+    remaining_missing_count: payload.remaining_missing_count ?? missingSlotKeys.length,
+    preparation_complete: payload.preparation_complete === true,
+    normal_continuation_required: payload.normal_continuation_required === true,
+    benchmark: payload.benchmark ?? null,
+    next_action: payload.next_action ?? null,
+    operator_action_closure: compactOperatorPayloadValue(payload.operator_action_closure ?? {}, "operator_action_closure", {
+      arrayItems: 6, stringChars: 220, objectKeys: 24, maxDepth: 4,
+    }, []),
+    payload_contract: {
+      server_bounded: true,
+      model_payload_sizing: false,
+      byte_limit: OPERATOR_MCP_MAX_STRUCTURED_BYTES,
+      original_bytes: originalBytes,
+      returned_bytes: 0,
+      truncated: true,
+      actionable_shadow_cycle_preserved: true,
+      all_missing_slots_preserved: missingSlotKeys.length === (Array.isArray(decisionBundle.missing_slot_keys) ? decisionBundle.missing_slot_keys.length : 0),
+      all_locked_source_lineup_preserved: lockedSourceLineup.length === (Array.isArray(decisionBundle.locked_source_lineup) ? decisionBundle.locked_source_lineup.length : 0),
+      selection_receipts_durably_stored_server_side: true,
+    },
+  };
+  (compacted.payload_contract as Record<string, unknown>).returned_bytes = operatorPayloadBytes(compacted);
+  return Number((compacted.payload_contract as Record<string, unknown>).returned_bytes) <= OPERATOR_MCP_MAX_STRUCTURED_BYTES
+    ? compacted
+    : null;
+}
+
 function enforceOperatorPayloadBudget(payload: Record<string, unknown>): Record<string, unknown> {
   const originalBytes = operatorPayloadBytes(payload);
   if (originalBytes <= OPERATOR_MCP_MAX_STRUCTURED_BYTES) return payload;
-  const compactAutonomousPreparation = compactManifestAutonomousPreparationPayload(payload, originalBytes);
+    const compactAutonomousPreparation = compactManifestAutonomousPreparationPayload(payload, originalBytes);
   if (compactAutonomousPreparation) return compactAutonomousPreparation;
+  const compactShadowPreparation = compactManifestShadowPreparationPayload(payload, originalBytes);
+  if (compactShadowPreparation) return compactShadowPreparation;
 
 
   const continuityCapsule = payload.continuity_capsule;
