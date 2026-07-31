@@ -10,19 +10,21 @@ import {
 } from "../src/operatorMcpRegistryComposition";
 
 describe("Operator MCP registry composition", () => {
-        it("preserves the exact 60-tool account aggregation order", () => {
+        it("preserves the exact 62-tool account aggregation order", () => {
     const names = OPERATOR_MCP_ACCOUNT_TOOLS.map((tool) => tool.name);
-    expect(names).toHaveLength(60);
+    expect(names).toHaveLength(62);
     expect(names.slice(0, 3)).toEqual([
       "list_accounts",
       "get_account_state",
       "read_lensically_ui_surface",
     ]);
         expect(names).toEqual(expect.arrayContaining([
+      "seed_manifest_shadow_snapshot",
       "prepare_manifest_shadow_cycle",
       "commit_manifest_shadow_cycle_strategy",
       "persist_manifest_shadow_batch",
-            "get_manifest_shadow_cycle_receipt",
+                        "get_manifest_shadow_cycle_receipt",
+      "get_manifest_shadow_posts",
       "persist_manifest_autonomous_batch",
     ]));
     expect(names.indexOf("prepare_manifest_shadow_cycle")).toBeLessThan(names.indexOf("prepare_manifest_autonomous_cycle"));
@@ -47,10 +49,12 @@ describe("Operator MCP registry composition", () => {
 
   it("preserves guided Proceed membership without blocking list_accounts", () => {
         expect(operatorMcpToolNameRequiresProceed("list_accounts")).toBe(false);
+    expect(operatorMcpToolNameRequiresProceed("seed_manifest_shadow_snapshot")).toBe(false);
     expect(operatorMcpToolNameRequiresProceed("prepare_manifest_shadow_cycle")).toBe(false);
     expect(operatorMcpToolNameRequiresProceed("commit_manifest_shadow_cycle_strategy")).toBe(false);
     expect(operatorMcpToolNameRequiresProceed("persist_manifest_shadow_batch")).toBe(false);
-        expect(operatorMcpToolNameRequiresProceed("get_manifest_shadow_cycle_receipt")).toBe(false);
+                expect(operatorMcpToolNameRequiresProceed("get_manifest_shadow_cycle_receipt")).toBe(false);
+    expect(operatorMcpToolNameRequiresProceed("get_manifest_shadow_posts")).toBe(false);
     expect(operatorMcpToolNameRequiresProceed("persist_manifest_autonomous_batch")).toBe(false);
     expect(operatorMcpToolNameRequiresProceed("get_account_state")).toBe(true);
     expect(operatorMcpToolNameRequiresProceed("getGrowthMission")).toBe(true);
@@ -58,10 +62,10 @@ describe("Operator MCP registry composition", () => {
     expect(operatorMcpToolNameRequiresProceed("readRepoFile")).toBe(false);
   });
 
-        it("builds the exact 117 direct tools with deterministic priority ordering", () => {
+        it("builds the exact 119 direct tools with deterministic priority ordering", () => {
     const tools = buildComposedOperatorMcpTools(false);
     const names = tools.map((tool) => tool.name);
-    expect(tools).toHaveLength(117);
+    expect(tools).toHaveLength(119);
     expect(names[0]).toBe("getOperatorStartupContext");
     expect(names.indexOf("getEngineeringContinuation")).toBeLessThan(names.indexOf("getDatabaseSchemaState"));
         expect(names.indexOf("get_performance_learning")).toBeLessThan(names.indexOf("prepare_manifest_shadow_cycle"));
@@ -75,7 +79,7 @@ describe("Operator MCP registry composition", () => {
   it("builds all three scoped account wrapper surfaces without brand_key", () => {
     const directTools = buildComposedOperatorMcpTools(false);
     const scopedTools = buildComposedOperatorMcpTools(true);
-                expect(scopedTools).toHaveLength(directTools.length + (59 * 3));
+                expect(scopedTools).toHaveLength(directTools.length + (61 * 3));
 
     for (const prefix of ["mm", "om", "vx"]) {
       const wrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_post_results`);
