@@ -710,7 +710,7 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DELETE FROM operator_post_performance_scores").run();
   await env.DB.prepare("DELETE FROM operator_post_fingerprints").run();
   await env.DB.prepare("DELETE FROM operator_execution_events").run();
-  await env.DB.prepare("DELETE FROM operator_pre_call_routes").run();
+  
   await env.DB.prepare("DELETE FROM operator_manifest_prepare_checkpoints").run();
   await env.DB.prepare("DELETE FROM operator_repo_write_sessions").run();
   await env.DB.prepare("DELETE FROM operator_work_ledger").run();
@@ -5807,6 +5807,27 @@ active_checkpoint: none
         expect(eligibleReads).toBe(44);
     expect(failedReads).toBe(0);
   }, 90000);
+
+    it("keeps mutation preflight source-defined after the legacy route table is retired", async () => {
+    await env.DB.prepare("DROP TABLE IF EXISTS operator_pre_call_routes").run();
+    const result = await mcpToolCallRaw<{
+      campaign: {
+        mutations_executed: number;
+        mutation_preflights: {
+          eligible: number;
+          failed: number;
+          failures: Array<Record<string, unknown>>;
+          side_effects_executed: number;
+        };
+      };
+    }>("runMcpTests", { segment: "s8" });
+    expect(result.structuredContent.campaign.mutations_executed).toBe(0);
+    expect(
+      result.structuredContent.campaign.mutation_preflights.failed,
+      JSON.stringify(result.structuredContent.campaign.mutation_preflights.failures),
+    ).toBe(0);
+    expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
+  }, 30000);
 
   it("preflights all bounded Execution Kernel mutations without side effects", async () => {
     const mutationSegments = [

@@ -16858,19 +16858,15 @@ function serializeOperatorPreCallRoute(row: Record<string, unknown>): Record<str
   };
 }
 
-async function findOperatorPreCallRoute(env: Env, toolName: string, args: Record<string, unknown>, operationHint?: unknown): Promise<Record<string, unknown> | null> {
-  const provider = operatorPreCallProvider(toolName);
-  const operationKey = operatorPreCallOperationKey(toolName, args, operationHint);
-    await ensureOperatorPreCallRoutesTable(env);
-  const rows = await env.DB.prepare(`SELECT * FROM operator_pre_call_routes
-    WHERE active = 1 AND (expires_at IS NULL OR datetime(expires_at) > CURRENT_TIMESTAMP)
-      AND (provider = ? OR provider = '*') AND (tool_name = ? OR tool_name = '*')
-      AND (operation_key = ? OR operation_key = '*')
-    ORDER BY priority DESC, CASE WHEN provider = ? THEN 0 ELSE 1 END,
-      CASE WHEN tool_name = ? THEN 0 ELSE 1 END, CASE WHEN operation_key = ? THEN 0 ELSE 1 END,
-      datetime(updated_at) DESC LIMIT 50`).bind(provider, toolName, operationKey, provider, toolName, operationKey).all<Record<string, unknown>>();
-  const matched = (rows.results ?? []).find((row) => operatorPreCallValueMatches(args, safeParseJsonString(String(row.match_json ?? "{}")) ?? {}));
-  return matched ? serializeOperatorPreCallRoute(matched) : null;
+async function findOperatorPreCallRoute(
+  _env: Env,
+  _toolName: string,
+  _args: Record<string, unknown>,
+  _operationHint?: unknown,
+): Promise<Record<string, unknown> | null> {
+  // Persistent pre-call routes were retired with the legacy execution library.
+  // All routing authority is source-defined and versioned in the Worker.
+  return null;
 }
 
 function sourceDefinedOperatorPreCallRoute(toolName: string, args: Record<string, unknown>): Record<string, unknown> | null {
