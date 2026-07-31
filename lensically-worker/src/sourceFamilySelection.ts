@@ -101,7 +101,11 @@ function isLiveSavedPatternId(liveIds: Set<string> | null, value: unknown): bool
 
 export function extractOwnerBannedSavedPatternIds(value: unknown): Set<string> {
   const ids = new Set<string>();
-  const visit = (item: unknown, key = ""): void => {
+    const visit = (item: unknown, key = ""): void => {
+    if (typeof item === "number") {
+      if (/saved[ _-]*patterns?/i.test(key) && Number.isInteger(item) && item > 0) ids.add(String(item));
+      return;
+    }
     if (typeof item === "string") {
       if (/saved[ _-]*patterns?/i.test(key) || /saved\s+patterns?/i.test(item)) {
         for (const match of item.matchAll(/\b\d+\b/g)) ids.add(match[0]);
