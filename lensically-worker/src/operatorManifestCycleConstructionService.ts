@@ -649,9 +649,13 @@ export async function constructOperatorManifestAutonomousCycle(
       batch_coverage_reconciliation: "persist_manifest_autonomous_batch reconciles authoritative Main Cycle coverage exactly once after each accepted one-to-four candidate batch; do not call get_hourly_coverage or prepare a second cycle between accepted batches.",
       collision_behavior: "Treat an occupied slot as nonfatal, preserve it, use the batch reconciliation result to identify the next authoritative missing slot, regenerate or move only the affected candidate with a new slot operation id, and continue without replaying successful siblings.",
     },
-    persistence_contract: {
-      tool: "persist_manifest_autonomous_post",
-      posts_per_call: 1,
+        persistence_contract: {
+      preferred_tool: "persist_manifest_autonomous_batch",
+      fallback_tool: "persist_manifest_autonomous_post",
+      candidates_per_batch: { minimum: 1, maximum: 4 },
+      generation_wave_size: 8,
+      uninterrupted_until_terminal_or_blocked: true,
+      regenerate_rejected_slots_only: true,
       model_orchestrated: true,
       preserve_existing_schedule: true,
       exact_missing_slots_only: true,
