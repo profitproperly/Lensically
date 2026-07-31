@@ -960,7 +960,8 @@ if (!operatorMcpRegistryComposition.includes('from "./operatorMcpManifestCycleRe
 if (source.includes('{ name: "get_manifest_intelligence_foundation"')
     || source.includes('{ name: "get_manifest_cycle_receipt"')
     || source.includes('{ name: "record_manifest_cycle_defect"')
-    || source.includes('{ name: "get_manifest_cycle_analysis_page"')
+        || source.includes('{ name: "get_manifest_cycle_analysis_page"')
+    || source.includes('{ name: "get_manifest_locked_lineup_page"')
     || source.includes('{ name: "commit_manifest_cycle_strategy"')) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_returned_to_index");
 }
@@ -969,10 +970,10 @@ if (!operatorMcpManifestCycleRegistry.includes("export const OPERATOR_MCP_MANIFE
     || !operatorMcpManifestCycleRegistry.includes("export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS")) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_module_incomplete");
 }
-if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered six-tool Manifest cycle registry")
+if (!operatorMcpManifestCycleRegistryTests.includes("preserves the exact ordered seven-tool Main Cycle registry")
     || !operatorMcpManifestCycleRegistryTests.includes("preserves pageable canonical cycle receipt reconstruction")
     || !operatorMcpManifestCycleRegistryTests.includes("preserves seven-stage defect evidence and durable repair verification")
-        || !operatorMcpManifestCycleRegistryTests.includes("preserves complete decision-bundle consumption and source-backed strategy locking")) {
+        || !operatorMcpManifestCycleRegistryTests.includes("preserves compact decision-bundle consumption, ambiguity-only detail, and locked-lineup paging")) {
   lifecycleErrors.push("operator_mcp_manifest_cycle_registry_tests_incomplete");
 }
 if (!operatorMcpRegistryComposition.includes('from "./operatorMcpAutonomousExecutionRegistry"')) {
