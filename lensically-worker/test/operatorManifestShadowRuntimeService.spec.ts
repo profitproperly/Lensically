@@ -650,7 +650,7 @@ describe("operatorManifestShadowRuntimeService", () => {
     it("terminalizes a failed latency benchmark and permits the next isolated run", async () => {
     const clock = new Date("2026-07-30T18:30:00.000Z");
     const harness = dependencyHarness(clock);
-    const prepared = await prepareRun({ deps: harness.deps, suffix: "latency-terminal", missingCount: 1, horizonHours: 2 });
+        const prepared = await prepareRun({ deps: harness.deps, scenario: "normal_24", suffix: "latency-terminal", horizonHours: 48 });
     expect(prepared.status).toBe(200);
     clock.setTime(clock.getTime() + 7 * 60_000);
     const failedReceipt = await completePrepared(harness.deps, prepared.body, "latency-terminal");
