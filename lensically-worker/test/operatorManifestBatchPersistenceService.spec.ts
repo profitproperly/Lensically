@@ -138,9 +138,34 @@ describe("operatorManifestBatchPersistenceService", () => {
         { operation_id: "candidate-3", slot_key: "2026-07-30T21:00", scheduled_post_id: 93 },
       ],
     }));
-    for (const item of result.results as JsonRecord[]) {
+        for (const item of result.results as JsonRecord[]) {
       expect(item).not.toHaveProperty("batch_reconciliation_context");
     }
+    const accepted = (result.results as JsonRecord[]).filter((item) => item.success === true);
+    expect(accepted).toHaveLength(2);
+    for (const item of accepted) {
+      expect(item).not.toHaveProperty("semantic_repetition");
+      expect(item).not.toHaveProperty("decision_influence");
+      expect(item).not.toHaveProperty("server_checks");
+      expect(item).toMatchObject({
+        publish_lineage_complete: true,
+        intelligence_lineage_complete: true,
+        coverage_reconciliation_deferred: true,
+        lineage: expect.objectContaining({
+          source_card_id: expect.any(String),
+          source_card_family_id: expect.any(String),
+          generation_run_id: expect.any(String),
+          draft_id: expect.any(String),
+          hypothesis_id: expect.any(String),
+          strategy_version_id: "strategy-output-1",
+        }),
+      });
+    }
+    expect((result.results as JsonRecord[])[1]).toMatchObject({
+      success: false,
+      error: "semantic_repetition_collision",
+      retryable: true,
+    });
   });
 
   it("does not reconcile when every candidate is rejected", async () => {
