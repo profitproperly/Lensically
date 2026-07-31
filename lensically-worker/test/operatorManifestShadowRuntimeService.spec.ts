@@ -494,6 +494,39 @@ describe("operatorManifestShadowRuntimeService", () => {
     })).rejects.toThrow("manifest_shadow_run_already_active");
   });
 
+    it("persists compact runtime references and hydrates exact frozen evidence for continuation", async () => {
+    const harness = dependencyHarness();
+    const prepared = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "compact-runtime-hydration",
+      horizonHours: 48,
+    });
+    expect(prepared.status).toBe(200);
+    expect(prepared.body.success).toBe(true);
+    const snapshotRow = await env.DB.prepare(
+      `SELECT payload_json, payload_bytes FROM manifest_shadow_snapshots WHERE shadow_run_id = ? LIMIT 1`,
+    ).bind(prepared.body.shadow_run_id).first<JsonRecord>();
+    const persistedSnapshot = parseJsonRecord(snapshotRow?.payload_json);
+    const persistedState = record(record(persistedSnapshot.metadata).state);
+    expect(rows(persistedState.source_candidates)).toHaveLength(0);
+    expect(record(persistedState.evidence)).toMatchObject({
+      externalized_to_frozen_seed: true,
+      source_candidate_count: 120,
+    });
+    expect(Number(snapshotRow?.payload_bytes ?? 0)).toBeLessThan(500_000);
+
+    const committed = await commitPrepared(harness.deps, prepared.body);
+    expect(committed.success).toBe(true);
+    const locked = rows(record(prepared.body.decision_bundle).locked_source_lineup);
+    const firstBatch = locked.slice(0, 4).map((item, index) =>
+      candidateFor(item, index, `${prepared.body.shadow_run_id}:hydrated:${index}`));
+    const persisted = await persistBatch(harness.deps, prepared.body, "batch-compact-runtime-hydration", firstBatch);
+    expect(persisted.status).toBe(200);
+    expect(persisted.body.accepted_count).toBe(4);
+    expect(persisted.body.rejected_count).toBe(0);
+  });
+
   it("forbids live evidence access before an Innovation run begins", async () => {
     const harness = dependencyHarness();
     const result = await handleOperatorManifestShadowTool({

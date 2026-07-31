@@ -328,11 +328,51 @@ function parseSnapshotState(row: JsonRecord | null): ManifestShadowRuntimeState 
   }
 }
 
+function runtimeStateForPersistence(state: ManifestShadowRuntimeState): ManifestShadowRuntimeState {
+  const decisionBundle = record(state.decision_bundle);
+  const snapshotHash = stringValue(
+    decisionBundle.manifest_decision_snapshot_hash,
+    stringValue(decisionBundle.snapshot_hash),
+  );
+  return {
+    ...state,
+    source_candidates: [],
+    evidence: {
+      captured_at: state.evidence.captured_at,
+      externalized_to_frozen_seed: true,
+      storage_contract: "manifest-shadow-frozen-seed-v1",
+      brand_key: state.brand_key,
+      snapshot_hash: snapshotHash,
+      source_candidate_count: state.source_candidates.length,
+    } as unknown as ManifestShadowEvidence,
+  };
+}
+
 async function readState(db: D1Database, runId: string): Promise<ManifestShadowRuntimeState | null> {
   const row = await db.prepare(
     `SELECT payload_json FROM manifest_shadow_snapshots WHERE shadow_run_id = ? LIMIT 1`,
   ).bind(runId).first<JsonRecord>();
-  return parseSnapshotState(row);
+  const state = parseSnapshotState(row);
+  if (!state) return null;
+  const persistedEvidence = record(state.evidence);
+  if (persistedEvidence.externalized_to_frozen_seed !== true) return state;
+  const frozenSeed = await readManifestShadowFrozenSeed(db, state.brand_key);
+  if (!frozenSeed) throw new Error("manifest_shadow_runtime_frozen_seed_missing");
+  const expectedHash = stringValue(persistedEvidence.snapshot_hash);
+  const actualHash = stringValue(frozenSeed.snapshot_hash);
+  if (!expectedHash || actualHash !== expectedHash) {
+    throw new Error("manifest_shadow_runtime_frozen_seed_hash_mismatch");
+  }
+  const sourceCandidates = records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[];
+  const expectedSourceCount = Number(persistedEvidence.source_candidate_count ?? sourceCandidates.length);
+  if (sourceCandidates.length !== expectedSourceCount) {
+    throw new Error("manifest_shadow_runtime_frozen_seed_source_count_mismatch");
+  }
+  return {
+    ...state,
+    source_candidates: sourceCandidates,
+    evidence: normalizeSeedEvidence(frozenSeed.evidence, state.started_at),
+  };
 }
 
 async function writeState(db: D1Database, state: ManifestShadowRuntimeState): Promise<void> {
@@ -341,7 +381,7 @@ async function writeState(db: D1Database, state: ManifestShadowRuntimeState): Pr
   ).bind(state.run_id).first<JsonRecord>();
   if (!row?.id) throw new Error("manifest_shadow_snapshot_not_found");
   const snapshot = JSON.parse(String(row.payload_json ?? "{}")) as ManifestShadowSnapshot;
-  snapshot.metadata = { ...(snapshot.metadata ?? {}), state };
+  snapshot.metadata = { ...(snapshot.metadata ?? {}), state: runtimeStateForPersistence(state) };
   const payloadJson = JSON.stringify(snapshot);
   await db.prepare(
     `UPDATE manifest_shadow_snapshots SET payload_json = ?, payload_bytes = ? WHERE id = ?`,
@@ -1341,8 +1381,21 @@ async function prepareShadowCycle(
       horizonEndLocal,
       JSON.stringify(state.target_slots),
       JSON.stringify(state.missing_slot_keys),
-            JSON.stringify({
-        evidence,
+                  JSON.stringify({
+        evidence_reference: {
+          storage_contract: "manifest-shadow-frozen-seed-v1",
+          brand_key: identity.brandKey,
+          snapshot_hash: exportedSnapshot.snapshot_hash,
+          source_candidate_count: candidates.length,
+        },
+        evidence_summary: {
+          captured_at: evidence.captured_at,
+          strongest_post_count: evidence.strongest_posts.length,
+          weakest_post_count: evidence.weakest_posts.length,
+          recent_published_count: evidence.recent_published.length,
+          future_scheduled_count: evidence.future_scheduled.length,
+          hard_ban_count: evidence.hard_bans.length,
+        },
         source_selection_summary: selection.summary,
         scenario_overlay: scenarioOverlay,
         selector_parity: compactParityReceipt,
@@ -1414,7 +1467,7 @@ async function prepareShadowCycle(
       source_as_of: nowIso,
       snapshot_hash: snapshotHash,
       tables: [],
-      metadata: { state },
+            metadata: { state: runtimeStateForPersistence(state) },
     };
     const expiresAt = new Date(now.getTime() + Math.max(1, Math.min(336, Number(payload.retention_hours ?? 72))) * 3600000).toISOString();
         const seeded = await seedManifestShadowSnapshot(dependencies.shadowDb, runId, snapshot, expiresAt);
