@@ -4,6 +4,7 @@ export const MANIFEST_SHADOW_CONTRACT_VERSION = "manifest-shadow-cycle-v1";
 export const MANIFEST_SHADOW_SNAPSHOT_VERSION = "manifest-shadow-snapshot-v1";
 export const MANIFEST_SHADOW_DEFAULT_SUCCESS_RETENTION_HOURS = 72;
 export const MANIFEST_SHADOW_MAX_FAILURE_RETENTION_HOURS = 24 * 14;
+export const MANIFEST_SHADOW_FROZEN_SEED_VERSION = "manifest-shadow-frozen-seed-v1";
 
 export const MANIFEST_SHADOW_OPERATIONAL_TABLES = [
   "operator_manifest_decision_influences",
@@ -135,6 +136,99 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+export type ManifestShadowFrozenSeedInput = {
+  id?: string;
+  brand_key: string;
+  source_as_of: string;
+  snapshot_hash: string;
+  source_candidates: JsonRecord[];
+  evidence: JsonRecord;
+};
+
+async function ensureManifestShadowFrozenSeedTable(db: D1Database): Promise<void> {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS manifest_shadow_frozen_seeds (
+       id TEXT PRIMARY KEY,
+       brand_key TEXT NOT NULL UNIQUE,
+       contract_version TEXT NOT NULL,
+       source_as_of TEXT NOT NULL,
+       snapshot_hash TEXT NOT NULL,
+       source_count INTEGER NOT NULL,
+       source_candidates_json TEXT NOT NULL,
+       evidence_json TEXT NOT NULL,
+       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+     )`,
+  ).run();
+}
+
+export async function writeManifestShadowFrozenSeed(
+  db: D1Database,
+  input: ManifestShadowFrozenSeedInput,
+): Promise<JsonRecord> {
+  await ensureManifestShadowFrozenSeedTable(db);
+  const id = input.id ?? crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO manifest_shadow_frozen_seeds (
+       id, brand_key, contract_version, source_as_of, snapshot_hash,
+       source_count, source_candidates_json, evidence_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(brand_key) DO UPDATE SET
+       id = excluded.id,
+       contract_version = excluded.contract_version,
+       source_as_of = excluded.source_as_of,
+       snapshot_hash = excluded.snapshot_hash,
+       source_count = excluded.source_count,
+       source_candidates_json = excluded.source_candidates_json,
+       evidence_json = excluded.evidence_json,
+       updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    id,
+    input.brand_key,
+    MANIFEST_SHADOW_FROZEN_SEED_VERSION,
+    input.source_as_of,
+    input.snapshot_hash,
+    input.source_candidates.length,
+    JSON.stringify(input.source_candidates),
+    JSON.stringify(input.evidence),
+  ).run();
+  return (await db.prepare(
+    `SELECT id, brand_key, contract_version, source_as_of, snapshot_hash, source_count, created_at, updated_at
+     FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
+  ).bind(input.brand_key).first<JsonRecord>()) ?? {};
+}
+
+export async function readManifestShadowFrozenSeed(
+  db: D1Database,
+  brandKey: string,
+): Promise<JsonRecord | null> {
+  await ensureManifestShadowFrozenSeedTable(db);
+  const row = await db.prepare(
+    `SELECT * FROM manifest_shadow_frozen_seeds WHERE brand_key = ? LIMIT 1`,
+  ).bind(brandKey).first<JsonRecord>();
+  if (!row) return null;
+  let sourceCandidates: JsonRecord[] = [];
+  let evidence: JsonRecord = {};
+  try {
+    const parsed = JSON.parse(String(row.source_candidates_json ?? "[]"));
+    sourceCandidates = Array.isArray(parsed)
+      ? parsed.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+      : [];
+  } catch {
+    sourceCandidates = [];
+  }
+  try {
+    evidence = asRecord(JSON.parse(String(row.evidence_json ?? "{}")));
+  } catch {
+    evidence = {};
+  }
+  return {
+    ...row,
+    source_candidates: sourceCandidates,
+    evidence,
+  };
 }
 
 function normalizeSql(sql: string): string {
