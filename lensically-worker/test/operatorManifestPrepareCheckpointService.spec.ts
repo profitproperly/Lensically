@@ -235,6 +235,33 @@ describe("Operator Manifest prepare checkpoint service", () => {
     });
   });
 
+    it("clamps every Main Cycle request to the fixed 48-hour runway", async () => {
+    const { dependencies, mocks } = createHarness();
+    mocks.refreshThreadsSnapshot.mockResolvedValueOnce({
+      refreshed: true,
+      complete: false,
+      evaluator_deferred: true,
+      collection_state: { cursor: "complete" },
+    });
+
+    const result = await handleOperatorManifestPrepareCheckpoint({
+      ...input,
+      payload: { ...input.payload, horizon_hours: 72 },
+    }, dependencies);
+
+    expect(result).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        success: true,
+        stage_completed: "live_collection",
+        next_stage: "live_evaluator",
+      }),
+    });
+    expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
+      horizon_hours: 48,
+    }));
+  });
+
   it("finalizes Content Focus and returns cycle-construction context", async () => {
     const { dependencies, mocks } = createHarness();
     mocks.readCheckpoint
