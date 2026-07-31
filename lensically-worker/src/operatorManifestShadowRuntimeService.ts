@@ -1114,42 +1114,111 @@ async function prepareShadowCycle(
       };
       deltaRefreshCount = 1;
     }
-    const occupied = new Set(slotPlan.occupiedSlotKeys);
-    const missingSlots = slotPlan.targetSlots.map((slot) => slot.key).filter((key) => !occupied.has(key)).slice(0, requestedMissingCount);
-        const selectionStarted = Date.now();
-    let selection = dependencies.selectSourceLineup({
-      candidates,
-      slot_keys: missingSlots,
-      seed: `${identity.brandKey}:${runId}:${variantKey}`,
+        const occupied = new Set(slotPlan.occupiedSlotKeys);
+    const missingSlots = slotPlan.targetSlots
+      .map((slot) => slot.key)
+      .filter((key) => !occupied.has(key))
+      .slice(0, requestedMissingCount);
+    const scenarioOverlay = await buildManifestDecisionScenarioOverlay({
+      snapshotHash: exportedSnapshot.snapshot_hash,
+      targetSlots: slotPlan.targetSlots as unknown as JsonRecord[],
+      occupiedSlotKeys: Array.from(occupied),
+    });
+    if (
+      scenarioOverlay.diff_manifest.forbidden_changed_paths.length > 0
+      || scenarioOverlay.diff_manifest.evidence_unchanged !== true
+    ) {
+      throw new Error("manifest_decision_scenario_overlay_overreach");
+    }
+
+    const selectionStarted = Date.now();
+    const selectorSeed = `${identity.brandKey}:${runId}:${variantKey}`;
+    let paritySnapshot: ManifestDecisionSnapshot = importedSnapshot;
+    let parityReceipt = await compareManifestDecisionSelectorParity({
+      snapshot: paritySnapshot,
+      slotKeys: missingSlots,
+      seed: selectorSeed,
+      minimumEligibleFamilies,
+      selectSourceLineup: dependencies.selectSourceLineup,
     });
     let sourceReplacementCount = 0;
-    if (testCase === "invalidated_source_replacement" && selection.selected.length) {
-      const invalidatedIdentity = String(selection.selected[0]?.source_identity_key ?? "");
+    if (testCase === "invalidated_source_replacement" && parityReceipt.innovation.selected.length) {
+      const invalidatedIdentity = String(parityReceipt.innovation.selected[0]?.source_identity_key ?? "");
       candidates = candidates.filter((candidate) => String(candidate.source_identity_key ?? "") !== invalidatedIdentity);
-      selection = dependencies.selectSourceLineup({
-        candidates,
-        slot_keys: missingSlots,
-        seed: `${identity.brandKey}:${runId}:${variantKey}:authoritative-replacement`,
+      const replacementEligible = candidates.filter((candidate) =>
+        candidate.lifetime_label !== "disproven"
+        && Boolean(candidate.source_identity_key)
+        && Boolean(candidate.source_card_id)
+        && Boolean(candidate.source_card_family_id)
+      );
+      paritySnapshot = {
+        ...importedSnapshot,
+        source_candidates: candidates,
+        eligibility_state: {
+          ...record(importedSnapshot.eligibility_state),
+          candidate_count: candidates.length,
+          eligible_candidate_count: replacementEligible.length,
+          eligible_family_count: new Set(
+            replacementEligible.map((candidate) => String(candidate.source_card_family_id)),
+          ).size,
+          invalidated_source_identity_key: invalidatedIdentity,
+        },
+      };
+      parityReceipt = await compareManifestDecisionSelectorParity({
+        snapshot: paritySnapshot,
+        slotKeys: missingSlots,
+        seed: `${selectorSeed}:authoritative-replacement`,
+        minimumEligibleFamilies,
+        selectSourceLineup: dependencies.selectSourceLineup,
       });
       sourceReplacementCount = 1;
     }
+    if (!parityReceipt.parity_passed) {
+      throw new Error("manifest_decision_selector_parity_failed");
+    }
+    const selection = parityReceipt.innovation;
     const lockedLineup = selection.selected as Array<SourceSelectionCandidate & { assigned_slot_key?: string }>;
+    const {
+      main_equivalent: _mainEquivalentParityPayload,
+      innovation: _innovationParityPayload,
+      ...compactParityReceipt
+    } = parityReceipt;
+    await recordManifestShadowStageEvent(dependencies.shadowDb, {
+      run_id: runId,
+      stage_key: "deterministic_selector_parity",
+      event_key: "deterministic_selector_parity_verified",
+      status: "completed",
+      started_at: nowIso,
+      completed_at: dependencies.now().toISOString(),
+      duration_ms: durationMs(selectionStarted),
+      payload: parityReceipt as unknown as JsonRecord,
+    });
+
     const decisionBundleStarted = Date.now();
-        const decisionBundle = buildDecisionBundle({
+    const decisionBundle = buildDecisionBundle({
       runId,
       evidence,
       missingSlots,
       lockedLineup,
       selectionSummary: selection.summary,
     });
-    if (frozenSeed) {
-      decisionBundle.frozen_seed_snapshot_hash = frozenSeed.snapshot_hash ?? null;
-      decisionBundle.frozen_seed_source_as_of = frozenSeed.source_as_of ?? null;
-      decisionBundle.genuine_source_seed = true;
-    }
-    const snapshotHash = await sha256(stableJson({ evidence, candidates, slotPlan, frozen_seed_snapshot_hash: frozenSeed?.snapshot_hash ?? null }));
+    decisionBundle.frozen_seed_snapshot_hash = frozenSeed.snapshot_hash ?? null;
+    decisionBundle.frozen_seed_source_as_of = frozenSeed.source_as_of ?? null;
+    decisionBundle.genuine_source_seed = true;
+    decisionBundle.manifest_decision_snapshot_hash = exportedSnapshot.snapshot_hash;
+    decisionBundle.snapshot_export = {
+      contract_version: exportedSnapshot.contract_version,
+      provider_version: exportedSnapshot.provider_version,
+      query_receipts: exportedSnapshot.query_receipts,
+      zero_write_proof: exportedSnapshot.zero_write_proof,
+      eligible_family_count: Number(record(exportedSnapshot.eligibility_state).eligible_family_count ?? 0),
+      main_disconnected_after_import: true,
+    };
+    decisionBundle.scenario_overlay = scenarioOverlay;
+    decisionBundle.selector_parity = compactParityReceipt;
+    const snapshotHash = exportedSnapshot.snapshot_hash;
     decisionBundle.snapshot_hash = snapshotHash;
-        const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
+    const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
     decisionBundle.bundle_id = decisionBundleId;
     const decisionBundleMs = durationMs(decisionBundleStarted);
     const state: ManifestShadowRuntimeState = {
@@ -1182,30 +1251,37 @@ async function prepareShadowCycle(
       completed: missingSlots.length === 0,
       started_at: nowIso,
       last_client_response_at: dependencies.now().toISOString(),
-      timings: {
+            timings: {
         workspace_reset_ms: Number((await dependencies.shadowDb.prepare(`SELECT duration_ms FROM manifest_shadow_stage_events WHERE shadow_run_id = ? AND event_key = 'workspace_reset'`).bind(runId).first<JsonRecord>())?.duration_ms ?? 0),
-        evidence_capture_ms: durationMs(evidenceStarted),
-                source_selection_ms: durationMs(selectionStarted),
+        snapshot_export_ms: snapshotExportMs,
+        snapshot_import_ms: snapshotImportMs,
+        evidence_capture_ms: snapshotExportMs,
+        source_selection_ms: durationMs(selectionStarted),
         decision_bundle_ms: decisionBundleMs,
+        isolated_preparation_ms: Math.max(0, durationMs(totalStarted) - snapshotExportMs),
         preparation_ms: durationMs(totalStarted),
       },
-            counters: {
-                        external_read_count: additionalExternalReads,
+      counters: {
+        external_read_count: additionalExternalReads,
+        snapshot_export_query_count: exportedSnapshot.query_receipts.length,
         main_read_count: 0,
         main_write_count: 0,
         retry_count: 0,
         continuation_count: 0,
         payload_bytes: jsonBytes(payload) + jsonBytes(decisionBundle),
+        candidate_pool_count: candidates.length,
+        eligible_family_count: parityReceipt.eligible_family_count,
+        selector_parity_count: parityReceipt.parity_passed ? 1 : 0,
         gate_count: 0,
         lineage_count: 0,
         batch_call_count: 0,
-                delta_refresh_count: deltaRefreshCount,
+        delta_refresh_count: deltaRefreshCount,
         source_replacement_count: sourceReplacementCount,
-                collision_injection_count: 0,
+        collision_injection_count: 0,
         gate_rejection_injection_count: 0,
         interruption_injection_count: 0,
       },
-            threads_mutation_count: 0,
+      threads_mutation_count: 0,
     };
     const horizonStartLocal = state.target_slots[0]?.key ?? nowIso;
     const horizonEndLocal = state.target_slots[state.target_slots.length - 1]?.key ?? nowIso;
@@ -1232,8 +1308,18 @@ async function prepareShadowCycle(
       horizonEndLocal,
       JSON.stringify(state.target_slots),
       JSON.stringify(state.missing_slot_keys),
-      JSON.stringify({ evidence, source_selection_summary: selection.summary }),
-      JSON.stringify({ decision_bundle_id: decisionBundleId, test_case: testCase, variant_key: variantKey }),
+            JSON.stringify({
+        evidence,
+        source_selection_summary: selection.summary,
+        scenario_overlay: scenarioOverlay,
+        selector_parity: compactParityReceipt,
+      }),
+      JSON.stringify({
+        decision_bundle_id: decisionBundleId,
+        test_case: testCase,
+        variant_key: variantKey,
+        manifest_decision_snapshot_hash: exportedSnapshot.snapshot_hash,
+      }),
       decisionBundleId,
     ).run();
     await dependencies.shadowDb.prepare(
@@ -1273,9 +1359,20 @@ async function prepareShadowCycle(
       identity.brandKey,
       operationRoot,
       MANIFEST_SHADOW_RUNTIME_VERSION,
-      JSON.stringify({ source: 'manifest_innovation_cycle', test_case: testCase, variant_key: variantKey }),
-      JSON.stringify({ snapshot_hash: snapshotHash, decision_bundle_id: decisionBundleId }),
-      JSON.stringify({ target_slots: state.target_slots, occupied_slot_keys: state.occupied_slot_keys }),
+            JSON.stringify({ source: 'manifest_innovation_cycle', test_case: testCase, variant_key: variantKey }),
+      JSON.stringify({
+        snapshot_hash: snapshotHash,
+        decision_bundle_id: decisionBundleId,
+        snapshot_export: decisionBundle.snapshot_export,
+        scenario_overlay_hash: scenarioOverlay.overlay_hash,
+        selector_parity: compactParityReceipt,
+      }),
+      JSON.stringify({
+        target_slots: state.target_slots,
+        occupied_slot_keys: state.occupied_slot_keys,
+        missing_slot_keys: state.missing_slot_keys,
+        overlay_diff_manifest: scenarioOverlay.diff_manifest,
+      }),
       nowIso,
     ).run();
     const snapshot: ManifestShadowSnapshot = {
@@ -1327,9 +1424,16 @@ async function prepareShadowCycle(
         target_count: slotPlan.targetSlots.length,
         occupied_count: occupied.size,
         missing_count: missingSlots.length,
-        source_candidate_count: candidates.length,
+                source_candidate_count: candidates.length,
+        eligible_family_count: parityReceipt.eligible_family_count,
+        minimum_eligible_family_count: parityReceipt.minimum_eligible_family_count,
         locked_source_count: lockedLineup.length,
         snapshot_hash: snapshotHash,
+        snapshot_export_ms: snapshotExportMs,
+        snapshot_import_ms: snapshotImportMs,
+        scenario_overlay_hash: scenarioOverlay.overlay_hash,
+        selector_parity_passed: parityReceipt.parity_passed,
+        selector_output_hash: parityReceipt.innovation_output_hash,
         decision_bundle_id: decisionBundleId,
         payload_bytes: seeded.payload_bytes,
       },
