@@ -11368,8 +11368,8 @@ async function prepareManifestAutonomousCycle(
   return {
     ...preparedResult,
     decision_bundle: deliveredDecisionBundle,
-    next_action: preparedResult.strategy_required === true
-      ? `Call commit_manifest_cycle_strategy with decision_bundle_id ${String(deliveredDecisionBundle.id ?? "")} and decision_bundle_hash ${String(deliveredDecisionBundle.bundle_hash ?? "")}, plus one model-authored account strategy and the exact locked source lineup. Use one bounded evidence-page detail read only when decision_bundle.requires_detail_read is true.`
+        next_action: preparedResult.strategy_required === true
+      ? `Read the exact Main Cycle locked lineup with get_manifest_locked_lineup_page from offset 0 until complete, then call commit_manifest_cycle_strategy with decision_bundle_id ${String(deliveredDecisionBundle.id ?? "")} and decision_bundle_hash ${String(deliveredDecisionBundle.bundle_hash ?? "")}, one model-authored account strategy, and that unchanged lineup. Use an evidence detail page only when decision_bundle.requires_detail_read is true. After strategy lock, continue directly through eight-candidate generation waves and one-to-four candidate persistence batches; do not prepare again or call get_hourly_coverage between accepted batches.`
       : preparedResult.next_action,
   };
   }
