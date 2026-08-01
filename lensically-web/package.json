@@ -7,11 +7,11 @@
         "test:mobile-save": "node scripts/test-mobile-save-extractor.mjs",
         "test:validated-artifact": "node scripts/test-validated-web-artifact.mjs",
     "test:cycles": "node scripts/test-cycles-ui.mjs",
-    "prebuild": "node scripts/prepare-next-output.js",
+        "prebuild": "npm run test:cycles && node scripts/prepare-next-output.js",
     "build": "node -e \"try{require('node:fs').rmSync('.next',{recursive:true,force:true})}catch{}\" && next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "prebuild:cf": "node scripts/prepare-next-output.js",
+        "prebuild:cf": "npm run test:cycles && node scripts/prepare-next-output.js",
     "build:cf": "node scripts/build-cloudflare.js",
     "preview:cf": "npm run build:cf && opennextjs-cloudflare preview",
     "deploy:cf": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-web.ps1"
