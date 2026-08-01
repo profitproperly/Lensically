@@ -78,7 +78,8 @@ async function operatorTool<T = Record<string, unknown>>(toolName: string, paylo
     body: JSON.stringify(payload),
   });
   const data = await response.json() as T & { error?: string };
-  expect(response.status, `${toolName}: ${data.error ?? ""}`).toBeLessThan(400);
+    expect(response.status, `${toolName}: ${data.error ?? JSON.stringify(data)}`).toBeLessThan(400);
+
   return data;
 }
 
