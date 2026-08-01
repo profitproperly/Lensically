@@ -1,7 +1,7 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
 
-export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v4";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v4";
+export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v5";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v5";
 
 
 export type SourceFamilyLifetimeLabel =
@@ -22,6 +22,7 @@ export type SourceFamilyRecentLabel =
   | "recovering";
 
 export type SourceFamilyConfidenceLabel = "low" | "developing" | "directional" | "reliable";
+export type SourceAllocationTier = "winner" | "development" | "exploration";
 
 export type SourceSelectionCandidate = Record<string, unknown> & {
   source_identity_key?: string;
@@ -36,7 +37,16 @@ export type SourceSelectionCandidate = Record<string, unknown> & {
   recent_index?: number | null;
   uses_24h?: number;
   uses_7d?: number;
-  uses_28d?: number;
+    uses_28d?: number;
+  published_uses_72h?: number;
+  future_scheduled_uses?: number;
+  latest_published_at?: string | null;
+  next_scheduled_at?: string | null;
+  published_exposure_times?: string[];
+  future_scheduled_exposure_times?: string[];
+  semantic_exposure_times?: string[];
+  semantic_published_uses_24h?: number;
+  semantic_future_scheduled_uses?: number;
   hours_since_last_use?: number | null;
   semantic_key?: string;
 };
@@ -57,8 +67,14 @@ export type SourceSelectionReceipt = {
   uses_24h: number;
   uses_7d: number;
   uses_28d: number;
-  planned_uses: number;
+    planned_uses: number;
+  semantic_key: string;
   semantic_overlap_count: number;
+  published_uses_72h: number;
+  future_scheduled_uses: number;
+  semantic_published_uses_24h: number;
+  semantic_future_scheduled_uses: number;
+  allocation_tier: SourceAllocationTier;
   exposure_burden: number;
   negative_evidence_multiplier: number;
   cooldown_hours: number;
@@ -270,12 +286,70 @@ function parseTimeMs(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function timestampMs(value: string): number | null {
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? `${value}:00Z` : value;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function slotDistanceHours(left: string, right: string): number {
-  const leftMs = Date.parse(`${left}:00Z`);
-  const rightMs = Date.parse(`${right}:00Z`);
-  if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) return Number.POSITIVE_INFINITY;
+  const leftMs = timestampMs(left);
+  const rightMs = timestampMs(right);
+  if (leftMs === null || rightMs === null) return Number.POSITIVE_INFINITY;
   return Math.abs(leftMs - rightMs) / 3600000;
 }
+
+function allocationTierForLabel(label: SourceFamilyLifetimeLabel | undefined): SourceAllocationTier {
+  if (label === "franchise" || label === "proven") return "winner";
+  if (label === "emerging" || label === "prospect") return "development";
+  return "exploration";
+}
+
+function buildAllocationTargets(
+  candidates: SourceSelectionCandidate[],
+  requestedSlots: number,
+): Record<SourceAllocationTier, number> {
+  const available: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
+  for (const candidate of candidates) available[allocationTierForLabel(candidate.lifetime_label)] += 1;
+  const targets: Record<SourceAllocationTier, number> = {
+    winner: Math.min(available.winner, Math.floor(requestedSlots * 0.4)),
+    development: Math.min(available.development, Math.ceil(requestedSlots * 0.3)),
+    exploration: Math.min(available.exploration, Math.ceil(requestedSlots * 0.3)),
+  };
+  let remaining = requestedSlots - targets.winner - targets.development - targets.exploration;
+  const expansionOrder: SourceAllocationTier[] = ["exploration", "development", "winner"];
+  while (remaining > 0) {
+    let allocated = false;
+    for (const tier of expansionOrder) {
+      if (targets[tier] >= available[tier]) continue;
+      targets[tier] += 1;
+      remaining -= 1;
+      allocated = true;
+      if (remaining === 0) break;
+    }
+    if (!allocated) throw new Error(`insufficient_hardened_source_families:${requestedSlots - remaining}:${requestedSlots}`);
+  }
+  return targets;
+}
+
+function chooseAllocationTier(
+  targets: Record<SourceAllocationTier, number>,
+  selected: Record<SourceAllocationTier, number>,
+  available: Set<SourceAllocationTier>,
+  slotIndex: number,
+  slotCount: number,
+): SourceAllocationTier | null {
+  const order: SourceAllocationTier[] = ["winner", "development", "exploration"];
+  const ranked = order
+    .filter((tier) => available.has(tier) && selected[tier] < targets[tier])
+    .map((tier) => ({
+      tier,
+      deficit: targets[tier] * ((slotIndex + 1) / Math.max(1, slotCount)) - selected[tier],
+    }))
+    .sort((left, right) => right.deficit - left.deficit || order.indexOf(left.tier) - order.indexOf(right.tier));
+  return ranked[0]?.tier ?? null;
+}
+
 
 export async function ensureSourceFamilySelectionTables(db: D1Database): Promise<void> {
   await Promise.all([
