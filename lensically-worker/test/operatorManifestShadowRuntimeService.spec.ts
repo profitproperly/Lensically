@@ -976,8 +976,13 @@ describe("operatorManifestShadowRuntimeService", () => {
       variantKey: "challenger",
     });
 
-    expect(challenger.status).toBe(400);
-    expect(String(challenger.body.error)).toContain("manifest_shadow_same_snapshot_control_missing:innovation-test:unpaired-pair");
+        expect(challenger.status).toBe(409);
+    expect(challenger.body).toEqual(expect.objectContaining({
+      error: "manifest_shadow_same_snapshot_control_missing:innovation-test:unpaired-pair",
+      pair_key: "innovation-test:unpaired-pair",
+      run_created: false,
+    }));
+
     expect(harness.audit.source_provider_reads).toBe(0);
     expect(harness.audit.evidence_provider_reads).toBe(0);
   });

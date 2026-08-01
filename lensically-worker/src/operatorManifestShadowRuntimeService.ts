@@ -1179,8 +1179,32 @@ async function prepareShadowCycle(
     replayingIncompletePreparation = true;
   }
 
+      const sameSnapshotControlSeed = testCase === "same_snapshot_ab" && variantKey !== "control"
+    ? await loadSameSnapshotControlSeed(dependencies.shadowDb, {
+        brandKey: identity.brandKey,
+        pairKey,
+        scenario,
+        codeSha: dependencies.codeSha,
+        nowIso,
+        horizonHours,
+        requestedMissingCount,
+      })
+    : null;
+  if (testCase === "same_snapshot_ab" && variantKey !== "control" && !sameSnapshotControlSeed) {
+    return {
+      body: {
+        success: false,
+        error: `manifest_shadow_same_snapshot_control_missing:${pairKey}`,
+        pair_key: pairKey,
+        run_created: false,
+      },
+      status: 409,
+    };
+  }
+
     const totalStarted = Date.now();
     const run = await beginManifestShadowRun(dependencies.shadowDb, {
+
     run_id: runId,
     brand_key: identity.brandKey,
     scenario,
@@ -1206,23 +1230,10 @@ async function prepareShadowCycle(
       },
     });
   }
-  try {
-            const snapshotExportStarted = Date.now();
-    const sameSnapshotControlSeed = testCase === "same_snapshot_ab" && variantKey !== "control"
-      ? await loadSameSnapshotControlSeed(dependencies.shadowDb, {
-          brandKey: identity.brandKey,
-          pairKey,
-          scenario,
-          codeSha: dependencies.codeSha,
-          nowIso,
-          horizonHours,
-          requestedMissingCount,
-        })
-      : null;
-    if (testCase === "same_snapshot_ab" && variantKey !== "control" && !sameSnapshotControlSeed) {
-      throw new Error(`manifest_shadow_same_snapshot_control_missing:${pairKey}`);
-    }
+    try {
+    const snapshotExportStarted = Date.now();
     const snapshotInput = {
+
       brandKey: identity.brandKey,
       accountId: identity.accountId,
       threadsUserId: identity.threadsUserId,
