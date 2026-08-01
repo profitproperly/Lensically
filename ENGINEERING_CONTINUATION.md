@@ -478,6 +478,7 @@ Latest operational notes:
 - Final-head regression validation exposed an allocation feasibility defect: quotas counted a family whose semantic exposure blocked every requested slot, producing `hardened_allocation_target_mismatch`. Root cause was quota calculation before horizon-feasibility exclusion. Repair excludes horizon-ineligible semantic families before target construction; the regression remains permanent.
 - Full Operator validation exposed a legacy one-post persistence fixture requesting a 48-slot runway from one source. That fixture encoded the exact repetition behavior now forbidden. Repair narrows the persistence-only fixture to one slot; 24/48-slot diversity remains owned by dedicated selector and isolated Innovation acceptance tests.
 - The first isolated Innovation fatigue fixture failed before selection because it provided 92 total frozen families while the Innovation provider contract requires at least 100. No runtime behavior was exercised. Repair expands the fixture to 120 fresh families while retaining the blocked recent, scheduled, and underperforming controls.
+- The expanded Innovation fixture exposed a real allocation arithmetic defect: for 24 slots, floor(40%) plus ceil(30%) plus ceil(30%) requested 25 allocations. Repair computes winner and development floors, assigns the exact remainder to exploration, then rebalances only for actual tier inventory. Allocation targets now always sum exactly to requested slots.
 
 ## Deferred Work — INACTIVE
 

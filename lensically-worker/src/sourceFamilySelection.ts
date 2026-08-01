@@ -311,10 +311,13 @@ function buildAllocationTargets(
 ): Record<SourceAllocationTier, number> {
   const available: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
   for (const candidate of candidates) available[allocationTierForLabel(candidate.lifetime_label)] += 1;
+    const desiredWinner = Math.floor(requestedSlots * 0.4);
+  const desiredDevelopment = Math.floor(requestedSlots * 0.3);
+  const desiredExploration = requestedSlots - desiredWinner - desiredDevelopment;
   const targets: Record<SourceAllocationTier, number> = {
-    winner: Math.min(available.winner, Math.floor(requestedSlots * 0.4)),
-    development: Math.min(available.development, Math.ceil(requestedSlots * 0.3)),
-    exploration: Math.min(available.exploration, Math.ceil(requestedSlots * 0.3)),
+    winner: Math.min(available.winner, desiredWinner),
+    development: Math.min(available.development, desiredDevelopment),
+    exploration: Math.min(available.exploration, desiredExploration),
   };
   let remaining = requestedSlots - targets.winner - targets.development - targets.exploration;
   const expansionOrder: SourceAllocationTier[] = ["exploration", "development", "winner"];
