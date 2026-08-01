@@ -113,7 +113,9 @@ import {
 } from "./operatorManifestShadowRuntimeService";
 import {
   buildManifestDecisionSnapshot,
+  compileManifestDecisionSnapshotPreselectionPolicy,
 } from "./operatorManifestDecisionSnapshotService";
+
 import {
   createManifestShadowReadOnlyDatabase,
 } from "./operatorManifestShadowService";
@@ -11304,9 +11306,10 @@ async function prepareManifestAutonomousCycle(
       brandKey,
       cycleId,
     ),
-            loadLockedSourceCards: async (brandKey, asOf) => {
+                        loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys) => {
       await refreshSourceFamilyLabels(env.DB, brandKey, asOf);
       const decisionSnapshot = await buildManifestDecisionSnapshot(
+
         createManifestShadowReadOnlyDatabase(env.DB),
         {
           brandKey,
@@ -11320,8 +11323,12 @@ async function prepareManifestAutonomousCycle(
           },
         },
       );
-      return decisionSnapshot.source_candidates as Record<string, unknown>[];
+            return {
+        candidates: decisionSnapshot.source_candidates as Record<string, unknown>[],
+        preselection_policy: compileManifestDecisionSnapshotPreselectionPolicy(decisionSnapshot, slotKeys),
+      };
     },
+
     loadSourceExclusions: async (brandKey) => {
       const rows = await env.DB.prepare(
         `SELECT source_identity_key FROM operator_source_exclusions

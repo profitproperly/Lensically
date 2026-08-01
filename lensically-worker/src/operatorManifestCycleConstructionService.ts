@@ -84,12 +84,18 @@ export interface OperatorManifestCycleConstructionDependencies {
     accountPosition: JsonRecord;
   }): Promise<unknown>;
   readLockedSourceSelectionPlan(brandKey: string, cycleId: string): Promise<JsonRecord[]>;
-  loadLockedSourceCards(brandKey: string, asOf: string): Promise<JsonRecord[]>;
+    loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
+    candidates: JsonRecord[];
+    preselection_policy: JsonRecord;
+  }>;
+
   loadSourceExclusions(brandKey: string): Promise<string[]>;
   selectSourceLineup(input: {
-    candidates: JsonRecord[];
+        candidates: JsonRecord[];
     slot_keys: string[];
     seed: string;
+    preselection_policy?: JsonRecord;
+
   }): { receipts: unknown[] };
   persistLockedSourceSelectionPlan(input: JsonRecord): Promise<JsonRecord[]>;
   buildRollingEvidence(input: JsonRecord): Promise<JsonRecord>;
@@ -358,8 +364,10 @@ export async function constructOperatorManifestAutonomousCycle(
       && planSlotKeys.length === currentMissingSlotKeys.length
       && planSlotKeys.every((slotKey, index) => slotKey === currentMissingSlotKeys[index]);
   };
-  let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
+    let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
+  let preselectionPolicy: JsonRecord | null = null;
   let sourceSelectionPlanStatus = missingSlots.length === 0
+
     ? "not_required"
     : lockedPlanMatchesCurrentHorizon
       ? "locked"
@@ -367,19 +375,22 @@ export async function constructOperatorManifestAutonomousCycle(
         ? "pending_horizon_reconciliation"
         : "pending";
   if (missingSlots.length > 0 && !lockedPlanMatchesCurrentHorizon) {
-    const lockedSourceCards = await dependencies.loadLockedSourceCards(
+        const sourceDecisionContext = await dependencies.loadLockedSourceDecisionContext(
       brandKey,
       String(clock.effective_now_iso ?? ""),
+      currentMissingSlotKeys,
     );
+    preselectionPolicy = record(sourceDecisionContext.preselection_policy);
+    const selectionCandidates = asRecords(sourceDecisionContext.candidates)
+      .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")));
 
-    const selectionCandidates = lockedSourceCards
-      .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
-      .filter((candidate) => candidate.lifetime_label !== "disproven");
     if (selectionCandidates.length > 0) {
       const backendSelection = dependencies.selectSourceLineup({
         candidates: selectionCandidates,
-        slot_keys: currentMissingSlotKeys,
+                slot_keys: currentMissingSlotKeys,
         seed: `${brandKey}:${cycleId}:${operationId}`,
+        preselection_policy: preselectionPolicy,
+
       });
       lockedSourceSelectionPlan = await dependencies.persistLockedSourceSelectionPlan({
         brand_key: brandKey,
@@ -435,8 +446,12 @@ export async function constructOperatorManifestAutonomousCycle(
     full_horizon_lineup_required_before_first_persist: true,
     backend_source_selection_locked: lockedSourceSelectionPlan.length > 0,
     source_selection_plan_status: sourceSelectionPlanStatus,
-    source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
+        source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
+    preselection_policy_version: preselectionPolicy?.contract_version ?? null,
+    preselection_policy_hash: preselectionPolicy?.policy_hash ?? null,
+    preselection_causal_signal_counts: preselectionPolicy?.causal_signal_counts ?? {},
     locked_source_selection_plan: compactLockedSourceSelectionPlanForReceipt(lockedSourceSelectionPlan),
+
   }, "manifest_cycle.horizon_plan");
   const cycleReceipt = await dependencies.beginCycleReceipt({
     cycleId,
