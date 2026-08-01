@@ -68,11 +68,19 @@ function createHarness() {
     readExistingCycle: vi.fn(async () => null as { id: string } | null),
     writeCycle: vi.fn(async () => undefined),
     readLockedSourceSelectionPlan: vi.fn(async () => [] as JsonRecord[]),
-    loadLockedSourceCards: vi.fn(async () => [
-      { id: "card-allowed", source_identity_key: "allowed", lifetime_label: "proven" },
-      { id: "card-excluded", source_identity_key: "excluded", lifetime_label: "proven" },
-      { id: "card-disproven", source_identity_key: "weak", lifetime_label: "disproven" },
-    ] as JsonRecord[]),
+        loadLockedSourceDecisionContext: vi.fn(async () => ({
+      candidates: [
+        { id: "card-allowed", source_identity_key: "allowed", lifetime_label: "proven" },
+        { id: "card-excluded", source_identity_key: "excluded", lifetime_label: "proven" },
+        { id: "card-underperforming", source_identity_key: "weak", lifetime_label: "underperforming" },
+      ] as JsonRecord[],
+      preselection_policy: {
+        contract_version: "source-preselection-policy-v1",
+        policy_hash: "policy-hash-1",
+        causal_signal_counts: { hard_ban: 1 },
+      } as JsonRecord,
+    })),
+
     loadSourceExclusions: vi.fn(async () => ["excluded"]),
         selectSourceLineup: vi.fn((selectionInput: { slot_keys: string[] }) => ({
       receipts: selectionInput.slot_keys.map((slotKey, index) => ({
@@ -142,7 +150,8 @@ function createHarness() {
     createId: () => "cycle-1",
     writeCycle: mocks.writeCycle,
     readLockedSourceSelectionPlan: mocks.readLockedSourceSelectionPlan,
-    loadLockedSourceCards: mocks.loadLockedSourceCards,
+        loadLockedSourceDecisionContext: mocks.loadLockedSourceDecisionContext,
+
     loadSourceExclusions: mocks.loadSourceExclusions,
     selectSourceLineup: mocks.selectSourceLineup,
     persistLockedSourceSelectionPlan: mocks.persistLockedSourceSelectionPlan,
@@ -317,8 +326,9 @@ describe("Operator Manifest cycle construction service", () => {
       existing: true,
       cycleId: "cycle-existing",
     }));
-    expect(mocks.loadLockedSourceCards).not.toHaveBeenCalled();
+        expect(mocks.loadLockedSourceDecisionContext).not.toHaveBeenCalled();
     expect(result).toMatchObject({
+
       success: true,
       reused_existing: true,
       cycle: {
@@ -366,10 +376,12 @@ describe("Operator Manifest cycle construction service", () => {
 
     const result = await constructOperatorManifestAutonomousCycle(input, dependencies);
 
-    expect(mocks.loadLockedSourceCards).toHaveBeenCalled();
+        expect(mocks.loadLockedSourceDecisionContext).toHaveBeenCalled();
     expect(mocks.selectSourceLineup).toHaveBeenCalledWith(expect.objectContaining({
       slot_keys: slots.map((slot) => slot.key),
+      preselection_policy: expect.objectContaining({ policy_hash: "policy-hash-1" }),
     }));
+
     expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalled();
     expect(result).toMatchObject({
       success: true,
@@ -413,9 +425,10 @@ describe("Operator Manifest cycle construction service", () => {
 
     await constructOperatorManifestAutonomousCycle(input, dependencies);
 
-    expect(mocks.loadSourceExclusions).toHaveBeenCalledWith("manifest_mental");
-    expect(mocks.loadLockedSourceCards).toHaveBeenCalled();
+        expect(mocks.loadSourceExclusions).toHaveBeenCalledWith("manifest_mental");
+    expect(mocks.loadLockedSourceDecisionContext).toHaveBeenCalled();
     expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalledWith(expect.objectContaining({
+
       brand_key: "manifest_mental",
       cycle_id: "cycle-existing",
     }));
@@ -438,9 +451,10 @@ describe("Operator Manifest cycle construction service", () => {
       status: "completed",
       missingSlots: [],
     }));
-    expect(mocks.refreshSavedPatternIntelligence).not.toHaveBeenCalled();
-    expect(mocks.loadLockedSourceCards).not.toHaveBeenCalled();
+        expect(mocks.refreshSavedPatternIntelligence).not.toHaveBeenCalled();
+    expect(mocks.loadLockedSourceDecisionContext).not.toHaveBeenCalled();
     expect(mocks.selectSourceLineup).not.toHaveBeenCalled();
+
     expect(mocks.beginCycleReceipt).toHaveBeenCalledWith(expect.objectContaining({
       horizonPlan: expect.objectContaining({
         authoritative_missing_slots: [],
@@ -448,8 +462,10 @@ describe("Operator Manifest cycle construction service", () => {
           expect.objectContaining({ key: slots[0].key, evidence: { scheduled_post_id: 1 } }),
           expect.objectContaining({ key: slots[1].key, evidence: { scheduled_post_id: 2 } }),
         ]),
-        source_selection_plan_status: "not_required",
+                source_selection_plan_status: "not_required",
+        preselection_policy_hash: null,
       }),
+
     }));
     expect(result).toMatchObject({
       success: true,
