@@ -532,17 +532,22 @@ async function readInnovationHistory(
      FROM manifest_shadow_runs r
      LEFT JOIN manifest_shadow_benchmark_receipts b ON b.shadow_run_id = r.id
      WHERE r.brand_key = ?`;
-  const ordered = ` ORDER BY sort_at DESC, r.id DESC LIMIT ?`;
+    const ordered = ` ORDER BY sort_at DESC, r.id DESC LIMIT ?`;
   const statement = cursor
-    ? db.prepare(`${baseSelect}
+    ? shadowDb.prepare(`${baseSelect}
        AND (COALESCE(r.completed_at, r.started_at, r.created_at) < ?
          OR (COALESCE(r.completed_at, r.started_at, r.created_at) = ? AND r.id < ?))${ordered}`)
       .bind(brandKey, cursor.at, cursor.at, cursor.id, limit + 1)
-    : db.prepare(`${baseSelect}${ordered}`).bind(brandKey, limit + 1);
+    : shadowDb.prepare(`${baseSelect}${ordered}`).bind(brandKey, limit + 1);
   const result = await statement.all<JsonRecord>();
   const rows = result.results ?? [];
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
+  const registryByRun = await readInnovationRegistryMap(
+    mainDb,
+    brandKey,
+    pageRows.map((row) => asText(row.id) ?? ""),
+  );
   const last = pageRows[pageRows.length - 1];
 
   return {
@@ -551,13 +556,14 @@ async function readInnovationHistory(
       success: true,
       contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
       rail: "innovation",
-      rows: pageRows.map((row) => {
+            rows: pageRows.map((row) => {
         const counts = asRecord(parseJson(row.counts_json, {}));
         const timings = asRecord(parseJson(row.timings_json, {}));
-        const registryState = asText(row.registry_state);
+        const registry = registryByRun.get(asText(row.id) ?? "") ?? {};
+        const registryState = asText(registry.state);
         const benchmarkPassed = asBoolean(row.benchmark_passed);
-        const displayState = registryState === "promoted"
-          ? `Promoted to Main ${asText(row.promotion_destination_version) ?? ""}`.trim()
+                const displayState = registryState === "promoted"
+          ? `Promoted to Main ${asText(registry.promotion_destination_version) ?? ""}`.trim()
           : registryState === "retired"
             ? "Retired"
             : registryState === "failed" || asText(row.status) === "failed"
@@ -579,9 +585,9 @@ async function readInnovationHistory(
           snapshot_hash: asText(row.snapshot_hash),
           status: registryState ?? asText(row.status),
           display_state: displayState,
-          challenged_main_version: asText(row.challenged_main_version),
-          promotion_destination_version: asText(row.promotion_destination_version),
-          promotion_eligible: asBoolean(row.promotion_eligible),
+                    challenged_main_version: asText(registry.challenged_main_version),
+          promotion_destination_version: asText(registry.promotion_destination_version),
+          promotion_eligible: asBoolean(registry.promotion_eligible),
           benchmark_passed: benchmarkPassed,
           accepted_count: asNumber(counts.accepted ?? counts.generated),
           target_count: asNumber(counts.target),
