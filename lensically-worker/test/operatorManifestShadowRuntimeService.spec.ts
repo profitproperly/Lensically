@@ -927,7 +927,17 @@ describe("operatorManifestShadowRuntimeService", () => {
     const firstReceipt = await completePrepared(firstHarness.deps, first.body, "ab-control");
     expect(Number(benchmarkFrom(firstReceipt).raw.passed)).toBe(1);
 
-    const secondHarness = dependencyHarness();
+        const changedEvidence = {
+      ...evidence(),
+      strongest_posts: [{ published_post_id: "changed-live-winner", likes: 999999 }],
+      weakest_posts: [{ published_post_id: "changed-live-loser", likes: 0 }],
+      captured_at: "2026-07-31T22:30:00.000Z",
+    };
+    const secondHarness = dependencyHarness(
+      new Date("2026-07-31T22:30:00.000Z"),
+      [...candidates()].reverse(),
+      changedEvidence,
+    );
     const second = await prepareRun({
       deps: secondHarness.deps,
       suffix: "ab-challenger",
@@ -935,13 +945,43 @@ describe("operatorManifestShadowRuntimeService", () => {
       missingCount: 1,
       variantKey: "challenger",
     });
+
     const secondReceipt = await completePrepared(secondHarness.deps, second.body, "ab-challenger");
     expect(Number(benchmarkFrom(secondReceipt).raw.passed)).toBe(1);
-    expect(first.body.snapshot_hash).toBe(second.body.snapshot_hash);
+        expect(first.body.snapshot_hash).toBe(second.body.snapshot_hash);
     expect(first.body.decision_bundle_id).not.toBe(second.body.decision_bundle_id);
+    expect(record(first.body.decision_bundle).missing_slot_keys).toEqual(record(second.body.decision_bundle).missing_slot_keys);
+    expect(record(first.body.decision_bundle).locked_source_lineup).toEqual(record(second.body.decision_bundle).locked_source_lineup);
+    expect(record(record(second.body.decision_bundle).same_snapshot_pair)).toEqual(expect.objectContaining({
+      pair_key: "innovation-test:ab-pair",
+      control_run_id: first.body.shadow_run_id,
+      role: "challenger",
+      reused_control_snapshot: true,
+      snapshot_hash_verified: true,
+      slot_plan_reused: true,
+    }));
     expect(firstHarness.audit.snapshot_db_calls).toBe(0);
     expect(secondHarness.audit.snapshot_db_calls).toBe(0);
+    expect(secondHarness.audit.source_provider_reads).toBe(0);
+    expect(secondHarness.audit.evidence_provider_reads).toBe(0);
   });
+
+  it("fails a same-snapshot challenger closed when no matching control exists", async () => {
+    const harness = dependencyHarness(new Date("2026-08-01T00:00:00.000Z"));
+    const challenger = await prepareRun({
+      deps: harness.deps,
+      suffix: "unpaired-challenger",
+      testCase: "same_snapshot_ab",
+      missingCount: 1,
+      variantKey: "challenger",
+    });
+
+    expect(challenger.status).toBe(400);
+    expect(String(challenger.body.error)).toContain("manifest_shadow_same_snapshot_control_missing:innovation-test:unpaired-pair");
+    expect(harness.audit.source_provider_reads).toBe(0);
+    expect(harness.audit.evidence_provider_reads).toBe(0);
+  });
+
 
   it("proves a frozen production-shaped cycle with zero Main, production, or Threads access", async () => {
     const result = await runScenario("normal_24", "zero-main", "frozen_snapshot_zero_main_access");
