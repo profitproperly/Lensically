@@ -58,8 +58,9 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-        it("preserves the exact 80-tool public surface and retirement policy", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(80);
+                it("preserves the exact 81-tool public surface and required Main Cycle dependencies", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(81);
+    expect(isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")).toBe(true);
     expect(isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")).toBe(true);
     expect(isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")).toBe(true);
     expect(isOperatorPublicDirectToolName("persist_manifest_shadow_batch")).toBe(true);

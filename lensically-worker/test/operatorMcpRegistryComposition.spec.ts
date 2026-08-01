@@ -74,7 +74,9 @@ describe("Operator MCP registry composition", () => {
         expect(names.indexOf("get_performance_learning")).toBeLessThan(names.indexOf("prepare_manifest_shadow_cycle"));
     expect(names.indexOf("prepare_manifest_shadow_cycle")).toBeLessThan(names.indexOf("commit_manifest_shadow_cycle_strategy"));
     expect(names.indexOf("commit_manifest_shadow_cycle_strategy")).toBeLessThan(names.indexOf("persist_manifest_shadow_batch"));
-    expect(names.indexOf("get_manifest_shadow_cycle_receipt")).toBeLessThan(names.indexOf("prepare_manifest_autonomous_cycle"));
+        expect(names.indexOf("get_manifest_shadow_cycle_receipt")).toBeLessThan(names.indexOf("prepare_manifest_autonomous_cycle"));
+    expect(names.indexOf("get_manifest_cycle_analysis_page")).toBeLessThan(names.indexOf("get_manifest_locked_lineup_page"));
+    expect(names.indexOf("get_manifest_locked_lineup_page")).toBeLessThan(names.indexOf("commit_manifest_cycle_strategy"));
         expect(names.indexOf("prepare_manifest_autonomous_cycle")).toBeLessThan(names.indexOf("persist_manifest_autonomous_batch"));
     expect(names.indexOf("persist_manifest_autonomous_batch")).toBeLessThan(names.indexOf("persist_manifest_autonomous_post"));
   });
