@@ -321,9 +321,11 @@ import {
   SOURCE_SELECTION_ENGINE_VERSION,
     enrichSourceCandidatesForSelection,
   ensureSourceFamilySelectionTables,
-  loadLockedSourceCardSelectionCandidates,
+    loadLockedSourceCardSelectionCandidates,
+  normalizeSourceFamilyLifetimeLabel,
 
     persistLockedSourceSelectionPlan,
+
   readLockedSourceSelectionPlan,
 
   refreshSourceFamilyLabels,
@@ -9955,11 +9957,10 @@ async function applyManifestContentFocusToPool(
   await ensureOperatorPerformanceEvaluatorTables(env);
   const enriched = await enrichSourceCandidatesForSelection(env.DB, brandKey, candidates);
   return enriched.map((candidate) => {
-    const lifetimeLabel = String(candidate.lifetime_label ?? "untested");
-    const focusStatus: OperatorContentFocusStatus = lifetimeLabel === "disproven"
-      ? "retire"
-      : lifetimeLabel === "underperforming"
+        const lifetimeLabel = normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label);
+    const focusStatus: OperatorContentFocusStatus = lifetimeLabel === "underperforming"
         ? "hold"
+
         : lifetimeLabel === "franchise" || lifetimeLabel === "proven"
           ? "repeat"
           : lifetimeLabel === "emerging"
@@ -12703,7 +12704,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")))
           .filter((candidate) => !alreadyPlannedIdentities.has(String(candidate.source_identity_key ?? "")))
           .filter((candidate) => String(candidate.source_identity_key ?? "") !== String(displacedPlan.source_identity_key ?? ""))
-          .filter((candidate) => candidate.lifetime_label !== "disproven");
+                    .filter((candidate) => normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) !== "underperforming");
+
         const replacement = selectSourceFamilyLineup({
           candidates,
           slot_keys: [slotKey],

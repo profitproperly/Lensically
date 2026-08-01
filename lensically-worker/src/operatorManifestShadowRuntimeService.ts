@@ -18,7 +18,12 @@ import {
   type ManifestShadowBenchmarkInput,
   type ManifestShadowSnapshot,
 } from "./operatorManifestShadowService";
-import type { SourceSelectionCandidate, SourceSelectionReceipt } from "./sourceFamilySelection";
+import {
+  normalizeSourceFamilyLifetimeLabel,
+  type SourceSelectionCandidate,
+  type SourceSelectionReceipt,
+} from "./sourceFamilySelection";
+
 import {
   buildManifestDecisionScenarioOverlay,
   buildManifestDecisionSnapshot,
@@ -1233,9 +1238,10 @@ async function prepareShadowCycle(
     if (testCase === "invalidated_source_replacement" && parityReceipt.innovation.selected.length) {
       const invalidatedIdentity = String(parityReceipt.innovation.selected[0]?.source_identity_key ?? "");
       candidates = candidates.filter((candidate) => String(candidate.source_identity_key ?? "") !== invalidatedIdentity);
-      const replacementEligible = candidates.filter((candidate) =>
-        candidate.lifetime_label !== "disproven"
+            const replacementEligible = candidates.filter((candidate) =>
+        normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) !== "underperforming"
         && Boolean(candidate.source_identity_key)
+
         && Boolean(candidate.source_card_id)
         && Boolean(candidate.source_card_family_id)
       );

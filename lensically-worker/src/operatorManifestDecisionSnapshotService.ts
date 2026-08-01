@@ -1,6 +1,8 @@
 import {
-  loadLockedSourceCardDecisionCandidates,
+    loadLockedSourceCardDecisionCandidates,
+  normalizeSourceFamilyLifetimeLabel,
   type SourceSelectionCandidate,
+
   type SourceSelectionReceipt,
 } from "./sourceFamilySelection";
 import {
@@ -259,17 +261,19 @@ export async function buildManifestDecisionSnapshot(
     firstOrNull(db, queryReceipts, "follower_checkpoint", `SELECT * FROM operator_manifest_follower_checkpoints WHERE brand_key = ? ORDER BY datetime(captured_at) DESC LIMIT 1`, [input.brandKey]),
   ]);
 
-  const activeCandidates = sourceCandidates.filter((candidate) =>
-    candidate.lifetime_label !== "disproven"
+    const activeCandidates = sourceCandidates.filter((candidate) =>
+    normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) !== "underperforming"
     && Boolean(candidate.source_identity_key)
+
     && Boolean(candidate.source_card_id)
     && Boolean(candidate.source_card_family_id)
   );
   const excludedCandidates = sourceCandidates.filter((candidate) => !activeCandidates.includes(candidate)).map((candidate) => ({
     source_identity_key: candidate.source_identity_key ?? null,
     source_card_id: candidate.source_card_id ?? null,
-    reason: candidate.lifetime_label === "disproven"
-      ? "lifetime_disproven"
+        reason: normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) === "underperforming"
+      ? "lifetime_underperforming"
+
       : !candidate.source_identity_key
         ? "source_identity_missing"
         : !candidate.source_card_id
