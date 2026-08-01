@@ -1192,11 +1192,8 @@ export async function readCycleObservability(
     brandKey: normalizeBrandKey(rawInput.brandKey),
     rail: normalizeRail(rawInput.rail),
   };
-    try {
-    if (input.action === "state") {
-      return await readRailState(input.db, input.brandKey);
-    }
-    if (input.rail === "innovation" && !input.shadowDb) {
+      try {
+    if (!input.shadowDb && (input.action === "state" || input.rail === "innovation")) {
       return {
         status: 503,
         body: {
@@ -1205,6 +1202,9 @@ export async function readCycleObservability(
           contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
         },
       };
+        }
+    if (input.action === "state") {
+      return await readRailState(input.db, input.shadowDb as D1Database, input.brandKey);
     }
     if (input.action === "history") {
       return input.rail === "innovation"
