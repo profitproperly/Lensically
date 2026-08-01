@@ -757,7 +757,7 @@ async function readInnovationSummary(
       ? "failed"
       : runStatus === "preparing" || runStatus === "running"
         ? "current_challenger"
-        : runStatus === "completed" && benchmarkPassed !== false
+                : runStatus === "completed"
           ? "champion_candidate"
           : runStatus;
   const promotedCurrentChampion = asText(champion.promoted_from_innovation_run_id) === runId;
