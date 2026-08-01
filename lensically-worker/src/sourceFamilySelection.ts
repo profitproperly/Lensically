@@ -794,105 +794,134 @@ export function selectSourceFamilyLineup(input: {
   summary: Record<string, unknown>;
   parity_trace?: Record<string, unknown>;
 } {
-  const active = input.candidates.filter((candidate) =>
-    candidate.lifetime_label !== "disproven"
-    && Boolean(candidate.source_identity_key)
-    && Boolean(candidate.source_card_id)
-    && Boolean(candidate.source_card_family_id)
-  );
+  const exclusionReason = (candidate: SourceSelectionCandidate): string | null => {
+    if (!candidate.source_identity_key) return "source_identity_missing";
+    if (!candidate.source_card_id) return "source_card_missing";
+    if (!candidate.source_card_family_id) return "source_family_missing";
+    if (candidate.lifetime_label === "disproven") return "lifetime_disproven";
+    if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
+    if (finiteNumber(candidate.published_uses_72h) > 0) return "source_published_within_72h";
+    if (finiteNumber(candidate.future_scheduled_uses) > 0) return "source_already_future_scheduled";
+    return null;
+  };
   const exclusions = input.candidates
-    .filter((candidate) => !active.includes(candidate))
-    .map((candidate) => ({
-      source_identity_key: candidate.source_identity_key ?? null,
-      source_card_id: candidate.source_card_id ?? null,
-      source_card_family_id: candidate.source_card_family_id ?? null,
-      reason: candidate.lifetime_label === "disproven"
-        ? "lifetime_disproven"
-        : !candidate.source_identity_key
-          ? "source_identity_missing"
-          : !candidate.source_card_id
-            ? "source_card_missing"
-            : "source_family_missing",
+    .map((candidate) => ({ candidate, reason: exclusionReason(candidate) }))
+    .filter((entry) => entry.reason !== null)
+    .map((entry) => ({
+      source_identity_key: entry.candidate.source_identity_key ?? null,
+      source_card_id: entry.candidate.source_card_id ?? null,
+      source_card_family_id: entry.candidate.source_card_family_id ?? null,
+      reason: entry.reason,
     }));
-  if (!active.length && input.slot_keys.length) throw new Error("no_eligible_source_families");
+  const active = input.candidates.filter((candidate) => exclusionReason(candidate) === null);
+  if (active.length < input.slot_keys.length) {
+    throw new Error(`insufficient_hardened_source_families:${active.length}:${input.slot_keys.length}`);
+  }
   const eligibleFamilyCount = new Set(active.map((candidate) => String(candidate.source_card_family_id))).size;
-  const cooldownHours = Math.min(24, Math.max(1, eligibleFamilyCount));
-  const requireUniqueSource = new Set(active.map((candidate) => String(candidate.source_identity_key))).size >= input.slot_keys.length;
+  const cooldownHours = 72;
+  const semanticSpacingHours = 24;
+  const requireUniqueSource = input.slot_keys.length > 0;
+  const allocationTargets = buildAllocationTargets(active, input.slot_keys.length);
+  const selectedTierCounts: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
   const selected: SourceSelectionCandidate[] = [];
   const receipts: SourceSelectionReceipt[] = [];
   const usedSources = new Set<string>();
   const plannedCounts = new Map<string, number>();
   const plannedLastSlot = new Map<string, string>();
-    const recentSemanticKeys: string[] = [];
+  const plannedSemanticSlots = new Map<string, string[]>();
   const relaxationCounts: Record<string, number> = { strict: 0, half: 0, exhausted: 0 };
   const slotRankings: Record<string, unknown>[] = [];
 
   for (let slotIndex = 0; slotIndex < input.slot_keys.length; slotIndex += 1) {
     const slotKey = input.slot_keys[slotIndex];
-    const available = active.filter((candidate) => !requireUniqueSource || !usedSources.has(String(candidate.source_identity_key)));
-    if (!available.length) throw new Error(`insufficient_eligible_source_families:${slotIndex}`);
-    let scored: Array<{ candidate: SourceSelectionCandidate; receipt: SourceSelectionReceipt }> = [];
-    for (const relaxation of [1, 0.5, 0]) {
-      scored = [];
-      for (const candidate of available) {
-        const identity = String(candidate.source_identity_key);
-        const familyId = String(candidate.source_card_family_id);
-        const sourceCardId = String(candidate.source_card_id);
-        const plannedLast = plannedLastSlot.get(familyId);
-        const historicalHours = candidate.hours_since_last_use === null || candidate.hours_since_last_use === undefined
-          ? Number.POSITIVE_INFINITY
-          : Math.max(0, finiteNumber(candidate.hours_since_last_use) + slotIndex);
-        const hoursSinceLast = plannedLast ? slotDistanceHours(slotKey, plannedLast) : historicalHours;
-        if (relaxation > 0 && hoursSinceLast < cooldownHours * relaxation) continue;
-        const n = Math.max(0, finiteNumber(candidate.lifetime_sample_size));
-        const lifetimeIndex = Math.max(0, finiteNumber(candidate.lifetime_index, 1));
-        const shrunkPerformance = (2 + n * lifetimeIndex) / (n + 2);
-        const recentFactor = candidate.recent_index === null || candidate.recent_index === undefined
-          ? 1
-          : clamp(finiteNumber(candidate.recent_index, 1), 0.75, 1.25);
-        const explorationBonus = 0.5 / Math.sqrt(n + 1);
-        const uses24h = Math.max(0, finiteNumber(candidate.uses_24h));
-        const uses7d = Math.max(0, finiteNumber(candidate.uses_7d));
-        const uses28d = Math.max(0, finiteNumber(candidate.uses_28d));
-        const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
-        const semanticKey = String(candidate.semantic_key ?? "unknown");
-        const semanticOverlapCount = recentSemanticKeys.slice(-6).filter((value) => value === semanticKey).length;
-        const exposureBurden = 1 + 2 * uses24h + 0.75 * uses7d + 0.25 * uses28d + 2 * plannedUses + 0.5 * semanticOverlapCount;
-        const negativeEvidenceMultiplier = candidate.lifetime_label === "underperforming" ? 0.65 : 1;
-        const score = ((shrunkPerformance * recentFactor + explorationBonus) / exposureBurden) * negativeEvidenceMultiplier;
-        const deterministicTiebreak = stableUnit(`${input.seed}|${slotKey}|${identity}`);
-        scored.push({
-          candidate,
-          receipt: {
-            policy_version: SOURCE_SELECTION_ENGINE_VERSION,
-            slot_key: slotKey,
-            source_identity_key: identity,
-            source_card_id: sourceCardId,
-            source_card_family_id: familyId,
-            lifetime_label: candidate.lifetime_label ?? "untested",
-            recent_label: candidate.recent_label ?? "no_recent_data",
-            lifetime_sample_size: n,
-            lifetime_index: lifetimeIndex,
-            recent_factor: recentFactor,
-            shrunk_performance: shrunkPerformance,
-            exploration_bonus: explorationBonus,
-            uses_24h: uses24h,
-            uses_7d: uses7d,
-            uses_28d: uses28d,
-            planned_uses: plannedUses,
-            semantic_overlap_count: semanticOverlapCount,
-            exposure_burden: exposureBurden,
-            negative_evidence_multiplier: negativeEvidenceMultiplier,
-            cooldown_hours: cooldownHours,
-            cooldown_relaxation: relaxation,
-            score,
-            deterministic_tiebreak: deterministicTiebreak,
-          },
-        });
-      }
-      if (scored.length) break;
+    const slotEligible = active.filter((candidate) => {
+      const identity = String(candidate.source_identity_key);
+      const familyId = String(candidate.source_card_family_id);
+      const semanticKey = String(candidate.semantic_key ?? "unknown");
+      if (usedSources.has(identity)) return false;
+      const plannedLast = plannedLastSlot.get(familyId);
+      if (plannedLast && slotDistanceHours(slotKey, plannedLast) < cooldownHours) return false;
+      const historicalSemanticTimes = Array.isArray(candidate.semantic_exposure_times)
+        ? candidate.semantic_exposure_times
+        : [];
+      if (historicalSemanticTimes.some((value) => slotDistanceHours(slotKey, value) < semanticSpacingHours)) return false;
+      const plannedSemanticTimes = plannedSemanticSlots.get(semanticKey) ?? [];
+      if (plannedSemanticTimes.some((value) => slotDistanceHours(slotKey, value) < semanticSpacingHours)) return false;
+      return true;
+    });
+    if (!slotEligible.length) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
+    const availableTiers = new Set(slotEligible.map((candidate) => allocationTierForLabel(candidate.lifetime_label)));
+    const allocationTier = chooseAllocationTier(
+      allocationTargets,
+      selectedTierCounts,
+      availableTiers,
+      slotIndex,
+      input.slot_keys.length,
+    );
+    if (!allocationTier) throw new Error(`hardened_allocation_target_unavailable:${slotIndex}`);
+    const available = slotEligible.filter((candidate) => allocationTierForLabel(candidate.lifetime_label) === allocationTier);
+    const scored: Array<{ candidate: SourceSelectionCandidate; receipt: SourceSelectionReceipt }> = [];
+    for (const candidate of available) {
+      const identity = String(candidate.source_identity_key);
+      const familyId = String(candidate.source_card_family_id);
+      const sourceCardId = String(candidate.source_card_id);
+      const n = Math.max(0, finiteNumber(candidate.lifetime_sample_size));
+      const lifetimeIndex = Math.max(0, finiteNumber(candidate.lifetime_index, 1));
+      const shrunkPerformance = (2 + n * lifetimeIndex) / (n + 2);
+      const recentFactor = candidate.recent_index === null || candidate.recent_index === undefined
+        ? 1
+        : clamp(finiteNumber(candidate.recent_index, 1), 0.75, 1.25);
+      const explorationBonus = 0.5 / Math.sqrt(n + 1);
+      const uses24h = Math.max(0, finiteNumber(candidate.uses_24h));
+      const uses7d = Math.max(0, finiteNumber(candidate.uses_7d));
+      const uses28d = Math.max(0, finiteNumber(candidate.uses_28d));
+      const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
+      const semanticKey = String(candidate.semantic_key ?? "unknown");
+      const semanticOverlapCount = (plannedSemanticSlots.get(semanticKey) ?? []).length;
+      const publishedUses72h = Math.max(0, finiteNumber(candidate.published_uses_72h));
+      const futureScheduledUses = Math.max(0, finiteNumber(candidate.future_scheduled_uses));
+      const semanticPublishedUses24h = Math.max(0, finiteNumber(candidate.semantic_published_uses_24h));
+      const semanticFutureScheduledUses = Math.max(0, finiteNumber(candidate.semantic_future_scheduled_uses));
+      const exposureBurden = 1 + 0.75 * uses7d + 0.25 * uses28d + 2 * plannedUses + 0.5 * semanticOverlapCount;
+      const negativeEvidenceMultiplier = 1;
+      const score = ((shrunkPerformance * recentFactor + explorationBonus) / exposureBurden) * negativeEvidenceMultiplier;
+      const deterministicTiebreak = stableUnit(`${input.seed}|${slotKey}|${identity}`);
+      scored.push({
+        candidate,
+        receipt: {
+          policy_version: SOURCE_SELECTION_ENGINE_VERSION,
+          slot_key: slotKey,
+          source_identity_key: identity,
+          source_card_id: sourceCardId,
+          source_card_family_id: familyId,
+          lifetime_label: candidate.lifetime_label ?? "untested",
+          recent_label: candidate.recent_label ?? "no_recent_data",
+          lifetime_sample_size: n,
+          lifetime_index: lifetimeIndex,
+          recent_factor: recentFactor,
+          shrunk_performance: shrunkPerformance,
+          exploration_bonus: explorationBonus,
+          uses_24h: uses24h,
+          uses_7d: uses7d,
+          uses_28d: uses28d,
+          planned_uses: plannedUses,
+          semantic_key: semanticKey,
+          semantic_overlap_count: semanticOverlapCount,
+          published_uses_72h: publishedUses72h,
+          future_scheduled_uses: futureScheduledUses,
+          semantic_published_uses_24h: semanticPublishedUses24h,
+          semantic_future_scheduled_uses: semanticFutureScheduledUses,
+          allocation_tier: allocationTier,
+          exposure_burden: exposureBurden,
+          negative_evidence_multiplier: negativeEvidenceMultiplier,
+          cooldown_hours: cooldownHours,
+          cooldown_relaxation: 1,
+          score,
+          deterministic_tiebreak: deterministicTiebreak,
+        },
+      });
     }
-        scored.sort((left, right) =>
+    scored.sort((left, right) =>
       right.receipt.score - left.receipt.score
       || right.receipt.deterministic_tiebreak - left.receipt.deterministic_tiebreak
       || left.receipt.source_identity_key.localeCompare(right.receipt.source_identity_key)
@@ -900,13 +929,14 @@ export function selectSourceFamilyLineup(input: {
     if (input.include_parity_trace) {
       slotRankings.push({
         slot_key: slotKey,
+        allocation_tier: allocationTier,
         ranked_source_identity_keys: scored.map((entry) => entry.receipt.source_identity_key),
         ranked_source_card_ids: scored.map((entry) => entry.receipt.source_card_id),
-        cooldown_relaxation: scored[0]?.receipt.cooldown_relaxation ?? null,
+        cooldown_relaxation: 1,
       });
     }
     const winner = scored[0];
-    if (!winner) throw new Error(`source_selection_exhausted:${slotIndex}`);
+    if (!winner) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
     const receipt = {
       ...winner.receipt,
       score: Number(winner.receipt.score.toFixed(8)),
@@ -921,29 +951,42 @@ export function selectSourceFamilyLineup(input: {
     usedSources.add(receipt.source_identity_key);
     plannedCounts.set(receipt.source_card_family_id, receipt.planned_uses + 1);
     plannedLastSlot.set(receipt.source_card_family_id, slotKey);
-    recentSemanticKeys.push(String(winner.candidate.semantic_key ?? "unknown"));
-    const relaxationKey = receipt.cooldown_relaxation === 1 ? "strict" : receipt.cooldown_relaxation === 0.5 ? "half" : "exhausted";
-    relaxationCounts[relaxationKey] += 1;
+    const semanticSlots = plannedSemanticSlots.get(receipt.semantic_key) ?? [];
+    semanticSlots.push(slotKey);
+    plannedSemanticSlots.set(receipt.semantic_key, semanticSlots);
+    selectedTierCounts[receipt.allocation_tier] += 1;
+    relaxationCounts.strict += 1;
+  }
+  for (const tier of ["winner", "development", "exploration"] as SourceAllocationTier[]) {
+    if (selectedTierCounts[tier] !== allocationTargets[tier]) {
+      throw new Error(`hardened_allocation_target_mismatch:${tier}:${selectedTierCounts[tier]}:${allocationTargets[tier]}`);
+    }
   }
   const labelCounts = selected.reduce<Record<string, number>>((counts, candidate) => {
     const label = String(candidate.lifetime_label ?? "untested");
     counts[label] = Number(counts[label] ?? 0) + 1;
     return counts;
   }, {});
-    return {
+  return {
     selected,
     receipts,
     summary: {
       engine_version: SOURCE_SELECTION_ENGINE_VERSION,
       deterministic: true,
       model_override_allowed: false,
+      recent_exposure_authority: "published_and_scheduled_lineage",
       eligible_family_count: eligibleFamilyCount,
+      hard_exclusion_count: exclusions.length,
       requested_slot_count: input.slot_keys.length,
       selected_count: selected.length,
       cooldown_hours: cooldownHours,
+      semantic_spacing_hours: semanticSpacingHours,
       unique_source_enforced: requireUniqueSource,
       cooldown_relaxations: relaxationCounts,
+      allocation_targets: allocationTargets,
+      selected_allocation_tiers: selectedTierCounts,
       selected_lifetime_labels: labelCounts,
+      strategy_influence_enforced: true,
     },
     parity_trace: input.include_parity_trace
       ? {
@@ -954,14 +997,18 @@ export function selectSourceFamilyLineup(input: {
             source_card_family_id: candidate.source_card_family_id ?? null,
             lifetime_label: candidate.lifetime_label ?? "untested",
             recent_label: candidate.recent_label ?? "no_recent_data",
+            allocation_tier: allocationTierForLabel(candidate.lifetime_label),
           })).sort((left, right) => String(left.source_identity_key).localeCompare(String(right.source_identity_key))),
           exclusions,
+          allocation_targets: allocationTargets,
           slot_rankings: slotRankings,
           selected_source_to_slot: receipts.map((receipt) => ({
             slot_key: receipt.slot_key,
             source_identity_key: receipt.source_identity_key,
             source_card_id: receipt.source_card_id,
             source_card_family_id: receipt.source_card_family_id,
+            allocation_tier: receipt.allocation_tier,
+            semantic_key: receipt.semantic_key,
           })),
         }
       : undefined,
