@@ -58,6 +58,7 @@ import {
 } from "./humanFreeAutonomy";
 
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import { readCycleObservability } from "./cycleObservabilityService";
 import {
     OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
@@ -31402,6 +31403,40 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         intelligence_backend_active: true,
       }), {
         status: 410,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...requestCorsHeaders,
+        },
+      });
+    }
+
+        if (url.pathname.startsWith("/api/cycles/") && request.method === "GET") {
+      const actionByPath: Record<string, "state" | "history" | "summary" | "selections" | "selection_detail"> = {
+        "/api/cycles/state": "state",
+        "/api/cycles/history": "history",
+        "/api/cycles/summary": "summary",
+        "/api/cycles/selections": "selections",
+        "/api/cycles/selection-detail": "selection_detail",
+      };
+      const action = actionByPath[url.pathname];
+      if (!action) {
+        return notFoundJsonResponse(requestCorsHeaders);
+      }
+      const result = await readCycleObservability({
+        db: env.DB,
+        brandKey: url.searchParams.get("brand_key")?.trim() || "manifest_mental",
+        action,
+        rail: url.searchParams.get("rail") === "innovation" ? "innovation" : "main",
+        id: url.searchParams.get("id")?.trim() || undefined,
+        cursor: url.searchParams.get("cursor"),
+        limit: Number(url.searchParams.get("limit") ?? "10"),
+        showAll: url.searchParams.get("show_all") === "1" || url.searchParams.get("show_all") === "true",
+        slotKey: url.searchParams.get("slot_key")?.trim() || undefined,
+        filter: url.searchParams.get("filter"),
+      });
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
