@@ -26,6 +26,7 @@ export type CycleObservabilityAction =
 
 export type CycleObservabilityInput = {
   db: D1Database;
+  shadowDb?: D1Database;
   brandKey: string;
   action: CycleObservabilityAction;
   rail?: CycleRail;
@@ -1125,13 +1126,23 @@ export async function readCycleObservability(
     brandKey: normalizeBrandKey(rawInput.brandKey),
     rail: normalizeRail(rawInput.rail),
   };
-  try {
+    try {
     if (input.action === "state") {
       return await readRailState(input.db, input.brandKey);
     }
+    if (input.rail === "innovation" && !input.shadowDb) {
+      return {
+        status: 503,
+        body: {
+          success: false,
+          error: "innovation_cycle_database_unavailable",
+          contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
+        },
+      };
+    }
     if (input.action === "history") {
       return input.rail === "innovation"
-        ? await readInnovationHistory(input.db, input.brandKey, input.cursor, input.limit)
+        ? await readInnovationHistory(input.db, input.shadowDb as D1Database, input.brandKey, input.cursor, input.limit)
         : await readMainHistory(input.db, input.brandKey, input.cursor, input.limit);
     }
 
@@ -1140,14 +1151,14 @@ export async function readCycleObservability(
       return { status: 400, body: { success: false, error: "cycle_id_required" } };
     }
 
-    if (input.action === "summary") {
+        if (input.action === "summary") {
       return input.rail === "innovation"
-        ? await readInnovationSummary(input.db, input.brandKey, id)
+        ? await readInnovationSummary(input.db, input.shadowDb as D1Database, input.brandKey, id)
         : await readMainSummary(input.db, input.brandKey, id);
     }
     if (input.action === "selections") {
       return input.rail === "innovation"
-        ? await readInnovationSelections(input.db, input.brandKey, id, Boolean(input.showAll), input.filter)
+        ? await readInnovationSelections(input.shadowDb as D1Database, input.brandKey, id, Boolean(input.showAll), input.filter)
         : await readMainSelections(input.db, input.brandKey, id, Boolean(input.showAll), input.filter);
     }
     if (input.action === "selection_detail") {
@@ -1155,8 +1166,8 @@ export async function readCycleObservability(
       if (!slotKey || slotKey.length > 100) {
         return { status: 400, body: { success: false, error: "slot_key_required" } };
       }
-      return input.rail === "innovation"
-        ? await readInnovationSelectionDetail(input.db, input.brandKey, id, slotKey)
+            return input.rail === "innovation"
+        ? await readInnovationSelectionDetail(input.shadowDb as D1Database, input.brandKey, id, slotKey)
         : await readMainSelectionDetail(input.db, input.brandKey, id, slotKey);
     }
     return { status: 400, body: { success: false, error: "unsupported_cycle_observability_action" } };

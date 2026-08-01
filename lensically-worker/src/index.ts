@@ -31423,8 +31423,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (!action) {
         return notFoundJsonResponse(requestCorsHeaders);
       }
-      const result = await readCycleObservability({
+            const result = await readCycleObservability({
         db: env.DB,
+        shadowDb: env.SHADOW_DB,
         brandKey: url.searchParams.get("brand_key")?.trim() || "manifest_mental",
         action,
         rail: url.searchParams.get("rail") === "innovation" ? "innovation" : "main",
