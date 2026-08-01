@@ -18,6 +18,7 @@ import {
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/cycles", label: "Cycles" },
   { href: "/insights", label: "Insights" },
   { href: "/saved-patterns", label: "Saved Patterns" },
   { href: "/followers", label: "Followers" },
