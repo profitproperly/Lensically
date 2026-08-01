@@ -200,6 +200,12 @@ function compactText(value: unknown, maxLength = 120): string | null {
   return normalized.length <= maxLength ? normalized : `${normalized.slice(0, Math.max(1, maxLength - 1)).trimEnd()}…`;
 }
 
+function titleCaseCycleState(value: unknown): string {
+  const normalized = asText(value);
+  if (!normalized) return "Unknown";
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function extractSourceText(primarySource: unknown): string | null {
   const source = asRecord(primarySource);
   for (const key of ["source_text", "post_text", "text", "body", "content", "caption"]) {
