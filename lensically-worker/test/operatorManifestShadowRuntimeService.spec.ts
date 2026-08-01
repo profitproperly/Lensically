@@ -467,8 +467,8 @@ describe("operatorManifestShadowRuntimeService", () => {
       horizonHours: 48,
     });
 
-    expect(prepared.status).toBe(200);
-    expect(prepared.body.success).toBe(true);
+        expect(prepared.status, JSON.stringify(prepared.body)).toBe(200);
+    expect(prepared.body.success, JSON.stringify(prepared.body)).toBe(true);
     const bundle = record(prepared.body.decision_bundle);
     const locked = rows(bundle.locked_source_lineup);
     const selectedIdentities = locked.map((item) => String(item.source_identity_key));
