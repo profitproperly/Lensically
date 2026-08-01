@@ -489,7 +489,8 @@ describe("operatorManifestShadowRuntimeService", () => {
     })).toBe(true);
     const selectionSummary = record(bundle.selection_summary);
     expect(selectionSummary).toMatchObject({
-      engine_version: "source-selection-engine-v5",
+            engine_version: "source-selection-engine-v6",
+
       recent_exposure_authority: "published_and_scheduled_lineage",
       selected_count: 24,
       strategy_influence_enforced: true,
