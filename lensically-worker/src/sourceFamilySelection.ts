@@ -674,24 +674,64 @@ export async function enrichSourceCandidatesForSelection(
        ON state.brand_key = fam.brand_key AND state.source_card_family_id = fam.id
      WHERE fam.brand_key = ? AND fam.status = 'active'`,
   ).bind(brandKey).all<Record<string, unknown>>();
-  const exposureRows = await db.prepare(
-    `SELECT source_identity_key,
-            MAX(selected_at) AS last_used_at,
-            SUM(CASE WHEN datetime(selected_at) >= datetime(?, '-24 hours') THEN 1 ELSE 0 END) AS uses_24h,
-            SUM(CASE WHEN datetime(selected_at) >= datetime(?, '-7 days') THEN 1 ELSE 0 END) AS uses_7d,
-            SUM(CASE WHEN datetime(selected_at) >= datetime(?, '-28 days') THEN 1 ELSE 0 END) AS uses_28d
-     FROM operator_source_selections
-     WHERE brand_key = ? AND datetime(selected_at) >= datetime(?, '-28 days')
-     GROUP BY source_identity_key`,
-  ).bind(nowIso, nowIso, nowIso, brandKey, nowIso).all<Record<string, unknown>>();
+    const audienceExposureRows = await db.prepare(
+    `SELECT DISTINCT fam.source_identity_key, fam.id AS source_card_family_id,
+            sp.status, sp.scheduled_time, sp.published_at,
+            COALESCE(sp.published_post_id, draft.published_post_id) AS published_post_id,
+            archive.post_timestamp
+     FROM gpt_generation_drafts draft
+     JOIN operator_source_cards card
+       ON card.id = draft.source_card_id
+     JOIN operator_source_card_families fam
+       ON fam.id = card.family_id AND fam.brand_key = card.brand_key
+     JOIN scheduled_posts sp
+       ON sp.id = draft.scheduled_post_id
+     LEFT JOIN threads_posts_archive archive
+       ON archive.post_id = COALESCE(sp.published_post_id, draft.published_post_id)
+     WHERE fam.brand_key = ?
+       AND draft.scheduled_post_id IS NOT NULL
+       AND sp.cancelled_at IS NULL
+       AND (
+         (sp.status = 'posted'
+          AND datetime(COALESCE(sp.published_at, archive.post_timestamp, sp.scheduled_time)) >= datetime(?, '-28 days'))
+         OR
+         (sp.status IN ('approved', 'posting') AND datetime(sp.scheduled_time) >= datetime(?))
+       )`,
+  ).bind(brandKey, nowIso, nowIso).all<Record<string, unknown>>();
   const stateByIdentity = new Map((stateRows.results ?? []).map((row) => [String(row.source_identity_key), row]));
-  const exposureByIdentity = new Map((exposureRows.results ?? []).map((row) => [String(row.source_identity_key), row]));
   const nowMs = parseTimeMs(nowIso) ?? Date.now();
-  return candidates.map((candidate) => {
+  type AudienceExposure = { published: string[]; scheduled: string[] };
+  const exposureByIdentity = new Map<string, AudienceExposure>();
+  for (const row of audienceExposureRows.results ?? []) {
+    const identity = String(row.source_identity_key ?? "");
+    if (!identity) continue;
+    const exposure = exposureByIdentity.get(identity) ?? { published: [], scheduled: [] };
+    const status = String(row.status ?? "");
+    if (status === "posted") {
+      const observedAt = String(row.published_at ?? row.post_timestamp ?? row.scheduled_time ?? "");
+      if (parseTimeMs(observedAt) !== null) exposure.published.push(observedAt);
+    } else {
+      const scheduledAt = String(row.scheduled_time ?? "");
+      const scheduledMs = parseTimeMs(scheduledAt);
+      if (scheduledMs !== null && scheduledMs >= nowMs) exposure.scheduled.push(scheduledAt);
+    }
+    exposureByIdentity.set(identity, exposure);
+  }
+  const enriched = candidates.map((candidate) => {
     const identity = String(candidate.source_identity_key ?? "");
     const state = stateByIdentity.get(identity);
-    const exposure = exposureByIdentity.get(identity);
-    const lastUsedMs = parseTimeMs(exposure?.last_used_at);
+    const exposure = exposureByIdentity.get(identity) ?? { published: [], scheduled: [] };
+    const publishedTimes = exposure.published
+      .filter((value) => parseTimeMs(value) !== null)
+      .sort((left, right) => Number(parseTimeMs(left)) - Number(parseTimeMs(right)));
+    const scheduledTimes = exposure.scheduled
+      .filter((value) => parseTimeMs(value) !== null)
+      .sort((left, right) => Number(parseTimeMs(left)) - Number(parseTimeMs(right)));
+    const countPublishedSince = (hours: number): number => publishedTimes.filter((value) =>
+      Number(parseTimeMs(value)) >= nowMs - hours * 3600000
+    ).length;
+    const latestPublishedAt = publishedTimes[publishedTimes.length - 1] ?? null;
+    const lastUsedMs = parseTimeMs(latestPublishedAt);
     const sourceMechanism = state?.source_mechanism ?? candidate.source_mechanism;
     const requiredProduct = state?.required_product ?? candidate.required_product;
     return {
@@ -705,13 +745,40 @@ export async function enrichSourceCandidatesForSelection(
       recent_sample_size: finiteNumber(state?.recent_sample_size),
       lifetime_index: finiteNumber(state?.lifetime_index, 1),
       recent_index: state?.recent_index === null || state?.recent_index === undefined ? null : finiteNumber(state.recent_index, 1),
-      uses_24h: finiteNumber(exposure?.uses_24h),
-      uses_7d: finiteNumber(exposure?.uses_7d),
-      uses_28d: finiteNumber(exposure?.uses_28d),
+      uses_24h: countPublishedSince(24),
+      uses_7d: countPublishedSince(24 * 7),
+      uses_28d: publishedTimes.length,
+      published_uses_72h: countPublishedSince(72),
+      future_scheduled_uses: scheduledTimes.length,
+      latest_published_at: latestPublishedAt,
+      next_scheduled_at: scheduledTimes[0] ?? null,
+      published_exposure_times: publishedTimes,
+      future_scheduled_exposure_times: scheduledTimes,
       hours_since_last_use: lastUsedMs === null ? null : Math.max(0, (nowMs - lastUsedMs) / 3600000),
       semantic_key: `${semanticToken(sourceMechanism)}:${semanticToken(requiredProduct)}`,
       source_mechanism: sourceMechanism ?? null,
       required_product: requiredProduct ?? null,
+    } as SourceSelectionCandidate;
+  });
+  const semanticExposureTimes = new Map<string, { published: string[]; scheduled: string[] }>();
+  for (const candidate of enriched) {
+    const semanticKey = String(candidate.semantic_key ?? "unknown");
+    const exposure = semanticExposureTimes.get(semanticKey) ?? { published: [], scheduled: [] };
+    exposure.published.push(...(candidate.published_exposure_times ?? []));
+    exposure.scheduled.push(...(candidate.future_scheduled_exposure_times ?? []));
+    semanticExposureTimes.set(semanticKey, exposure);
+  }
+  return enriched.map((candidate) => {
+    const semanticKey = String(candidate.semantic_key ?? "unknown");
+    const exposure = semanticExposureTimes.get(semanticKey) ?? { published: [], scheduled: [] };
+    const semanticPublished24h = exposure.published.filter((value) =>
+      Number(parseTimeMs(value)) >= nowMs - 24 * 3600000
+    ).length;
+    return {
+      ...candidate,
+      semantic_exposure_times: [...exposure.published, ...exposure.scheduled],
+      semantic_published_uses_24h: semanticPublished24h,
+      semantic_future_scheduled_uses: exposure.scheduled.length,
     };
   });
 }
