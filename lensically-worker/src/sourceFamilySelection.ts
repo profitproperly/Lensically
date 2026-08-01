@@ -1151,9 +1151,48 @@ export async function validateLineupAgainstLockedSourceSelectionPlan(
     lineup: Record<string, unknown>[];
   },
 ): Promise<Record<string, unknown>[]> {
-  const plan = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
+    const plan = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
   if (!plan.length) throw new Error("locked_source_selection_plan_missing");
   if (plan.length !== input.lineup.length) throw new Error("locked_source_selection_plan_lineup_count_mismatch");
+  const seenSources = new Set<string>();
+  const semanticSlots = new Map<string, string[]>();
+  for (const row of plan) {
+    const receipt = row.receipt && typeof row.receipt === "object" && !Array.isArray(row.receipt)
+      ? row.receipt as Record<string, unknown>
+      : {};
+    const slotKey = String(row.slot_key ?? "");
+    const sourceIdentityKey = String(row.source_identity_key ?? "");
+    const lifetimeLabel = String(receipt.lifetime_label ?? "");
+    const semanticKey = String(receipt.semantic_key ?? "");
+    if (String(receipt.policy_version ?? "") !== SOURCE_SELECTION_ENGINE_VERSION) {
+      throw new Error(`locked_source_selection_plan_policy_mismatch:${slotKey}`);
+    }
+    if (lifetimeLabel === "underperforming" || lifetimeLabel === "disproven") {
+      throw new Error(`locked_source_selection_plan_weak_family:${slotKey}`);
+    }
+    if (finiteNumber(receipt.published_uses_72h) > 0) {
+      throw new Error(`locked_source_selection_plan_recent_source:${slotKey}`);
+    }
+    if (finiteNumber(receipt.future_scheduled_uses) > 0) {
+      throw new Error(`locked_source_selection_plan_scheduled_source:${slotKey}`);
+    }
+    if (finiteNumber(receipt.cooldown_relaxation) !== 1 || finiteNumber(receipt.cooldown_hours) !== 72) {
+      throw new Error(`locked_source_selection_plan_relaxed_cooldown:${slotKey}`);
+    }
+    if (!sourceIdentityKey || seenSources.has(sourceIdentityKey)) {
+      throw new Error(`locked_source_selection_plan_duplicate_source:${slotKey}`);
+    }
+    seenSources.add(sourceIdentityKey);
+    if (!semanticKey || !String(receipt.allocation_tier ?? "")) {
+      throw new Error(`locked_source_selection_plan_strategy_evidence_missing:${slotKey}`);
+    }
+    const priorSlots = semanticSlots.get(semanticKey) ?? [];
+    if (priorSlots.some((priorSlot) => slotDistanceHours(slotKey, priorSlot) < 24)) {
+      throw new Error(`locked_source_selection_plan_semantic_crowding:${slotKey}`);
+    }
+    priorSlots.push(slotKey);
+    semanticSlots.set(semanticKey, priorSlots);
+  }
   const expected = new Map(plan.map((row) => [String(row.slot_key), String(row.source_card_id)]));
   for (const item of input.lineup) {
     const slotKey = String(item.slot_key ?? "");
@@ -1203,7 +1242,8 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
       recent_index: 2,
       uses_24h: 4,
       uses_7d: 10,
-      uses_28d: 20,
+            uses_28d: 20,
+      published_uses_72h: 1,
       hours_since_last_use: 1,
       semantic_key: "winner",
     },
