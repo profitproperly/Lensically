@@ -6,20 +6,32 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-family-audition-and-preselection-authority
-active_checkpoint: owner-wake-proceed-gate
-validated_source_head: 95916b7605da46592ce92fde84f231a47a22a133
-documentation_source_head: 95916b7605da46592ce92fde84f231a47a22a133
-production_sha: 95916b7605da46592ce92fde84f231a47a22a133
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_checkpoint: repair-paired-shadow-seed-storage
+validated_source_head: 58ff3720134c4ad86f7e069876da1c282fa78689
+documentation_source_head: 58ff3720134c4ad86f7e069876da1c282fa78689
+production_sha: 58ff3720134c4ad86f7e069876da1c282fa78689
+active_interrupt_id: paired-shadow-seed-sqlite-toobig-20260801
+active_interrupt_state: repairing
+active_interrupt_precedence: P1 blocks Innovation acceptance until normalized seed storage is deployed and verified
+
 
 
 
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
+## Active Interrupt — paired-shadow-seed-sqlite-toobig-20260801
+
+- Severity: P1.
+- Observed live on exact deployed SHA `58ff3720134c4ad86f7e069876da1c282fa78689` while preparing the fresh `same_snapshot_ab` control.
+- Failure: `D1_ERROR: string or blob too big: SQLITE_TOOBIG`; run `shadow-77d881f189791d1e32b05e9fdf97342c` failed before acceptance.
+- Root cause: the prevention patch attempted to persist the complete production-shaped decision snapshot inside one `manifest_shadow_snapshots.payload_json` value. The live snapshot is too large for the bounded D1 row/value contract.
+- Required repair: normalize the paired seed into bounded durable chunks or existing normalized Shadow tables; persist only a compact manifest/reference in the snapshot row; reconstruct and hash-verify the challenger seed before selection.
+- Permanent prevention: add a large live-shaped regression that exceeds the former single-value size, proves chunked round-trip equality, proves no provider reads by the challenger, and fails closed on missing/incomplete chunks.
+- Resume condition: exact-head tests pass, exact SHA deploys, a fresh control and challenger complete on the same hash/slots/lineup, and the interrupt is closed here.
+
 ## Authority and Precedence
+
 
 1. Execute only the active job and Current Action recorded here.
 2. A directly verified P0/P1 security, data-loss, credential, production-safety, or irreversible incident may interrupt only after concrete harm is established and recorded here.
