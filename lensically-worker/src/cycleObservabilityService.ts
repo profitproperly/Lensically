@@ -685,11 +685,12 @@ async function readMainSummary(
 }
 
 async function readInnovationSummary(
-  db: D1Database,
+  mainDb: D1Database,
+  shadowDb: D1Database,
   brandKey: string,
   runId: string,
 ): Promise<CycleObservabilityResult> {
-  const row = await db.prepare(
+    const row = await shadowDb.prepare(
     `SELECT
        r.*,
        s.snapshot_hash AS persisted_snapshot_hash,
@@ -705,27 +706,32 @@ async function readInnovationSummary(
        b.payload_bytes AS benchmark_payload_bytes,
        b.production_noninterference_passed,
        b.threads_mutation_count,
-       b.cleanup_orphan_count,
+              b.cleanup_orphan_count,
        b.passed AS benchmark_passed,
        b.failed_rule,
-       ir.state AS registry_state,
-       ir.challenged_main_version,
-       ir.selector_version,
-       ir.preselection_policy_version,
-       ir.control_or_challenger,
-       ir.promotion_eligible,
-       ir.promotion_destination_version,
        (SELECT COUNT(*) FROM manifest_shadow_stage_events e WHERE e.shadow_run_id = r.id) AS stage_event_count
      FROM manifest_shadow_runs r
      LEFT JOIN manifest_shadow_snapshots s ON s.shadow_run_id = r.id
      LEFT JOIN manifest_shadow_benchmark_receipts b ON b.shadow_run_id = r.id
-     LEFT JOIN manifest_cycle_innovation_runs ir ON ir.run_id = r.id
      WHERE r.brand_key = ? AND r.id = ?
      LIMIT 1`,
   ).bind(brandKey, runId).first<JsonRecord>();
-  if (!row) {
+    if (!row) {
     return { status: 404, body: { success: false, error: "innovation_cycle_not_found", id: runId } };
   }
+  const registry = await mainDb.prepare(
+    `SELECT
+       state,
+       challenged_main_version,
+       selector_version,
+       preselection_policy_version,
+       control_or_challenger,
+       promotion_eligible,
+       promotion_destination_version
+     FROM manifest_cycle_innovation_runs
+     WHERE brand_key = ? AND run_id = ?
+     LIMIT 1`,
+  ).bind(brandKey, runId).first<JsonRecord>() ?? {};
 
   return {
     status: 200,
@@ -734,7 +740,7 @@ async function readInnovationSummary(
       contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
       rail: "innovation",
       id: runId,
-      status: asText(row.registry_state) ?? asText(row.status),
+            status: asText(registry.state) ?? asText(row.status),
       scenario: asText(row.scenario),
       evidence_mode: asText(row.evidence_mode),
       variant_key: asText(row.variant_key),
@@ -744,12 +750,12 @@ async function readInnovationSummary(
       snapshot_contract_version: asText(row.snapshot_contract_version),
       snapshot_source_as_of: asText(row.source_as_of),
       snapshot_payload_bytes: asNumber(row.snapshot_payload_bytes),
-      challenged_main_version: asText(row.challenged_main_version),
-      selector_version: asText(row.selector_version),
-      preselection_policy_version: asText(row.preselection_policy_version),
-      control_or_challenger: asText(row.control_or_challenger) ?? asText(row.variant_key),
-      promotion_eligible: asBoolean(row.promotion_eligible),
-      promotion_destination_version: asText(row.promotion_destination_version),
+            challenged_main_version: asText(registry.challenged_main_version),
+      selector_version: asText(registry.selector_version),
+      preselection_policy_version: asText(registry.preselection_policy_version),
+      control_or_challenger: asText(registry.control_or_challenger) ?? asText(row.variant_key),
+      promotion_eligible: asBoolean(registry.promotion_eligible),
+      promotion_destination_version: asText(registry.promotion_destination_version),
       contract_versions: asRecord(parseJson(row.contract_versions_json, {})),
       counts: asRecord(parseJson(row.counts_json, {})),
       timings: asRecord(parseJson(row.timings_json, {})),
