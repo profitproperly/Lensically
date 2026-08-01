@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-07-31
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-source-selection-hardening
-active_checkpoint: innovation-implementation
-validated_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
-documentation_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
-production_sha: d2166702b0868d32f63cb4eb314dea75984715ec
+active_job_id: null
+active_checkpoint: none
+validated_source_head: 95916b7605da46592ce92fde84f231a47a22a133
+documentation_source_head: 95916b7605da46592ce92fde84f231a47a22a133
+production_sha: 95916b7605da46592ce92fde84f231a47a22a133
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -28,9 +28,18 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### ACTIVE — Manifest Source Selection Hardening
+### COMPLETED — Manifest Source Selection Hardening
 
 job_id: `manifest-source-selection-hardening`
+
+Completion evidence:
+
+- Source selection engine promoted as `source-selection-engine-v5` with 72-hour published hard exclusions, future-scheduled hard exclusions, audience-time exposure authority, no cooldown relaxation, underperforming/disproven exclusion, protected winner/development/exploration allocation, 24-hour semantic spacing, and fail-closed locked-plan validation.
+- The ten July 30–31 near-copy failures are permanent regression fixtures.
+- Exact tested source SHA `95916b7605da46592ce92fde84f231a47a22a133` passed typecheck/fast validation run `30679888468` and all eight deterministic Operator shards in run `30679966909`.
+- The isolated Innovation 24-slot acceptance rejected every blocked recent, future-scheduled, and underperforming control; selected 24 unique sources with 9 winner, 7 development, and 8 exploration allocations; completed full shadow persistence; and recorded zero forbidden Main-database calls.
+- Exact-SHA production release `manifest-source-selection-v5`, run `30680008979`, completed successfully and verified production runtime identity.
+- No Main cycle preparation, dry run, test, canary, scheduling, publishing, or account execution occurred during this job. The next naturally required Main cycle remains owner-directed future work.
 
 Owner objective:
 
@@ -470,7 +479,7 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 
 ## Current Action
 
-Map the exact selector, evidence input, decision validation, and regression-test surfaces using repository-index reads; then implement the hard selection and exposure rules, add permanent regression fixtures, validate the source head, and prove the behavior only inside the isolated Innovation Cycle. After acceptance, port and deploy the proven code to Main, verify release identity without invoking Main, then close the job.
+None. Manifest source-selection hardening is proven in the isolated Innovation test bed, deployed as the Main Champion code at exact SHA `95916b7605da46592ce92fde84f231a47a22a133`, and closed without invoking Main.
 
 Latest operational notes:
 
