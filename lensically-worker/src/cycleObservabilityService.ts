@@ -741,19 +741,26 @@ async function readInnovationSummary(
     if (!row) {
     return { status: 404, body: { success: false, error: "innovation_cycle_not_found", id: runId } };
   }
-  const registry = await mainDb.prepare(
-    `SELECT
-       state,
-       challenged_main_version,
-       selector_version,
-       preselection_policy_version,
-       control_or_challenger,
-       promotion_eligible,
-       promotion_destination_version
-     FROM manifest_cycle_innovation_runs
-     WHERE brand_key = ? AND run_id = ?
+    const promotion = await mainDb.prepare(
+    `SELECT previous_version, promoted_version, classification, tested_sha, promoted_at
+     FROM manifest_cycle_promotion_history
+     WHERE brand_key = ? AND innovation_run_id = ?
+     ORDER BY promoted_at DESC
      LIMIT 1`,
-  ).bind(brandKey, runId).first<JsonRecord>() ?? {};
+  ).bind(brandKey, runId).first<JsonRecord>();
+  const champion = await readCurrentChampion(mainDb, brandKey);
+  const benchmarkPassed = asBoolean(row.benchmark_passed);
+  const runStatus = asText(row.status)?.toLowerCase() ?? "unknown";
+  const derivedState = promotion
+    ? "promoted"
+    : runStatus === "failed" || benchmarkPassed === false
+      ? "failed"
+      : runStatus === "preparing" || runStatus === "running"
+        ? "current_challenger"
+        : runStatus === "completed" && benchmarkPassed !== false
+          ? "champion_candidate"
+          : runStatus;
+  const promotedCurrentChampion = asText(champion.promoted_from_innovation_run_id) === runId;
 
   return {
     status: 200,
@@ -762,7 +769,7 @@ async function readInnovationSummary(
       contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
       rail: "innovation",
       id: runId,
-            status: asText(registry.state) ?? asText(row.status),
+                  status: derivedState,
       scenario: asText(row.scenario),
       evidence_mode: asText(row.evidence_mode),
       variant_key: asText(row.variant_key),
@@ -772,12 +779,12 @@ async function readInnovationSummary(
       snapshot_contract_version: asText(row.snapshot_contract_version),
       snapshot_source_as_of: asText(row.source_as_of),
       snapshot_payload_bytes: asNumber(row.snapshot_payload_bytes),
-            challenged_main_version: asText(registry.challenged_main_version),
-      selector_version: asText(registry.selector_version),
-      preselection_policy_version: asText(registry.preselection_policy_version),
-      control_or_challenger: asText(registry.control_or_challenger) ?? asText(row.variant_key),
-      promotion_eligible: asBoolean(registry.promotion_eligible),
-      promotion_destination_version: asText(registry.promotion_destination_version),
+                  challenged_main_version: asText(promotion?.previous_version) ?? asText(champion.semantic_version),
+      selector_version: promotedCurrentChampion ? asText(champion.selector_version) : null,
+      preselection_policy_version: promotedCurrentChampion ? asText(champion.preselection_policy_version) : null,
+      control_or_challenger: asText(row.variant_key),
+      promotion_eligible: Boolean(promotion) || derivedState === "champion_candidate",
+      promotion_destination_version: asText(promotion?.promoted_version),
       contract_versions: asRecord(parseJson(row.contract_versions_json, {})),
       counts: asRecord(parseJson(row.counts_json, {})),
       timings: asRecord(parseJson(row.timings_json, {})),
@@ -788,7 +795,7 @@ async function readInnovationSummary(
       production_noninterference_passed: asBoolean(row.production_noninterference_passed),
       threads_mutation_count: asNumber(row.threads_mutation_count),
       cleanup_orphan_count: asNumber(row.cleanup_orphan_count),
-      benchmark_passed: asBoolean(row.benchmark_passed),
+            benchmark_passed: benchmarkPassed,
       failed_rule: asText(row.failed_rule),
       stage_event_count: asNumber(row.stage_event_count),
       failure_code: asText(row.failure_code),
