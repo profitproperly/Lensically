@@ -446,7 +446,7 @@ describe("operatorManifestShadowRuntimeService", () => {
       lifetime_label: "underperforming" as const,
       semantic_key: "blocked-underperforming-semantic",
     };
-    const fresh = candidates(80).map((candidate, index) => ({
+        const fresh = candidates(120).map((candidate, index) => ({
       ...candidate,
       source_candidate_id: `fresh-${index}`,
       source_identity_key: `fresh-identity-${index}`,

@@ -477,6 +477,7 @@ Latest operational notes:
 - Repository content search requires an exact known file path. The attempted directory-prefix search failed without mutation; prevention is to enumerate repository paths first and search only verified files.
 - Final-head regression validation exposed an allocation feasibility defect: quotas counted a family whose semantic exposure blocked every requested slot, producing `hardened_allocation_target_mismatch`. Root cause was quota calculation before horizon-feasibility exclusion. Repair excludes horizon-ineligible semantic families before target construction; the regression remains permanent.
 - Full Operator validation exposed a legacy one-post persistence fixture requesting a 48-slot runway from one source. That fixture encoded the exact repetition behavior now forbidden. Repair narrows the persistence-only fixture to one slot; 24/48-slot diversity remains owned by dedicated selector and isolated Innovation acceptance tests.
+- The first isolated Innovation fatigue fixture failed before selection because it provided 92 total frozen families while the Innovation provider contract requires at least 100. No runtime behavior was exercised. Repair expands the fixture to 120 fresh families while retaining the blocked recent, scheduled, and underperforming controls.
 
 ## Deferred Work — INACTIVE
 
