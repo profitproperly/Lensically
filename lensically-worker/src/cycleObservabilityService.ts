@@ -227,92 +227,35 @@ function isMissingSchemaError(error: unknown): boolean {
   return /no such table|no such column/i.test(message);
 }
 
-async function readRailState(db: D1Database, brandKey: string): Promise<CycleObservabilityResult> {
-  const row = await db.prepare(
+async function readRailState(
+  mainDb: D1Database,
+  shadowDb: D1Database,
+  brandKey: string,
+): Promise<CycleObservabilityResult> {
+  const champion = await mainDb.prepare(
     `SELECT
-       rs.brand_key,
-       rs.main_state,
-       rs.innovation_state,
-       rs.current_champion_id,
-       rs.active_innovation_run_id,
-       rs.challenged_main_version,
-       rs.candidate_version,
-       rs.state_contract_version,
-       rs.updated_at AS rail_updated_at,
-       c.semantic_version,
-       c.source_sha,
-       c.selector_version,
-       c.preselection_policy_version,
-       c.component_versions_json,
-       c.promoted_from_innovation_run_id,
-       c.promotion_classification,
-       c.promoted_at,
-       i.state AS active_innovation_state,
-       i.tested_sha AS active_tested_sha,
-       i.snapshot_hash AS active_snapshot_hash,
-       i.selector_version AS active_selector_version,
-       i.preselection_policy_version AS active_preselection_policy_version,
-       i.control_or_challenger AS active_control_or_challenger,
-       i.passed AS active_passed,
-       i.promotion_eligible AS active_promotion_eligible,
-       i.promotion_destination_version AS active_promotion_destination_version,
-       i.started_at AS active_started_at,
-       i.completed_at AS active_completed_at
-     FROM manifest_cycle_rail_state rs
-     JOIN manifest_cycle_champions c
-       ON c.id = rs.current_champion_id
-      AND c.brand_key = rs.brand_key
-      AND c.status = 'current'
-     LEFT JOIN manifest_cycle_innovation_runs i
-       ON i.run_id = rs.active_innovation_run_id
-      AND i.brand_key = rs.brand_key
-     WHERE rs.brand_key = ?
+       id,
+       semantic_version,
+       source_sha,
+       selector_version,
+       preselection_policy_version,
+       component_versions_json,
+       promoted_from_innovation_run_id,
+       promotion_classification,
+       promoted_at,
+       updated_at
+     FROM manifest_cycle_champions
+     WHERE brand_key = ? AND status = 'current'
      LIMIT 1`,
   ).bind(brandKey).first<JsonRecord>();
-
-  if (!row) {
+  if (!champion) {
     return {
       status: 404,
-      body: {
-        success: false,
-        error: "cycle_rail_state_not_found",
-        brand_key: brandKey,
-      },
+      body: { success: false, error: "main_cycle_champion_not_found", brand_key: brandKey },
     };
   }
 
-  const mainState = asText(row.main_state) as MainCycleRailState;
-  const innovationState = asText(row.innovation_state) as InnovationCycleRailState;
-  validatePairedCycleRailState({
-    mainState,
-    innovationState,
-    activeInnovationRunId: asText(row.active_innovation_run_id),
-  });
-
-  const latestInnovation = await db.prepare(
-    `SELECT
-       run_id,
-       state,
-       challenged_main_version,
-       tested_sha,
-       snapshot_hash,
-       selector_version,
-       preselection_policy_version,
-       control_or_challenger,
-       passed,
-       promotion_eligible,
-       promotion_destination_version,
-       started_at,
-       completed_at,
-       created_at,
-       updated_at
-     FROM manifest_cycle_innovation_runs
-     WHERE brand_key = ?
-     ORDER BY COALESCE(completed_at, started_at, created_at) DESC, run_id DESC
-     LIMIT 1`,
-  ).bind(brandKey).first<JsonRecord>();
-
-  const promotions = await db.prepare(
+  const promotions = await mainDb.prepare(
     `SELECT
        id,
        previous_version,
@@ -327,22 +270,80 @@ async function readRailState(db: D1Database, brandKey: string): Promise<CycleObs
      LIMIT 10`,
   ).bind(brandKey).all<JsonRecord>();
 
-  const activeInnovationRunId = asText(row.active_innovation_run_id);
-  const activeInnovation = activeInnovationRunId ? {
-    run_id: activeInnovationRunId,
-    state: asText(row.active_innovation_state) ?? innovationState,
-    challenged_main_version: asText(row.challenged_main_version) ?? asText(row.semantic_version),
-    candidate_version: asText(row.candidate_version),
-    tested_sha: asText(row.active_tested_sha),
-    snapshot_hash: asText(row.active_snapshot_hash),
-    selector_version: asText(row.active_selector_version),
-    preselection_policy_version: asText(row.active_preselection_policy_version),
-    control_or_challenger: asText(row.active_control_or_challenger),
-    passed: asBoolean(row.active_passed),
-    promotion_eligible: asBoolean(row.active_promotion_eligible),
-    promotion_destination_version: asText(row.active_promotion_destination_version),
-    started_at: asText(row.active_started_at),
-    completed_at: asText(row.active_completed_at),
+  const latestInnovation = await shadowDb.prepare(
+    `SELECT
+       r.id AS run_id,
+       r.status,
+       r.variant_key,
+       r.code_sha,
+       r.snapshot_hash,
+       r.started_at,
+       r.completed_at,
+       r.created_at,
+       b.passed AS benchmark_passed,
+       b.failed_rule,
+       b.counts_json,
+       b.timings_json
+     FROM manifest_shadow_runs r
+     LEFT JOIN manifest_shadow_benchmark_receipts b ON b.shadow_run_id = r.id
+     WHERE r.brand_key = ?
+     ORDER BY COALESCE(r.completed_at, r.started_at, r.created_at) DESC, r.id DESC
+     LIMIT 1`,
+  ).bind(brandKey).first<JsonRecord>();
+
+  const latestRunId = asText(latestInnovation?.run_id);
+  const promotionForLatest = latestRunId
+    ? (promotions.results ?? []).find((promotion) => asText(promotion.innovation_run_id) === latestRunId) ?? null
+    : null;
+  const promotedByChampion = latestRunId && asText(champion.promoted_from_innovation_run_id) === latestRunId;
+  const promoted = Boolean(promotionForLatest || promotedByChampion);
+  const latestStatus = asText(latestInnovation?.status)?.toLowerCase() ?? null;
+  const benchmarkPassed = asBoolean(latestInnovation?.benchmark_passed);
+  const isRunning = latestStatus === "preparing" || latestStatus === "running";
+  const isCandidate = !promoted && latestStatus === "completed" && benchmarkPassed !== false;
+
+  const mainState: MainCycleRailState = isRunning
+    ? "incumbent_behind_challenger"
+    : isCandidate
+      ? "incumbent_awaiting_promotion"
+      : "current_champion";
+  const innovationState: InnovationCycleRailState = isRunning
+    ? "current_challenger"
+    : isCandidate
+      ? "champion_candidate"
+      : "standby";
+  const activeInnovationRunId = isRunning || isCandidate ? latestRunId : null;
+  validatePairedCycleRailState({ mainState, innovationState, activeInnovationRunId });
+
+  const latestDerivedState = promoted
+    ? "promoted"
+    : latestStatus === "failed" || benchmarkPassed === false
+      ? "failed"
+      : isRunning
+        ? "current_challenger"
+        : isCandidate
+          ? "champion_candidate"
+          : latestStatus;
+  const promotionDestinationVersion = asText(promotionForLatest?.promoted_version)
+    ?? (promotedByChampion ? asText(champion.semantic_version) : null);
+  const latestRun = latestInnovation ? {
+    run_id: latestRunId,
+    state: latestDerivedState,
+    challenged_main_version: asText(champion.semantic_version),
+    candidate_version: null,
+    tested_sha: asText(latestInnovation.code_sha),
+    snapshot_hash: asText(latestInnovation.snapshot_hash),
+    selector_version: null,
+    preselection_policy_version: null,
+    control_or_challenger: asText(latestInnovation.variant_key),
+    passed: benchmarkPassed,
+    promotion_eligible: isCandidate || promoted,
+    promotion_destination_version: promotionDestinationVersion,
+    started_at: asText(latestInnovation.started_at),
+    completed_at: asText(latestInnovation.completed_at),
+    failed_rule: asText(latestInnovation.failed_rule),
+    counts: asRecord(parseJson(latestInnovation.counts_json, {})),
+    timings: asRecord(parseJson(latestInnovation.timings_json, {})),
   } : null;
 
   return {
@@ -350,6 +351,7 @@ async function readRailState(db: D1Database, brandKey: string): Promise<CycleObs
     body: {
       success: true,
       contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
+      state_contract_version: CYCLE_RAIL_STATE_CONTRACT_VERSION,
       brand_key: brandKey,
       main: {
         state: mainState,
@@ -358,14 +360,14 @@ async function readRailState(db: D1Database, brandKey: string): Promise<CycleObs
           : mainState === "incumbent_behind_challenger"
             ? "Incumbent — Behind Challenger"
             : "Incumbent — Awaiting Promotion",
-        semantic_version: asText(row.semantic_version),
-        source_sha: asText(row.source_sha),
-        selector_version: asText(row.selector_version),
-        preselection_policy_version: asText(row.preselection_policy_version),
-        component_versions: asRecord(parseJson(row.component_versions_json, {})),
-        promoted_from_innovation_run_id: asText(row.promoted_from_innovation_run_id),
-        promotion_classification: asText(row.promotion_classification),
-        promoted_at: asText(row.promoted_at),
+        semantic_version: asText(champion.semantic_version),
+        source_sha: asText(champion.source_sha),
+        selector_version: asText(champion.selector_version),
+        preselection_policy_version: asText(champion.preselection_policy_version),
+        component_versions: asRecord(parseJson(champion.component_versions_json, {})),
+        promoted_from_innovation_run_id: asText(champion.promoted_from_innovation_run_id),
+        promotion_classification: asText(champion.promotion_classification),
+        promoted_at: asText(champion.promoted_at),
       },
       innovation: {
         state: innovationState,
@@ -374,22 +376,8 @@ async function readRailState(db: D1Database, brandKey: string): Promise<CycleObs
           : innovationState === "current_challenger"
             ? "Current Challenger"
             : "Champion Candidate",
-        active_run: activeInnovation,
-        latest_run: activeInnovation ?? (latestInnovation ? {
-          run_id: asText(latestInnovation.run_id),
-          state: asText(latestInnovation.state),
-          challenged_main_version: asText(latestInnovation.challenged_main_version),
-          tested_sha: asText(latestInnovation.tested_sha),
-          snapshot_hash: asText(latestInnovation.snapshot_hash),
-          selector_version: asText(latestInnovation.selector_version),
-          preselection_policy_version: asText(latestInnovation.preselection_policy_version),
-          control_or_challenger: asText(latestInnovation.control_or_challenger),
-          passed: asBoolean(latestInnovation.passed),
-          promotion_eligible: asBoolean(latestInnovation.promotion_eligible),
-          promotion_destination_version: asText(latestInnovation.promotion_destination_version),
-          started_at: asText(latestInnovation.started_at),
-          completed_at: asText(latestInnovation.completed_at),
-        } : null),
+        active_run: activeInnovationRunId ? latestRun : null,
+        latest_run: latestRun,
       },
       promotion_history: (promotions.results ?? []).map((promotion) => ({
         id: asText(promotion.id),
@@ -400,10 +388,15 @@ async function readRailState(db: D1Database, brandKey: string): Promise<CycleObs
         tested_sha: asText(promotion.tested_sha),
         promoted_at: asText(promotion.promoted_at),
       })),
-      updated_at: asText(row.rail_updated_at),
+      updated_at: asText(latestInnovation?.completed_at)
+        ?? asText(latestInnovation?.started_at)
+        ?? asText(champion.updated_at)
+        ?? asText(champion.promoted_at),
     },
   };
 }
+
+
 
 async function readMainHistory(
   db: D1Database,
