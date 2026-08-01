@@ -1,8 +1,13 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import type { SourcePreselectionPolicy, SourcePreselectionSignal } from "./sourcePreselectionPolicy";
+import {
+  sourcePreselectionAdjustmentForCandidate,
+  sourcePreselectionExclusionForCandidate,
+  sourcePreselectionTargetMatchesCandidate,
+} from "./sourcePreselectionPolicy";
 
-export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v5";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v5";
-
+export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v6";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v6";
 
 export type SourceFamilyLifetimeLabel =
   | "untested"
@@ -10,8 +15,25 @@ export type SourceFamilyLifetimeLabel =
   | "emerging"
   | "proven"
   | "franchise"
-  | "underperforming"
-  | "disproven";
+  | "underperforming";
+
+export type SourceFamilyAuditionState =
+  | "untested"
+  | "probation"
+  | "provisional_pass"
+  | "tiebreaker"
+  | "graduated"
+  | "underperforming";
+
+export function normalizeSourceFamilyLifetimeLabel(value: unknown): SourceFamilyLifetimeLabel {
+  const normalized = String(value ?? "untested");
+  if (normalized === "disproven") return "underperforming";
+  if (["untested", "prospect", "emerging", "proven", "franchise", "underperforming"].includes(normalized)) {
+    return normalized as SourceFamilyLifetimeLabel;
+  }
+  return "untested";
+}
+
 
 export type SourceFamilyRecentLabel =
   | "no_recent_data"
@@ -28,10 +50,16 @@ export type SourceSelectionCandidate = Record<string, unknown> & {
   source_identity_key?: string;
   source_card_id?: string | null;
   source_card_family_id?: string | null;
-  lifetime_label?: SourceFamilyLifetimeLabel;
+    lifetime_label?: SourceFamilyLifetimeLabel;
+  audition_state?: SourceFamilyAuditionState;
+  audition_passes?: number;
+  audition_failures?: number;
+  audition_opportunities_remaining?: number;
+  graduated?: boolean;
   recent_label?: SourceFamilyRecentLabel;
   confidence_label?: SourceFamilyConfidenceLabel;
   lifetime_sample_size?: number;
+
   recent_sample_size?: number;
   lifetime_index?: number;
   recent_index?: number | null;
@@ -57,9 +85,14 @@ export type SourceSelectionReceipt = {
   source_identity_key: string;
   source_card_id: string;
   source_card_family_id: string;
-  lifetime_label: SourceFamilyLifetimeLabel;
+    lifetime_label: SourceFamilyLifetimeLabel;
+  audition_state: SourceFamilyAuditionState;
+  audition_passes: number;
+  audition_failures: number;
+  audition_opportunities_remaining: number;
   recent_label: SourceFamilyRecentLabel;
   lifetime_sample_size: number;
+
   lifetime_index: number;
   recent_factor: number;
   shrunk_performance: number;
@@ -79,14 +112,33 @@ export type SourceSelectionReceipt = {
   negative_evidence_multiplier: number;
   cooldown_hours: number;
   cooldown_relaxation: number;
-  score: number;
+    score: number;
   deterministic_tiebreak: number;
+  preselection_policy_version?: string;
+  preselection_policy_hash?: string;
+  preselection_score_multiplier?: number;
+  preselection_score_addend?: number;
+  preselection_signals?: SourcePreselectionSignal[];
+  experiment_reservation_key?: string | null;
 };
 
 function finiteNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+
+function parseJsonRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(String(value ?? "{}"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -200,6 +252,11 @@ export function classifySourceFamilyLifetime(input: {
   indexes: number[];
 }): {
   label: SourceFamilyLifetimeLabel;
+  audition_state: SourceFamilyAuditionState;
+  audition_passes: number;
+  audition_failures: number;
+  audition_opportunities_remaining: number;
+  graduated: boolean;
   median_index: number | null;
   probability_above_median: number;
   probability_above_franchise_floor: number;
@@ -210,6 +267,11 @@ export function classifySourceFamilyLifetime(input: {
   if (!indexes.length) {
     return {
       label: "untested",
+      audition_state: "untested",
+      audition_passes: 0,
+      audition_failures: 0,
+      audition_opportunities_remaining: 2,
+      graduated: false,
       median_index: null,
       probability_above_median: 0.5,
       probability_above_franchise_floor: 0.5,
@@ -221,14 +283,47 @@ export function classifySourceFamilyLifetime(input: {
   const aboveMedian = posteriorThresholdProbability(indexes, 1, "above");
   const aboveFranchiseFloor = posteriorThresholdProbability(indexes, 1.25, "above");
   const belowUnderperformanceFloor = posteriorThresholdProbability(indexes, 0.85, "below");
-  let label: SourceFamilyLifetimeLabel = "prospect";
-  if (medianIndex >= 1.5 && aboveFranchiseFloor >= 0.9) label = "franchise";
-  else if (aboveMedian >= 0.8) label = "proven";
-  else if (medianIndex >= 1.15) label = "emerging";
-  else if (medianIndex < 0.85 && belowUnderperformanceFloor >= 0.9) label = "disproven";
-  else if (medianIndex < 0.85) label = "underperforming";
+  const auditionIndexes = indexes.slice(0, 3);
+  const auditionPasses = auditionIndexes.filter((value) => value >= 0.85).length;
+  const auditionFailures = auditionIndexes.length - auditionPasses;
+  let auditionState: SourceFamilyAuditionState;
+  let auditionOpportunitiesRemaining = 0;
+  let graduated = false;
+  if (indexes.length === 1) {
+    auditionState = indexes[0] >= 0.85 ? "provisional_pass" : "probation";
+    auditionOpportunitiesRemaining = 1;
+  } else if (indexes.length === 2) {
+    if (auditionPasses === 2) {
+      auditionState = "graduated";
+      graduated = true;
+    } else if (auditionFailures === 2) {
+      auditionState = "underperforming";
+    } else {
+      auditionState = "tiebreaker";
+      auditionOpportunitiesRemaining = 1;
+    }
+  } else if (auditionPasses >= 2) {
+    auditionState = "graduated";
+    graduated = true;
+  } else {
+    auditionState = "underperforming";
+  }
+  let label: SourceFamilyLifetimeLabel = graduated ? "prospect" : "untested";
+  if (auditionState === "underperforming") label = "underperforming";
+  else if (graduated) {
+    if (medianIndex < 0.85) label = "underperforming";
+    else if (medianIndex >= 1.5 && aboveFranchiseFloor >= 0.9) label = "franchise";
+    else if (aboveMedian >= 0.8) label = "proven";
+    else if (medianIndex >= 1.15) label = "emerging";
+  }
+  if (label === "underperforming") auditionState = "underperforming";
   return {
     label,
+    audition_state: auditionState,
+    audition_passes: auditionPasses,
+    audition_failures: auditionFailures,
+    audition_opportunities_remaining: auditionOpportunitiesRemaining,
+    graduated: graduated && label !== "underperforming",
     median_index: medianIndex,
     probability_above_median: aboveMedian,
     probability_above_franchise_floor: aboveFranchiseFloor,
@@ -236,6 +331,7 @@ export function classifySourceFamilyLifetime(input: {
     confidence_label: confidenceLabel([aboveMedian, aboveFranchiseFloor, belowUnderperformanceFloor]),
   };
 }
+
 
 export function classifySourceFamilyRecent(input: {
   recent_indexes: number[];
@@ -478,9 +574,15 @@ export async function refreshSourceFamilyLabels(
     const familyRecentMedian = median(recentLikes);
     const state = {
       policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
-      lifetime: {
+            lifetime: {
         label: lifetime.label,
+        audition_state: lifetime.audition_state,
+        audition_passes: lifetime.audition_passes,
+        audition_failures: lifetime.audition_failures,
+        audition_opportunities_remaining: lifetime.audition_opportunities_remaining,
+        graduated: lifetime.graduated,
         sample_size: lifetimeLikes.length,
+
         median_likes: familyLifetimeMedian,
         account_median_likes: accountLifetimeMedian,
         median_index: lifetime.median_index,
@@ -668,8 +770,9 @@ export async function enrichSourceCandidatesForSelection(
     `SELECT fam.id AS source_card_family_id, fam.source_identity_key, fam.current_source_card_id,
             card.source_mechanism, card.required_product,
             state.lifetime_label, state.recent_label, state.confidence_label,
-            state.lifetime_sample_size, state.recent_sample_size,
-            state.lifetime_index, state.recent_index
+                        state.lifetime_sample_size, state.recent_sample_size,
+            state.lifetime_index, state.recent_index, state.state_json
+
      FROM operator_source_card_families fam
      LEFT JOIN operator_source_cards card
        ON card.id = fam.current_source_card_id AND card.brand_key = fam.brand_key
@@ -735,14 +838,23 @@ export async function enrichSourceCandidatesForSelection(
     ).length;
     const latestPublishedAt = publishedTimes[publishedTimes.length - 1] ?? null;
     const lastUsedMs = parseTimeMs(latestPublishedAt);
-    const sourceMechanism = state?.source_mechanism ?? candidate.source_mechanism;
+        const sourceMechanism = state?.source_mechanism ?? candidate.source_mechanism;
     const requiredProduct = state?.required_product ?? candidate.required_product;
+    const persistedState = parseJsonRecord(state?.state_json);
+    const persistedLifetime = parseJsonRecord(persistedState.lifetime);
     return {
+
       ...candidate,
       source_card_family_id: state?.source_card_family_id ? String(state.source_card_family_id) : null,
       source_card_id: state?.current_source_card_id ? String(state.current_source_card_id) : null,
-      lifetime_label: (state?.lifetime_label ?? "untested") as SourceFamilyLifetimeLabel,
+            lifetime_label: normalizeSourceFamilyLifetimeLabel(state?.lifetime_label),
+      audition_state: String(persistedLifetime.audition_state ?? "untested") as SourceFamilyAuditionState,
+      audition_passes: finiteNumber(persistedLifetime.audition_passes),
+      audition_failures: finiteNumber(persistedLifetime.audition_failures),
+      audition_opportunities_remaining: finiteNumber(persistedLifetime.audition_opportunities_remaining),
+      graduated: persistedLifetime.graduated === true,
       recent_label: (state?.recent_label ?? "no_recent_data") as SourceFamilyRecentLabel,
+
       confidence_label: (state?.confidence_label ?? "low") as SourceFamilyConfidenceLabel,
       lifetime_sample_size: finiteNumber(state?.lifetime_sample_size),
       recent_sample_size: finiteNumber(state?.recent_sample_size),
@@ -797,12 +909,16 @@ export function selectSourceFamilyLineup(input: {
   summary: Record<string, unknown>;
   parity_trace?: Record<string, unknown>;
 } {
+    const normalizedCandidates = input.candidates.map((candidate) => ({
+    ...candidate,
+    lifetime_label: normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label),
+  }));
   const exclusionReason = (candidate: SourceSelectionCandidate): string | null => {
     if (!candidate.source_identity_key) return "source_identity_missing";
     if (!candidate.source_card_id) return "source_card_missing";
     if (!candidate.source_card_family_id) return "source_family_missing";
-    if (candidate.lifetime_label === "disproven") return "lifetime_disproven";
     if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
+
         if (finiteNumber(candidate.published_uses_72h) > 0) return "source_published_within_72h";
     if (finiteNumber(candidate.future_scheduled_uses) > 0) return "source_already_future_scheduled";
     const semanticExposureTimes = Array.isArray(candidate.semantic_exposure_times)
@@ -813,7 +929,8 @@ export function selectSourceFamilyLineup(input: {
     )) return "semantic_exposure_blocks_horizon";
     return null;
   };
-  const exclusions = input.candidates
+    const exclusions = normalizedCandidates
+
     .map((candidate) => ({ candidate, reason: exclusionReason(candidate) }))
     .filter((entry) => entry.reason !== null)
     .map((entry) => ({
@@ -822,7 +939,8 @@ export function selectSourceFamilyLineup(input: {
       source_card_family_id: entry.candidate.source_card_family_id ?? null,
       reason: entry.reason,
     }));
-  const active = input.candidates.filter((candidate) => exclusionReason(candidate) === null);
+    const active = normalizedCandidates.filter((candidate) => exclusionReason(candidate) === null);
+
   if (active.length < input.slot_keys.length) {
     throw new Error(`insufficient_hardened_source_families:${active.length}:${input.slot_keys.length}`);
   }
@@ -1281,7 +1399,8 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     one_breakout_recognized: oneBreakout.label === "emerging",
     repeated_winners_franchise: repeatedWinners.label === "franchise",
     viral_plus_failures_not_franchise: viralPlusFailures.label !== "franchise" && viralPlusFailures.label !== "proven",
-    repeated_losers_disproven: repeatedLosers.label === "disproven",
+        repeated_losers_underperforming: repeatedLosers.label === "underperforming",
+
     absent_recent_data_preserved: recentAbsent.label === "no_recent_data",
     recovery_detected: recovering.label === "recovering",
     new_account_explores_all: new Set(newAccountSelection.selected.map((item) => item.source_identity_key)).size === 24,
