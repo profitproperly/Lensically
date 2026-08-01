@@ -208,7 +208,117 @@ function machineKey(value: unknown, fallback = "unknown"): string {
   return normalized || fallback;
 }
 
+type SameSnapshotPairSeed = {
+  contract_version: "manifest-shadow-same-snapshot-pair-v1";
+  pair_key: string;
+  control_run_id: string;
+  code_sha: string;
+  scenario: string;
+  horizon_hours: number;
+  requested_missing_count: number;
+  exported_snapshot: ManifestDecisionSnapshot;
+  slot_plan: { targetSlots: ManifestShadowSlot[]; occupiedSlotKeys: string[] };
+};
+
+function sameSnapshotPairKey(operationRoot: string): string {
+  return operationRoot.replace(/(^|[-_:])(control|challenger)(?=$|[-_:])/gi, "$1pair");
+}
+
+function parseJsonObject(value: unknown): JsonRecord {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonRecord;
+  try {
+    const parsed = JSON.parse(String(value ?? "{}"));
+    return record(parsed);
+  } catch {
+    return {};
+  }
+}
+
+async function loadSameSnapshotControlSeed(
+  db: D1Database,
+  input: {
+    brandKey: string;
+    pairKey: string;
+    scenario: string;
+    codeSha: string;
+    nowIso: string;
+    horizonHours: number;
+    requestedMissingCount: number;
+  },
+): Promise<SameSnapshotPairSeed | null> {
+  const result = await db.prepare(
+    `SELECT runs.id, snapshots.payload_json
+       FROM manifest_shadow_runs runs
+       JOIN manifest_shadow_snapshots snapshots ON snapshots.shadow_run_id = runs.id
+      WHERE runs.brand_key = ?
+        AND runs.scenario = ?
+        AND runs.variant_key = 'control'
+        AND runs.status = 'completed'
+        AND runs.code_sha = ?
+        AND datetime(snapshots.expires_at) > datetime(?)
+      ORDER BY datetime(runs.completed_at) DESC
+      LIMIT 20`,
+  ).bind(input.brandKey, input.scenario, input.codeSha, input.nowIso).all<JsonRecord>();
+  for (const row of result.results ?? []) {
+    const snapshot = parseJsonObject(row.payload_json);
+    const metadata = record(snapshot.metadata);
+    const seed = record(metadata.same_snapshot_pair_seed);
+    if (seed.contract_version !== "manifest-shadow-same-snapshot-pair-v1") continue;
+    if (String(seed.pair_key ?? "") !== input.pairKey) continue;
+    if (String(seed.control_run_id ?? "") !== String(row.id ?? "")) continue;
+    if (String(seed.code_sha ?? "") !== input.codeSha) continue;
+    if (String(seed.scenario ?? "") !== input.scenario) continue;
+    if (Number(seed.horizon_hours ?? -1) !== input.horizonHours) continue;
+    if (Number(seed.requested_missing_count ?? -1) !== input.requestedMissingCount) continue;
+    const exportedSnapshot = record(seed.exported_snapshot) as unknown as ManifestDecisionSnapshot;
+    const slotPlan = record(seed.slot_plan);
+    const targetSlots = records(slotPlan.targetSlots) as unknown as ManifestShadowSlot[];
+    const occupiedSlotKeys = Array.isArray(slotPlan.occupiedSlotKeys)
+      ? slotPlan.occupiedSlotKeys.map((value) => String(value))
+      : [];
+    if (!exportedSnapshot.snapshot_hash || !targetSlots.length) continue;
+    return {
+      contract_version: "manifest-shadow-same-snapshot-pair-v1",
+      pair_key: input.pairKey,
+      control_run_id: String(row.id),
+      code_sha: input.codeSha,
+      scenario: input.scenario,
+      horizon_hours: input.horizonHours,
+      requested_missing_count: input.requestedMissingCount,
+      exported_snapshot: exportedSnapshot,
+      slot_plan: { targetSlots, occupiedSlotKeys },
+    };
+  }
+  return null;
+}
+
+async function retireLegacyUnpairedSameSnapshotChallenger(
+  db: D1Database,
+  nowIso: string,
+): Promise<string | null> {
+  const active = await db.prepare(
+    `SELECT id FROM manifest_shadow_runs WHERE status IN ('preparing', 'running') AND variant_key = 'challenger' LIMIT 1`,
+  ).first<JsonRecord>();
+  if (!active?.id) return null;
+  const state = await readState(db, String(active.id));
+  if (!state || state.test_case !== "same_snapshot_ab" || state.strategy) return null;
+  const pairing = record(state.decision_bundle.same_snapshot_pair);
+  if (pairing.control_run_id && pairing.snapshot_hash_verified === true) return null;
+  await failManifestShadowRun(db, {
+    run_id: String(active.id),
+    now_iso: nowIso,
+    error_code: "manifest_shadow_same_snapshot_pair_missing",
+    error_message: "Legacy challenger captured a fresh snapshot instead of reusing a completed control seed.",
+    diagnostics: {
+      stage: "same_snapshot_pairing",
+      prevention: "challengers now require an exact persisted control decision snapshot and slot plan",
+    },
+  });
+  return String(active.id);
+}
+
 function normalizeText(value: unknown): string {
+
   return String(value ?? "")
     .normalize("NFKC")
     .toLowerCase()
