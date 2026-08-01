@@ -545,11 +545,12 @@ async function readInnovationHistory(
   const rows = result.results ?? [];
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
-  const registryByRun = await readInnovationRegistryMap(
+    const promotionByRun = await readPromotionMap(
     mainDb,
     brandKey,
     pageRows.map((row) => asText(row.id) ?? ""),
   );
+  const champion = await readCurrentChampion(mainDb, brandKey);
   const last = pageRows[pageRows.length - 1];
 
   return {
@@ -558,25 +559,37 @@ async function readInnovationHistory(
       success: true,
       contract_version: CYCLE_OBSERVABILITY_CONTRACT_VERSION,
       rail: "innovation",
-            rows: pageRows.map((row) => {
+                  rows: pageRows.map((row, index) => {
         const counts = asRecord(parseJson(row.counts_json, {}));
         const timings = asRecord(parseJson(row.timings_json, {}));
-        const registry = registryByRun.get(asText(row.id) ?? "") ?? {};
-        const registryState = asText(registry.state);
+        const runId = asText(row.id) ?? "";
+        const promotion = promotionByRun.get(runId) ?? null;
         const benchmarkPassed = asBoolean(row.benchmark_passed);
-                const displayState = registryState === "promoted"
-          ? `Promoted to Main ${asText(registry.promotion_destination_version) ?? ""}`.trim()
-          : registryState === "retired"
-            ? "Retired"
-            : registryState === "failed" || asText(row.status) === "failed"
-              ? "Failed"
-              : registryState === "champion_candidate"
-                ? "Champion Candidate"
-                : registryState === "current_challenger"
-                  ? "Current Challenger"
-                  : benchmarkPassed === true
-                    ? "Passed"
-                    : asText(row.status) ?? "Unknown";
+        const runStatus = asText(row.status)?.toLowerCase() ?? "unknown";
+        const running = runStatus === "preparing" || runStatus === "running";
+        const candidate = index === 0 && !promotion && runStatus === "completed" && benchmarkPassed !== false;
+        const derivedState = promotion
+          ? "promoted"
+          : runStatus === "failed" || benchmarkPassed === false
+            ? "failed"
+            : running
+              ? "current_challenger"
+              : candidate
+                ? "champion_candidate"
+                : benchmarkPassed === true
+                  ? "passed"
+                  : runStatus;
+        const displayState = derivedState === "promoted"
+          ? `Promoted to Main ${asText(promotion?.promoted_version) ?? ""}`.trim()
+          : derivedState === "failed"
+            ? "Failed"
+            : derivedState === "champion_candidate"
+              ? "Champion Candidate"
+              : derivedState === "current_challenger"
+                ? "Current Challenger"
+                : derivedState === "passed"
+                  ? "Passed"
+                  : titleCaseCycleState(derivedState);
         return {
           id: asText(row.id),
           scenario: asText(row.scenario),
@@ -585,11 +598,12 @@ async function readInnovationHistory(
           operation_root: asText(row.operation_root),
           tested_sha: asText(row.code_sha),
           snapshot_hash: asText(row.snapshot_hash),
-          status: registryState ?? asText(row.status),
+                    status: derivedState,
           display_state: displayState,
-                    challenged_main_version: asText(registry.challenged_main_version),
-          promotion_destination_version: asText(registry.promotion_destination_version),
-          promotion_eligible: asBoolean(registry.promotion_eligible),
+          challenged_main_version: asText(promotion?.previous_version)
+            ?? (running || candidate ? asText(champion.semantic_version) : null),
+          promotion_destination_version: asText(promotion?.promoted_version),
+          promotion_eligible: promotion ? true : candidate || benchmarkPassed === true,
           benchmark_passed: benchmarkPassed,
           accepted_count: asNumber(counts.accepted ?? counts.generated),
           target_count: asNumber(counts.target),
