@@ -3,7 +3,11 @@
 ## Product
 
 - Lensically is a private multi-account Threads workspace with `lensically-web/` as the frontend and `lensically-worker/` as the production backend.
-- Active product surfaces include Create Post, Scheduled Posts, Dashboard, Intelligence, Insights, Followers, Post Archive, Saved Patterns, and GPT Memory.
+- Active product surfaces include Create Post, Scheduled Posts, Dashboard, Cycles, Intelligence, Insights, Followers, Post Archive, Saved Patterns, and GPT Memory.
+- `Cycles` is one normal sidebar destination beneath Dashboard. It opens Main by default and uses an in-page `Main | Innovation` switch; there is no Cycles dropdown and no Compare surface.
+- Main Cycle releases use one durable semantic Champion registry. The accepted baseline is `Main Cycle v1.0.0`, bound to source SHA `ec52201fab48e0a00926c8e7319b90e0a925a584`, selector `source-selection-engine-v6`, and preselection policy `source-preselection-policy-v1`.
+- Active Innovation state is not copied into Main persistence. The paired UI state is derived read-only from the released Main Champion and physically isolated `SHADOW_DB` run/benchmark receipts. Main stores only released Champion identity and immutable promotion history.
+- Read-only `/api/cycles/*` surfaces provide current paired state, server-paginated Main/Innovation history, bounded summaries, six-row source-selection previews, and exact persisted Stage 4 detail on demand. Missing historical fields are labeled unavailable rather than inferred.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
 - Backend persistence is the source of truth for accounts, workflow state, schedules, presets, strategy memory, source lineage, performance snapshots, and continuity. Browser storage is convenience-only.
 

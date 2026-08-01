@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: cycles-observability-and-champion-registry-ui
-active_checkpoint: architecture-reconciliation-and-implementation
+active_checkpoint: exact-sha-release-and-live-verification
 validated_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
 documentation_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
 production_sha: ec52201fab48e0a00926c8e7319b90e0a925a584
@@ -95,7 +95,7 @@ Implementation plan:
 
 1. **Reconcile the existing website and cycle receipt architecture.** Identify the current sidebar, routing, dashboard shell, API/read-model patterns, Main autonomous-cycle receipts, Innovation shadow receipts, Stage 4 selection receipts, deployment path, and existing pagination conventions. Determine the smallest coherent integration surface before editing.
 
-2. **Create a canonical rail-state and Champion-version registry.** Persist the paired Main/Innovation state machine, active Main Champion identity, current or absent Innovation challenger, promotion lineage, exact SHA bindings, component versions, timestamps, and semantic-version bump classification. Add fail-closed rules preventing two active challengers, two current champions, or a promotion that is not tied to a passed Innovation run and exact tested SHA.
+2. **Create a canonical Champion-version registry and derived paired rail state.** Persist only released Main Champion identity, promotion lineage, exact SHA bindings, component versions, timestamps, and semantic-version bump classification in Main. Derive active or absent Innovation state read-only from the physically isolated shadow run and benchmark receipts so Innovation never writes operational state into Main. Add fail-closed rules preventing two current champions or a promotion that is not tied to a passed Innovation run and exact tested SHA.
 
 3. **Seed the current Main Champion.** Register `Main Cycle v1.0.0` against deployed SHA `ec52201fab48e0a00926c8e7319b90e0a925a584`, selector `source-selection-engine-v6`, preselection policy `source-preselection-policy-v1`, and the accepted Innovation proof. Preserve the existing code SHA and component versions as the technical source of truth beneath the human-readable semantic version.
 
@@ -133,14 +133,14 @@ Definition of done:
 - History is server-paginated; one cycle remains compact through six-row preview, show-all, collapsed details, filters, and detail-on-demand.
 - Main has one durable semantic version registry seeded at `v1.0.0`; Innovation remains run-based.
 - The paired rail states truthfully distinguish Current Champion, Standby, Incumbent Behind Challenger, Current Challenger, Awaiting Promotion, Champion Candidate, Failed, Retired, and Promoted.
-- Promotion atomically advances the Main Champion identity/version and returns Innovation to Standby while preserving historical promotion lineage.
+- Promotion atomically advances the released Main Champion identity/version and records immutable promotion lineage; the read model then derives Innovation as Standby from the promoted shadow run without copying active Innovation state into Main.
 - Legacy gaps are labeled unavailable rather than guessed.
 - Exact-SHA release and read-only live verification pass with zero Main Cycle invocation and zero operational data contamination.
 
 ## Current Action
 
-- Owner Proceed received on 2026-08-01.
-- Reconcile the website, API/read-model, receipt, and deployment architecture, then implement and validate the complete accepted plan autonomously.
+- Exact-head typecheck run `30711806364` and full push-validation run `30711782117` passed on source SHA `5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae` before documentation reconciliation.
+- Run final exact-head validation after this canonical architecture update, release the exact accepted Worker and validated web artifact, and verify the Cycles page/APIs, paired state, scheduler health, and production identity read-only.
 - Preserve the non-negotiable boundary: no Main Cycle preparation, execution, scheduling, publishing, or operational-data mutation during this work.
 
 ### COMPLETED — Manifest Family Audition and Preselection Authority
