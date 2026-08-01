@@ -209,16 +209,20 @@ function machineKey(value: unknown, fallback = "unknown"): string {
 }
 
 type SameSnapshotPairSeed = {
-  contract_version: "manifest-shadow-same-snapshot-pair-v1";
+  contract_version: "manifest-shadow-same-snapshot-pair-v2";
   pair_key: string;
   control_run_id: string;
   code_sha: string;
   scenario: string;
   horizon_hours: number;
   requested_missing_count: number;
-  exported_snapshot: ManifestDecisionSnapshot;
+  frozen_seed_id: string;
+  snapshot_hash: string;
+  exported_snapshot_shell: JsonRecord;
   slot_plan: { targetSlots: ManifestShadowSlot[]; occupiedSlotKeys: string[] };
+  exported_snapshot: ManifestDecisionSnapshot;
 };
+
 
 function sameSnapshotPairKey(operationRoot: string): string {
   return operationRoot.replace(/(^|[-_:])(control|challenger)(?=$|[-_:])/gi, "$1pair");
@@ -263,30 +267,45 @@ async function loadSameSnapshotControlSeed(
     const snapshot = parseJsonObject(row.payload_json);
     const metadata = record(snapshot.metadata);
     const seed = record(metadata.same_snapshot_pair_seed);
-    if (seed.contract_version !== "manifest-shadow-same-snapshot-pair-v1") continue;
+        if (seed.contract_version !== "manifest-shadow-same-snapshot-pair-v2") continue;
+
     if (String(seed.pair_key ?? "") !== input.pairKey) continue;
     if (String(seed.control_run_id ?? "") !== String(row.id ?? "")) continue;
     if (String(seed.code_sha ?? "") !== input.codeSha) continue;
     if (String(seed.scenario ?? "") !== input.scenario) continue;
     if (Number(seed.horizon_hours ?? -1) !== input.horizonHours) continue;
     if (Number(seed.requested_missing_count ?? -1) !== input.requestedMissingCount) continue;
-    const exportedSnapshot = record(seed.exported_snapshot) as unknown as ManifestDecisionSnapshot;
+        const frozenSeed = await readManifestShadowFrozenSeed(db, input.brandKey);
+    if (!frozenSeed) continue;
+    if (String(frozenSeed.id ?? "") !== String(seed.frozen_seed_id ?? "")) continue;
+    if (String(frozenSeed.snapshot_hash ?? "") !== String(seed.snapshot_hash ?? "")) continue;
+    const exportedSnapshot = {
+      ...record(seed.exported_snapshot_shell),
+      source_candidates: records(frozenSeed.source_candidates),
+      evidence: record(frozenSeed.evidence),
+    } as unknown as ManifestDecisionSnapshot;
+    if (exportedSnapshot.snapshot_hash !== String(seed.snapshot_hash ?? "")) continue;
     const slotPlan = record(seed.slot_plan);
+
     const targetSlots = records(slotPlan.targetSlots) as unknown as ManifestShadowSlot[];
     const occupiedSlotKeys = Array.isArray(slotPlan.occupiedSlotKeys)
       ? slotPlan.occupiedSlotKeys.map((value) => String(value))
       : [];
     if (!exportedSnapshot.snapshot_hash || !targetSlots.length) continue;
     return {
-      contract_version: "manifest-shadow-same-snapshot-pair-v1",
+            contract_version: "manifest-shadow-same-snapshot-pair-v2",
       pair_key: input.pairKey,
       control_run_id: String(row.id),
       code_sha: input.codeSha,
       scenario: input.scenario,
       horizon_hours: input.horizonHours,
       requested_missing_count: input.requestedMissingCount,
+      frozen_seed_id: String(seed.frozen_seed_id),
+      snapshot_hash: String(seed.snapshot_hash),
+      exported_snapshot_shell: record(seed.exported_snapshot_shell),
       exported_snapshot: exportedSnapshot,
       slot_plan: { targetSlots, occupiedSlotKeys },
+
     };
   }
   return null;
@@ -1282,13 +1301,16 @@ async function prepareShadowCycle(
 
     const snapshotImportStarted = Date.now();
     const exportedShadowEvidence = manifestDecisionSnapshotToShadowEvidence(exportedSnapshot);
-    await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
-      brand_key: identity.brandKey,
-      source_as_of: exportedSnapshot.captured_at,
-      snapshot_hash: exportedSnapshot.snapshot_hash,
-      source_candidates: exportedSnapshot.source_candidates as unknown as JsonRecord[],
-      evidence: exportedShadowEvidence,
-    });
+        if (!sameSnapshotControlSeed) {
+      await writeManifestShadowFrozenSeed(dependencies.shadowDb, {
+        brand_key: identity.brandKey,
+        source_as_of: exportedSnapshot.captured_at,
+        snapshot_hash: exportedSnapshot.snapshot_hash,
+        source_candidates: exportedSnapshot.source_candidates as unknown as JsonRecord[],
+        evidence: exportedShadowEvidence,
+      });
+    }
+
     const frozenSeed = await readManifestShadowFrozenSeed(dependencies.shadowDb, identity.brandKey);
     if (!frozenSeed) throw new Error("manifest_decision_snapshot_import_missing");
     const importedSnapshot = readManifestDecisionSnapshotFromShadowEvidence(frozenSeed.evidence);
@@ -1655,19 +1677,22 @@ async function prepareShadowCycle(
       }),
       nowIso,
     ).run();
-        const sameSnapshotPairSeed: SameSnapshotPairSeed | null = testCase === "same_snapshot_ab" && variantKey === "control"
+            const sameSnapshotPairSeed: Omit<SameSnapshotPairSeed, "exported_snapshot"> | null = testCase === "same_snapshot_ab" && variantKey === "control"
       ? {
-          contract_version: "manifest-shadow-same-snapshot-pair-v1",
+          contract_version: "manifest-shadow-same-snapshot-pair-v2",
           pair_key: pairKey,
           control_run_id: runId,
           code_sha: dependencies.codeSha,
           scenario,
           horizon_hours: horizonHours,
           requested_missing_count: requestedMissingCount,
-          exported_snapshot: exportedSnapshot,
+          frozen_seed_id: String(frozenSeed.id),
+          snapshot_hash: exportedSnapshot.snapshot_hash,
+          exported_snapshot_shell: runtimeDecisionSnapshotForPersistence(exportedSnapshot),
           slot_plan: slotPlan,
         }
       : null;
+
     const snapshot: ManifestShadowSnapshot = {
       contract_version: MANIFEST_SHADOW_SNAPSHOT_VERSION,
       brand_key: identity.brandKey,
