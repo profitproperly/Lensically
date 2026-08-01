@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
-updated_at: 2026-07-31
+status: active
+updated_at: 2026-08-01
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: none
+active_job_id: manifest-family-audition-and-preselection-authority
+active_checkpoint: owner-wake-proceed-gate
 validated_source_head: 95916b7605da46592ce92fde84f231a47a22a133
 documentation_source_head: 95916b7605da46592ce92fde84f231a47a22a133
 production_sha: 95916b7605da46592ce92fde84f231a47a22a133
@@ -27,6 +27,80 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 4. Keep one active outcome and reject unrelated scope until it closes.
 
 ## Unified Job Queue
+
+### ACTIVE — Manifest Family Audition and Preselection Authority
+
+job_id: `manifest-family-audition-and-preselection-authority`
+
+Owner objective:
+
+- Preserve strict performance accountability: families that cannot meet the like floor lose routine audience exposure.
+- Replace one-result expulsion with a bounded two-strike audition and one tiebreaker only when the first two results split.
+- Remove `disproven` as a newly generated operational family label because it duplicates the exclusion effect of `underperforming`.
+- Move the source-selection effects of active experiments, strategy directives, hard bans, and strongest/weakest mature evidence into Stage 4 before source locking.
+- Prove all changes in the physically isolated Innovation Cycle, then promote only the proven behavior into the Main Champion code and stop without invoking Main.
+
+Non-negotiable boundaries:
+
+- Do not prepare, dry-run, test, canary, schedule, publish, or otherwise invoke the Main Cycle.
+- Do not mutate Main account data, production schedules, Threads, historical lineage, or production receipts.
+- All behavioral validation occurs in source-level tests and the isolated Innovation Cycle.
+- Stage 4 becomes the sole authority for source eligibility, ranking, allocation, experiment reservations, and lineup locking.
+- Stage 5 may receive read-only trace context for generation and audit, but it may not introduce new source-selection authority, substitute sources, or alter the locked lineup.
+
+Implementation plan:
+
+1. **Reconcile the repository before implementation.** Identify the changes introduced at pre-plan head `2d442d20266d55e8ae4a05bc35d44e559f3e2d02` and the associated failed Cloudflare Workers build reported on 2026-08-01. Determine whether the failure is stale, documentation-neutral, or a real code blocker; fix and permanently regress any real blocker before source-policy work. Then trace the active v5 source-label, selection, decision-snapshot, cycle-construction, and decision-bundle paths. Record every enum, persisted field, selector filter, test fixture, receipt field, and compatibility surface touched by `disproven`, `underperforming`, recent ranking, and the four Stage 5 intelligence signals.
+
+2. **Implement the bounded family audition policy.** Use authoritative 24-hour normalized family results against the existing `0.85` floor.
+   - Zero matured results: `untested`; eligible for first audition.
+   - One matured result below `0.85`: probation with one strike; eligible for exactly one second audition opportunity.
+   - First two results both below `0.85`: `underperforming`; excluded.
+   - First two results both at or above `0.85`: graduate to normal lifetime-median policy.
+   - First two results split: eligible for exactly one third tiebreaker.
+   - After the third result, two passes graduate and two failures become `underperforming` and excluded.
+   - After graduation, every later matured result updates the lifetime median; a lifetime median below `0.85` cuts the family from the next lineup.
+   - Probation and tiebreaker opportunities remain exploration-only, low-priority, exposure-constrained, and never guaranteed outside available exploration capacity.
+
+3. **Retire `disproven` without destroying history.** Stop generating `disproven` as a current operational label. Normalize legacy persisted `disproven` values to `underperforming` at read/refresh boundaries, preserve immutable historical receipts, and avoid a destructive database rewrite unless tests prove one is required. Update types, counts, selector filters, diagnostics, fixtures, and documentation so there is one weak-family exclusion label and separate confidence telemetry.
+
+4. **Create a deterministic Stage 4 preselection-policy compiler.** Before candidate filtering and lineup lock, compile only source-relevant authority from:
+   - active experiments: required/reserved eligible slots and variant constraints;
+   - strategy directives: deterministic allocation, weighting, promotion, reduction, and source-role constraints;
+   - hard bans: fail-closed candidate exclusions before scoring;
+   - strongest/weakest mature evidence: eligibility, ranking, and controlled-development adjustments.
+   The compiler must return a versioned, hashable, auditable policy object consumed directly by the selector.
+
+5. **Make Stage 4 causally authoritative.** Extend the selector input beyond `{candidates, slot_keys, seed}` to include the compiled preselection policy. Apply hard exclusions before allocation targets, apply experiment reservations before general fill, apply strategy/evidence weights before deterministic ranking, preserve exposure and semantic-spacing protections, then lock the complete source-to-slot lineup. Persist a compact causal trace showing which signal changed eligibility, score, tier, reservation, or placement.
+
+6. **Demote Stage 5 to generation and audit context.** Build the post-lock decision bundle from the already applied Stage 4 policy and locked lineup. Retain strongest/weakest evidence, experiments, directives, and bans only as explanatory/generation context. Add fail-closed validation proving Stage 5 cannot select a new source, change a family, release a ban, change a reservation, or modify slot placement.
+
+7. **Add permanent regression coverage.** Include:
+   - one-flop probation, two-flop exclusion, two-pass graduation, split-result tiebreaker, tiebreaker pass/fail, and post-graduation lifetime-median cut;
+   - exact `0.85` boundary behavior and account-median normalization;
+   - legacy `disproven` compatibility and immutable-history preservation;
+   - independent counterfactual tests proving each of the four intelligence signals materially changes Stage 4 output when applicable;
+   - allocation totals, unique sources, cooldowns, future exposure, semantic spacing, idempotency, and no source substitution;
+   - a regression proving identical Stage 5 inputs cannot alter the Stage 4 locked lineup.
+
+8. **Prove in the isolated Innovation Cycle.** Run deterministic source tests first, then a full 24-slot isolated Innovation acceptance with audition-state controls, banned controls, experiment reservations, strategy-weight changes, strongest/weakest evidence, complete lineage, and forbidden Main/Threads proxies. Compare control versus challenger lineups from the same frozen snapshot and verify every expected causal difference.
+
+9. **Promote the proven champion behavior only.** Port the exact accepted implementation and regressions into the Main Champion code path, validate the final repository head, deploy the exact tested SHA, verify runtime identity and scheduler health using read-only checks, and stop. Do not invoke Main.
+
+Definition of done:
+
+- A new family cannot be permanently cut from one weak result; it receives one bounded second audition.
+- A family with two weak auditions is excluded; a split receives only one tiebreaker.
+- Graduated families are continuously governed by lifetime median performance.
+- `disproven` is no longer generated as an operational label, while legacy history remains readable and intact.
+- The four intelligence signals affect source determination before lock and have permanent causal regressions.
+- Stage 5 cannot alter source eligibility, ranking, reservations, or the locked lineup.
+- Innovation acceptance proves the full behavior with zero Main and Threads access.
+- The exact validated SHA is deployed, read-only runtime health passes, and execution stops without running Main.
+
+Start gate:
+
+- Planning is authorized now. Implementation is explicitly paused until the owner returns after sleep and says to proceed.
 
 ### COMPLETED — Manifest Source Selection Hardening
 
@@ -479,7 +553,7 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 
 ## Current Action
 
-None. Manifest source-selection hardening is proven in the isolated Innovation test bed, deployed as the Main Champion code at exact SHA `95916b7605da46592ce92fde84f231a47a22a133`, and closed without invoking Main.
+**WAIT AT OWNER WAKE GATE. Do not inspect implementation files, edit code, run tests, deploy, or invoke either cycle tonight.** When the owner returns and explicitly says to proceed, re-read this ledger, reconcile the repository head and the pre-existing failed Cloudflare build, then begin Step 1 of `manifest-family-audition-and-preselection-authority`. Main Cycle execution remains forbidden throughout the job.
 
 Latest operational notes:
 
