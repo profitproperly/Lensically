@@ -463,7 +463,7 @@ async function readMainHistory(
   };
 }
 
-async function readInnovationRegistryMap(
+async function readPromotionMap(
   db: D1Database,
   brandKey: string,
   runIds: string[],
@@ -473,23 +473,32 @@ async function readInnovationRegistryMap(
   const placeholders = uniqueRunIds.map(() => "?").join(", ");
   const result = await db.prepare(
     `SELECT
-       run_id,
-       state,
-       challenged_main_version,
+       innovation_run_id,
+       previous_version,
+       promoted_version,
+       classification,
        tested_sha,
-       snapshot_hash,
+       promoted_at
+     FROM manifest_cycle_promotion_history
+     WHERE brand_key = ? AND innovation_run_id IN (${placeholders})`,
+  ).bind(brandKey, ...uniqueRunIds).all<JsonRecord>();
+  return new Map((result.results ?? []).map((row) => [asText(row.innovation_run_id) ?? "", row]));
+}
+
+async function readCurrentChampion(
+  db: D1Database,
+  brandKey: string,
+): Promise<JsonRecord> {
+  return await db.prepare(
+    `SELECT
+       semantic_version,
        selector_version,
        preselection_policy_version,
-       control_or_challenger,
-       passed,
-       promotion_eligible,
-       promotion_destination_version,
-       started_at,
-       completed_at
-     FROM manifest_cycle_innovation_runs
-     WHERE brand_key = ? AND run_id IN (${placeholders})`,
-  ).bind(brandKey, ...uniqueRunIds).all<JsonRecord>();
-  return new Map((result.results ?? []).map((row) => [asText(row.run_id) ?? "", row]));
+       promoted_from_innovation_run_id
+     FROM manifest_cycle_champions
+     WHERE brand_key = ? AND status = 'current'
+     LIMIT 1`,
+  ).bind(brandKey).first<JsonRecord>() ?? {};
 }
 
 async function readInnovationHistory(
