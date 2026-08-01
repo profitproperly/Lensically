@@ -470,8 +470,38 @@ async function readMainHistory(
   };
 }
 
-async function readInnovationHistory(
+async function readInnovationRegistryMap(
   db: D1Database,
+  brandKey: string,
+  runIds: string[],
+): Promise<Map<string, JsonRecord>> {
+  const uniqueRunIds = [...new Set(runIds.filter(Boolean))].slice(0, CYCLE_HISTORY_MAX_LIMIT);
+  if (!uniqueRunIds.length) return new Map();
+  const placeholders = uniqueRunIds.map(() => "?").join(", ");
+  const result = await db.prepare(
+    `SELECT
+       run_id,
+       state,
+       challenged_main_version,
+       tested_sha,
+       snapshot_hash,
+       selector_version,
+       preselection_policy_version,
+       control_or_challenger,
+       passed,
+       promotion_eligible,
+       promotion_destination_version,
+       started_at,
+       completed_at
+     FROM manifest_cycle_innovation_runs
+     WHERE brand_key = ? AND run_id IN (${placeholders})`,
+  ).bind(brandKey, ...uniqueRunIds).all<JsonRecord>();
+  return new Map((result.results ?? []).map((row) => [asText(row.run_id) ?? "", row]));
+}
+
+async function readInnovationHistory(
+  mainDb: D1Database,
+  shadowDb: D1Database,
   brandKey: string,
   cursorValue: unknown,
   limitValue: unknown,
@@ -496,16 +526,11 @@ async function readInnovationHistory(
        b.timings_json,
        b.production_noninterference_passed,
        b.threads_mutation_count,
-       b.cleanup_orphan_count,
+              b.cleanup_orphan_count,
        b.passed AS benchmark_passed,
-       b.failed_rule,
-       ir.state AS registry_state,
-       ir.challenged_main_version,
-       ir.promotion_destination_version,
-       ir.promotion_eligible
+       b.failed_rule
      FROM manifest_shadow_runs r
      LEFT JOIN manifest_shadow_benchmark_receipts b ON b.shadow_run_id = r.id
-     LEFT JOIN manifest_cycle_innovation_runs ir ON ir.run_id = r.id
      WHERE r.brand_key = ?`;
   const ordered = ` ORDER BY sort_at DESC, r.id DESC LIMIT ?`;
   const statement = cursor
