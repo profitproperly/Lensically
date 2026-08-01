@@ -308,14 +308,18 @@ export function classifySourceFamilyLifetime(input: {
   } else {
     auditionState = "underperforming";
   }
-  let label: SourceFamilyLifetimeLabel = graduated ? "prospect" : "untested";
+    let label: SourceFamilyLifetimeLabel = "untested";
   if (auditionState === "underperforming") label = "underperforming";
-  else if (graduated) {
+  else if (!graduated && auditionPasses > 0) {
+    label = medianIndex >= 1.15 ? "emerging" : "prospect";
+  } else if (graduated) {
+    label = "prospect";
     if (medianIndex < 0.85) label = "underperforming";
     else if (medianIndex >= 1.5 && aboveFranchiseFloor >= 0.9) label = "franchise";
     else if (aboveMedian >= 0.8) label = "proven";
     else if (medianIndex >= 1.15) label = "emerging";
   }
+
   if (label === "underperforming") auditionState = "underperforming";
   return {
     label,

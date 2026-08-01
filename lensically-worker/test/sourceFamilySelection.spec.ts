@@ -96,9 +96,10 @@ describe("bounded source family audition", () => {
   });
 
   it("uses one tiebreaker only when the first two results split", () => {
-    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85] })).toEqual(expect.objectContaining({
-      label: "untested",
+        expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85] })).toEqual(expect.objectContaining({
+      label: "prospect",
       audition_state: "tiebreaker",
+
       audition_opportunities_remaining: 1,
     }));
     expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85, 0.85] })).toEqual(expect.objectContaining({
@@ -120,11 +121,18 @@ describe("bounded source family audition", () => {
     }));
   });
 
-  it("treats the exact 0.85 floor as a pass and normalizes legacy disproven history", () => {
+    it("recognizes one passing result immediately, treats 0.85 as a pass, and normalizes legacy history", () => {
     expect(classifySourceFamilyLifetime({ indexes: [0.85] })).toEqual(expect.objectContaining({
+      label: "prospect",
       audition_state: "provisional_pass",
       audition_passes: 1,
     }));
+    expect(classifySourceFamilyLifetime({ indexes: [4] })).toEqual(expect.objectContaining({
+      label: "emerging",
+      audition_state: "provisional_pass",
+      audition_passes: 1,
+    }));
+
     expect(normalizeSourceFamilyLifetimeLabel("disproven")).toBe("underperforming");
   });
 });
