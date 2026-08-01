@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-01
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: cycles-observability-and-champion-registry-ui
+active_checkpoint: owner-proceed-gate
 validated_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
 documentation_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
 production_sha: ec52201fab48e0a00926c8e7319b90e0a925a584
@@ -40,6 +40,107 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 4. Keep one active outcome and reject unrelated scope until it closes.
 
 ## Unified Job Queue
+
+### ACTIVE — Cycles Observability and Champion Registry UI
+
+job_id: `cycles-observability-and-champion-registry-ui`
+
+Owner objective:
+
+- Make Main and Innovation cycle operations understandable without requiring the owner to ask the model to reconstruct each run.
+- Add one clean Cycles destination to the existing website without bloating the sidebar or duplicating operational surfaces.
+- Show the exact persisted Stage 4 source-selection operation: what source was selected for each slot, why it qualified, what affected its score or eligibility, and what protections were applied.
+- Establish one canonical semantic version for the Main Cycle Champion while keeping Innovation as a run-based test rail rather than a separately versioned product line.
+- Make the current lead relationship obvious: Main is the Current Champion when fully current; Innovation becomes the Current Challenger while it is being upgraded ahead of Main.
+
+Accepted product contract:
+
+- The sidebar receives exactly one navigable item: `Cycles`.
+- `Cycles` is a normal page button, not an expandable section and not a dropdown.
+- Opening Cycles defaults to the Main view.
+- The page header contains a two-state `Main | Innovation` switch. Main and Innovation are views inside one Cycles page.
+- There is no permanent Compare view, Compare sidebar entry, or required comparison workflow.
+- Main and Innovation remain physically and logically separated underneath; the UI may present both rails but may not merge Innovation evidence into Main history, learning, schedules, family labels, or receipts.
+- The website displays canonical persisted receipts only. It must never recalculate, reinterpret, or manufacture the reason a source was selected.
+
+Canonical paired rail states:
+
+1. Stable/current:
+   - Main: `Current Champion`
+   - Innovation: `Standby`
+2. Upgrade active:
+   - Main: `Incumbent — Behind Challenger`
+   - Innovation: `Current Challenger`
+3. Challenger passed but not promoted:
+   - Main: `Incumbent — Awaiting Promotion`
+   - Innovation: `Champion Candidate`
+4. Challenger failed or was abandoned:
+   - Main: `Current Champion`
+   - Innovation run: `Failed` or `Retired`; active Innovation returns to `Standby`
+5. Promotion complete:
+   - Main: `Current Champion` at the new semantic version
+   - Innovation: `Standby`; the historical Innovation run remains marked `Promoted to Main vN.N.N`
+
+Version contract:
+
+- Introduce one durable canonical Main Cycle semantic version in `vMAJOR.MINOR.PATCH` form.
+- Register the currently deployed proven Champion as `Main Cycle v1.0.0`, bound to exact source SHA `ec52201fab48e0a00926c8e7319b90e0a925a584` and its component/contract versions.
+- PATCH increments are non-behavioral fixes that preserve the cycle’s decision contract.
+- MINOR increments add backward-compatible intelligence, observability, or cycle capability.
+- MAJOR increments represent incompatible architecture or decision-contract changes.
+- Innovation runs do not receive semantic versions. They retain run ID, tested SHA, snapshot hash, selector/policy versions, control/challenger role, result state, and promotion destination when applicable.
+- A Main semantic version changes only through a recorded Champion promotion or an explicitly classified Main release; arbitrary UI labels may not advance it.
+
+Implementation plan:
+
+1. **Reconcile the existing website and cycle receipt architecture.** Identify the current sidebar, routing, dashboard shell, API/read-model patterns, Main autonomous-cycle receipts, Innovation shadow receipts, Stage 4 selection receipts, deployment path, and existing pagination conventions. Determine the smallest coherent integration surface before editing.
+
+2. **Create a canonical rail-state and Champion-version registry.** Persist the paired Main/Innovation state machine, active Main Champion identity, current or absent Innovation challenger, promotion lineage, exact SHA bindings, component versions, timestamps, and semantic-version bump classification. Add fail-closed rules preventing two active challengers, two current champions, or a promotion that is not tied to a passed Innovation run and exact tested SHA.
+
+3. **Seed the current Main Champion.** Register `Main Cycle v1.0.0` against deployed SHA `ec52201fab48e0a00926c8e7319b90e0a925a584`, selector `source-selection-engine-v6`, preselection policy `source-preselection-policy-v1`, and the accepted Innovation proof. Preserve the existing code SHA and component versions as the technical source of truth beneath the human-readable semantic version.
+
+4. **Build bounded read-only Cycles APIs/read models.** Provide compact endpoints or equivalent typed reads for:
+   - current paired rail state and Main Champion version;
+   - Main cycle history and Innovation run history with server-side cursor pagination;
+   - one cycle/run summary;
+   - compact source-selection rows for one cycle;
+   - one complete source-selection causal receipt by slot;
+   - promotion lineage and technical identity.
+   Responses must be server-bounded, stable, pageable, and read-only. Historical cycles missing newer receipt fields must return explicit `unavailable` values rather than inferred explanations.
+
+5. **Project the exact Stage 4 source-selection audit.** For every selected slot expose the persisted source and family identity, audition state, allocation tier, score, bonuses, penalties, hard exclusions, experiment reservation, strategy/evidence influence, recent and future exposure, cooldown, semantic spacing, selected slot, policy version/hash, selector version/seed, and concise persisted reason. Preserve canonical hashes and receipt references so every displayed explanation can be traced to the locked lineup.
+
+6. **Add the single Cycles page shell.** Add exactly one `Cycles` sidebar button in the agreed position beneath Dashboard. Opening it routes to Main by default. Add the in-page `Main | Innovation` switch with clear active styling and rail-state badges. Do not create a dropdown, nested sidebar buttons, or Compare surface.
+
+7. **Build the Main view.** Show `Main Cycle vN.N.N`, its paired state, Current Champion badge when current, exact deployed SHA in expandable technical details, deployment/promotion timestamp, and paginated Main cycle history. Each history row opens the cycle summary and source-selection audit without navigating to a separate top-level product area.
+
+8. **Build the Innovation view.** Show `Standby`, `Current Challenger`, or `Champion Candidate` as dictated by the canonical rail state. When active, identify the Main version being challenged and show run ID, tested SHA, snapshot identity, control/challenger role, progress/result, gates, isolation proof, and promotion eligibility. Historical runs retain `Passed`, `Failed`, `Retired`, or `Promoted to Main vN.N.N`. Innovation receives no semantic version.
+
+9. **Keep the audit dense but not bloated.** The cycle detail starts with a compact summary: candidates evaluated, selected, excluded, tier mix, policy identity, snapshot time, warnings, substitutions, failed gates, and lineage status. Below it, show the first six collapsed slot rows and a `Show all 24` control rather than traditional pagination inside one 24-slot cycle. Each row displays hour, source shorthand, family state, tier, and score; expansion reveals the exact source text, causal signals, bonuses/penalties, exposure checks, semantic-spacing result, and persisted selection reason. Add lightweight filters for winner, development, exploration, probation, underperforming, experiment, and excluded where the underlying receipt supports them.
+
+10. **Add cycle-history pagination and payload guards.** Use server-side pagination for cycle/run history, defaulting to 10 records per page or cursor window. Fetch full causal detail only when a row is expanded. Add payload-size, query-bound, and response-shape regressions so the audit cannot recreate prior unbounded snapshot/receipt failures or load every historical detail into the initial page.
+
+11. **Validate state truth and noninterference.** Add backend and UI regressions for every paired state transition, default Main routing, Main/Innovation switching, semantic-version seeding and bump rules, promotion lineage, no duplicate champion/challenger, legacy receipt gaps, pagination boundaries, expansion-on-demand, responsive behavior, and the complete absence of Compare/dropdown behavior. Prove all reads are non-mutating and Innovation data never changes Main operational state.
+
+12. **Release through the protected exact-SHA path.** Validate the final source head, deploy the exact tested SHA, run read-only production verification for page/API identity and scheduler health, and stop without preparing, running, scheduling, or publishing a Main Cycle.
+
+Definition of done:
+
+- One Cycles sidebar button opens Main by default and provides an in-page Main/Innovation switch.
+- No Cycles dropdown and no Compare surface exist.
+- The owner can inspect Main and Innovation history without asking the model to reconstruct it.
+- Every supported selected slot can reveal the exact persisted Stage 4 reason, score factors, exposure checks, policy identity, and lineage reference.
+- History is server-paginated; one cycle remains compact through six-row preview, show-all, collapsed details, filters, and detail-on-demand.
+- Main has one durable semantic version registry seeded at `v1.0.0`; Innovation remains run-based.
+- The paired rail states truthfully distinguish Current Champion, Standby, Incumbent Behind Challenger, Current Challenger, Awaiting Promotion, Champion Candidate, Failed, Retired, and Promoted.
+- Promotion atomically advances the Main Champion identity/version and returns Innovation to Standby while preserving historical promotion lineage.
+- Legacy gaps are labeled unavailable rather than guessed.
+- Exact-SHA release and read-only live verification pass with zero Main Cycle invocation and zero operational data contamination.
+
+## Current Action
+
+- Wait for the owner’s explicit `Proceed` before implementation.
+- On Proceed, execute only Step 1: reconcile the website, API/read-model, receipt, and deployment architecture; then continue through the plan autonomously unless a genuine owner-only decision or P0/P1 interruption occurs.
 
 ### COMPLETED — Manifest Family Audition and Preselection Authority
 
