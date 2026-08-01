@@ -152,9 +152,42 @@ export async function readManifestShadowEvidence(
     firstOrNull(db, `SELECT * FROM operator_generation_learning_briefs WHERE brand_key = ? AND active = 1 ORDER BY datetime(generated_at) DESC LIMIT 1`, [input.brandKey]),
     firstOrNull(db, `SELECT * FROM operator_content_focus_reviews WHERE brand_key = ? ORDER BY datetime(created_at) DESC LIMIT 1`, [input.brandKey]),
     rowsOrEmpty(db, `SELECT id, rule_key, rule_type, phrase, pattern, rule_text, body, description, active, source_authority FROM operator_manifest_hard_bans WHERE brand_key = ? AND active = 1 ORDER BY rule_key`, [input.brandKey]),
-    rowsOrEmpty(db, `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total FROM threads_posts_archive WHERE threads_user_id = ? AND datetime(substr(post_timestamp, 1, 19)) >= datetime(?, '-28 days') ORDER BY likes DESC, views DESC, datetime(post_timestamp) DESC LIMIT 12`, [input.threadsUserId, input.nowIso]),
-    rowsOrEmpty(db, `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total FROM threads_posts_archive WHERE threads_user_id = ? AND datetime(substr(post_timestamp, 1, 19)) >= datetime(?, '-28 days') ORDER BY likes ASC, views ASC, datetime(post_timestamp) DESC LIMIT 12`, [input.threadsUserId, input.nowIso]),
-    rowsOrEmpty(db, `SELECT post_id, post_text, post_timestamp, views, likes, replies, reposts, quotes, shares, engagement_total FROM threads_posts_archive WHERE threads_user_id = ? AND datetime(substr(post_timestamp, 1, 19)) >= datetime(?, '-72 hours') ORDER BY datetime(post_timestamp) DESC LIMIT 40`, [input.threadsUserId, input.nowIso]),
+        rowsOrEmpty(db, `SELECT archive.post_id, archive.post_text, archive.post_timestamp, archive.views, archive.likes, archive.replies, archive.reposts, archive.quotes, archive.shares, archive.engagement_total,
+            fingerprint.source_card_id, card.family_id AS source_card_family_id, family.source_identity_key
+       FROM threads_posts_archive archive
+       LEFT JOIN operator_post_fingerprints fingerprint
+         ON fingerprint.brand_key = ? AND fingerprint.published_post_id = archive.post_id
+       LEFT JOIN operator_source_cards card
+         ON card.brand_key = fingerprint.brand_key AND card.id = fingerprint.source_card_id
+       LEFT JOIN operator_source_card_families family
+         ON family.brand_key = card.brand_key AND family.id = card.family_id
+       WHERE archive.threads_user_id = ? AND datetime(substr(archive.post_timestamp, 1, 19)) >= datetime(?, '-28 days')
+       ORDER BY archive.likes DESC, archive.views DESC, datetime(archive.post_timestamp) DESC LIMIT 12`, [input.brandKey, input.threadsUserId, input.nowIso]),
+
+        rowsOrEmpty(db, `SELECT archive.post_id, archive.post_text, archive.post_timestamp, archive.views, archive.likes, archive.replies, archive.reposts, archive.quotes, archive.shares, archive.engagement_total,
+            fingerprint.source_card_id, card.family_id AS source_card_family_id, family.source_identity_key
+       FROM threads_posts_archive archive
+       LEFT JOIN operator_post_fingerprints fingerprint
+         ON fingerprint.brand_key = ? AND fingerprint.published_post_id = archive.post_id
+       LEFT JOIN operator_source_cards card
+         ON card.brand_key = fingerprint.brand_key AND card.id = fingerprint.source_card_id
+       LEFT JOIN operator_source_card_families family
+         ON family.brand_key = card.brand_key AND family.id = card.family_id
+       WHERE archive.threads_user_id = ? AND datetime(substr(archive.post_timestamp, 1, 19)) >= datetime(?, '-28 days')
+       ORDER BY archive.likes ASC, archive.views ASC, datetime(archive.post_timestamp) DESC LIMIT 12`, [input.brandKey, input.threadsUserId, input.nowIso]),
+
+        rowsOrEmpty(db, `SELECT archive.post_id, archive.post_text, archive.post_timestamp, archive.views, archive.likes, archive.replies, archive.reposts, archive.quotes, archive.shares, archive.engagement_total,
+            fingerprint.source_card_id, card.family_id AS source_card_family_id, family.source_identity_key
+       FROM threads_posts_archive archive
+       LEFT JOIN operator_post_fingerprints fingerprint
+         ON fingerprint.brand_key = ? AND fingerprint.published_post_id = archive.post_id
+       LEFT JOIN operator_source_cards card
+         ON card.brand_key = fingerprint.brand_key AND card.id = fingerprint.source_card_id
+       LEFT JOIN operator_source_card_families family
+         ON family.brand_key = card.brand_key AND family.id = card.family_id
+       WHERE archive.threads_user_id = ? AND datetime(substr(archive.post_timestamp, 1, 19)) >= datetime(?, '-72 hours')
+       ORDER BY datetime(archive.post_timestamp) DESC LIMIT 40`, [input.brandKey, input.threadsUserId, input.nowIso]),
+
     rowsOrEmpty(db, `SELECT id, post_text, status, scheduled_time, published_post_id FROM scheduled_posts WHERE threads_user_id = ? AND datetime(scheduled_time) >= datetime(?) ORDER BY datetime(scheduled_time) ASC LIMIT 72`, [input.threadsUserId, input.nowIso]),
     readManifestShadowProductionFingerprint(db),
     firstOrNull(db, `SELECT MAX(observed_at) AS latest_metric_at, COUNT(*) AS metric_count FROM operator_post_metric_snapshots WHERE brand_key = ?`, [input.brandKey]),
