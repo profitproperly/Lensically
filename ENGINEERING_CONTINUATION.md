@@ -470,7 +470,9 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 
 ## Current Action
 
-Implement the hard selection and exposure rules in the shared selector and decision-validation path, add permanent regression fixtures, validate the source head, and prove the behavior only inside the isolated Innovation Cycle. After acceptance, port and deploy the proven code to Main, verify release identity without invoking Main, then close the job.
+Map the exact selector, evidence input, decision validation, and regression-test surfaces using repository-index reads; then implement the hard selection and exposure rules, add permanent regression fixtures, validate the source head, and prove the behavior only inside the isolated Innovation Cycle. After acceptance, port and deploy the proven code to Main, verify release identity without invoking Main, then close the job.
+
+Latest operational note: repository content search requires an exact known file path. The attempted directory-prefix search failed without mutation; prevention is to enumerate repository paths first and search only verified files.
 
 ## Deferred Work — INACTIVE
 
