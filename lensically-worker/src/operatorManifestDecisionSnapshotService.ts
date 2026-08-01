@@ -9,6 +9,11 @@ import {
   readManifestShadowEvidence,
   readManifestShadowProductionFingerprint,
 } from "./operatorManifestShadowEvidenceService";
+import {
+  compileSourcePreselectionPolicy,
+  type SourcePreselectionPolicy,
+} from "./sourcePreselectionPolicy";
+
 
 type JsonRecord = Record<string, unknown>;
 
@@ -89,8 +94,12 @@ export type ManifestDecisionParityReceipt = {
   eligible_pool_hash: string;
   exclusions_hash: string;
   ranked_order_hash: string;
-  selected_lineup_hash: string;
+    selected_lineup_hash: string;
+  preselection_policy_version: string;
+  preselection_policy_hash: string;
+  preselection_causal_signal_counts: Record<string, number>;
   main_equivalent_output_hash: string;
+
   innovation_output_hash: string;
   eligible_pool_match: boolean;
   exclusions_match: boolean;
@@ -384,8 +393,10 @@ export async function compareManifestDecisionSelectorParity(input: {
   selectSourceLineup: (selectionInput: {
     candidates: SourceSelectionCandidate[];
     slot_keys: string[];
-    seed: string;
+        seed: string;
+    preselection_policy?: SourcePreselectionPolicy;
     include_parity_trace?: boolean;
+
   }) => {
     selected: SourceSelectionCandidate[];
     receipts: SourceSelectionReceipt[];
@@ -393,12 +404,33 @@ export async function compareManifestDecisionSelectorParity(input: {
     parity_trace?: JsonRecord;
   };
 }): Promise<ManifestDecisionParityReceipt> {
+  const strategy = record(input.snapshot.strategy);
+  const preselectionPolicy = compileSourcePreselectionPolicy({
+    candidates: cloneValue(input.snapshot.source_candidates),
+    slot_keys: [...input.slotKeys],
+    strategy_directives: strategy.directives ?? strategy,
+    active_experiments: [
+      ...cloneValue(input.snapshot.experiments),
+      ...records(strategy.experiments),
+    ],
+    hard_bans: cloneValue(input.snapshot.hard_bans),
+    strongest_mature_evidence: [
+      ...cloneValue(input.snapshot.strongest_posts),
+      ...records(strategy.strongest),
+    ],
+    weakest_mature_evidence: [
+      ...cloneValue(input.snapshot.weakest_posts),
+      ...records(strategy.weakest),
+    ],
+  });
   const runSelector = () => input.selectSourceLineup({
     candidates: cloneValue(input.snapshot.source_candidates),
     slot_keys: [...input.slotKeys],
     seed: input.seed,
+    preselection_policy: preselectionPolicy,
     include_parity_trace: true,
   });
+
   const mainEquivalent = runSelector();
   const innovation = runSelector();
   const mainTrace = record(mainEquivalent.parity_trace);
@@ -459,8 +491,12 @@ export async function compareManifestDecisionSelectorParity(input: {
     eligible_pool_hash: eligiblePoolHash,
     exclusions_hash: exclusionsHash,
     ranked_order_hash: rankedOrderHash,
-    selected_lineup_hash: selectedLineupHash,
+        selected_lineup_hash: selectedLineupHash,
+    preselection_policy_version: preselectionPolicy.contract_version,
+    preselection_policy_hash: preselectionPolicy.policy_hash,
+    preselection_causal_signal_counts: preselectionPolicy.causal_signal_counts,
     main_equivalent_output_hash: mainOutputHash,
+
     innovation_output_hash: innovationOutputHash,
     eligible_pool_match: eligiblePoolMatch,
     exclusions_match: exclusionsMatch,
