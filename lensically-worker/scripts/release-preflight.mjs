@@ -778,7 +778,8 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 80-tool public surface and retirement policy")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 81-tool public surface and required Main Cycle dependencies")
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("persist_manifest_shadow_batch")')
