@@ -385,7 +385,33 @@ export async function buildManifestDecisionScenarioOverlay(input: {
   return { ...withoutHash, overlay_hash: await hashManifestDecisionValue(withoutHash) };
 }
 
+export function compileManifestDecisionSnapshotPreselectionPolicy(
+  snapshot: ManifestDecisionSnapshot,
+  slotKeys: string[],
+): SourcePreselectionPolicy {
+  const strategy = record(snapshot.strategy);
+  return compileSourcePreselectionPolicy({
+    candidates: cloneValue(snapshot.source_candidates),
+    slot_keys: [...slotKeys],
+    strategy_directives: strategy.directives ?? strategy,
+    active_experiments: [
+      ...cloneValue(snapshot.experiments),
+      ...records(strategy.experiments),
+    ],
+    hard_bans: cloneValue(snapshot.hard_bans),
+    strongest_mature_evidence: [
+      ...cloneValue(snapshot.strongest_posts),
+      ...records(strategy.strongest),
+    ],
+    weakest_mature_evidence: [
+      ...cloneValue(snapshot.weakest_posts),
+      ...records(strategy.weakest),
+    ],
+  });
+}
+
 export async function compareManifestDecisionSelectorParity(input: {
+
   snapshot: ManifestDecisionSnapshot;
   slotKeys: string[];
   seed: string;
@@ -404,25 +430,8 @@ export async function compareManifestDecisionSelectorParity(input: {
     parity_trace?: JsonRecord;
   };
 }): Promise<ManifestDecisionParityReceipt> {
-  const strategy = record(input.snapshot.strategy);
-  const preselectionPolicy = compileSourcePreselectionPolicy({
-    candidates: cloneValue(input.snapshot.source_candidates),
-    slot_keys: [...input.slotKeys],
-    strategy_directives: strategy.directives ?? strategy,
-    active_experiments: [
-      ...cloneValue(input.snapshot.experiments),
-      ...records(strategy.experiments),
-    ],
-    hard_bans: cloneValue(input.snapshot.hard_bans),
-    strongest_mature_evidence: [
-      ...cloneValue(input.snapshot.strongest_posts),
-      ...records(strategy.strongest),
-    ],
-    weakest_mature_evidence: [
-      ...cloneValue(input.snapshot.weakest_posts),
-      ...records(strategy.weakest),
-    ],
-  });
+  const preselectionPolicy = compileManifestDecisionSnapshotPreselectionPolicy(input.snapshot, input.slotKeys);
+
   const runSelector = () => input.selectSourceLineup({
     candidates: cloneValue(input.snapshot.source_candidates),
     slot_keys: [...input.slotKeys],
