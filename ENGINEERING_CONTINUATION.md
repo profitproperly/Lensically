@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-07-31
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: none
+active_job_id: manifest-source-selection-hardening
+active_checkpoint: innovation-implementation
 validated_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 documentation_source_head: d2166702b0868d32f63cb4eb314dea75984715ec
 production_sha: d2166702b0868d32f63cb4eb314dea75984715ec
@@ -27,6 +27,32 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 4. Keep one active outcome and reject unrelated scope until it closes.
 
 ## Unified Job Queue
+
+### ACTIVE — Manifest Source Selection Hardening
+
+job_id: `manifest-source-selection-hardening`
+
+Owner objective:
+
+- Harden the source-family selector so mature performance evidence, recent published exposure, future scheduled exposure, family labels, and semantic diversity govern every lineup.
+- Implement and validate exclusively through source tests and the physically isolated Innovation Cycle.
+- Never prepare, dry-run, test, canary, schedule, publish, or otherwise execute the Main Cycle during this job.
+- After Innovation acceptance, port only the proven code and regression prevention into the Main Champion codebase, validate and deploy the exact production code, then stop without invoking Main.
+- Leave the naturally required Main production cycle for a separate owner instruction on a later day.
+
+Acceptance requirements:
+
+1. Published exposure inside 72 hours is a hard source-family exclusion.
+2. Future scheduled exposure is treated as already consumed.
+3. Cooldowns use audience publication/schedule timestamps, not source-selection timestamps.
+4. Cooldown relaxation cannot occur while unused eligible families remain.
+5. Underperforming families are excluded from routine deployment; disproven families remain excluded.
+6. Protected exploration and controlled winner allocation are enforced across the full lineup.
+7. Semantic-premise limits compare recent published, future scheduled, and planned lineup exposure.
+8. Strategy commitment fails when the lineup does not materially reflect intelligence and exposure constraints.
+9. The July 30–31 near-copy failures are permanent regression fixtures.
+10. Innovation acceptance proves the hardened behavior with zero Main and Threads access.
+11. Promotion ports code only; no Main execution occurs.
 
 ### COMPLETED — Manifest Innovation Synthetic 24-Slot Persistence Benchmark
 
@@ -444,7 +470,7 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 
 ## Current Action
 
-None. The Main Champion promotion job is closed after a successful naturally required 46-slot production cycle, canonical terminal receipt, complete lineage, zero unresolved defects, and healthy scheduler verification.
+Implement the hard selection and exposure rules in the shared selector and decision-validation path, add permanent regression fixtures, validate the source head, and prove the behavior only inside the isolated Innovation Cycle. After acceptance, port and deploy the proven code to Main, verify release identity without invoking Main, then close the job.
 
 ## Deferred Work — INACTIVE
 
