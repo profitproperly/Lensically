@@ -379,7 +379,12 @@ async function prepareManifestSourceBackedCycleForTest(
     operation_id: `test-source-backed-prepare-${crypto.randomUUID()}`,
     proceed_confirmed: true,
   });
+    expect(
+    preparedResponse.cycle,
+    `prepare_manifest_autonomous_cycle returned no cycle: ${JSON.stringify(preparedResponse)}`,
+  ).toBeDefined();
   const reconstructedMissingSlots = Array.isArray(preparedResponse.cycle.missing_slots)
+
     ? preparedResponse.cycle.missing_slots
     : (preparedResponse.locked_source_selection_plan ?? []).flatMap((item) => {
         const slotKey = String(item.slot_key ?? "");
