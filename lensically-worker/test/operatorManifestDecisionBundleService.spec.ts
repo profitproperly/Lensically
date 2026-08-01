@@ -190,12 +190,16 @@ describe("operatorManifestDecisionBundleService", () => {
       .toEqual(missingSlots.map((slot) => slot.key));
         expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.source_card_id))
       .toEqual(Array.from({ length: 48 }, (_, index) => `card-${index}`));
-    expect(bundle.locked_source_plan[0]).toEqual(expect.objectContaining({
-      audition_state: "graduated",
-      preselection_policy_hash: "policy-hash-1",
-      preselection_signals: expect.arrayContaining([expect.objectContaining({ signal_type: "strongest_evidence" })]),
+        expect(bundle.selection_causal_authority).toEqual(expect.objectContaining({
+      preselection_policy_versions: ["source-preselection-policy-v1"],
+      preselection_policy_hashes: ["policy-hash-1"],
+      per_selection_trace_persisted: true,
+      durable_receipt_authority: "operator_source_selection_plans.receipt_json",
+      locked_source_plan_hash: bundle.locked_source_plan_hash,
+      stage_5_generation_and_audit_only: true,
     }));
     expect(bundle.stage_authority).toEqual(expect.objectContaining({
+
       stage_5: "generation_and_audit_context_only",
       stage_5_may_rerank: false,
       stage_5_may_substitute_sources: false,

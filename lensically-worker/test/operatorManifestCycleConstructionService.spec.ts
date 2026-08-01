@@ -220,11 +220,16 @@ describe("Operator Manifest cycle construction service", () => {
       targetSlots: slots,
       missingSlots: slots,
     }));
-    expect(mocks.selectSourceLineup).toHaveBeenCalledWith({
-      candidates: [{ id: "card-allowed", source_identity_key: "allowed", lifetime_label: "proven" }],
+        expect(mocks.selectSourceLineup).toHaveBeenCalledWith({
+      candidates: [
+        { id: "card-allowed", source_identity_key: "allowed", lifetime_label: "proven" },
+        { id: "card-underperforming", source_identity_key: "weak", lifetime_label: "underperforming" },
+      ],
       slot_keys: slots.map((slot) => slot.key),
       seed: "manifest_mental:cycle-1:prepare-op-1",
+      preselection_policy: expect.objectContaining({ policy_hash: "policy-hash-1" }),
     });
+
         expect(mocks.persistLockedSourceSelectionPlan).toHaveBeenCalledWith({
       brand_key: "manifest_mental",
       cycle_id: "cycle-1",

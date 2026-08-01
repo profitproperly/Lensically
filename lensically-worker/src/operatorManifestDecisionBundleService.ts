@@ -269,7 +269,16 @@ export async function buildManifestDecisionBundle(
       experiment_reservation_key: receipt.experiment_reservation_key ?? null,
     };
   });
-  const lockedSourcePlanHash = await sha256(lockedSourcePlan);
+    const lockedSourcePlanHash = await sha256(lockedSourcePlan);
+  const selectionCausalAuthority = {
+    contract_version: "manifest-selection-causal-authority-v1",
+    preselection_policy_versions: [...new Set(lockedSourcePlan.map((item) => item.preselection_policy_version).filter(Boolean))],
+    preselection_policy_hashes: [...new Set(lockedSourcePlan.map((item) => item.preselection_policy_hash).filter(Boolean))],
+    per_selection_trace_persisted: true,
+    durable_receipt_authority: "operator_source_selection_plans.receipt_json",
+    locked_source_plan_hash: lockedSourcePlanHash,
+    stage_5_generation_and_audit_only: true,
+  };
 
   const activeExperiments = (experimentRows.results ?? []).map((row) => ({
     id: row.id,
@@ -332,8 +341,10 @@ export async function buildManifestDecisionBundle(
       authoritative_missing_slots: records(parseJson(cycle.missing_slots_json, [])),
     },
         locked_source_plan: lockedSourcePlan,
-    locked_source_plan_hash: lockedSourcePlanHash,
+        locked_source_plan_hash: lockedSourcePlanHash,
+    selection_causal_authority: selectionCausalAuthority,
     stage_authority: {
+
       stage_4: "selection_exclusion_reservation_weighting_ranking_and_source_to_slot_lock",
       stage_5: "generation_and_audit_context_only",
       stage_5_may_rerank: false,
@@ -614,13 +625,17 @@ export async function buildManifestDecisionBundle(
         : undefined,
     }));
     bundle.hard_bans = records(bundle.hard_bans).map((ban) => ({ rule_key: ban.rule_key }));
-    bundle.required_directives = {
+        bundle.required_directives = {
       primary_metric: "24_hour_likes",
       source_backed_generation_only: true,
       original_model_sources_forbidden: true,
       exact_locked_plan_required: true,
+      stage_4_locked_source_plan_hash: bundle.locked_source_plan_hash,
+      stage_5_generation_and_audit_only: true,
+      stage_5_source_or_slot_mutation_forbidden: true,
       deterministic_gates_server_owned: true,
     };
+
     const strategyAuthority = record(bundle.current_strategy_authority);
     bundle.current_strategy_authority = Object.keys(strategyAuthority).length
       ? {
