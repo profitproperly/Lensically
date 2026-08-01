@@ -1345,8 +1345,9 @@ async function prepareShadowCycle(
         snapshot_export_ms: snapshotExportMs,
                 snapshot_import_ms: snapshotImportMs,
         main_disconnected_after_import: true,
-        same_snapshot_pair: testCase === "same_snapshot_ab" ? {
-          contract_version: "manifest-shadow-same-snapshot-pair-v1",
+                same_snapshot_pair: testCase === "same_snapshot_ab" ? {
+          contract_version: "manifest-shadow-same-snapshot-pair-v2",
+
           pair_key: pairKey,
           control_run_id: sameSnapshotControlSeed?.control_run_id ?? runId,
           role: variantKey === "control" ? "control" : "challenger",
@@ -1490,8 +1491,9 @@ async function prepareShadowCycle(
     };
         decisionBundle.scenario_overlay = scenarioOverlay;
     decisionBundle.selector_parity = compactParityReceipt;
-    decisionBundle.same_snapshot_pair = testCase === "same_snapshot_ab" ? {
-      contract_version: "manifest-shadow-same-snapshot-pair-v1",
+        decisionBundle.same_snapshot_pair = testCase === "same_snapshot_ab" ? {
+      contract_version: "manifest-shadow-same-snapshot-pair-v2",
+
       pair_key: pairKey,
       control_run_id: sameSnapshotControlSeed?.control_run_id ?? runId,
       role: variantKey === "control" ? "control" : "challenger",
@@ -1703,8 +1705,9 @@ async function prepareShadowCycle(
         state: runtimeStateForPersistence(state),
         ...(sameSnapshotPairSeed ? { same_snapshot_pair_seed: sameSnapshotPairSeed } : {}),
         ...(sameSnapshotControlSeed ? {
-          same_snapshot_pair_reference: {
-            contract_version: "manifest-shadow-same-snapshot-pair-v1",
+                    same_snapshot_pair_reference: {
+            contract_version: "manifest-shadow-same-snapshot-pair-v2",
+
             pair_key: pairKey,
             control_run_id: sameSnapshotControlSeed.control_run_id,
             snapshot_hash: exportedSnapshot.snapshot_hash,
