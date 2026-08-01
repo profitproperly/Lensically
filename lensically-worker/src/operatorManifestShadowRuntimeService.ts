@@ -1144,9 +1144,14 @@ async function prepareShadowCycle(
   const requestedMissingCount = scenarioMissingCount(scenario, payload.missing_count);
   const horizonHours = Math.max(requestedMissingCount, Math.min(72, Math.max(1, Math.trunc(Number(payload.horizon_hours ?? Math.max(48, requestedMissingCount))))));
     const operationRoot = stringValue(payload.operation_id, `${identity.brandKey}:shadow:${scenario}:${testCase}:${variantKey}:${new Date().toISOString().slice(0, 10)}`);
-  const now = dependencies.now();
+    const now = dependencies.now();
   const nowIso = now.toISOString();
+  const pairKey = sameSnapshotPairKey(operationRoot);
+  const retiredLegacyRunId = testCase === "same_snapshot_ab"
+    ? await retireLegacyUnpairedSameSnapshotChallenger(dependencies.shadowDb, nowIso)
+    : null;
   const runId = `shadow-${(await sha256(operationRoot)).slice(0, 32)}`;
+
   const existing = await dependencies.shadowDb.prepare(
     `SELECT id, status FROM manifest_shadow_runs WHERE operation_root = ? LIMIT 1`,
   ).bind(operationRoot).first<JsonRecord>();
@@ -1202,7 +1207,21 @@ async function prepareShadowCycle(
     });
   }
   try {
-        const snapshotExportStarted = Date.now();
+            const snapshotExportStarted = Date.now();
+    const sameSnapshotControlSeed = testCase === "same_snapshot_ab" && variantKey !== "control"
+      ? await loadSameSnapshotControlSeed(dependencies.shadowDb, {
+          brandKey: identity.brandKey,
+          pairKey,
+          scenario,
+          codeSha: dependencies.codeSha,
+          nowIso,
+          horizonHours,
+          requestedMissingCount,
+        })
+      : null;
+    if (testCase === "same_snapshot_ab" && variantKey !== "control" && !sameSnapshotControlSeed) {
+      throw new Error(`manifest_shadow_same_snapshot_control_missing:${pairKey}`);
+    }
     const snapshotInput = {
       brandKey: identity.brandKey,
       accountId: identity.accountId,
@@ -1215,14 +1234,17 @@ async function prepareShadowCycle(
         scenario,
       },
     };
-    const exportedSnapshot = dependencies.buildDecisionSnapshot
-      ? await dependencies.buildDecisionSnapshot(snapshotInput)
-      : await buildManifestDecisionSnapshot(
-          createManifestShadowReadOnlyDatabase(dependencies.snapshotDb),
-          snapshotInput,
-        );
+    const exportedSnapshot = sameSnapshotControlSeed?.exported_snapshot
+      ?? (dependencies.buildDecisionSnapshot
+        ? await dependencies.buildDecisionSnapshot(snapshotInput)
+        : await buildManifestDecisionSnapshot(
+            createManifestShadowReadOnlyDatabase(dependencies.snapshotDb),
+            snapshotInput,
+          ));
+    const slotPlan = sameSnapshotControlSeed?.slot_plan
+      ?? await dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount });
     const snapshotExportMs = durationMs(snapshotExportStarted);
-    const slotPlan = await dependencies.buildSlots({ timezone, horizonHours, scenario, requestedMissingCount });
+
 
     const resetStarted = Date.now();
     const reset = await resetManifestShadowWorkspace(dependencies.shadowDb);
@@ -1288,9 +1310,21 @@ async function prepareShadowCycle(
         query_count: exportedSnapshot.query_receipts.length,
         zero_write_proof: exportedSnapshot.zero_write_proof,
         snapshot_export_ms: snapshotExportMs,
-        snapshot_import_ms: snapshotImportMs,
+                snapshot_import_ms: snapshotImportMs,
         main_disconnected_after_import: true,
+        same_snapshot_pair: testCase === "same_snapshot_ab" ? {
+          contract_version: "manifest-shadow-same-snapshot-pair-v1",
+          pair_key: pairKey,
+          control_run_id: sameSnapshotControlSeed?.control_run_id ?? runId,
+          role: variantKey === "control" ? "control" : "challenger",
+          reused_control_snapshot: Boolean(sameSnapshotControlSeed),
+          snapshot_hash_verified: sameSnapshotControlSeed
+            ? sameSnapshotControlSeed.exported_snapshot.snapshot_hash === exportedSnapshot.snapshot_hash
+            : true,
+          retired_legacy_unpaired_run_id: retiredLegacyRunId,
+        } : null,
       },
+
     });
 
     const loadedCandidates = records(frozenSeed.source_candidates) as unknown as SourceSelectionCandidate[];
@@ -1334,8 +1368,11 @@ async function prepareShadowCycle(
       throw new Error("manifest_decision_scenario_overlay_overreach");
     }
 
-    const selectionStarted = Date.now();
-    const selectorSeed = `${identity.brandKey}:${runId}:${variantKey}`;
+        const selectionStarted = Date.now();
+    const selectorSeed = testCase === "same_snapshot_ab"
+      ? `${identity.brandKey}:${pairKey}:same-snapshot`
+      : `${identity.brandKey}:${runId}:${variantKey}`;
+
     let paritySnapshot: ManifestDecisionSnapshot = importedSnapshot;
     let parityReceipt = await compareManifestDecisionSelectorParity({
       snapshot: paritySnapshot,
@@ -1418,8 +1455,22 @@ async function prepareShadowCycle(
       eligible_family_count: Number(record(exportedSnapshot.eligibility_state).eligible_family_count ?? 0),
       main_disconnected_after_import: true,
     };
-    decisionBundle.scenario_overlay = scenarioOverlay;
+        decisionBundle.scenario_overlay = scenarioOverlay;
     decisionBundle.selector_parity = compactParityReceipt;
+    decisionBundle.same_snapshot_pair = testCase === "same_snapshot_ab" ? {
+      contract_version: "manifest-shadow-same-snapshot-pair-v1",
+      pair_key: pairKey,
+      control_run_id: sameSnapshotControlSeed?.control_run_id ?? runId,
+      role: variantKey === "control" ? "control" : "challenger",
+      reused_control_snapshot: Boolean(sameSnapshotControlSeed),
+      snapshot_hash: exportedSnapshot.snapshot_hash,
+      snapshot_hash_verified: sameSnapshotControlSeed
+        ? sameSnapshotControlSeed.exported_snapshot.snapshot_hash === exportedSnapshot.snapshot_hash
+        : true,
+      slot_plan_reused: Boolean(sameSnapshotControlSeed),
+      selector_seed: selectorSeed,
+    };
+
     const snapshotHash = exportedSnapshot.snapshot_hash;
     decisionBundle.snapshot_hash = snapshotHash;
     const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
@@ -1592,14 +1643,39 @@ async function prepareShadowCycle(
       }),
       nowIso,
     ).run();
+        const sameSnapshotPairSeed: SameSnapshotPairSeed | null = testCase === "same_snapshot_ab" && variantKey === "control"
+      ? {
+          contract_version: "manifest-shadow-same-snapshot-pair-v1",
+          pair_key: pairKey,
+          control_run_id: runId,
+          code_sha: dependencies.codeSha,
+          scenario,
+          horizon_hours: horizonHours,
+          requested_missing_count: requestedMissingCount,
+          exported_snapshot: exportedSnapshot,
+          slot_plan: slotPlan,
+        }
+      : null;
     const snapshot: ManifestShadowSnapshot = {
       contract_version: MANIFEST_SHADOW_SNAPSHOT_VERSION,
       brand_key: identity.brandKey,
-      source_as_of: nowIso,
+      source_as_of: exportedSnapshot.captured_at,
       snapshot_hash: snapshotHash,
       tables: [],
-            metadata: { state: runtimeStateForPersistence(state) },
+      metadata: {
+        state: runtimeStateForPersistence(state),
+        ...(sameSnapshotPairSeed ? { same_snapshot_pair_seed: sameSnapshotPairSeed } : {}),
+        ...(sameSnapshotControlSeed ? {
+          same_snapshot_pair_reference: {
+            contract_version: "manifest-shadow-same-snapshot-pair-v1",
+            pair_key: pairKey,
+            control_run_id: sameSnapshotControlSeed.control_run_id,
+            snapshot_hash: exportedSnapshot.snapshot_hash,
+          },
+        } : {}),
+      },
     };
+
     const expiresAt = new Date(now.getTime() + Math.max(1, Math.min(336, Number(payload.retention_hours ?? 72))) * 3600000).toISOString();
         const seeded = await seedManifestShadowSnapshot(dependencies.shadowDb, runId, snapshot, expiresAt);
     if (testCase === "retained_failure_cleanup") {
