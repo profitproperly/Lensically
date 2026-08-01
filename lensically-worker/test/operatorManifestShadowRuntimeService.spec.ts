@@ -94,9 +94,10 @@ function evidence(): ManifestShadowEvidence {
   };
 }
 
-async function frozenDecisionSnapshot(): Promise<ManifestDecisionSnapshot> {
-  const sourceCandidates = candidates(120);
-  const frozenEvidence = evidence();
+async function frozenDecisionSnapshot(
+  sourceCandidates = candidates(120),
+  frozenEvidence = evidence(),
+): Promise<ManifestDecisionSnapshot> {
   const withoutHash: Omit<ManifestDecisionSnapshot, "snapshot_hash"> = {
     contract_version: "manifest-decision-snapshot-v1",
     provider_version: "manifest-decision-provider-v1",
@@ -155,7 +156,11 @@ type DependencyHarness = {
   };
 };
 
-function dependencyHarness(now = new Date("2026-07-30T18:30:00.000Z")): DependencyHarness {
+function dependencyHarness(
+  now = new Date("2026-07-30T18:30:00.000Z"),
+  sourceCandidates = candidates(),
+  frozenEvidence = evidence(),
+): DependencyHarness {
   const audit = {
     snapshot_db_calls: 0,
     evidence_provider_reads: 0,
@@ -177,21 +182,21 @@ function dependencyHarness(now = new Date("2026-07-30T18:30:00.000Z")): Dependen
     shadowDb: env.DB,
     codeSha: "a".repeat(40),
     minimumEligibleFamilies: 100,
-    buildDecisionSnapshot: async () => {
+        buildDecisionSnapshot: async () => {
       audit.source_provider_reads += 1;
       audit.evidence_provider_reads += 1;
-      return frozenDecisionSnapshot();
+      return frozenDecisionSnapshot(sourceCandidates, frozenEvidence);
     },
     now: () => new Date(now.getTime()),
     buildSlots: async (input) => buildManifestShadowScenarioSlots({ now, ...input }),
-    loadSourceCandidates: async () => {
+        loadSourceCandidates: async () => {
       audit.source_provider_reads += 1;
-      return candidates();
+      return sourceCandidates;
     },
     selectSourceLineup: (input) => selectSourceFamilyLineup(input),
-    readEvidence: async () => {
+        readEvidence: async () => {
       audit.evidence_provider_reads += 1;
-      return evidence();
+      return frozenEvidence;
     },
   };
   return { deps, audit };
@@ -397,6 +402,111 @@ describe("operatorManifestShadowRuntimeService", () => {
 
     const existing = candidates(2);
     expect(resolveManifestShadowSourceCandidates(existing, "manifest_mental")).toBe(existing);
+  });
+
+    it("rejects recent parrot repeats and enforces diverse allocation in an isolated 24-slot Innovation cycle", async () => {
+    const julyRepeatKeys = [
+      "life-about-to-get-good",
+      "hands-channel-abundance",
+      "inner-child-higher-self",
+      "intuition-believe-it",
+      "kind-person-opportunity",
+      "celebrate-others-beautiful",
+      "twenty-k-month-day",
+      "one-hundred-k-stay-focused",
+      "future-spouse-coming",
+      "flat-stomach-bank-account",
+    ];
+    const blockedRecent = julyRepeatKeys.map((key, index) => ({
+      ...candidates(1)[0],
+      source_candidate_id: `blocked-recent-${key}`,
+      source_identity_key: `blocked-recent-${key}`,
+      source_card_family_id: `blocked-recent-family-${index}`,
+      source_card_id: `blocked-recent-card-${index}`,
+      lifetime_label: "proven" as const,
+      published_uses_72h: 1,
+      semantic_key: `blocked-semantic-${key}`,
+    }));
+    const blockedScheduled = {
+      ...candidates(1)[0],
+      source_candidate_id: "blocked-future-scheduled",
+      source_identity_key: "blocked-future-scheduled",
+      source_card_family_id: "blocked-future-scheduled-family",
+      source_card_id: "blocked-future-scheduled-card",
+      lifetime_label: "franchise" as const,
+      future_scheduled_uses: 1,
+      semantic_key: "blocked-future-scheduled-semantic",
+    };
+    const blockedWeak = {
+      ...candidates(1)[0],
+      source_candidate_id: "blocked-underperforming",
+      source_identity_key: "blocked-underperforming",
+      source_card_family_id: "blocked-underperforming-family",
+      source_card_id: "blocked-underperforming-card",
+      lifetime_label: "underperforming" as const,
+      semantic_key: "blocked-underperforming-semantic",
+    };
+    const fresh = candidates(80).map((candidate, index) => ({
+      ...candidate,
+      source_candidate_id: `fresh-${index}`,
+      source_identity_key: `fresh-identity-${index}`,
+      source_card_family_id: `fresh-family-${index}`,
+      source_card_id: `fresh-card-${index}`,
+      lifetime_label: index < 12 ? "proven" as const : index < 30 ? "emerging" as const : "untested" as const,
+      published_uses_72h: 0,
+      future_scheduled_uses: 0,
+      semantic_exposure_times: [],
+      semantic_key: `fresh-semantic-${index}`,
+    }));
+    const sourceCandidates = [...blockedRecent, blockedScheduled, blockedWeak, ...fresh];
+    const harness = dependencyHarness(new Date("2026-07-30T18:30:00.000Z"), sourceCandidates);
+    const prepared = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "fatigue-hardening",
+      horizonHours: 48,
+    });
+
+    expect(prepared.status).toBe(200);
+    expect(prepared.body.success).toBe(true);
+    const bundle = record(prepared.body.decision_bundle);
+    const locked = rows(bundle.locked_source_lineup);
+    const selectedIdentities = locked.map((item) => String(item.source_identity_key));
+    const blockedIdentities = new Set([
+      ...blockedRecent.map((candidate) => String(candidate.source_identity_key)),
+      String(blockedScheduled.source_identity_key),
+      String(blockedWeak.source_identity_key),
+    ]);
+    expect(locked).toHaveLength(24);
+    expect(new Set(selectedIdentities).size).toBe(24);
+    expect(selectedIdentities.every((identityKey) => !blockedIdentities.has(identityKey))).toBe(true);
+    expect(locked.every((item) => {
+      const receipt = record(item.selection_receipt);
+      return Number(receipt.cooldown_hours) === 72
+        && Number(receipt.cooldown_relaxation) === 1
+        && Number(receipt.published_uses_72h) === 0
+        && Number(receipt.future_scheduled_uses) === 0;
+    })).toBe(true);
+    const selectionSummary = record(bundle.selection_summary);
+    expect(selectionSummary).toMatchObject({
+      engine_version: "source-selection-engine-v5",
+      recent_exposure_authority: "published_and_scheduled_lineage",
+      selected_count: 24,
+      strategy_influence_enforced: true,
+    });
+    const selectedTiers = record(selectionSummary.selected_allocation_tiers);
+    expect(Number(selectedTiers.exploration)).toBeGreaterThanOrEqual(7);
+    expect(Number(selectedTiers.development)).toBeGreaterThanOrEqual(7);
+    expect(Number(selectedTiers.winner)).toBeGreaterThan(0);
+    expect(harness.audit.snapshot_db_calls).toBe(0);
+    expect(harness.audit.source_provider_reads).toBe(1);
+    expect(harness.audit.evidence_provider_reads).toBe(1);
+
+    const completedReceipt = await completePrepared(harness.deps, prepared.body, "fatigue-hardening");
+    const benchmark = benchmarkFrom(completedReceipt);
+    expect(benchmark.counts.main_read_count).toBe(0);
+    expect(benchmark.counts.main_write_count).toBe(0);
+    expect(benchmark.counts.threads_mutation_count).toBe(0);
   });
 
   it("prepares isolated no-op, 24-slot, and 48-slot Innovation cycles without Main database access", async () => {
