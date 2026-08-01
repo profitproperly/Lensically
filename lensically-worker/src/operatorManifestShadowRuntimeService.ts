@@ -1467,11 +1467,12 @@ async function prepareShadowCycle(
       snapshot_hash_verified: sameSnapshotControlSeed
         ? sameSnapshotControlSeed.exported_snapshot.snapshot_hash === exportedSnapshot.snapshot_hash
         : true,
-      slot_plan_reused: Boolean(sameSnapshotControlSeed),
+            slot_plan_reused: Boolean(sameSnapshotControlSeed),
       selector_seed: selectorSeed,
-    };
+    } : null;
 
     const snapshotHash = exportedSnapshot.snapshot_hash;
+
     decisionBundle.snapshot_hash = snapshotHash;
     const decisionBundleId = `shadow-bundle-${(await sha256(stableJson(decisionBundle))).slice(0, 32)}`;
     decisionBundle.bundle_id = decisionBundleId;
