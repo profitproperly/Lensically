@@ -472,7 +472,10 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 
 Map the exact selector, evidence input, decision validation, and regression-test surfaces using repository-index reads; then implement the hard selection and exposure rules, add permanent regression fixtures, validate the source head, and prove the behavior only inside the isolated Innovation Cycle. After acceptance, port and deploy the proven code to Main, verify release identity without invoking Main, then close the job.
 
-Latest operational note: repository content search requires an exact known file path. The attempted directory-prefix search failed without mutation; prevention is to enumerate repository paths first and search only verified files.
+Latest operational notes:
+
+- Repository content search requires an exact known file path. The attempted directory-prefix search failed without mutation; prevention is to enumerate repository paths first and search only verified files.
+- Final-head regression validation exposed an allocation feasibility defect: quotas counted a family whose semantic exposure blocked every requested slot, producing `hardened_allocation_target_mismatch`. Root cause was quota calculation before horizon-feasibility exclusion. Repair excludes horizon-ineligible semantic families before target construction; the regression remains permanent.
 
 ## Deferred Work — INACTIVE
 

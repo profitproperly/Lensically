@@ -800,8 +800,14 @@ export function selectSourceFamilyLineup(input: {
     if (!candidate.source_card_family_id) return "source_family_missing";
     if (candidate.lifetime_label === "disproven") return "lifetime_disproven";
     if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
-    if (finiteNumber(candidate.published_uses_72h) > 0) return "source_published_within_72h";
+        if (finiteNumber(candidate.published_uses_72h) > 0) return "source_published_within_72h";
     if (finiteNumber(candidate.future_scheduled_uses) > 0) return "source_already_future_scheduled";
+    const semanticExposureTimes = Array.isArray(candidate.semantic_exposure_times)
+      ? candidate.semantic_exposure_times
+      : [];
+    if (input.slot_keys.length > 0 && semanticExposureTimes.length > 0 && input.slot_keys.every((slotKey) =>
+      semanticExposureTimes.some((value) => slotDistanceHours(slotKey, value) < 24)
+    )) return "semantic_exposure_blocks_horizon";
     return null;
   };
   const exclusions = input.candidates
