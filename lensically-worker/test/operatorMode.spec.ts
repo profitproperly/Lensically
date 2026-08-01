@@ -375,7 +375,7 @@ async function prepareManifestSourceBackedCycleForTest(
   }>("prepare_manifest_autonomous_cycle", {
     brand_key: "manifest_mental",
     timezone: "America/New_York",
-    horizon_hours: 48,
+        horizon_hours: 1,
     operation_id: `test-source-backed-prepare-${crypto.randomUUID()}`,
     proceed_confirmed: true,
   });
