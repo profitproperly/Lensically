@@ -9,7 +9,6 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 type QueryMethod = "first" | "all";
-
 type QueryHandler = (input: {
   sql: string;
   bindings: unknown[];
@@ -38,14 +37,75 @@ function createDb(handler: QueryHandler): D1Database {
   } as unknown as D1Database;
 }
 
+function championRow(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    id: "manifest-main-v1.0.0",
+    semantic_version: "v1.0.0",
+    source_sha: "ec52201",
+    selector_version: "source-selection-engine-v6",
+    preselection_policy_version: "source-preselection-policy-v1",
+    component_versions_json: "{\"mcp\":\"1.41.0\"}",
+    promoted_from_innovation_run_id: "shadow-promoted",
+    promotion_classification: "baseline",
+    promoted_at: "2026-08-01T16:37:15Z",
+    updated_at: "2026-08-01T16:37:15Z",
+    ...overrides,
+  };
+}
+
+function promotionRow(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    id: "promotion-1",
+    previous_version: null,
+    promoted_version: "v1.0.0",
+    classification: "baseline",
+    innovation_run_id: "shadow-promoted",
+    tested_sha: "ec52201",
+    promoted_at: "2026-08-01T16:37:15Z",
+    ...overrides,
+  };
+}
+
+function shadowRun(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    run_id: "shadow-promoted",
+    id: "shadow-promoted",
+    status: "completed",
+    variant_key: "challenger",
+    code_sha: "ec52201",
+    snapshot_hash: "snapshot-1",
+    started_at: "2026-08-01T16:29:58Z",
+    completed_at: "2026-08-01T16:37:15Z",
+    created_at: "2026-08-01T16:29:58Z",
+    sort_at: "2026-08-01T16:37:15Z",
+    benchmark_passed: 1,
+    counts_json: "{\"accepted\":24,\"target\":24,\"gates_executed\":288,\"lineage_verified\":24}",
+    timings_json: "{\"total_wall_clock_ms\":1000}",
+    production_noninterference_passed: 1,
+    threads_mutation_count: 0,
+    cleanup_orphan_count: 0,
+    ...overrides,
+  };
+}
+
+function createMainStateDb(promotions: JsonRecord[] = [promotionRow()]): D1Database {
+  return createDb(({ sql, method }) => {
+    if (method === "first" && sql.includes("FROM manifest_cycle_champions")) return championRow();
+    if (method === "all" && sql.includes("FROM manifest_cycle_promotion_history")) return promotions;
+    return method === "all" ? [] : null;
+  });
+}
+
+function createShadowStateDb(run: JsonRecord | null): D1Database {
+  return createDb(({ sql, method }) => {
+    if (method === "first" && sql.includes("FROM manifest_shadow_runs")) return run;
+    return method === "all" ? [] : null;
+  });
+}
+
 describe("cycleObservabilityService", () => {
   it("parses and increments the canonical Main semantic version", () => {
-    expect(parseMainCycleSemanticVersion("v1.2.3")).toEqual({
-      major: 1,
-      minor: 2,
-      patch: 3,
-      text: "v1.2.3",
-    });
+    expect(parseMainCycleSemanticVersion("v1.2.3")).toEqual({ major: 1, minor: 2, patch: 3, text: "v1.2.3" });
     expect(incrementMainCycleSemanticVersion("v1.2.3", "patch")).toBe("v1.2.4");
     expect(incrementMainCycleSemanticVersion("v1.2.3", "minor")).toBe("v1.3.0");
     expect(incrementMainCycleSemanticVersion("v1.2.3", "major")).toBe("v2.0.0");
@@ -75,67 +135,20 @@ describe("cycleObservabilityService", () => {
     })).toThrow("manifest_cycle_rail_state_pair_invalid");
   });
 
-  it("returns the seeded Main Champion and Standby Innovation relationship", async () => {
-    const db = createDb(({ sql, method }) => {
-      if (method === "first" && sql.includes("FROM manifest_cycle_rail_state")) {
-        return {
-          brand_key: "manifest_mental",
-          main_state: "current_champion",
-          innovation_state: "standby",
-          current_champion_id: "manifest-main-v1.0.0",
-          active_innovation_run_id: null,
-          state_contract_version: "manifest-cycle-rail-state-v1",
-          rail_updated_at: "2026-08-01T17:00:00Z",
-          semantic_version: "v1.0.0",
-          source_sha: "ec52201",
-          selector_version: "source-selection-engine-v6",
-          preselection_policy_version: "source-preselection-policy-v1",
-          component_versions_json: "{\"mcp\":\"1.41.0\"}",
-          promoted_from_innovation_run_id: "shadow-promoted",
-          promotion_classification: "baseline",
-          promoted_at: "2026-08-01T16:37:15Z",
-        };
-      }
-      if (method === "first" && sql.includes("FROM manifest_cycle_innovation_runs")) {
-        return {
-          run_id: "shadow-promoted",
-          state: "promoted",
-          tested_sha: "ec52201",
-          promotion_destination_version: "v1.0.0",
-          passed: 1,
-          promotion_eligible: 1,
-        };
-      }
-      if (method === "all" && sql.includes("FROM manifest_cycle_promotion_history")) {
-        return [{
-          id: "promotion-1",
-          previous_version: null,
-          promoted_version: "v1.0.0",
-          classification: "baseline",
-          innovation_run_id: "shadow-promoted",
-          tested_sha: "ec52201",
-          promoted_at: "2026-08-01T16:37:15Z",
-        }];
-      }
-      return method === "all" ? [] : null;
-    });
-
+  it("derives Current Champion and Standby from a promoted isolated run", async () => {
     const result = await readCycleObservability({
-      db,
+      db: createMainStateDb(),
+      shadowDb: createShadowStateDb(shadowRun()),
       brandKey: "manifest_mental",
       action: "state",
     });
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
-      success: true,
-      main: {
-        state: "current_champion",
-        display_state: "Current Champion",
-        semantic_version: "v1.0.0",
-      },
+      main: { state: "current_champion", display_state: "Current Champion", semantic_version: "v1.0.0" },
       innovation: {
         state: "standby",
         display_state: "Standby",
+        active_run: null,
         latest_run: {
           run_id: "shadow-promoted",
           state: "promoted",
@@ -145,7 +158,73 @@ describe("cycleObservabilityService", () => {
     });
   });
 
-  it("bounds Main history to ten rows and returns an opaque next cursor", async () => {
+  it("derives Behind Challenger and Current Challenger while the latest isolated run is active", async () => {
+    const result = await readCycleObservability({
+      db: createMainStateDb([]),
+      shadowDb: createShadowStateDb(shadowRun({
+        run_id: "shadow-active",
+        id: "shadow-active",
+        status: "running",
+        completed_at: null,
+        benchmark_passed: null,
+      })),
+      brandKey: "manifest_mental",
+      action: "state",
+    });
+    expect(result.body).toMatchObject({
+      main: { state: "incumbent_behind_challenger", display_state: "Incumbent — Behind Challenger" },
+      innovation: {
+        state: "current_challenger",
+        display_state: "Current Challenger",
+        active_run: { run_id: "shadow-active", state: "current_challenger" },
+      },
+    });
+  });
+
+  it("derives Awaiting Promotion and Champion Candidate for the latest unpromoted passing run", async () => {
+    const result = await readCycleObservability({
+      db: createMainStateDb([]),
+      shadowDb: createShadowStateDb(shadowRun({
+        run_id: "shadow-candidate",
+        id: "shadow-candidate",
+      })),
+      brandKey: "manifest_mental",
+      action: "state",
+    });
+    expect(result.body).toMatchObject({
+      main: { state: "incumbent_awaiting_promotion", display_state: "Incumbent — Awaiting Promotion" },
+      innovation: {
+        state: "champion_candidate",
+        display_state: "Champion Candidate",
+        active_run: { run_id: "shadow-candidate", state: "champion_candidate", promotion_eligible: true },
+      },
+    });
+  });
+
+  it("keeps Main Champion current when the latest isolated run fails", async () => {
+    const result = await readCycleObservability({
+      db: createMainStateDb([]),
+      shadowDb: createShadowStateDb(shadowRun({
+        run_id: "shadow-failed",
+        id: "shadow-failed",
+        status: "failed",
+        benchmark_passed: 0,
+        failed_rule: "gate_failed",
+      })),
+      brandKey: "manifest_mental",
+      action: "state",
+    });
+    expect(result.body).toMatchObject({
+      main: { state: "current_champion" },
+      innovation: {
+        state: "standby",
+        active_run: null,
+        latest_run: { run_id: "shadow-failed", state: "failed", failed_rule: "gate_failed" },
+      },
+    });
+  });
+
+  it("bounds Main history to ten rows and returns an opaque cursor", async () => {
     const rows = Array.from({ length: 11 }, (_, index) => ({
       id: `cycle-${String(20 - index).padStart(2, "0")}`,
       operation_id: `operation-${index}`,
@@ -173,6 +252,46 @@ describe("cycleObservabilityService", () => {
     expect(result.body.page_size).toBe(10);
     expect(result.body.has_more).toBe(true);
     expect(typeof result.body.next_cursor).toBe("string");
+  });
+
+  it("keeps Innovation history in SHADOW_DB and enriches promotion only from Main history", async () => {
+    const mainQueries: string[] = [];
+    const shadowQueries: string[] = [];
+    const mainDb = createDb(({ sql, method }) => {
+      mainQueries.push(sql);
+      if (method === "all" && sql.includes("FROM manifest_cycle_promotion_history")) {
+        return [promotionRow({ innovation_run_id: "shadow-1" })];
+      }
+      if (method === "first" && sql.includes("FROM manifest_cycle_champions")) return championRow();
+      return method === "all" ? [] : null;
+    });
+    const shadowDb = createDb(({ sql, method }) => {
+      shadowQueries.push(sql);
+      if (method === "all" && sql.includes("FROM manifest_shadow_runs")) {
+        return [shadowRun({ id: "shadow-1", run_id: "shadow-1" })];
+      }
+      return method === "all" ? [] : null;
+    });
+
+    const result = await readCycleObservability({
+      db: mainDb,
+      shadowDb,
+      brandKey: "manifest_mental",
+      action: "history",
+      rail: "innovation",
+    });
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      rows: [{
+        id: "shadow-1",
+        status: "promoted",
+        display_state: "Promoted to Main v1.0.0",
+        promotion_destination_version: "v1.0.0",
+      }],
+    });
+    expect(mainQueries.some((sql) => sql.includes("manifest_shadow_"))).toBe(false);
+    expect(shadowQueries.some((sql) => sql.includes("manifest_cycle_"))).toBe(false);
+    expect(mainQueries.some((sql) => sql.includes("manifest_cycle_innovation_runs"))).toBe(false);
   });
 
   it("returns six compact source rows first and exact persisted detail on demand", async () => {
@@ -239,34 +358,27 @@ describe("cycleObservabilityService", () => {
         persisted_reason: "Persisted selector reason",
         audition_state: "probation",
         allocation_tier: "exploration",
-        score_factors: {
-          exploration_bonus: 0.5,
-        },
+        score_factors: { exploration_bonus: 0.5 },
         exposure_checks: {
           future_scheduled_uses: 0,
           semantic_overlap_count: 0,
           cooldown_hours: 72,
         },
-        persisted_receipt: {
-          available: true,
-        },
+        persisted_receipt: { available: true },
       },
     });
   });
 
   it("labels oversized Innovation snapshots unavailable instead of loading them", async () => {
-    const db = createDb(({ sql, method }) => {
+    const shadowDb = createDb(({ sql, method }) => {
       if (method === "first" && sql.includes("FROM manifest_shadow_snapshots")) {
-        return {
-          payload_json: "{}",
-          payload_bytes: 900_000,
-        };
+        return { payload_json: "{}", payload_bytes: 900_000 };
       }
       return method === "all" ? [] : null;
     });
-        const result = await readCycleObservability({
-      db,
-      shadowDb: db,
+    const result = await readCycleObservability({
+      db: createDb(() => null),
+      shadowDb,
       brandKey: "manifest_mental",
       action: "selections",
       rail: "innovation",
@@ -281,80 +393,36 @@ describe("cycleObservabilityService", () => {
     });
   });
 
-    it("keeps Innovation evidence in SHADOW_DB and promotion state in Main DB", async () => {
-    const mainQueries: string[] = [];
-    const shadowQueries: string[] = [];
-    const mainDb = createDb(({ sql, method }) => {
-      mainQueries.push(sql);
-      if (method === "all" && sql.includes("FROM manifest_cycle_innovation_runs")) {
-        return [{
-          run_id: "shadow-1",
-          state: "promoted",
-          promotion_destination_version: "v1.0.0",
-          promotion_eligible: 1,
-        }];
-      }
-      return method === "all" ? [] : null;
-    });
-    const shadowDb = createDb(({ sql, method }) => {
-      shadowQueries.push(sql);
-      if (method === "all" && sql.includes("FROM manifest_shadow_runs")) {
-        return [{
-          id: "shadow-1",
-          status: "completed",
-          variant_key: "challenger",
-          code_sha: "exact-sha",
-          snapshot_hash: "snapshot-1",
-          sort_at: "2026-08-01T16:37:15Z",
-          counts_json: "{\"accepted\":24,\"target\":24}",
-          timings_json: "{\"total_wall_clock_ms\":1000}",
-          benchmark_passed: 1,
-          production_noninterference_passed: 1,
-        }];
-      }
-      return method === "all" ? [] : null;
-    });
-
-    const result = await readCycleObservability({
-      db: mainDb,
-      shadowDb,
-      brandKey: "manifest_mental",
-      action: "history",
-      rail: "innovation",
-    });
-    expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({
-      rows: [{
-        id: "shadow-1",
-        status: "promoted",
-        display_state: "Promoted to Main v1.0.0",
-        promotion_destination_version: "v1.0.0",
-      }],
-    });
-    expect(mainQueries.some((sql) => sql.includes("manifest_shadow_"))).toBe(false);
-    expect(shadowQueries.some((sql) => sql.includes("manifest_cycle_innovation_runs"))).toBe(false);
-  });
-
-  it("fails closed when the isolated Innovation binding is unavailable", async () => {
+  it("fails closed when isolated Innovation evidence is unavailable", async () => {
     const db = createDb(() => null);
-    const result = await readCycleObservability({
+    const history = await readCycleObservability({
       db,
       brandKey: "manifest_mental",
       action: "history",
       rail: "innovation",
     });
-    expect(result).toMatchObject({
+    const state = await readCycleObservability({
+      db,
+      brandKey: "manifest_mental",
+      action: "state",
+    });
+    expect(history).toMatchObject({
+      status: 503,
+      body: { error: "innovation_cycle_database_unavailable" },
+    });
+    expect(state).toMatchObject({
       status: 503,
       body: { error: "innovation_cycle_database_unavailable" },
     });
   });
 
-  it("fails closed while the migration schema is unavailable", async () => {
-    const db = createDb(() => {
-      throw new Error("D1_ERROR: no such table: manifest_cycle_rail_state");
+  it("fails closed while the Champion registry migration is unavailable", async () => {
+    const mainDb = createDb(() => {
+      throw new Error("D1_ERROR: no such table: manifest_cycle_champions");
     });
     const result = await readCycleObservability({
-      db,
+      db: mainDb,
+      shadowDb: createShadowStateDb(null),
       brandKey: "manifest_mental",
       action: "state",
     });
