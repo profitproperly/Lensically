@@ -9972,8 +9972,9 @@ async function applyManifestContentFocusToPool(
       ...candidate,
       focus_observed: Number(candidate.lifetime_sample_size ?? 0) > 0,
       focus_family_id: candidate.source_card_family_id ?? null,
-      focus_status: focusStatus,
-      focus_weight: focusStatus === "retire" ? 0 : 1,
+            focus_status: focusStatus,
+      focus_weight: focusStatus === "hold" ? 0 : 1,
+
       autonomous_role: lifetimeLabel,
       autonomous_recommended_role: lifetimeLabel,
       actual_decay: candidate.recent_label === "cooling" || candidate.recent_label === "cold",

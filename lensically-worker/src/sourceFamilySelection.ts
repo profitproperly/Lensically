@@ -1016,11 +1016,15 @@ export function selectSourceFamilyLineup(input: {
       && reservation.slot_keys.length === 0
     );
     const activeReservation = genericReservation ?? null;
-    const pendingReservedCandidateKeys = new Set(reservations
-      .filter((reservation) => !fulfilledReservations.has(reservation.reservation_key))
-      .map((reservation) => reservationCandidate.get(reservation.reservation_key))
-      .filter((candidate): candidate is SourceSelectionCandidate => Boolean(candidate))
-      .map((candidate) => String(candidate.source_identity_key)));
+        const pendingReservedCandidateKeys = new Set<string>();
+    for (const reservation of reservations) {
+      if (fulfilledReservations.has(reservation.reservation_key)) continue;
+      const reservedCandidate = reservationCandidate.get(reservation.reservation_key);
+      if (reservedCandidate?.source_identity_key) {
+        pendingReservedCandidateKeys.add(String(reservedCandidate.source_identity_key));
+      }
+    }
+
     const slotEligible = active.filter((candidate) => {
 
       const identity = String(candidate.source_identity_key);
