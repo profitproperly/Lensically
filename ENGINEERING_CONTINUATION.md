@@ -1,18 +1,18 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-01
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-preserved-functions-contract-20260801
+active_checkpoint: validate-release-verify-and-resume-cycle
 validated_source_head: 5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae
 documentation_source_head: e830e6796bc36fda4366e31391bbe39bfaeb1cfc
-production_sha: 5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+production_sha: 06a495ad13f8816d87a3076d285a1a64621984d9
+active_interrupt_id: manifest-preserved-functions-contract-20260801
+active_interrupt_state: open
+active_interrupt_precedence: P1
 
 
 
@@ -20,6 +20,14 @@ active_interrupt_precedence: none
 
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
+
+## ACTIVE Interrupt — manifest-preserved-functions-contract-20260801
+
+- Severity: P1, blocking the live Manifest Main Cycle `3acfd16d-365d-44c4-8ce6-b263db90cd6f` before any candidate was accepted.
+- Observed live on SHA `06a495ad13f8816d87a3076d285a1a64621984d9`: two source-faithful candidates failed because the public `preserved_functions` schema did not disclose that the deterministic gate requires the source card's exact `must_preserve_function` statements rather than semantic evidence.
+- Root cause: the source-fidelity gate intentionally performs exact normalized requirement matching, but the typed public schema exposed only an undescribed string array. This made a valid client call structurally incapable of predicting the enforced contract.
+- Required repair: advertise exact-statement replay in the single-post schema inherited by batch persistence, pin the contract with a direct registry regression, validate, release the exact SHA, verify the live tool definition, then retry only the two rejected slots with new operation IDs and the unchanged source-backed text.
+- Side effects: zero candidates accepted, zero schedule rows created, zero coverage reconciliation performed.
 
 ## Resolved Interrupt — paired-shadow-seed-sqlite-toobig-20260801
 

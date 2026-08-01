@@ -55,7 +55,11 @@ const OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS: OperatorMcpToolDefinition[] 
             strategic_purpose: { type: "string" },
             recommended_direction: { type: "string" },
             intentionally_different_from_prior: { type: "string" },
-            preserved_functions: { type: "array", items: { type: "string" } },
+                        preserved_functions: {
+              type: "array",
+              items: { type: "string" },
+              description: "Copy the exact must_preserve_function requirement statements returned by the locked lineup or canonical source card. Semantic paraphrases do not satisfy the deterministic source-fidelity gate.",
+            },
             transformed_elements: { type: "array", items: { type: "string" } },
             satisfied_time_or_context_requirements: {
               type: "array",

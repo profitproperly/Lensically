@@ -64,7 +64,9 @@ describe("Operator MCP autonomous execution registry", () => {
       "source_context",
       "hypothesis",
     ]);
-    expect(post.properties.source_context.required).toEqual(["kind", "source_card_id"]);
+        expect(post.properties.source_context.required).toEqual(["kind", "source_card_id"]);
+    expect(post.properties.preserved_functions.description).toContain("exact must_preserve_function requirement statements");
+    expect(post.properties.preserved_functions.description).toContain("Semantic paraphrases do not satisfy");
     expect(post.properties.hypothesis.description).toContain("Follower attribution is forbidden");
     expect(post.properties.hypothesis.properties.experiment.properties.maturity_windows.items.enum).toEqual([6, 12, 18, 24]);
   });
