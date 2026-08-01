@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-01
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: cycles-observability-and-champion-registry-ui
-active_checkpoint: exact-sha-release-and-live-verification
-validated_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
-documentation_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
-production_sha: ec52201fab48e0a00926c8e7319b90e0a925a584
+active_job_id: null
+active_checkpoint: null
+validated_source_head: 5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae
+documentation_source_head: e830e6796bc36fda4366e31391bbe39bfaeb1cfc
+production_sha: 5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -41,9 +41,34 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### ACTIVE — Cycles Observability and Champion Registry UI
+### COMPLETED — Cycles Observability and Champion Registry UI
 
 job_id: `cycles-observability-and-champion-registry-ui`
+
+Completion evidence:
+
+- Exact deployed source SHA `5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae` adds one `Cycles` sidebar destination beneath Dashboard, opens Main by default, and provides one in-page `Main | Innovation` switch with no dropdown, nested navigation, or Compare surface.
+- Main Cycle semantic versioning is durable and seeded at `v1.0.0`. The version record remains bound to the accepted decision-behavior Champion SHA `ec52201fab48e0a00926c8e7319b90e0a925a584`, selector `source-selection-engine-v6`, and preselection policy `source-preselection-policy-v1`; the observability release does not falsely advance behavioral version identity.
+- Main DB stores only released Champion identity and immutable promotion history. Active Innovation truth remains physically isolated in `SHADOW_DB`; the read model derives Current Champion/Standby, Behind Challenger/Current Challenger, and Awaiting Promotion/Champion Candidate without any Innovation write to Main.
+- Five read-only `/api/cycles/*` surfaces provide paired state, cursor-paginated Main/Innovation history, bounded cycle summaries, compact source-selection rows, and exact persisted Stage 4 detail by slot. History is capped at ten rows, source audits begin with six rows, and full receipt detail is loaded only when expanded.
+- The source audit displays persisted source/family identity, audition state, allocation tier, score factors, exposure checks, policy identity/hash, causal signals, exclusions, exact source text, and receipt reference. It never recalculates selection or invents explanations; unsupported legacy fields are explicitly unavailable.
+- Database migrations `0023_cycle_observability_champion_registry.sql` and `0024_register_main_cycle_v1.sql` were planned, applied, and verified through the protected release lane. Schema and small-data registration remain separated by release policy.
+- Exact source validation passed typecheck run `30711806364` and full push-validation run `30711782117`. Documentation-reconciled validation passed typecheck run `30711968600` and all eight Operator shards in run `30711976859`. The permanent Cycles production-verification guard passed full push-validation run `30712149631`.
+- Exact-SHA release run `30712049858` restored the validated web artifact, applied and verified both migrations, deployed the Worker and web product, provisioned the isolated Shadow binding, and passed production runtime, scheduler, website, and legacy-surface verification.
+- Final read-only live-verification release run `30712256441` passed the new mandatory Cycles acceptance checks: `/api/cycles/state` reported Main `v1.0.0` as `current_champion`, Innovation as `standby`, no active challenger, and the latest accepted run as promoted to Main `v1.0.0`; `/cycles` exposed the operational-history and `Why these sources` audit shell.
+- Live MCP verification reports source SHA `5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae`, MCP `1.41.0`, and 80 advertised/live tools. Live scheduler verification reports enabled, healthy, operational, publishing enabled, normal mode, fresh alarm and Cron heartbeats, zero overdue posts, zero quarantined posts, and no error.
+- No Main Cycle preparation, dry run, test, canary, scheduling, publishing, or account execution occurred. The only Main persistence change was the release-time semantic Champion and promotion-history registration; Innovation lifecycle and evidence never contaminated Main operational data.
+
+Failure and prevention record:
+
+- A guessed frontend route omitted the existing `(internal)` route group. The read failed without mutation; repository file enumeration established the canonical path, and later work used exact listed paths rather than repeating blind route guesses.
+- Direct creation of nontrivial source and migration files hit the repository payload guard. No mutation occurred; all large writes moved to the enforced chunked write session path.
+- The first static UI contract test contained an accidental impossible sentinel. It was removed before release, replaced with real endpoint/navigation/disclosure assertions, and made mandatory in both standard and Cloudflare web prebuilds.
+- The first migration mixed DDL and seed data and was blocked by `schema_migration_contains_data_mutation`. Schema creation moved to migration `0023`, idempotent Champion registration moved to explicit small-data migration `0024`, and the existing migration release gate permanently enforces the separation.
+- One multi-replacement patch matched two query builders and was rejected atomically. The replacement was narrowed to exact function context; no ambiguous mutation was committed.
+- The initial state design duplicated active Innovation state into Main DB and assumed unsupported cross-database joins. Review stopped release, removed both duplicate active-state tables, retained only released Champion/promotion history in Main, routed shadow evidence exclusively through `SHADOW_DB`, and added regressions proving neither store queries the other store’s tables.
+- Derived-state TypeScript narrowing exposed one redundant benchmark comparison. The exact-head typecheck blocked release; the redundant comparison was removed without behavior change and exact-head validation passed.
+- Protected release acceptance now permanently verifies the Cycles API’s exact paired state and the deployed Cycles source-audit page before any future release may pass.
 
 Owner objective:
 
@@ -137,11 +162,7 @@ Definition of done:
 - Legacy gaps are labeled unavailable rather than guessed.
 - Exact-SHA release and read-only live verification pass with zero Main Cycle invocation and zero operational data contamination.
 
-## Current Action
 
-- Exact-head typecheck run `30711806364` and full push-validation run `30711782117` passed on source SHA `5c6cbfd70cbb8b5fbdaee414666267edbb7c33ae` before documentation reconciliation.
-- Run final exact-head validation after this canonical architecture update, release the exact accepted Worker and validated web artifact, and verify the Cycles page/APIs, paired state, scheduler health, and production identity read-only.
-- Preserve the non-negotiable boundary: no Main Cycle preparation, execution, scheduling, publishing, or operational-data mutation during this work.
 
 ### COMPLETED — Manifest Family Audition and Preselection Authority
 
