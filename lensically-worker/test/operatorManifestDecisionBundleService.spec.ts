@@ -169,7 +169,16 @@ describe("operatorManifestDecisionBundleService", () => {
         `identity-${index}`,
         `family-${index}`,
         `card-${index}`,
-        JSON.stringify({ lifetime_label: "proven", recent_label: "stable", score: 1.5 }),
+                JSON.stringify({
+          lifetime_label: "proven",
+          audition_state: "graduated",
+          recent_label: "stable",
+          score: 1.5,
+          preselection_policy_version: "source-preselection-policy-v1",
+          preselection_policy_hash: "policy-hash-1",
+          preselection_signals: [{ signal_type: "strongest_evidence", signal_key: "post-1", effect: "weight" }],
+        }),
+
       )),
     ]);
 
@@ -179,9 +188,24 @@ describe("operatorManifestDecisionBundleService", () => {
     expect(bundle.locked_source_plan).toHaveLength(48);
     expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.slot_key))
       .toEqual(missingSlots.map((slot) => slot.key));
-    expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.source_card_id))
+        expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.source_card_id))
       .toEqual(Array.from({ length: 48 }, (_, index) => `card-${index}`));
+    expect(bundle.locked_source_plan[0]).toEqual(expect.objectContaining({
+      audition_state: "graduated",
+      preselection_policy_hash: "policy-hash-1",
+      preselection_signals: expect.arrayContaining([expect.objectContaining({ signal_type: "strongest_evidence" })]),
+    }));
+    expect(bundle.stage_authority).toEqual(expect.objectContaining({
+      stage_5: "generation_and_audit_context_only",
+      stage_5_may_rerank: false,
+      stage_5_may_substitute_sources: false,
+      stage_5_may_change_slots: false,
+    }));
+    const replayed = await buildManifestDecisionBundle(env.DB, { brandKey, cycleId, snapshotId });
+    expect((replayed.bundle as Record<string, any>).locked_source_plan_hash).toBe(bundle.locked_source_plan_hash);
+    expect((replayed.bundle as Record<string, any>).locked_source_plan).toEqual(bundle.locked_source_plan);
     expect(built.requires_detail_read).toBe(true);
+
     expect(String(built.detail_reason)).toContain("bundle_size_compaction_level_");
   });
 });

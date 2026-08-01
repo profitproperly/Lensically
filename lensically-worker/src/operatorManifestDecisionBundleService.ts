@@ -256,12 +256,20 @@ export async function buildManifestDecisionBundle(
       source_card_family_id: row.source_card_family_id,
       source_card_id: row.source_card_id,
       engine_version: row.engine_version,
-      lifetime_label: receipt.lifetime_label ?? null,
+            lifetime_label: receipt.lifetime_label ?? null,
+      audition_state: receipt.audition_state ?? null,
       recent_label: receipt.recent_label ?? null,
       score: receipt.score ?? null,
       cooldown_relaxation: receipt.cooldown_relaxation ?? null,
+      preselection_policy_version: receipt.preselection_policy_version ?? null,
+      preselection_policy_hash: receipt.preselection_policy_hash ?? null,
+      preselection_score_multiplier: receipt.preselection_score_multiplier ?? 1,
+      preselection_score_addend: receipt.preselection_score_addend ?? 0,
+      preselection_signals: receipt.preselection_signals ?? [],
+      experiment_reservation_key: receipt.experiment_reservation_key ?? null,
     };
   });
+  const lockedSourcePlanHash = await sha256(lockedSourcePlan);
 
   const activeExperiments = (experimentRows.results ?? []).map((row) => ({
     id: row.id,
@@ -323,8 +331,17 @@ export async function buildManifestDecisionBundle(
       account_position: parseJson(cycle.account_position_json, {}),
       authoritative_missing_slots: records(parseJson(cycle.missing_slots_json, [])),
     },
-    locked_source_plan: lockedSourcePlan,
+        locked_source_plan: lockedSourcePlan,
+    locked_source_plan_hash: lockedSourcePlanHash,
+    stage_authority: {
+      stage_4: "selection_exclusion_reservation_weighting_ranking_and_source_to_slot_lock",
+      stage_5: "generation_and_audit_context_only",
+      stage_5_may_rerank: false,
+      stage_5_may_substitute_sources: false,
+      stage_5_may_change_slots: false,
+    },
     active_experiments: activeExperiments,
+
     unresolved_evidence_gaps: unresolvedEvidenceGaps,
     hard_bans: (hardBanRows.results ?? []).map((row) => ({
       rule_key: row.rule_key,
@@ -338,8 +355,12 @@ export async function buildManifestDecisionBundle(
       primary_metric: "24_hour_likes",
       source_backed_generation_only: true,
       original_model_sources_forbidden: true,
-      exact_locked_plan_required: true,
+            exact_locked_plan_required: true,
+      stage_4_locked_source_plan_hash: lockedSourcePlanHash,
+      stage_5_generation_and_audit_only: true,
+      stage_5_source_or_slot_mutation_forbidden: true,
       deterministic_hard_bans_server_owned: true,
+
       deterministic_duplicate_and_slot_checks_server_owned: true,
       model_judgment_retained: [
         "account strategy",
