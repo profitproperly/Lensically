@@ -216,10 +216,10 @@ type SameSnapshotPairSeed = {
   scenario: string;
   horizon_hours: number;
   requested_missing_count: number;
-  frozen_seed_id: string;
+    frozen_seed_id: string;
   snapshot_hash: string;
-  exported_snapshot_shell: JsonRecord;
   slot_plan: { targetSlots: ManifestShadowSlot[]; occupiedSlotKeys: string[] };
+
   exported_snapshot: ManifestDecisionSnapshot;
 };
 
@@ -275,16 +275,20 @@ async function loadSameSnapshotControlSeed(
     if (String(seed.scenario ?? "") !== input.scenario) continue;
     if (Number(seed.horizon_hours ?? -1) !== input.horizonHours) continue;
     if (Number(seed.requested_missing_count ?? -1) !== input.requestedMissingCount) continue;
-        const frozenSeed = await readManifestShadowFrozenSeed(db, input.brandKey);
+            let frozenSeed: JsonRecord | null = null;
+    try {
+      frozenSeed = await readManifestShadowFrozenSeed(db, input.brandKey);
+    } catch {
+      continue;
+    }
     if (!frozenSeed) continue;
+
     if (String(frozenSeed.id ?? "") !== String(seed.frozen_seed_id ?? "")) continue;
     if (String(frozenSeed.snapshot_hash ?? "") !== String(seed.snapshot_hash ?? "")) continue;
-    const exportedSnapshot = {
-      ...record(seed.exported_snapshot_shell),
-      source_candidates: records(frozenSeed.source_candidates),
-      evidence: record(frozenSeed.evidence),
-    } as unknown as ManifestDecisionSnapshot;
+        const exportedSnapshot = readManifestDecisionSnapshotFromShadowEvidence(frozenSeed.evidence);
+    if (!exportedSnapshot) continue;
     if (exportedSnapshot.snapshot_hash !== String(seed.snapshot_hash ?? "")) continue;
+
     const slotPlan = record(seed.slot_plan);
 
     const targetSlots = records(slotPlan.targetSlots) as unknown as ManifestShadowSlot[];
@@ -300,10 +304,10 @@ async function loadSameSnapshotControlSeed(
       scenario: input.scenario,
       horizon_hours: input.horizonHours,
       requested_missing_count: input.requestedMissingCount,
-      frozen_seed_id: String(seed.frozen_seed_id),
+            frozen_seed_id: String(seed.frozen_seed_id),
       snapshot_hash: String(seed.snapshot_hash),
-      exported_snapshot_shell: record(seed.exported_snapshot_shell),
       exported_snapshot: exportedSnapshot,
+
       slot_plan: { targetSlots, occupiedSlotKeys },
 
     };
@@ -1688,10 +1692,10 @@ async function prepareShadowCycle(
           scenario,
           horizon_hours: horizonHours,
           requested_missing_count: requestedMissingCount,
-          frozen_seed_id: String(frozenSeed.id),
+                    frozen_seed_id: String(frozenSeed.id),
           snapshot_hash: exportedSnapshot.snapshot_hash,
-          exported_snapshot_shell: runtimeDecisionSnapshotForPersistence(exportedSnapshot),
           slot_plan: slotPlan,
+
         }
       : null;
 
