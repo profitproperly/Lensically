@@ -915,8 +915,13 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(await verifyManifestShadowOrphans(env.DB)).toBe(0);
   });
 
-  it("runs same-snapshot A/B variants sequentially with identical frozen snapshot hashes", async () => {
-    const firstHarness = dependencyHarness();
+    it("runs live-sized same-snapshot A/B variants through bounded chunks with identical hashes", async () => {
+    const largeCandidates = candidates().map((candidate, index) => ({
+      ...candidate,
+      live_sized_payload: `${index}:`.padEnd(12_000, "x"),
+    }));
+    const firstHarness = dependencyHarness(new Date("2026-07-31T22:00:00.000Z"), largeCandidates);
+
     const first = await prepareRun({
       deps: firstHarness.deps,
       suffix: "ab-control",
@@ -924,10 +929,19 @@ describe("operatorManifestShadowRuntimeService", () => {
       missingCount: 1,
       variantKey: "control",
     });
-    const firstReceipt = await completePrepared(firstHarness.deps, first.body, "ab-control");
+        const firstReceipt = await completePrepared(firstHarness.deps, first.body, "ab-control");
     expect(Number(benchmarkFrom(firstReceipt).raw.passed)).toBe(1);
+    const chunkCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM manifest_shadow_frozen_seed_chunks`,
+    ).first<{ count?: number }>();
+    const snapshotPayload = await env.DB.prepare(
+      `SELECT LENGTH(payload_json) AS byte_count FROM manifest_shadow_snapshots WHERE shadow_run_id = ?`,
+    ).bind(first.body.shadow_run_id).first<{ byte_count?: number }>();
+    expect(Number(chunkCount?.count ?? 0)).toBeGreaterThan(4);
+    expect(Number(snapshotPayload?.byte_count ?? 0)).toBeLessThan(100_000);
 
         const changedEvidence = {
+
       ...evidence(),
       strongest_posts: [{ published_post_id: "changed-live-winner", likes: 999999 }],
       weakest_posts: [{ published_post_id: "changed-live-loser", likes: 0 }],
@@ -952,8 +966,10 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(first.body.decision_bundle_id).not.toBe(second.body.decision_bundle_id);
     expect(record(first.body.decision_bundle).missing_slot_keys).toEqual(record(second.body.decision_bundle).missing_slot_keys);
     expect(record(first.body.decision_bundle).locked_source_lineup).toEqual(record(second.body.decision_bundle).locked_source_lineup);
-    expect(record(record(second.body.decision_bundle).same_snapshot_pair)).toEqual(expect.objectContaining({
+        expect(record(record(second.body.decision_bundle).same_snapshot_pair)).toEqual(expect.objectContaining({
+      contract_version: "manifest-shadow-same-snapshot-pair-v2",
       pair_key: "innovation-test:ab-pair",
+
       control_run_id: first.body.shadow_run_id,
       role: "challenger",
       reused_control_snapshot: true,
@@ -966,7 +982,45 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(secondHarness.audit.evidence_provider_reads).toBe(0);
   });
 
+    it("fails a same-snapshot challenger closed when a persisted control chunk is missing", async () => {
+    const largeCandidates = candidates().map((candidate, index) => ({
+      ...candidate,
+      live_sized_payload: `${index}:`.padEnd(12_000, "y"),
+    }));
+    const controlHarness = dependencyHarness(new Date("2026-07-31T23:00:00.000Z"), largeCandidates);
+    const control = await prepareRun({
+      deps: controlHarness.deps,
+      suffix: "chunk-control",
+      testCase: "same_snapshot_ab",
+      missingCount: 1,
+      variantKey: "control",
+    });
+    await completePrepared(controlHarness.deps, control.body, "chunk-control");
+    const frozenSeed = await env.DB.prepare(
+      `SELECT id FROM manifest_shadow_frozen_seeds WHERE brand_key = 'manifest_mental' LIMIT 1`,
+    ).first<{ id?: string }>();
+    await env.DB.prepare(
+      `DELETE FROM manifest_shadow_frozen_seed_chunks
+        WHERE seed_id = ? AND payload_kind = 'evidence' AND chunk_index = 1`,
+    ).bind(frozenSeed?.id).run();
+
+    const challengerHarness = dependencyHarness(new Date("2026-07-31T23:30:00.000Z"));
+    const challenger = await prepareRun({
+      deps: challengerHarness.deps,
+      suffix: "chunk-challenger",
+      testCase: "same_snapshot_ab",
+      missingCount: 1,
+      variantKey: "challenger",
+    });
+
+    expect(challenger.status).toBe(409);
+    expect(String(challenger.body.error)).toContain("manifest_shadow_same_snapshot_control_missing:innovation-test:chunk-pair");
+    expect(challengerHarness.audit.source_provider_reads).toBe(0);
+    expect(challengerHarness.audit.evidence_provider_reads).toBe(0);
+  });
+
   it("fails a same-snapshot challenger closed when no matching control exists", async () => {
+
     const harness = dependencyHarness(new Date("2026-08-01T00:00:00.000Z"));
     const challenger = await prepareRun({
       deps: harness.deps,
