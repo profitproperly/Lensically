@@ -2,7 +2,7 @@
 -- lensically-migration-owner: release-engineering
 -- lensically-migration-risk: low
 
--- Register the already accepted and deployed Main Cycle Champion without invoking Main.
+-- Register the accepted and deployed Main Champion without invoking Main.
 
 INSERT OR IGNORE INTO manifest_cycle_champions (
   id,
@@ -34,56 +34,6 @@ INSERT OR IGNORE INTO manifest_cycle_champions (
   'baseline',
   'current',
   '2026-08-01T16:37:15.026Z'
-);
-
-INSERT OR IGNORE INTO manifest_cycle_innovation_runs (
-  run_id,
-  brand_key,
-  state,
-  challenged_main_version,
-  tested_sha,
-  snapshot_hash,
-  selector_version,
-  preselection_policy_version,
-  control_or_challenger,
-  passed,
-  promotion_eligible,
-  promotion_destination_version,
-  started_at,
-  completed_at
-) VALUES (
-  'shadow-0471e82a5bb485665cc038a4e73641ee',
-  'manifest_mental',
-  'promoted',
-  NULL,
-  'ec52201fab48e0a00926c8e7319b90e0a925a584',
-  'a3536b1afc2613ca985040cd2b02a140e160f6ae85ff9c0d529d9923c82372b8',
-  'source-selection-engine-v6',
-  'source-preselection-policy-v1',
-  'challenger',
-  1,
-  1,
-  'v1.0.0',
-  '2026-08-01T16:29:58.728Z',
-  '2026-08-01T16:37:15.026Z'
-);
-
-INSERT OR IGNORE INTO manifest_cycle_rail_state (
-  brand_key,
-  main_state,
-  innovation_state,
-  current_champion_id,
-  active_innovation_run_id,
-  challenged_main_version,
-  candidate_version
-) VALUES (
-  'manifest_mental',
-  'current_champion',
-  'standby',
-  'manifest-main-v1.0.0',
-  NULL,
-  NULL,
-  NULL
 );
 
 INSERT OR IGNORE INTO manifest_cycle_promotion_history (
