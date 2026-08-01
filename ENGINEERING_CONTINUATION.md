@@ -1,18 +1,19 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-01
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-family-audition-and-preselection-authority
-active_checkpoint: repair-paired-shadow-seed-storage
-validated_source_head: 58ff3720134c4ad86f7e069876da1c282fa78689
-documentation_source_head: 58ff3720134c4ad86f7e069876da1c282fa78689
-production_sha: 58ff3720134c4ad86f7e069876da1c282fa78689
-active_interrupt_id: paired-shadow-seed-sqlite-toobig-20260801
-active_interrupt_state: repairing
-active_interrupt_precedence: P1 blocks Innovation acceptance until normalized seed storage is deployed and verified
+active_job_id: null
+active_checkpoint: null
+validated_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
+documentation_source_head: ec52201fab48e0a00926c8e7319b90e0a925a584
+production_sha: ec52201fab48e0a00926c8e7319b90e0a925a584
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
+
 
 
 
@@ -20,15 +21,15 @@ active_interrupt_precedence: P1 blocks Innovation acceptance until normalized se
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
-## Active Interrupt — paired-shadow-seed-sqlite-toobig-20260801
+## Resolved Interrupt — paired-shadow-seed-sqlite-toobig-20260801
 
-- Severity: P1.
-- Observed live on exact deployed SHA `58ff3720134c4ad86f7e069876da1c282fa78689` while preparing the fresh `same_snapshot_ab` control.
-- Failure: `D1_ERROR: string or blob too big: SQLITE_TOOBIG`; run `shadow-77d881f189791d1e32b05e9fdf97342c` failed before acceptance.
-- Root cause: the prevention patch attempted to persist the complete production-shaped decision snapshot inside one `manifest_shadow_snapshots.payload_json` value. The live snapshot is too large for the bounded D1 row/value contract.
-- Required repair: normalize the paired seed into bounded durable chunks or existing normalized Shadow tables; persist only a compact manifest/reference in the snapshot row; reconstruct and hash-verify the challenger seed before selection.
-- Permanent prevention: add a large live-shaped regression that exceeds the former single-value size, proves chunked round-trip equality, proves no provider reads by the challenger, and fails closed on missing/incomplete chunks.
-- Resume condition: exact-head tests pass, exact SHA deploys, a fresh control and challenger complete on the same hash/slots/lineup, and the interrupt is closed here.
+- Severity: P1, closed.
+- Observed live on SHA `58ff3720134c4ad86f7e069876da1c282fa78689`: `D1_ERROR: string or blob too big: SQLITE_TOOBIG` while run `shadow-77d881f189791d1e32b05e9fdf97342c` attempted to persist the complete production-shaped decision snapshot inside one `manifest_shadow_snapshots.payload_json` value.
+- Root cause: the paired A/B seed was stored as one unbounded D1 value instead of using the existing bounded frozen-seed chunk contract.
+- Repair: pairing contract `manifest-shadow-same-snapshot-pair-v2` stores source candidates and evidence in verified chunks of at most 48 KB, keeps only a compact seed reference in the snapshot row, reconstructs the challenger from the frozen evidence, verifies seed ID and snapshot hash, and performs zero live-provider reads.
+- Permanent prevention: exact-head regressions use a 288 KB live-shaped candidate payload, prove chunked round-trip equality, prove the compact snapshot row remains bounded, prove a later challenger ignores changed live candidates and evidence, and fail closed with no run when a control or any required chunk is missing.
+- Live closure: fresh control `shadow-6860ced7162b1d7e5bf70c0f4fd72495` and challenger `shadow-0471e82a5bb485665cc038a4e73641ee` completed on the same frozen snapshot, selector seed, slots, policy, and lineup. The failure cannot recur through the paired path without a regression failing first.
+
 
 ## Authority and Precedence
 
@@ -40,11 +41,28 @@ This root file is the sole authority for incomplete Lensically work. D1 work sta
 
 ## Unified Job Queue
 
-### ACTIVE — Manifest Family Audition and Preselection Authority
+### COMPLETED — Manifest Family Audition and Preselection Authority
 
 job_id: `manifest-family-audition-and-preselection-authority`
 
+Completion evidence:
+
+- Exact source SHA `ec52201fab48e0a00926c8e7319b90e0a925a584` implements `source-family-label-policy-v6`, `source-selection-engine-v6`, and versioned Stage 4 policy `source-preselection-policy-v1`.
+- The bounded audition contract is permanent: weak N=1 receives one exploration-only second chance; two failures exclude; a split receives one tiebreaker; exact `0.85` passes; strong N=1 remains immediately recognized; and a graduated family is cut when its later lifetime median falls below `0.85`.
+- `disproven` is no longer generated. Legacy values normalize to `underperforming` at read boundaries without destructive history rewrites.
+- Active experiments, strategy directives, hard bans, and strongest/weakest mature evidence compile before source lock into a deterministic hashable policy that changes exclusion, reservation, tier, weight, or score with durable causal traces.
+- Stage 4 is the sole source-selection authority. Stage 5 receives only generation and audit context and cannot re-rank, release exclusions, substitute a source, change a family, alter a reservation, or move a slot.
+- Exact-head validation passed typecheck run `30708172332`, complete eight-shard Operator run `30708178113`, and full push-validation run `30708168451`, including the 288 KB paired-seed and missing-chunk prevention regressions.
+- Exact-SHA release run `30708220683` deployed `ec52201fab48e0a00926c8e7319b90e0a925a584`. Live MCP verification reports version `1.41.0`, 80 advertised tools, and matching production identity.
+- The direct Cloudflare branch-build check remains a known non-authoritative failure path; the protected exact-SHA `worker-release` check succeeded and is the canonical deployment authority.
+- Innovation control `shadow-6860ced7162b1d7e5bf70c0f4fd72495` and challenger `shadow-0471e82a5bb485665cc038a4e73641ee` used snapshot `a3536b1afc2613ca985040cd2b02a140e160f6ae85ff9c0d529d9923c82372b8`, selector seed `manifest_mental:family-audition-paired-v2-pair-20260801:same-snapshot`, policy hash `source-preselection-policy-v1:0889e345`, and lineup hash `7992b94ff781cf2784f997a00818810fd7f68ef810a025f1502d117ed27d40a5`.
+- Both paired runs accepted 24/24 candidates with zero rejections, 288/288 gates, 24 complete lineages, zero source replacements, zero external reads, zero Main reads, zero Main writes, zero Threads mutations, zero cleanup orphans, and production noninterference passed. Combined acceptance is 48/48 candidates, 576/576 gates, and 48 complete lineages.
+- Control wall clock was `436298 ms`; challenger wall clock was `278888 ms`; both passed the isolated `599999 ms` ceiling. Genuine generation speed optimization remains separately deferred and inactive.
+- Live scheduler verification after deployment reports enabled, healthy, operational, normal publishing mode, fresh heartbeats, zero overdue posts, zero quarantined posts, and no error.
+- No Main Cycle preparation, dry run, test, canary, scheduling, publishing, or account execution occurred. Main and production account data remained untouched throughout behavioral acceptance.
+
 Owner objective:
+
 
 - Preserve strict performance accountability: families that cannot meet the like floor lose routine audience exposure.
 - Replace one-result expulsion with a bounded two-strike audition and one tiebreaker only when the first two results split.
@@ -110,9 +128,11 @@ Definition of done:
 - Innovation acceptance proves the full behavior with zero Main and Threads access.
 - The exact validated SHA is deployed, read-only runtime health passes, and execution stops without running Main.
 
-Start gate:
+Completion state:
 
-- Planning is authorized now. Implementation is explicitly paused until the owner returns after sleep and says to proceed.
+- The owner wake/proceed gate was satisfied by the explicit instruction to complete the ECL work.
+- All nine implementation steps and the definition of done are closed on the exact validated and deployed SHA above.
+
 
 ### COMPLETED — Manifest Source Selection Hardening
 
@@ -563,9 +583,7 @@ Production SHA: `eef92f606d87fe64c28493dcf67a119c9693fc34`
 - The live scheduler is enabled, healthy, operational, publishing in normal mode, heartbeat-fresh, and has zero overdue or quarantined posts.
 - The Innovation Cycle remained untouched and isolated throughout the Main Cycle production proof.
 
-## Current Action
 
-**WAIT AT OWNER WAKE GATE. Do not inspect implementation files, edit code, run tests, deploy, or invoke either cycle tonight.** When the owner returns and explicitly says to proceed, re-read this ledger, reconcile the repository head and the pre-existing failed Cloudflare build, then begin Step 1 of `manifest-family-audition-and-preselection-authority`. Main Cycle execution remains forbidden throughout the job.
 
 Latest operational notes:
 
