@@ -264,8 +264,9 @@ describe("cycleObservabilityService", () => {
       }
       return method === "all" ? [] : null;
     });
-    const result = await readCycleObservability({
+        const result = await readCycleObservability({
       db,
+      shadowDb: db,
       brandKey: "manifest_mental",
       action: "selections",
       rail: "innovation",
@@ -277,6 +278,74 @@ describe("cycleObservabilityService", () => {
       unavailable_reason: "snapshot_state_too_large",
       snapshot_payload_bytes: 900000,
       rows: [],
+    });
+  });
+
+    it("keeps Innovation evidence in SHADOW_DB and promotion state in Main DB", async () => {
+    const mainQueries: string[] = [];
+    const shadowQueries: string[] = [];
+    const mainDb = createDb(({ sql, method }) => {
+      mainQueries.push(sql);
+      if (method === "all" && sql.includes("FROM manifest_cycle_innovation_runs")) {
+        return [{
+          run_id: "shadow-1",
+          state: "promoted",
+          promotion_destination_version: "v1.0.0",
+          promotion_eligible: 1,
+        }];
+      }
+      return method === "all" ? [] : null;
+    });
+    const shadowDb = createDb(({ sql, method }) => {
+      shadowQueries.push(sql);
+      if (method === "all" && sql.includes("FROM manifest_shadow_runs")) {
+        return [{
+          id: "shadow-1",
+          status: "completed",
+          variant_key: "challenger",
+          code_sha: "exact-sha",
+          snapshot_hash: "snapshot-1",
+          sort_at: "2026-08-01T16:37:15Z",
+          counts_json: "{\"accepted\":24,\"target\":24}",
+          timings_json: "{\"total_wall_clock_ms\":1000}",
+          benchmark_passed: 1,
+          production_noninterference_passed: 1,
+        }];
+      }
+      return method === "all" ? [] : null;
+    });
+
+    const result = await readCycleObservability({
+      db: mainDb,
+      shadowDb,
+      brandKey: "manifest_mental",
+      action: "history",
+      rail: "innovation",
+    });
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      rows: [{
+        id: "shadow-1",
+        status: "promoted",
+        display_state: "Promoted to Main v1.0.0",
+        promotion_destination_version: "v1.0.0",
+      }],
+    });
+    expect(mainQueries.some((sql) => sql.includes("manifest_shadow_"))).toBe(false);
+    expect(shadowQueries.some((sql) => sql.includes("manifest_cycle_innovation_runs"))).toBe(false);
+  });
+
+  it("fails closed when the isolated Innovation binding is unavailable", async () => {
+    const db = createDb(() => null);
+    const result = await readCycleObservability({
+      db,
+      brandKey: "manifest_mental",
+      action: "history",
+      rail: "innovation",
+    });
+    expect(result).toMatchObject({
+      status: 503,
+      body: { error: "innovation_cycle_database_unavailable" },
     });
   });
 
