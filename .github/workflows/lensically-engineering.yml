@@ -660,9 +660,11 @@ jobs:
           expected_sha="$(git rev-parse HEAD)"
           verified=false
           for attempt in $(seq 1 45); do
-            runtime_ok=false
+                        runtime_ok=false
             scheduler_ok=false
             dashboard_ok=false
+            cycles_api_ok=false
+            cycles_page_ok=false
 
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
               && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null; then
@@ -672,9 +674,18 @@ jobs:
               && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
               scheduler_ok=true
             fi
-            if curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
+                        if curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
               && grep -q "Operator Dashboard" /tmp/lensically-dashboard.html; then
               dashboard_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/cycles/state?brand_key=manifest_mental" > /tmp/lensically-cycles-state.json \
+              && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null and .innovation.latest_run.state == "promoted" and .innovation.latest_run.promotion_destination_version == "v1.0.0"' /tmp/lensically-cycles-state.json > /dev/null; then
+              cycles_api_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://lensically.com/cycles" > /tmp/lensically-cycles.html \
+              && grep -q "Operational history and source audit" /tmp/lensically-cycles.html \
+              && grep -q "Why these sources" /tmp/lensically-cycles.html; then
+              cycles_page_ok=true
             fi
 
             gpt_memory_status="$(curl --silent --output /tmp/gpt-memory-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/gpt-memory/dashboard' || true)"
@@ -683,7 +694,9 @@ jobs:
 
             if [ "${runtime_ok}" = "true" ] \
               && [ "${scheduler_ok}" = "true" ] \
-              && [ "${dashboard_ok}" = "true" ] \
+                            && [ "${dashboard_ok}" = "true" ] \
+              && [ "${cycles_api_ok}" = "true" ] \
+              && [ "${cycles_page_ok}" = "true" ] \
               && [ "${gpt_memory_status}" = "410" ] \
               && [ "${agent_status}" = "410" ] \
               && [ "${intelligence_status}" = "410" ]; then
@@ -696,7 +709,9 @@ jobs:
           if [ "${verified}" != "true" ]; then
             cat /tmp/lensically-runtime-health.json || true
             cat /tmp/lensically-scheduler-health.json || true
-            head -c 2000 /tmp/lensically-dashboard.html || true
+                        head -c 2000 /tmp/lensically-dashboard.html || true
+            cat /tmp/lensically-cycles-state.json || true
+            head -c 4000 /tmp/lensically-cycles.html || true
             cat /tmp/gpt-memory-retired.json || true
             cat /tmp/agent-retired.json || true
             cat /tmp/intelligence-retired.json || true
