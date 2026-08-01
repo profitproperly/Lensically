@@ -262,7 +262,8 @@ function followerAttributionViolations(
       || /\bfollowers?\b.{0,120}\b(?:came|come|coming|generated|gained|added|driven|produced|brought|converted)\s+(?:from|by)\b/.test(normalized);
     const explicitPolicyBoundary = /\b(?:do not|don't|never|must not|should not|cannot|can't)\s+(?:infer|claim|attribute|connect|tie)\b.{0,120}\bfollowers?\b/.test(normalized)
       || /\bfollowers?\b.{0,120}\b(?:cannot|can't|must not|should not)\s+be\s+(?:attributed|connected|tied)\b/.test(normalized)
-      || /\bfollowers?\b.{0,120}\b(?:are|is)\s+not\s+(?:attributed|attributable|connected|tied)\b/.test(normalized)
+            || /\bfollowers?\b.{0,120}\b(?:are|is)\s+not\s+(?:attributed|attributable|connected|tied)\b/.test(normalized)
+      || /\bno\s+follower(?:s| movement| growth| change)?\b.{0,120}\b(?:is|are|was|were)?\s*(?:attributed|attributable|connected|tied)\b/.test(normalized)
       || /\bfollowers?\b.{0,120}\baccount[- ]level(?: context)? only\b/.test(normalized)
       || /\baccount[- ]level(?: follower)? (?:context|checkpoint|trajectory|tracking) only\b/.test(normalized);
     const scopedFollowerClaim = /\b(?:this|that|the|each|a)\s+(?:post|slot|family|experiment|day|period|campaign|cycle|schedule)\b.{0,120}\bfollowers?\b/.test(normalized)

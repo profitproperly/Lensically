@@ -7,6 +7,7 @@ import {
     MANIFEST_DECISION_BUNDLE_CONTRACT_VERSION,
   MANIFEST_DECISION_BUNDLE_MAX_BYTES,
 } from "../src/operatorManifestDecisionBundleService";
+import { validateManifestFollowerAttributionBoundary } from "../src/manifestIntelligence";
 
 const brandKey = "manifest_decision_bundle_test";
 
@@ -210,7 +211,24 @@ describe("operatorManifestDecisionBundleService", () => {
     expect((replayed.bundle as Record<string, any>).locked_source_plan).toEqual(bundle.locked_source_plan);
     expect(built.requires_detail_read).toBe(true);
 
-    expect(String(built.detail_reason)).toContain("bundle_size_compaction_level_");
+        expect(String(built.detail_reason)).toContain("bundle_size_compaction_level_");
   });
 });
+
+describe("Manifest follower attribution boundary", () => {
+  it("allows explicit no-attribution policy statements that use a no-follower noun phrase", () => {
+    expect(validateManifestFollowerAttributionBoundary({
+      uncertainty: "Evidence is incomplete, and no follower movement is attributed to individual posts or families.",
+    })).toEqual({ ok: true });
+  });
+
+  it("continues to reject positive scoped follower attribution claims", () => {
+    const result = validateManifestFollowerAttributionBoundary({
+      conclusion: "This post generated 25 followers.",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(" ")).toContain("follower_attribution_forbidden");
+  });
+});
+
 
