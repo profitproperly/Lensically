@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifySourceFamilyLifetime,
   extractOwnerBannedSavedPatternIds,
+  normalizeSourceFamilyLifetimeLabel,
   selectSourceFamilyLineup,
+
   type SourceFamilyLifetimeLabel,
   type SourceSelectionCandidate,
 } from "../src/sourceFamilySelection";
+import { compileSourcePreselectionPolicy } from "../src/sourcePreselectionPolicy";
+
 
 function candidate(
   id: string,
@@ -66,13 +71,72 @@ describe("source family owner exclusions", () => {
   });
 });
 
+describe("bounded source family audition", () => {
+  it("keeps a one-flop family on probation for exactly one second audition", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [0.84] })).toEqual(expect.objectContaining({
+      label: "untested",
+      audition_state: "probation",
+      audition_failures: 1,
+      audition_opportunities_remaining: 1,
+      graduated: false,
+    }));
+  });
+
+  it("excludes two flops and graduates two passes", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.6] })).toEqual(expect.objectContaining({
+      label: "underperforming",
+      audition_state: "underperforming",
+      audition_failures: 2,
+    }));
+    expect(classifySourceFamilyLifetime({ indexes: [0.85, 0.9] })).toEqual(expect.objectContaining({
+      audition_state: "graduated",
+      audition_passes: 2,
+      graduated: true,
+    }));
+  });
+
+  it("uses one tiebreaker only when the first two results split", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85] })).toEqual(expect.objectContaining({
+      label: "untested",
+      audition_state: "tiebreaker",
+      audition_opportunities_remaining: 1,
+    }));
+    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85, 0.85] })).toEqual(expect.objectContaining({
+      audition_state: "graduated",
+      audition_passes: 2,
+      graduated: true,
+    }));
+    expect(classifySourceFamilyLifetime({ indexes: [0.85, 0.84, 0.2] })).toEqual(expect.objectContaining({
+      label: "underperforming",
+      audition_state: "underperforming",
+      audition_failures: 2,
+    }));
+  });
+
+  it("cuts a graduated family when its later lifetime median falls below 0.85", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [1, 1, 0.2, 0.2, 0.2] })).toEqual(expect.objectContaining({
+      label: "underperforming",
+      audition_state: "underperforming",
+    }));
+  });
+
+  it("treats the exact 0.85 floor as a pass and normalizes legacy disproven history", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [0.85] })).toEqual(expect.objectContaining({
+      audition_state: "provisional_pass",
+      audition_passes: 1,
+    }));
+    expect(normalizeSourceFamilyLifetimeLabel("disproven")).toBe("underperforming");
+  });
+});
+
 describe("hardened source family selection", () => {
-  it("hard-excludes recent published, future scheduled, underperforming, and disproven families", () => {
+  it("hard-excludes recent published, future scheduled, and underperforming families", () => {
+
     const blocked = [
       candidate("recent", "proven", { published_uses_72h: 1 }),
       candidate("scheduled", "franchise", { future_scheduled_uses: 1 }),
-      candidate("weak", "underperforming"),
-      candidate("dead", "disproven"),
+            candidate("weak", "underperforming"),
+
     ];
     const safe = Array.from({ length: 6 }, (_, index) => candidate(`safe-${index}`));
     const result = selectSourceFamilyLineup({
@@ -88,12 +152,70 @@ describe("hardened source family selection", () => {
     expect(result.parity_trace?.exclusions).toEqual(expect.arrayContaining([
       expect.objectContaining({ reason: "source_published_within_72h" }),
       expect.objectContaining({ reason: "source_already_future_scheduled" }),
-      expect.objectContaining({ reason: "lifetime_underperforming" }),
-      expect.objectContaining({ reason: "lifetime_disproven" }),
+            expect.objectContaining({ reason: "lifetime_underperforming" }),
+
+    ]));
+  });
+
+    it("keeps probation and tiebreaker families exploration-only", () => {
+    const audition = [
+      candidate("probation", "untested", { audition_state: "probation", audition_failures: 1 }),
+      candidate("tiebreaker", "untested", { audition_state: "tiebreaker", audition_passes: 1, audition_failures: 1 }),
+    ];
+    const result = selectSourceFamilyLineup({
+      candidates: [...audition, candidate("winner", "franchise"), candidate("dev", "emerging")],
+      slot_keys: slots(4),
+      seed: "audition-exploration",
+    });
+    const auditionReceipts = result.receipts.filter((receipt) => ["probation", "tiebreaker"].includes(receipt.audition_state));
+    expect(auditionReceipts).toHaveLength(2);
+    expect(auditionReceipts.every((receipt) => receipt.allocation_tier === "exploration")).toBe(true);
+  });
+
+  it("enforces compiled hard bans, experiment reservations, and strategy/evidence weights before lock", () => {
+    const candidates = [
+      candidate("banned", "franchise", { text: "Forbidden premise" }),
+      candidate("reserved", "emerging"),
+      candidate("weighted", "emerging"),
+      candidate("safe-a", "franchise"),
+      candidate("safe-b", "prospect"),
+      candidate("safe-c"),
+    ];
+    const slotKeys = slots(4);
+    const policy = compileSourcePreselectionPolicy({
+      candidates,
+      slot_keys: slotKeys,
+      hard_bans: [{ rule_key: "ban-premise", phrase: "Forbidden premise", active: 1 }],
+      active_experiments: [{
+        experiment_key: "reserved-test",
+        status: "active",
+        source_identity_key: "source-reserved",
+        required_slots: 1,
+        reserved_slot_keys: [slotKeys[0]],
+      }],
+      strategy_directives: { source_weights: { "source-weighted": 2 } },
+      strongest_mature_evidence: [{ source_identity_key: "source-weighted" }],
+    });
+    const result = selectSourceFamilyLineup({ candidates, slot_keys: slotKeys, seed: "policy-authority", preselection_policy: policy, include_parity_trace: true });
+
+    expect(result.selected.some((item) => item.source_identity_key === "source-banned")).toBe(false);
+    expect(result.receipts[0]).toEqual(expect.objectContaining({
+      source_identity_key: "source-reserved",
+      experiment_reservation_key: "reserved-test",
+      preselection_policy_hash: policy.policy_hash,
+    }));
+    expect(result.summary).toEqual(expect.objectContaining({
+      experiment_reservations_required: 1,
+      experiment_reservations_fulfilled: 1,
+      preselection_policy_hash: policy.policy_hash,
+    }));
+    expect(result.parity_trace?.exclusions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source_identity_key: "source-banned", reason: "preselection_hard_ban" }),
     ]));
   });
 
   it("enforces protected exploration and controlled winner allocation", () => {
+
     const winners = Array.from({ length: 3 }, (_, index) => candidate(`winner-${index}`, "franchise"));
     const development = Array.from({ length: 8 }, (_, index) => candidate(`development-${index}`, "emerging"));
     const exploration = Array.from({ length: 20 }, (_, index) => candidate(`exploration-${index}`));
