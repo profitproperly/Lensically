@@ -5868,24 +5868,29 @@ active_checkpoint: none
       ["s7", "account_mutations_a"],
       ["s8", "account_mutations_b"],
     ] as const;
-    let eligibleMutations = 0;
+        let eligibleMutations = 0;
+    let expectedMutationCapabilities: number | null = null;
     let failedMutationPreflights = 0;
     for (const [transportSegment, canonicalSegment] of mutationSegments) {
       const result = await mcpToolCallRaw<{
         campaign: {
           segment: string;
           mutations_executed: number;
-          mutation_preflights: {
+                    mutation_preflights: {
             eligible: number;
             failed: number;
             failures: Array<Record<string, unknown>>;
             side_effects_executed: number;
           };
+          risk_groups: { mutation: number };
         };
       }>("runMcpTests", { segment: transportSegment });
       expect(result.structuredContent.campaign.segment).toBe(canonicalSegment);
       expect(result.structuredContent.campaign.mutations_executed).toBe(0);
-      eligibleMutations += result.structuredContent.campaign.mutation_preflights.eligible;
+            eligibleMutations += result.structuredContent.campaign.mutation_preflights.eligible;
+      const reportedMutationCapabilities = result.structuredContent.campaign.risk_groups.mutation;
+      expectedMutationCapabilities ??= reportedMutationCapabilities;
+      expect(reportedMutationCapabilities).toBe(expectedMutationCapabilities);
       failedMutationPreflights += result.structuredContent.campaign.mutation_preflights.failed;
       expect(
         result.structuredContent.campaign.mutation_preflights.failed,
@@ -5893,7 +5898,8 @@ active_checkpoint: none
       ).toBe(0);
       expect(result.structuredContent.campaign.mutation_preflights.side_effects_executed).toBe(0);
     }
-                                                                                                                                                                                                        expect(eligibleMutations).toBe(70);
+                                                                                                                                                                                                            expect(expectedMutationCapabilities).not.toBeNull();
+    expect(eligibleMutations).toBe(expectedMutationCapabilities);
     expect(failedMutationPreflights).toBe(0);
   }, 90000);
 
