@@ -78,6 +78,84 @@ function createHarness() {
 }
 
 describe("Operator Manifest cycle product service", () => {
+  it("returns source evidence and owner notes without activating legacy mimicry fields", async () => {
+    const { dependencies } = createHarness();
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ total: 1 })),
+        all: vi.fn(async () => ({
+          results: [{
+            slot_key: "2026-08-03T12:00:00-04:00",
+            selection_order: 1,
+            source_identity_key: "threads:source-1",
+            source_card_family_id: "family-1",
+            source_card_id: "card-1",
+            source_selection_id: "selection-1",
+            source_card_version_number: 1,
+            source_type: "saved_pattern",
+            internal_source_id: "222",
+            canonical_source_url: "https://example.com/source",
+            source_title: "Source title",
+            primary_source_json: JSON.stringify({ text: "Original source", metrics: { likes: 1000 } }),
+            source_mechanism: "Preserve everything closely.",
+            required_product: "Repeat the same payoff.",
+            recommended_direction: "Create a close adaptation.",
+            transformation_contract_json: JSON.stringify({ notes: "Use only slight wording changes." }),
+            pass_conditions_json: JSON.stringify(["Stay close."]),
+            fail_conditions_json: JSON.stringify(["Change the premise."]),
+            owner_guidance_id: "guidance-1",
+            owner_guidance_text: "Use this source as evidence and follow my note.",
+            owner_guidance_version: 2,
+            owner_guidance_updated_at: "2026-08-02T03:00:00.000Z",
+            latest_owner_edit_note_json: JSON.stringify({
+              id: "revision-1",
+              owner_note: "The prior version repeated too much.",
+              model_or_previous_text: "Model text",
+              owner_version: "Owner text",
+            }),
+            receipt_json: JSON.stringify({ lifetime_label: "franchise", score: 0.9 }),
+          }],
+        })),
+        run: vi.fn(async () => ({ success: true })),
+      })),
+    }));
+    dependencies.db = { prepare } as unknown as D1Database;
+
+    const response = await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_locked_lineup_page",
+      brandKey: "manifest_mental",
+      payload: { cycle_id: "cycle-1", offset: 0, limit: 12 },
+    }, dependencies);
+
+    expect(response.status).toBe(200);
+    const page = response.body.lineup_page as JsonRecord;
+    const item = (page.items as JsonRecord[])[0];
+    expect(item).toMatchObject({
+      source_card_id: "card-1",
+      primary_source: expect.objectContaining({ text: "Original source" }),
+      owner_guidance: expect.objectContaining({
+        id: "guidance-1",
+        text: "Use this source as evidence and follow my note.",
+      }),
+      latest_owner_edit_note: expect.objectContaining({
+        id: "revision-1",
+        owner_note: "The prior version repeated too much.",
+      }),
+      generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+      legacy_source_card_interpretation: {
+        preserved_historically: true,
+        active_generation_instruction: false,
+      },
+    });
+    expect(item).not.toHaveProperty("source_mechanism");
+    expect(item).not.toHaveProperty("required_product");
+    expect(item).not.toHaveProperty("recommended_direction");
+    expect(item).not.toHaveProperty("transformation_contract");
+    expect(item).not.toHaveProperty("pass_conditions");
+    expect(item).not.toHaveProperty("fail_conditions");
+    expect(sqlStatements(prepare)).toContain("operator_source_card_owner_guidance");
+  });
+
   it("preserves bounded evidence-page validation and observed failures", async () => {
     const { dependencies, mocks } = createHarness();
     const missing = await handleOperatorManifestCycleServiceTool({
