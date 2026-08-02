@@ -223,10 +223,7 @@ export async function handleOperatorManifestCycleServiceTool(
           internal_source_id: row.internal_source_id ?? null,
           canonical_source_url: row.canonical_source_url ?? null,
           source_title: String(row.source_title ?? "").slice(0, 240),
-          primary_source: compactLineupCue(parseJson(row.primary_source_json, {})),
-          source_mechanism: String(row.source_mechanism ?? "").slice(0, 800),
-          required_product: String(row.required_product ?? "").slice(0, 400),
-                    recommended_direction: String(row.recommended_direction ?? "").slice(0, 800),
+                    primary_source: compactLineupCue(parseJson(row.primary_source_json, {})),
           owner_guidance: row.owner_guidance_id ? {
             id: row.owner_guidance_id,
             text: String(row.owner_guidance_text ?? ""),
@@ -234,11 +231,12 @@ export async function handleOperatorManifestCycleServiceTool(
             updated_at: row.owner_guidance_updated_at ?? null,
             active: true,
           } : null,
-          latest_owner_edit_note: parseJson(row.latest_owner_edit_note_json, null),
+                    latest_owner_edit_note: parseJson(row.latest_owner_edit_note_json, null),
           generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
-          transformation_contract: compactLineupCue(parseJson(row.transformation_contract_json, {})),
-          pass_conditions: compactLineupCue(parseJson(row.pass_conditions_json, [])),
-          fail_conditions: compactLineupCue(parseJson(row.fail_conditions_json, [])),
+          legacy_source_card_interpretation: {
+            preserved_historically: true,
+            active_generation_instruction: false,
+          },
           selection_evidence: {
             lifetime_label: receipt.lifetime_label ?? null,
             recent_label: receipt.recent_label ?? null,
