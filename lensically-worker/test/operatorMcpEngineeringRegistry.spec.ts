@@ -5,11 +5,11 @@ import {
 } from "../src/operatorMcpEngineeringRegistry";
 
 describe("Operator MCP engineering registry", () => {
-  it("preserves the exact 33-tool engineering registry without duplicates", () => {
-    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(33);
-    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(33);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(33);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(33);
+    it("preserves the exact 34-tool engineering registry without duplicates", () => {
+    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(34);
+    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(34);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(34);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(34);
     expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name))).toEqual(
       new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES),
     );
@@ -32,7 +32,31 @@ describe("Operator MCP engineering registry", () => {
       required: ["patches", "message"],
       properties: { patches: { minItems: 1, maxItems: 20 } },
     });
-    expect(byName.get("deleteRepoFile")?.annotations).toMatchObject({ destructiveHint: true });
+        expect(byName.get("deleteRepoFile")?.annotations).toMatchObject({ destructiveHint: true });
+    expect(byName.get("operateGitHubRepositories")?.inputSchema).toMatchObject({
+      required: ["operation"],
+      properties: {
+        operation: {
+          enum: [
+            "list_repositories",
+            "get_repository",
+            "list_files",
+            "read_file",
+            "search_file",
+            "upsert_file",
+            "patch_file",
+            "delete_file",
+            "list_workflow_runs",
+            "dispatch_workflow",
+            "get_workflow_run",
+          ],
+        },
+        repository: { pattern: "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$" },
+        limit: { maximum: 500 },
+      },
+    });
+    expect(byName.get("operateGitHubRepositories")?.annotations).toMatchObject({ destructiveHint: true, openWorldHint: true });
+
   });
 
   it("preserves exact workflow and deployment controls", () => {
