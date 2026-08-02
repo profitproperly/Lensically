@@ -530,8 +530,8 @@ export async function resolveSavedPatternSourceCard(
   input: { accountId: string; patternId: number },
 ): Promise<Record<string, unknown> | null> {
   const row = await db.prepare(
-    `SELECT c.id, c.brand_key, c.title, c.status, c.source_mechanism,
-            c.required_product, c.recommended_direction, c.version_number,
+        `SELECT c.id, c.brand_key, c.title, c.status, c.primary_source_json,
+            c.version_number,
             c.updated_at, f.id AS family_id, f.source_identity_key,
             g.id AS guidance_id, g.guidance_text, g.version_number AS guidance_version,
             g.updated_at AS guidance_updated_at
@@ -557,11 +557,9 @@ export async function resolveSavedPatternSourceCard(
     brand_key: row.brand_key,
     family_id: row.family_id,
     source_identity_key: row.source_identity_key,
-    title: row.title,
+        title: row.title,
     status: row.status,
-    source_mechanism: row.source_mechanism,
-    required_product: row.required_product,
-    recommended_direction: row.recommended_direction ?? null,
+    primary_source: safeJson(row.primary_source_json),
     version_number: Number(row.version_number ?? 1),
     updated_at: row.updated_at,
     owner_guidance: row.guidance_id ? {
