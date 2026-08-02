@@ -79,7 +79,7 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
     ownerNote: Object.prototype.hasOwnProperty.call(payload, "owner_note")
       ? dependencies.normalizeText(payload.owner_note, 12_000, true)
       : undefined,
-    editorType: "model",
+        editorType: payload.editor_type === "owner" ? "owner" : "model",
     editSource: "mcp",
   });
 
