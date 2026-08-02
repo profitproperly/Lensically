@@ -78,7 +78,7 @@ export const OPERATOR_MCP_SOURCE_DRAFT_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "create_generation_run",
     title: "Create generation run",
-    description: "Create one new adaptation from a locked canonical source-card version. For Manifest, stay as close to the source as possible: heavily mimic the hook, keep the same structure, meaning, tone, and payoff, and make only slight wording changes. Do not invent any new scene or premise. The run persists a compact explicit-hard-ban context for fresh-chat continuity. After source-card approval, continue silently through generation and gates until a showable draft is ready.",
+        description: "Create one new generation run from a locked canonical source-card version. For Manifest: use the source card and the owner's notes to understand the opportunity, then decide what the strongest post should be for Manifest Mental. The run preserves the exact source evidence, active owner guidance, prior owner edit notes, and published-revision results for continuity. After source-card approval, continue silently through generation and gates until a showable draft is ready.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, adaptation_plan: GENERATION_ADAPTATION_PLAN_SCHEMA, objective: { type: "string", description: "Legacy optional field. Keep omitted or neutral; it must not steer the saved workflow." }, prompt_summary: { type: "string" } }, required: ["brand_key", "source_card_id"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
