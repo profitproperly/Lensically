@@ -485,38 +485,18 @@ export default function SavedPatternsPage() {
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => void reviewPattern(pattern, "approved")}
-                          disabled={reviewingId === pattern.id}
-                          className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Mark Useful
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void reviewPattern(pattern, "watch")}
-                          disabled={reviewingId === pattern.id}
+                          onClick={() => void toggleSourceCard(pattern.id)}
+                          disabled={loadingSourceCardId === pattern.id}
                           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Watch
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void reviewPattern(pattern, "cooldown")}
-                          disabled={reviewingId === pattern.id}
-                          className="rounded-md border border-amber-200 bg-white px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Cooldown
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void reviewPattern(pattern, "rejected")}
-                          disabled={reviewingId === pattern.id}
-                          className="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Reject Pattern
+                          {loadingSourceCardId === pattern.id
+                            ? "Loading Source Card..."
+                            : expandedPatternId === pattern.id
+                              ? "Hide Source Card"
+                              : "Source Card"}
                         </button>
                       </div>
 
