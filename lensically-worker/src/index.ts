@@ -7765,6 +7765,7 @@ async function listOperatorAccounts(env: Env): Promise<Record<string, unknown>[]
 
 async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCardId: string): Promise<Record<string, unknown> | null> {
   await ensureOperatorWorkflowTables(env);
+  await ensureOwnerEditLearningTables(env);
   const row = await env.DB.prepare(
     `SELECT *
      FROM operator_source_cards
@@ -7775,6 +7776,7 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
   if (!row) {
     return null;
   }
+  const ownerLearning = await readSourceCardOwnerLearning(env.DB, sourceCardId);
   return {
     id: row.id,
     brand_key: row.brand_key,
