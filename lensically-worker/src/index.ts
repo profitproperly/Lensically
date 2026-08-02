@@ -7881,13 +7881,27 @@ async function getOperatorSourceCardHistory(
        d.status AS draft_status,
        d.strategy_json,
        d.score_json,
-       d.scheduled_post_id,
+              d.scheduled_post_id,
        d.published_post_id,
-       d.created_at AS draft_created_at
+       d.created_at AS draft_created_at,
+       s.current_revision_id,
+       s.published_revision_id,
+       pr.editor_type AS published_editor_type,
+       pr.change_magnitude AS published_change_magnitude,
+       pr.previous_text AS published_previous_text,
+       pr.revised_text AS published_revision_text,
+       pr.owner_note AS published_owner_note,
+       pr.became_published AS revision_became_published
      FROM gpt_generation_runs r
      LEFT JOIN gpt_generation_drafts d
        ON d.run_id = r.id
       AND d.account_id = r.account_id
+     LEFT JOIN scheduled_posts s
+       ON s.id = d.scheduled_post_id
+      AND s.threads_user_id = d.threads_user_id
+     LEFT JOIN operator_scheduled_post_revisions pr
+       ON pr.id = s.published_revision_id
+      AND pr.scheduled_post_id = s.id
      WHERE r.account_id = ?
        AND (
          (? IS NOT NULL AND r.source_card_family_id = ?)
