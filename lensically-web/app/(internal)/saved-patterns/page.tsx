@@ -23,16 +23,64 @@ type SavedPatternRow = {
   updated_at: string;
 };
 
+type OwnerLearningSummary = {
+  scheduled_post_count?: number;
+  untouched_model_count?: number;
+  owner_edited_count?: number;
+  substantial_owner_rewrite_count?: number;
+  owner_notes_count?: number;
+  owner_intervention_rate?: number;
+  published_24h?: {
+    owner_edited_sample_size?: number;
+    owner_edited_median_overall?: number | null;
+    untouched_model_sample_size?: number;
+    untouched_model_median_overall?: number | null;
+    evidence_type?: string;
+  };
+};
+
+type SourceCardRevision = {
+  id?: string;
+  scheduled_post_id?: number;
+  revision_number?: number;
+  editor_type?: string;
+  previous_text?: string | null;
+  revised_text?: string;
+  owner_note?: string | null;
+  change_magnitude?: string;
+  became_published?: boolean;
+  published_post_id?: string | null;
+  performance_24h?: { scores?: Record<string, unknown> | null; metrics?: Record<string, unknown> | null } | null;
+  created_at?: string;
+};
+
+type SourceCardDetail = {
+  id: string;
+  title?: string;
+  status?: string;
+  source_mechanism?: string;
+  required_product?: string;
+  recommended_direction?: string | null;
+  generation_direction?: string;
+  owner_guidance?: { text?: string; version_number?: number; updated_at?: string; active?: boolean } | null;
+  owner_learning?: {
+    owner_edit_notes?: SourceCardRevision[];
+    revision_history?: SourceCardRevision[];
+  };
+};
+
 type SavedPatternsResponse = {
   order?: "newest" | "likes";
   patterns?: SavedPatternRow[];
   total?: number;
+  owner_learning_summary?: OwnerLearningSummary | null;
   error?: string;
 };
 
 const SAVED_PATTERNS_URL = buildWorkerUrl("/api/patterns/list");
 const DELETE_PATTERNS_URL = buildWorkerUrl("/api/patterns/delete");
-const REVIEW_PATTERN_URL = buildWorkerUrl("/api/gpt-memory/saved-patterns/review");
+const SOURCE_CARD_URL = buildWorkerUrl("/api/patterns/source-card");
+const SOURCE_CARD_GUIDANCE_URL = buildWorkerUrl("/api/patterns/source-card/guidance");
 const APP_USER_ID = "lensically";
 const DEFAULT_LIMIT = 200;
 
