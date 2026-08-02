@@ -28982,8 +28982,9 @@ async function updateScheduledPostForAppUser(
       threads_user_id: string;
       post_text: string;
       scheduled_time: string;
-      spoiler_all_text: number | string | null;
+            spoiler_all_text: number | string | null;
       spoiler_phrases_json: string | null;
+      current_revision_id: string | null;
     }>();
 
   if (!existing || (input.expectedThreadsUserId && existing.threads_user_id !== input.expectedThreadsUserId)) {
