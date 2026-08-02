@@ -72,9 +72,14 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
     time: hasTime ? dependencies.normalizeText(payload.time, 20) ?? "" : undefined,
     timeZone: dependencies.normalizeText(payload.timezone, 100, true) ?? input.defaultTimezone,
     spoilerAllText: hasSpoilerAllText ? payload.spoiler_all_text === true : undefined,
-    spoilerPhrases: hasSpoilerPhrases
+        spoilerPhrases: hasSpoilerPhrases
       ? dependencies.normalizeSpoilerPhrases(payload.spoiler_phrases)
       : undefined,
+    ownerNote: Object.prototype.hasOwnProperty.call(payload, "owner_note")
+      ? dependencies.normalizeText(payload.owner_note, 12_000, true)
+      : undefined,
+    editorType: "model",
+    editSource: "mcp",
   });
 
   if (!updated.success || !updated.scheduledPost) {
