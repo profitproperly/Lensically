@@ -1,3 +1,7 @@
+-- lensically-migration-class: schema
+-- lensically-migration-owner: operator-engineering
+-- lensically-migration-risk: low
+
 CREATE TABLE IF NOT EXISTS commercial_orders (
   session_id TEXT PRIMARY KEY,
   payment_intent_id TEXT,
