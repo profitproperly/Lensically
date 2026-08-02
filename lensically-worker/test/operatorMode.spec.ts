@@ -5834,7 +5834,9 @@ active_checkpoint: none
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-        expect(eligibleReads).toBe(44);
+            // The bounded read campaign includes the two native Stripe reads:
+    // getStripeAccountState and readStripeObjects.
+    expect(eligibleReads).toBe(46);
     expect(failedReads).toBe(0);
   }, 90000);
 
