@@ -68,10 +68,19 @@ describe("admitOperatorGenerationRun", () => {
     });
   });
 
-  it("requires a Manifest adaptation goal before context retrieval", async () => {
+    it("allows Manifest to decide from source evidence and owner notes without a forced adaptation goal", async () => {
+    const card = {
+      id: "card-1",
+      status: "locked",
+      primary_source: { text: "Original source" },
+      owner_guidance: { id: "guidance-1", text: "Use my full note." },
+      owner_edit_notes: [{ id: "revision-1", owner_note: "Previous correction." }],
+      generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+    };
     const dependencies = createDependencies({
-      loadSourceCard: vi.fn(async () => ({ id: "card-1", status: "locked" })),
+      loadSourceCard: vi.fn(async () => card),
       normalizeAdaptationPlan: vi.fn(() => ({ adaptation_goal: null })),
+      loadCanonicalContext: vi.fn(async () => ({ family: null, versions: [], adaptation_history: [] })),
     });
 
     const result = await admitOperatorGenerationRun({
@@ -79,13 +88,15 @@ describe("admitOperatorGenerationRun", () => {
       payload: { source_card_id: "card-1", adaptation_plan: {} },
     }, dependencies);
 
-    expect(dependencies.loadCanonicalContext).not.toHaveBeenCalled();
-    expect(dependencies.loadAccountRejectionContext).not.toHaveBeenCalled();
-    expect(dependencies.loadPerformanceLearning).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      kind: "response",
-      status: 400,
-      body: { success: false, error: "manifest_adaptation_goal_required" },
+    expect(result.kind).toBe("continue");
+    if (result.kind !== "continue") throw new Error("expected continuation");
+    expect(result.context.adaptationPlan).toEqual({ adaptation_goal: null });
+    expect(result.context.priorAdaptationContext).toMatchObject({
+      source_evidence: { primary_source: { text: "Original source" } },
+      owner_guidance: { id: "guidance-1", text: "Use my full note." },
+      owner_edit_notes: [{ id: "revision-1", owner_note: "Previous correction." }],
+      generation_direction: card.generation_direction,
+      prior_runs: [],
     });
   });
 
