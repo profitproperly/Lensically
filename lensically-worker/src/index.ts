@@ -7824,6 +7824,35 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
   };
 }
 
+function buildActiveGenerationSourceCard(
+  card: Record<string, unknown>,
+  brandKey: GptBrandKey,
+): Record<string, unknown> {
+  if (brandKey !== "manifest_mental") return card;
+  return {
+    id: card.id,
+    brand_key: card.brand_key,
+    status: card.status,
+    title: card.title,
+    lane_key: card.lane_key ?? null,
+    primary_source: card.primary_source ?? null,
+    secondary_sources: card.secondary_sources ?? [],
+    metrics_snapshot: card.metrics_snapshot ?? null,
+    owner_guidance: card.owner_guidance ?? null,
+    owner_edit_notes: card.owner_edit_notes ?? [],
+    owner_revision_history: card.owner_revision_history ?? [],
+    generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+    family_id: card.family_id ?? null,
+    source_selection_id: card.source_selection_id ?? null,
+    version_number: card.version_number ?? 1,
+    is_current: card.is_current === true,
+    legacy_source_card_interpretation: {
+      preserved_historically: true,
+      active_generation_instruction: false,
+    },
+  };
+}
+
 async function getOperatorSourceCardHistory(
   env: Env,
   brand: GptResolvedBrand,
