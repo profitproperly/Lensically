@@ -2577,13 +2577,17 @@ if (!operatorGenerationRunAdmissionService.includes("export async function admit
     || !operatorGenerationRunAdmissionService.includes("dependencies.loadAccountRejectionContext")
     || !operatorGenerationRunAdmissionService.includes("dependencies.loadPerformanceLearning")
     || !operatorGenerationRunAdmissionService.includes("locked_source_card_required")
-    || !operatorGenerationRunAdmissionService.includes("manifest_adaptation_goal_required")
+    || operatorGenerationRunAdmissionService.includes("manifest_adaptation_goal_required")
+    || !operatorGenerationRunAdmissionService.includes("source_evidence")
+    || !operatorGenerationRunAdmissionService.includes("owner_guidance")
+    || !operatorGenerationRunAdmissionService.includes("owner_edit_notes")
+    || !operatorGenerationRunAdmissionService.includes("published_execution")
     || !operatorGenerationRunAdmissionService.includes("slice(-24)")) {
   lifecycleErrors.push("operator_generation_run_admission_service_module_incomplete");
 }
 if (!operatorGenerationRunAdmissionServiceTests.includes("returns the exact saved-workflow conflict before any source-card lookup")
     || !operatorGenerationRunAdmissionServiceTests.includes("requires a normalized locked source card before adaptation work")
-    || !operatorGenerationRunAdmissionServiceTests.includes("requires a Manifest adaptation goal before context retrieval")
+    || !operatorGenerationRunAdmissionServiceTests.includes("allows Manifest to decide from source evidence and owner notes without a forced adaptation goal")
     || !operatorGenerationRunAdmissionServiceTests.includes("allows a non-Manifest run without an adaptation goal")
     || !operatorGenerationRunAdmissionServiceTests.includes("assembles canonical context with only the latest 24 historical runs")
     || !operatorGenerationRunAdmissionServiceTests.includes("uses empty canonical defaults when optional history fields are malformed")) {
