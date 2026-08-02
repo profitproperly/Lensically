@@ -14878,8 +14878,11 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         date,
         time,
         timeZone,
-        spoilerAllText,
+                spoilerAllText,
         spoilerPhrases,
+        ownerNote,
+        editorType,
+        editSource,
       }) => {
         const result = await updateScheduledPostForAppUser(env, {
           appUserId: WORKSPACE_APP_USER_ID,
@@ -14891,11 +14894,15 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           timeZone,
           spoilerAllText,
           spoilerPhrases,
+          ownerNote,
+          editorType,
+          editSource,
         });
         return {
           success: result.success,
           scheduledPost: result.scheduledPost ?? null,
           linkedDraftsUpdated: result.linkedDraftsUpdated,
+          revision: result.revision ?? null,
           error: result.error ?? null,
           statusCode: result.statusCode,
         };
