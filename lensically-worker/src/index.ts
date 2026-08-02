@@ -30769,6 +30769,114 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+        if (normalizedPath === "/api/patterns/source-card" && request.method === "GET") {
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      const patternId = Math.trunc(Number(url.searchParams.get("saved_pattern_id") ?? 0));
+      if (!appUserId || !Number.isInteger(patternId) || patternId <= 0) {
+        return new Response(JSON.stringify({ error: "app_user_id and saved_pattern_id are required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const accountId = await resolvePatternAccountId(
+        env,
+        url.searchParams.get("threads_user_id"),
+        url.searchParams.get("account_id"),
+      );
+      const ownedPattern = await env.DB.prepare(
+        `SELECT id FROM external_patterns
+         WHERE id = ? AND app_user_id = ? AND account_id = ? LIMIT 1`,
+      ).bind(patternId, appUserId, accountId).first<{ id: number | string }>();
+      if (!ownedPattern) {
+        return new Response(JSON.stringify({ error: "saved_pattern_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      await ensureOwnerEditLearningTables(env);
+      const sourceCard = await resolveSavedPatternSourceCard(env.DB, { accountId, patternId });
+      return new Response(JSON.stringify({
+        success: true,
+        saved_pattern_id: patternId,
+        source_card: sourceCard,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedPath === "/api/patterns/source-card/guidance" && request.method === "POST") {
+      let payload: {
+        app_user_id?: unknown;
+        account_id?: unknown;
+        threads_user_id?: unknown;
+        saved_pattern_id?: unknown;
+        guidance_text?: unknown;
+        active?: unknown;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const appUserId = normalizeAppUserId(typeof payload.app_user_id === "string" ? payload.app_user_id : null);
+      const patternId = Math.trunc(Number(payload.saved_pattern_id ?? 0));
+      const threadsUserId = normalizeOperatorText(payload.threads_user_id, 255, true);
+      if (!appUserId || !threadsUserId || !Number.isInteger(patternId) || patternId <= 0) {
+        return new Response(JSON.stringify({ error: "app_user_id, threads_user_id, and saved_pattern_id are required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const accountId = await resolvePatternAccountId(
+        env,
+        threadsUserId,
+        typeof payload.account_id === "string" ? payload.account_id : null,
+      );
+      const ownedPattern = await env.DB.prepare(
+        `SELECT id FROM external_patterns
+         WHERE id = ? AND app_user_id = ? AND account_id = ? LIMIT 1`,
+      ).bind(patternId, appUserId, accountId).first<{ id: number | string }>();
+      if (!ownedPattern) {
+        return new Response(JSON.stringify({ error: "saved_pattern_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      await ensureOwnerEditLearningTables(env);
+      const sourceCard = await resolveSavedPatternSourceCard(env.DB, { accountId, patternId });
+      if (!sourceCard?.id || !sourceCard.brand_key) {
+        return new Response(JSON.stringify({ error: "linked_source_card_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      try {
+        const guidance = await saveSourceCardOwnerGuidance(env.DB, {
+          brandKey: String(sourceCard.brand_key),
+          accountId,
+          threadsUserId,
+          sourceCardId: String(sourceCard.id),
+          guidanceText: payload.guidance_text,
+          active: payload.active !== false,
+        });
+        const refreshed = await resolveSavedPatternSourceCard(env.DB, { accountId, patternId });
+        return new Response(JSON.stringify({ success: true, guidance, source_card: refreshed }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return new Response(JSON.stringify({ error: message }), {
+          status: message === "guidance_text_required" ? 400 : 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (normalizedPath === "/api/patterns/delete" && request.method === "POST") {
       let payload: {
         app_user_id?: unknown;
