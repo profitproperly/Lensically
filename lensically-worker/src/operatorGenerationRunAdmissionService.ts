@@ -75,12 +75,38 @@ export async function admitOperatorGenerationRun(
     dependencies.loadAccountRejectionContext(),
     dependencies.loadPerformanceLearning(),
   ]);
+    const adaptationHistory = Array.isArray(canonicalContext.adaptation_history)
+    ? canonicalContext.adaptation_history.slice(-24) as JsonRecord[]
+    : [];
+  const priorRuns = input.brandKey === "manifest_mental"
+    ? adaptationHistory.map((run) => ({
+      run_id: run.run_id ?? null,
+      status: run.status ?? null,
+      created_at: run.created_at ?? null,
+      drafts: Array.isArray(run.drafts)
+        ? (run.drafts as JsonRecord[]).map((draft) => ({
+          draft_id: draft.draft_id ?? null,
+          status: draft.status ?? null,
+          scheduled_post_id: draft.scheduled_post_id ?? null,
+          published_post_id: draft.published_post_id ?? null,
+          published_execution: draft.published_execution ?? null,
+          metric_history: draft.metric_history ?? [],
+        }))
+        : [],
+    }))
+    : adaptationHistory;
   const priorAdaptationContext: JsonRecord = {
     family: canonicalContext.family ?? null,
     versions: canonicalContext.versions ?? [],
-    prior_runs: Array.isArray(canonicalContext.adaptation_history)
-      ? canonicalContext.adaptation_history.slice(-24)
-      : [],
+    source_evidence: input.brandKey === "manifest_mental" ? {
+      title: sourceCard.title ?? null,
+      primary_source: sourceCard.primary_source ?? null,
+      metrics_snapshot: sourceCard.metrics_snapshot ?? null,
+    } : null,
+    owner_guidance: sourceCard.owner_guidance ?? null,
+    owner_edit_notes: sourceCard.owner_edit_notes ?? [],
+    generation_direction: sourceCard.generation_direction ?? null,
+    prior_runs: priorRuns,
     account_rejection_context: accountRejectionContext,
     performance_learning: performanceLearning,
   };
