@@ -19,6 +19,25 @@ active_interrupt_precedence: none
 
 
 
+
+
+
+
+
+
+
+## Completed Commercial Hero Viewport-Fit Pass — operator-viewport-fit-v5-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Validated viewport-fit commit: `5b8165f2593fec925867b20c76dd559a2bfb75c8`.
+- Cloudflare Pages deployment workflow `30769545448` completed successfully from that exact SHA.
+- Owner-observed defect: on an approximately 1811×861 desktop viewport, the package card still extended below the fold, hiding the purchase button and defeating the requirement that the complete offer be visible immediately.
+- Repair: reduced hero top and bottom padding, headline scale, paragraph spacing, package-card padding, list spacing, price scale, and CTA spacing while preserving every purchasable deliverable, the one-time price, and the primary purchase action.
+- Responsive correction: two-column layout now remains active down to 901px wide; desktop screens at 800px height or less receive an additional compact mode that removes only redundant proof chips while retaining all package contents, price, CTA, and third-party cost disclosure.
+- Validation: push validation and fast validation completed successfully before deployment.
+- Permanent prevention: a public sales hero is not complete unless the full package definition, price, and primary purchase action are visible without scrolling at the target desktop viewport. Desktop visual QA must include both width and height constraints; checking width alone is insufficient.
+
 ## Resolved Interrupt — public-sales-page-account-identity-exposure-20260802
 
 - Severity: P1, resolved before further sales-page work.
