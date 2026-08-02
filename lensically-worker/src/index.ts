@@ -70,6 +70,7 @@ import {
   handleOperatorStripeTool,
   isOperatorStripeToolName,
 } from "./operatorStripeService";
+import { handleCommercialDeliveryRequest } from "./commercialDeliveryService";
 
 
 
@@ -30871,6 +30872,13 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }, "error");
         return notFoundJsonResponse(requestCorsHeaders);
       }
+    }
+
+        if (
+      normalizedPath === "/api/commercial/checkout-session"
+      || normalizedPath === "/api/commercial/download"
+    ) {
+      return handleCommercialDeliveryRequest(request, env, normalizedPath);
     }
 
     if (
