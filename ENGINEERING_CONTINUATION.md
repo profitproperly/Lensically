@@ -26,6 +26,16 @@ active_interrupt_precedence: none
 
 
 
+## Completed Hero Copy Refinement Pass: operator-hero-copy-refinement-v7-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Validated public-page commit: `35926e1da43c3067daee98a5bdb98a0ff71d29cb`.
+- Cloudflare Pages deployment workflow `30770935728` completed successfully from that exact SHA.
+- Owner-directed refinements: removed the unnecessary top package label and version, changed the hero description from a custom website to a custom system, changed the primary CTA to `Get Lensically Operator for $997`, clarified the final deliverable as fully AI-autonomous operation, and removed the third-party cost warning beneath the purchase button.
+- Validation: push validation and fast validation completed successfully.
+- Public-page scans: zero em dashes, zero `Complete Threads platform`, zero removed warning text, and zero matches for `Manifest Mental`, `opmg`, or `vectrix`.
+
 ## Completed Platform-First Hero Positioning Pass: operator-platform-positioning-v6-20260802
 
 - Status: completed and deployed.
