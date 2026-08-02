@@ -19393,7 +19393,8 @@ async function handleOperatorMcpAdminTool(
                 "createGitHubRepository",
                 "upsertGitHubRepositoryFile",
         "operateGitHubRepositories",
-        "createCloudflarePagesProject\,
+                "createCloudflarePagesProject",
+
         "deployCloudflarePagesProject",
         "deleteRepoFile",
         "runGitHubWorkflow",
