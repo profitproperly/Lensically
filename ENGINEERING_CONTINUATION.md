@@ -19,16 +19,18 @@ active_interrupt_precedence: none
 
 
 
-## Completed Commercial Sales Page Redesign — operator-sales-redesign-20260802
+## Completed Commercial Sales Page Redesign — operator-sales-redesign-v3-20260802
 
 - Status: completed and deployed.
 - Product page source: `lensically-worker/public/operator/index.html`.
-- Validated redesign commit: `5916017c7aba623886cca29619450c448cb53c0a`.
-- Cloudflare Pages deployment workflow `30768283707` completed successfully from that exact SHA.
+- Validated editorial redesign commit: `3649026affd9fb7614ffa887cf5c279e371fd21b`.
+- Cloudflare Pages deployment workflow `30768623807` completed successfully from that exact SHA.
 - Public entry route remains `lensically-worker/public/index.html`, which redirects buyers to `/operator/`.
-- The redesign replaced the documentation-first specification page with an outcome-first commercial narrative, code-native product previews, interactive Dashboard/Operator/Cycles/Recovery views, stronger offer architecture, premium responsive motion, mobile navigation, and a persistent mobile purchase action.
+- The owner rejected the prior `5916017c7aba623886cca29619450c448cb53c0a` implementation because it still presented as a generic AI SaaS template: oversized broken headline, floating glass navigation, purple glow, fake perspective browser chrome, tiny unreadable dashboard detail, decorative floating cards, and weak first-viewport balance.
+- The accepted repair direction removed those template patterns and rebuilt the page around an editorial black/paper/acid design system, compact outcome-first hero, readable code-native product board, open row-based information architecture, large alternating product demonstrations, ownership comparison, AI-led installation, commercial offer, responsive navigation, and mobile purchase action.
 - Product truth constraints remain enforced: no fabricated testimonials, no follower/revenue guarantees, no managed-service claim, and no change to the canonical $997 Stripe Payment Link or legal surfaces.
-- Prevention rule: future commercial page work must begin with buyer outcome, product proof, transformation, ownership, installation, offer, and objections before technical requirements or legal detail. A documentation-first card grid may not be treated as a finished sales page.
+- Permanent prevention: Lensically commercial pages may not use generic AI-SaaS defaults as a substitute for design. Prohibited defaults include floating glass nav pills, decorative purple fog, perspective browser mockups, unreadably dense fake dashboards, gradient headline treatment, arbitrary floating status cards, repeated bento grids, and first viewports dominated by oversized copy. Future redesigns must establish a specific editorial art direction, preserve readable product evidence at the target viewport, show the next section inside or immediately below the first screen, and verify proportion rather than relying on code volume or animation.
+
 
 ## Completed Commercial Release — lensically-operator-threads-v1-20260802
 
