@@ -26,6 +26,15 @@ active_interrupt_precedence: none
 
 
 
+## Completed Hero CTA Simplification Pass: operator-hero-cta-v9-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Public-page commit: `f7aa8bad7f5ab044025432763d9915dcef10e130`.
+- Cloudflare Pages deployment workflow `30771385415` completed successfully from that exact SHA.
+- Owner-directed correction: removed the price and separator from the primary hero button so it now reads `Get Lensically Operator`.
+- Verification: bounded source scan confirmed the exact CTA text before deployment.
+
 ## Completed Hero Sentence Alignment Pass: operator-hero-copy-alignment-v8-20260802
 
 - Status: completed and deployed.
