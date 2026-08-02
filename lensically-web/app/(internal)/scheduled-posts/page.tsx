@@ -974,8 +974,9 @@ export default function ScheduledPostsPage() {
           };
         }),
       );
-      setEditingScheduledPostId(null);
+            setEditingScheduledPostId(null);
       setEditPostText("");
+      setEditOwnerNote("");
       setEditSpoilerAllText(false);
       setEditSpoilerPhrasesInput("");
       setEditScheduleDate("");
