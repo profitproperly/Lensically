@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
 status: completed
-updated_at: 2026-08-01
+updated_at: 2026-08-02
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: null
 active_checkpoint: null
-validated_source_head: 580ab6773d0e088a9cf046b240b80f841e60589f
-documentation_source_head: e830e6796bc36fda4366e31391bbe39bfaeb1cfc
-production_sha: 580ab6773d0e088a9cf046b240b80f841e60589f
+validated_source_head: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
+documentation_source_head: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
+production_sha: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -18,6 +18,20 @@ active_interrupt_precedence: none
 
 
 
+
+## Completed Commercial Release — lensically-operator-threads-v1-20260802
+
+- Engineering status: completed and deployed from exact validated SHA `f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4`.
+- Root commercial site: Cloudflare Pages project `lensically-operator`, deployed from `lensically-worker/public`.
+- API fulfillment surface: production Worker on `api.lensically.com` with paid Checkout Session verification, migration-owned purchase ledger, deterministic license identity, short-lived one-time download tokens, five-download cap, and private GitHub release streaming.
+- Canonical offer: `Lensically Operator for Threads — Commercial License`, live product `prod_V0574p9of5FVl1`, one-time price `price_1U04xK4dwsz5Id6rMBTw8Nbx` at USD 997, and Payment Link `plink_1U04xX4dwsz5Id6r1mYvbYr0`.
+- Canonical release asset: `Lensically-Operator-Threads-v1.0.0.zip`, SHA-256 `d8d8df30de3e81c19872599a5c8b8ecec996adce14017781dc5d4ab3d8f0d979` from the private `profitproperly/Lensically-Operator-Threads` repository.
+- Commercial policies: license, refund policy, privacy policy, terms, and data-deletion instructions are published; support authority is `support@lensically.com`.
+- Permanent prevention: every Worker release now fails closed unless the canonical Stripe product identities, checkout URL, root-to-API handoff, paid-session verification call, and support policy references remain present.
+- Validation: exact-head typecheck, lifecycle gate, push validation, all eight deterministic Operator shards, D1 migration release, Worker runtime verification, and Cloudflare Pages deployment passed.
+- Known verification limit: no real USD 997 customer transaction was created during engineering, so the first paid purchase remains the first live Stripe-to-download transaction proof.
+- Owner-only launch gate: set the Stripe account public support email to `support@lensically.com` in the Stripe Dashboard and verify that mailbox receives mail. Stripe requires Dashboard use for updating the platform account's own business profile.
+- Superseded Stripe product, price, and Payment Link objects from the initial narrower-license draft are noncanonical and are not referenced by the public site or fulfillment gate. They may be archived later when native Stripe archive operations are added; they do not block sales.
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
 
