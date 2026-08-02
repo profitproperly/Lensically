@@ -406,6 +406,116 @@ describe("operator gate engine", () => {
     }));
   });
 
+    it("uses source-specific owner guidance instead of legacy Manifest mimicry rules", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "transform", gate_key: "source_transformation_contract_gate", severity: "block", evaluator: "hybrid" },
+      { id: "inventory", gate_key: "current_inventory_repeat_gate", severity: "block", evaluator: "backend" },
+      { id: "owner", gate_key: "historical_owner_rejection_gate", severity: "block", evaluator: "hybrid" },
+      { id: "required", gate_key: "required_gate_execution_gate", severity: "block", evaluator: "backend" },
+    ]);
+    dependencies.getSourceCard.mockResolvedValue({
+      status: "locked",
+      primary_source: { text: "The source sentence." },
+      transformation_contract: {
+        must_preserve_function: ["Keep every old close-mimic instruction."],
+        notes: "Use only slight wording changes.",
+      },
+      owner_guidance: { id: "guidance-1", text: "Use this source differently next time." },
+      owner_edit_notes: [{ id: "revision-1", owner_note: "This was too repetitive." }],
+    });
+    dependencies.getLatestInventory.mockResolvedValue({
+      realm_entrance_key: "same_opening",
+      opening_phrase: "same opening",
+    });
+
+    const result = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-4",
+      threadsUserId: "threads-4",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-4",
+      draftId: "draft-4",
+      draftText: "Same opening, but a different complete post.",
+      draftAnalysis: {
+        realm_entrance_key: "same_opening",
+        opening_phrase: "same opening",
+      },
+      modelGateResults: [{
+        gate_key: "historical_owner_rejection_gate",
+        result: "pass",
+        rationale: "The candidate follows the complete source-card owner guidance.",
+        evidence: {
+          owner_guidance_id: "guidance-1",
+          reviewed_owner_note_ids: ["revision-1"],
+        },
+      }],
+    }, dependencies);
+
+    expect(result.showable).toBe(true);
+    expect(result.gate_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gate_key: "source_transformation_contract_gate",
+        result: "pass",
+        evidence: expect.objectContaining({ legacy_transformation_contract_active: false }),
+      }),
+      expect.objectContaining({
+        gate_key: "current_inventory_repeat_gate",
+        result: "pass",
+        evidence: expect.objectContaining({ universal_repeat_rule_active: false }),
+      }),
+      expect.objectContaining({
+        gate_key: "historical_owner_rejection_gate",
+        result: "pass",
+        evidence: expect.objectContaining({
+          owner_guidance_id: "guidance-1",
+          reviewed_owner_note_ids: ["revision-1"],
+        }),
+      }),
+    ]));
+  });
+
+  it("blocks Manifest generation when the owner-note review is incomplete", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "owner", gate_key: "historical_owner_rejection_gate", severity: "block", evaluator: "hybrid" },
+    ]);
+    dependencies.getSourceCard.mockResolvedValue({
+      status: "locked",
+      transformation_contract: { notes: "Use only slight wording changes." },
+      owner_guidance: { id: "guidance-2", text: "Use the whole note." },
+      owner_edit_notes: [
+        { id: "revision-2", owner_note: "First correction." },
+        { id: "revision-3", owner_note: "Second correction." },
+      ],
+    });
+
+    const result = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-5",
+      threadsUserId: "threads-5",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-5",
+      draftText: "Candidate",
+      modelGateResults: [{
+        gate_key: "historical_owner_rejection_gate",
+        result: "pass",
+        rationale: "Reviewed some guidance.",
+        evidence: {
+          owner_guidance_id: "guidance-2",
+          reviewed_owner_note_ids: ["revision-2"],
+        },
+      }],
+    }, dependencies);
+
+    expect(result.showable).toBe(false);
+    expect(result.blocking_failures).toEqual([
+      expect.objectContaining({
+        gate_key: "historical_owner_rejection_gate",
+        result: "fail",
+        evidence: expect.objectContaining({ missing_owner_note_ids: ["revision-3"] }),
+      }),
+    ]);
+  });
+
   it("preserves duplicate and scheduling collision outcomes through explicit adapters", async () => {
     const dependencies = createGateEngineDependencies([
       { id: "duplicate", gate_key: "exact_duplicate_gate", severity: "block", evaluator: "backend" },
