@@ -164,9 +164,13 @@ const PUBLIC_DIRECT_TOOL_NAMES = [
   "verifyDeployedMcpVersion",
   "listMcpTools",
   "readMcpToolDefinition",
-  "runMcpTests",
+    "runMcpTests",
   "listEngineeringAudit",
+  "getStripeAccountState",
+  "readStripeObjects",
+  "operateStripe",
 ] as const;
+
 
 export const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES = new Set<string>(
   PUBLIC_DIRECT_TOOL_NAMES.filter((name) => !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(name)),

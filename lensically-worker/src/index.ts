@@ -66,6 +66,12 @@ import {
   buildOperatorMcpInitializeResult,
 } from "./operatorMcpProtocol";
 import { type OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
+import {
+  handleOperatorStripeTool,
+  isOperatorStripeToolName,
+} from "./operatorStripeService";
+
+
 
 import {
   FORBIDDEN_RETIRED_TOOL_NAMES,
@@ -412,8 +418,10 @@ interface Env {
   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;
   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;
   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;
-  LENSICALLY_COMMIT_SHA?: string;
+    LENSICALLY_COMMIT_SHA?: string;
+  LENSICALLY_STRIPE_KEY?: string;
   CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };
+
   GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
@@ -17060,7 +17068,9 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 
 function operatorPreCallProvider(toolName: string): string {
                         if (["getEngineeringContinuation", "getDatabaseSchemaState", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "operateGitHubRepositories", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
-        if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+                if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
+        if (["getStripeAccountState", "readStripeObjects", "operateStripe"].includes(toolName)) return "stripe";
+
     if (["schedule_approved_draft", "schedule_manifest_review_batch", "delete_scheduled_post", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
 }
@@ -18862,9 +18872,14 @@ async function handleOperatorMcpAdminTool(
   args: Record<string, unknown>,
   preparationAlreadyComplete = false,
 ): Promise<Record<string, unknown>> {
-  if (!preparationAlreadyComplete) await prepareOperatorMode(env);
+    if (!preparationAlreadyComplete) await prepareOperatorMode(env);
+
+  if (isOperatorStripeToolName(toolName)) {
+    return handleOperatorStripeTool(env, toolName, args);
+  }
 
     if (toolName === "selectOperatorKey") {
+
     const brandKey = normalizeGptBrandKey(args.brand_key);
     if (!brandKey) {
       return { ok: false, error: "invalid_brand_key", canonical_keys: ["manifest_mental", "opmg_deadman", "vectrix"], account_data_loaded: false };
@@ -19353,9 +19368,12 @@ async function handleOperatorMcpAdminTool(
         "inspectMcpFailure",
         "listMcpTools",
       ]),
-      admin_reads_b: new Set([
+            admin_reads_b: new Set([
         "readMcpToolDefinition",
         "runMcpTests",
+        "getStripeAccountState",
+        "readStripeObjects",
+
         "getWorkflowStatus",
         "list_accounts",
         "get_account_state",
@@ -19399,8 +19417,10 @@ async function handleOperatorMcpAdminTool(
         "deleteRepoFile",
         "runGitHubWorkflow",
       ]),
-      admin_mutations: new Set([
+            admin_mutations: new Set([
         "confirmOperatorProceed",
+        "operateStripe",
+
         "updateGrowthMission",
         "proposeOperatorDecision",
         "resolveOperatorDecision",
