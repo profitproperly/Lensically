@@ -583,7 +583,20 @@ export async function runOperatorGateEngine<TStage extends string>(
       }
       continue;
     }
-    if (gateKey === "current_inventory_repeat_gate") {
+        if (gateKey === "current_inventory_repeat_gate") {
+      if (manifestOwnerGuided) {
+        results.push(buildOperatorGateResult(
+          gate,
+          "pass",
+          "Manifest repeatability is governed source by source through the owner’s guidance, not a universal opener or realm-rotation rule.",
+          {
+            owner_guidance_id: ownerGuidance?.id ?? null,
+            owner_note_count: ownerEditNotes.length,
+            universal_repeat_rule_active: false,
+          },
+        ));
+        continue;
+      }
       const latest = await dependencies.getLatestInventory(input.brandKey);
       const candidateRealm = dependencies.normalizeMachineKey(input.draftAnalysis?.realm_entrance_key, "")
         || dependencies.inferRealmEntranceKey(
