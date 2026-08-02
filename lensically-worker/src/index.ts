@@ -30746,7 +30746,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const total = Number(totalRow?.total ?? 0);
       const totalPages = Math.max(1, Math.ceil(total / limit));
 
-      const sanitizedRows = (rows.results ?? []).map(sanitizeExternalPatternRow);
+            const sanitizedRows = (rows.results ?? []).map(sanitizeExternalPatternRow);
+      const requestedThreadsUserId = normalizeOperatorText(url.searchParams.get("threads_user_id"), 255, true);
+      const ownerLearningSummary = requestedThreadsUserId
+        ? await readOwnerLearningSummary(env.DB, requestedThreadsUserId)
+        : null;
 
       return new Response(JSON.stringify({
         success: true,
@@ -30758,6 +30762,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         page_size: limit,
         total_pages: totalPages,
         patterns: sanitizedRows,
+        owner_learning_summary: ownerLearningSummary,
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
