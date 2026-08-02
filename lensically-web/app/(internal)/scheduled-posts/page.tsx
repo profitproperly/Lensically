@@ -927,8 +927,9 @@ export default function ScheduledPostsPage() {
           date: editScheduleDate,
           time: normalizedTime,
           timezone,
-          spoiler_all_text: editSpoilerAllText,
+                    spoiler_all_text: editSpoilerAllText,
           spoiler_phrases: spoilerPhrases,
+          owner_note: editOwnerNote.trim() || undefined,
         }),
       });
 
