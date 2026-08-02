@@ -1,0 +1,449 @@
+const STRIPE_API_ORIGIN = "https://api.stripe.com/v1";
+const GITHUB_API_ORIGIN = "https://api.github.com";
+
+export const COMMERCIAL_PRODUCT_KEY = "lensically_operator_threads";
+export const COMMERCIAL_PRODUCT_RELEASE = "v1.0.0";
+export const COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx";
+export const COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0";
+export const COMMERCIAL_PRODUCT_AMOUNT = 99_700;
+export const COMMERCIAL_PRODUCT_CURRENCY = "usd";
+export const COMMERCIAL_RELEASE_REPOSITORY = "Lensically-Operator-Threads";
+export const COMMERCIAL_RELEASE_ASSET = "Lensically-Operator-Threads-v1.0.0.zip";
+export const COMMERCIAL_RELEASE_SHA256 = "d8d8df30de3e81c19872599a5c8b8ecec996adce14017781dc5d4ab3d8f0d979";
+
+const DOWNLOAD_TOKEN_TTL_MS = 15 * 60 * 1000;
+const MAX_DOWNLOADS_PER_PURCHASE = 5;
+
+export interface CommercialDeliveryEnv {
+  DB: D1Database;
+  LENSICALLY_STRIPE_KEY?: string;
+  GITHUB_TOKEN?: string;
+  GITHUB_OWNER?: string;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+type CommercialCheckoutValidation =
+  | {
+      ok: true;
+      sessionId: string;
+      paymentIntentId: string | null;
+      customerEmail: string | null;
+      customerName: string | null;
+      amountTotal: number;
+      currency: string;
+      checkoutCreatedAt: number | null;
+    }
+  | { ok: false; error: string };
+
+type CommercialOrderRow = {
+  session_id: string;
+  license_key: string;
+  customer_email: string | null;
+  customer_name: string | null;
+  download_count: number | string;
+};
+
+type CommercialDownloadTokenRow = {
+  token_hash: string;
+  session_id: string;
+  expires_at: string;
+  used_at: string | null;
+  download_count: number | string;
+};
+
+function jsonResponse(payload: JsonRecord, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      "cache-control": "no-store, private",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonRecord
+    : null;
+}
+
+function stringValue(value: unknown, maxLength = 1000): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, maxLength) : null;
+}
+
+function integerValue(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function expandableId(value: unknown): string | null {
+  if (typeof value === "string") return stringValue(value, 255);
+  const record = asRecord(value);
+  return record ? stringValue(record.id, 255) : null;
+}
+
+function timingSafeTextEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+export function validateCommercialCheckoutSessionPayload(payload: unknown): CommercialCheckoutValidation {
+  const session = asRecord(payload);
+  if (!session) return { ok: false, error: "invalid_checkout_session" };
+
+  const sessionId = stringValue(session.id, 255);
+  if (!sessionId || !/^cs_(?:test_|live_)?[A-Za-z0-9]+$/.test(sessionId)) {
+    return { ok: false, error: "invalid_checkout_session_id" };
+  }
+
+  if (stringValue(session.payment_status, 40) !== "paid") {
+    return { ok: false, error: "checkout_not_paid" };
+  }
+  if (stringValue(session.status, 40) !== "complete") {
+    return { ok: false, error: "checkout_not_complete" };
+  }
+
+  const amountTotal = integerValue(session.amount_total);
+  const currency = stringValue(session.currency, 3)?.toLowerCase() ?? "";
+  if (amountTotal !== COMMERCIAL_PRODUCT_AMOUNT || currency !== COMMERCIAL_PRODUCT_CURRENCY) {
+    return { ok: false, error: "checkout_amount_mismatch" };
+  }
+
+  const paymentLinkId = expandableId(session.payment_link);
+  if (!paymentLinkId || !timingSafeTextEqual(paymentLinkId, COMMERCIAL_PAYMENT_LINK_ID)) {
+    return { ok: false, error: "checkout_payment_link_mismatch" };
+  }
+
+  const lineItems = asRecord(session.line_items);
+  const lineItemData = Array.isArray(lineItems?.data) ? lineItems.data : [];
+  const matchingLine = lineItemData.find((entry) => {
+    const line = asRecord(entry);
+    if (!line) return false;
+    const priceId = expandableId(line.price);
+    const quantity = integerValue(line.quantity);
+    return priceId === COMMERCIAL_PRODUCT_PRICE_ID && quantity === 1;
+  });
+  if (!matchingLine) return { ok: false, error: "checkout_line_item_mismatch" };
+
+  const customerDetails = asRecord(session.customer_details);
+  return {
+    ok: true,
+    sessionId,
+    paymentIntentId: expandableId(session.payment_intent),
+    customerEmail: stringValue(customerDetails?.email, 320),
+    customerName: stringValue(customerDetails?.name, 250),
+    amountTotal,
+    currency,
+    checkoutCreatedAt: integerValue(session.created),
+  };
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function randomToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+async function deterministicLicenseKey(sessionId: string): Promise<string> {
+  const digest = (await sha256Hex(`lensically-commercial-license:${sessionId}`)).toUpperCase();
+  return `LOT-${digest.slice(0, 6)}-${digest.slice(6, 12)}-${digest.slice(12, 18)}`;
+}
+
+async function ensureCommercialSalesTables(db: D1Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS commercial_orders (
+      session_id TEXT PRIMARY KEY,
+      payment_intent_id TEXT,
+      customer_email TEXT,
+      customer_name TEXT,
+      product_key TEXT NOT NULL,
+      release_version TEXT NOT NULL,
+      payment_link_id TEXT NOT NULL,
+      price_id TEXT NOT NULL,
+      amount_total INTEGER NOT NULL,
+      currency TEXT NOT NULL,
+      payment_status TEXT NOT NULL,
+      license_key TEXT NOT NULL UNIQUE,
+      checkout_created_at INTEGER,
+      first_verified_at TEXT NOT NULL,
+      last_verified_at TEXT NOT NULL,
+      download_count INTEGER NOT NULL DEFAULT 0,
+      last_downloaded_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_commercial_orders_email
+      ON commercial_orders(customer_email);
+    CREATE TABLE IF NOT EXISTS commercial_download_tokens (
+      token_hash TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      FOREIGN KEY (session_id) REFERENCES commercial_orders(session_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_commercial_download_tokens_session
+      ON commercial_download_tokens(session_id, expires_at);
+  `);
+}
+
+async function fetchStripeCheckoutSession(
+  env: CommercialDeliveryEnv,
+  sessionId: string,
+): Promise<{ ok: true; session: JsonRecord } | { ok: false; status: number; error: string }> {
+  const stripeKey = env.LENSICALLY_STRIPE_KEY?.trim() ?? "";
+  if (!stripeKey || (!stripeKey.startsWith("sk_") && !stripeKey.startsWith("rk_"))) {
+    return { ok: false, status: 503, error: "checkout_verification_unavailable" };
+  }
+
+  const query = new URLSearchParams();
+  query.append("expand[]", "line_items.data.price");
+  const response = await fetch(
+    `${STRIPE_API_ORIGIN}/checkout/sessions/${encodeURIComponent(sessionId)}?${query.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${stripeKey}` },
+    },
+  );
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status === 404 ? 404 : 502,
+      error: response.status === 404 ? "checkout_session_not_found" : "checkout_verification_failed",
+    };
+  }
+  const session = asRecord(payload);
+  return session
+    ? { ok: true, session }
+    : { ok: false, status: 502, error: "checkout_verification_failed" };
+}
+
+async function issueCommercialDownload(
+  request: Request,
+  env: CommercialDeliveryEnv,
+  sessionId: string,
+): Promise<Response> {
+  if (!/^cs_(?:test_|live_)?[A-Za-z0-9]+$/.test(sessionId)) {
+    return jsonResponse({ ok: false, error: "invalid_checkout_session_id" }, 400);
+  }
+
+  const stripeResult = await fetchStripeCheckoutSession(env, sessionId);
+  if (!stripeResult.ok) {
+    return jsonResponse({ ok: false, error: stripeResult.error }, stripeResult.status);
+  }
+
+  const validation = validateCommercialCheckoutSessionPayload(stripeResult.session);
+  if (!validation.ok) {
+    const status = validation.error === "checkout_not_paid" || validation.error === "checkout_not_complete"
+      ? 402
+      : 403;
+    return jsonResponse({ ok: false, error: validation.error }, status);
+  }
+
+  await ensureCommercialSalesTables(env.DB);
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const existing = await env.DB.prepare(
+    `SELECT session_id, license_key, customer_email, customer_name, download_count
+     FROM commercial_orders
+     WHERE session_id = ?`,
+  ).bind(validation.sessionId).first<CommercialOrderRow>();
+  const downloadCount = Number(existing?.download_count ?? 0);
+  if (downloadCount >= MAX_DOWNLOADS_PER_PURCHASE) {
+    return jsonResponse({ ok: false, error: "download_limit_reached" }, 429);
+  }
+
+  const licenseKey = existing?.license_key ?? await deterministicLicenseKey(validation.sessionId);
+  await env.DB.prepare(
+    `INSERT INTO commercial_orders (
+       session_id, payment_intent_id, customer_email, customer_name, product_key,
+       release_version, payment_link_id, price_id, amount_total, currency,
+       payment_status, license_key, checkout_created_at, first_verified_at, last_verified_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?)
+     ON CONFLICT(session_id) DO UPDATE SET
+       payment_intent_id = excluded.payment_intent_id,
+       customer_email = COALESCE(excluded.customer_email, commercial_orders.customer_email),
+       customer_name = COALESCE(excluded.customer_name, commercial_orders.customer_name),
+       amount_total = excluded.amount_total,
+       currency = excluded.currency,
+       payment_status = 'paid',
+       last_verified_at = excluded.last_verified_at`,
+  ).bind(
+    validation.sessionId,
+    validation.paymentIntentId,
+    validation.customerEmail,
+    validation.customerName,
+    COMMERCIAL_PRODUCT_KEY,
+    COMMERCIAL_PRODUCT_RELEASE,
+    COMMERCIAL_PAYMENT_LINK_ID,
+    COMMERCIAL_PRODUCT_PRICE_ID,
+    validation.amountTotal,
+    validation.currency,
+    licenseKey,
+    validation.checkoutCreatedAt,
+    nowIso,
+    nowIso,
+  ).run();
+
+  await env.DB.prepare(
+    `DELETE FROM commercial_download_tokens
+     WHERE datetime(expires_at) <= datetime(?)
+        OR (used_at IS NOT NULL AND datetime(used_at) <= datetime(?, '-1 day'))`,
+  ).bind(nowIso, nowIso).run();
+
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(now.getTime() + DOWNLOAD_TOKEN_TTL_MS).toISOString();
+  await env.DB.prepare(
+    `INSERT INTO commercial_download_tokens (token_hash, session_id, created_at, expires_at)
+     VALUES (?, ?, ?, ?)`,
+  ).bind(tokenHash, validation.sessionId, nowIso, expiresAt).run();
+
+  const downloadUrl = new URL("/api/commercial/download", request.url);
+  downloadUrl.searchParams.set("token", token);
+  return jsonResponse({
+    ok: true,
+    product: "Lensically Operator for Threads",
+    release: COMMERCIAL_PRODUCT_RELEASE,
+    license_key: licenseKey,
+    customer_email: validation.customerEmail,
+    downloads_remaining: MAX_DOWNLOADS_PER_PURCHASE - downloadCount,
+    download_url: downloadUrl.toString(),
+    download_expires_at: expiresAt,
+    sha256: COMMERCIAL_RELEASE_SHA256,
+  });
+}
+
+async function fetchCommercialReleaseAsset(
+  env: CommercialDeliveryEnv,
+): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
+  const githubToken = env.GITHUB_TOKEN?.trim() ?? "";
+  if (!githubToken) return { ok: false, error: "release_delivery_unavailable" };
+  const owner = env.GITHUB_OWNER?.trim() || "profitproperly";
+  const commonHeaders = {
+    Authorization: `Bearer ${githubToken}`,
+    "User-Agent": "Lensically-Commercial-Delivery",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const releaseResponse = await fetch(
+    `${GITHUB_API_ORIGIN}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(COMMERCIAL_RELEASE_REPOSITORY)}/releases/tags/${encodeURIComponent(COMMERCIAL_PRODUCT_RELEASE)}`,
+    { headers: { ...commonHeaders, Accept: "application/vnd.github+json" } },
+  );
+  const releasePayload = await releaseResponse.json().catch(() => null);
+  if (!releaseResponse.ok) return { ok: false, error: "release_lookup_failed" };
+  const release = asRecord(releasePayload);
+  const assets = Array.isArray(release?.assets) ? release.assets : [];
+  const asset = assets
+    .map(asRecord)
+    .find((entry) => stringValue(entry?.name, 255) === COMMERCIAL_RELEASE_ASSET);
+  const assetApiUrl = stringValue(asset?.url, 2000);
+  if (!assetApiUrl) return { ok: false, error: "release_asset_missing" };
+
+  const assetResponse = await fetch(assetApiUrl, {
+    headers: { ...commonHeaders, Accept: "application/octet-stream" },
+    redirect: "follow",
+  });
+  if (!assetResponse.ok || !assetResponse.body) {
+    return { ok: false, error: "release_download_failed" };
+  }
+  return { ok: true, response: assetResponse };
+}
+
+async function serveCommercialDownload(
+  env: CommercialDeliveryEnv,
+  token: string,
+): Promise<Response> {
+  if (!/^[A-Za-z0-9_-]{40,100}$/.test(token)) {
+    return jsonResponse({ ok: false, error: "invalid_download_token" }, 400);
+  }
+  await ensureCommercialSalesTables(env.DB);
+  const nowIso = new Date().toISOString();
+  const tokenHash = await sha256Hex(token);
+  const tokenRow = await env.DB.prepare(
+    `SELECT t.token_hash, t.session_id, t.expires_at, t.used_at, o.download_count
+     FROM commercial_download_tokens t
+     JOIN commercial_orders o ON o.session_id = t.session_id
+     WHERE t.token_hash = ?`,
+  ).bind(tokenHash).first<CommercialDownloadTokenRow>();
+  if (!tokenRow || tokenRow.used_at || new Date(tokenRow.expires_at).getTime() <= Date.now()) {
+    return jsonResponse({ ok: false, error: "download_token_expired_or_used" }, 410);
+  }
+  if (Number(tokenRow.download_count) >= MAX_DOWNLOADS_PER_PURCHASE) {
+    return jsonResponse({ ok: false, error: "download_limit_reached" }, 429);
+  }
+
+  const asset = await fetchCommercialReleaseAsset(env);
+  if (!asset.ok) return jsonResponse({ ok: false, error: asset.error }, 502);
+
+  const consumed = await env.DB.prepare(
+    `UPDATE commercial_download_tokens
+     SET used_at = ?
+     WHERE token_hash = ?
+       AND used_at IS NULL
+       AND datetime(expires_at) > datetime(?)
+     RETURNING session_id`,
+  ).bind(nowIso, tokenHash, nowIso).first<{ session_id: string }>();
+  if (!consumed) {
+    return jsonResponse({ ok: false, error: "download_token_expired_or_used" }, 410);
+  }
+  await env.DB.prepare(
+    `UPDATE commercial_orders
+     SET download_count = download_count + 1,
+         last_downloaded_at = ?
+     WHERE session_id = ?`,
+  ).bind(nowIso, tokenRow.session_id).run();
+
+  const headers = new Headers();
+  headers.set("content-type", "application/zip");
+  headers.set("content-disposition", `attachment; filename="${COMMERCIAL_RELEASE_ASSET}"`);
+  headers.set("cache-control", "no-store, private");
+  headers.set("referrer-policy", "no-referrer");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-lensically-release", COMMERCIAL_PRODUCT_RELEASE);
+  headers.set("x-lensically-sha256", COMMERCIAL_RELEASE_SHA256);
+  const contentLength = asset.response.headers.get("content-length");
+  if (contentLength) headers.set("content-length", contentLength);
+  return new Response(asset.response.body, { status: 200, headers });
+}
+
+export async function handleCommercialDeliveryRequest(
+  request: Request,
+  env: CommercialDeliveryEnv,
+  normalizedPath: string,
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+  }
+  const url = new URL(request.url);
+  if (normalizedPath === "/api/commercial/checkout-session") {
+    const sessionId = stringValue(url.searchParams.get("session_id"), 255);
+    return sessionId
+      ? issueCommercialDownload(request, env, sessionId)
+      : jsonResponse({ ok: false, error: "session_id_required" }, 400);
+  }
+  if (normalizedPath === "/api/commercial/download") {
+    const token = stringValue(url.searchParams.get("token"), 200);
+    return token
+      ? serveCommercialDownload(env, token)
+      : jsonResponse({ ok: false, error: "download_token_required" }, 400);
+  }
+  return jsonResponse({ ok: false, error: "not_found" }, 404);
+}
