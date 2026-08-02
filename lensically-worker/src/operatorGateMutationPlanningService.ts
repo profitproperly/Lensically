@@ -667,32 +667,80 @@ export async function runOperatorGateEngine<TStage extends string>(
         return !approvedForCurrentDraft
           && dependencies.containsRejectedSurface(normalizedDraft, surface);
       });
-      if (manifestCloseMimicry) {
-        if (matchedBannedSurfaces.length) {
+            if (manifestOwnerGuided) {
+        const requiredOwnerNoteIds = ownerEditNotes
+          .map((note) => String(note.id ?? ""))
+          .filter(Boolean);
+        const hasOwnerLearning = Boolean(ownerGuidance?.id) || requiredOwnerNoteIds.length > 0;
+        if (!hasOwnerLearning) {
+          results.push(buildOperatorGateResult(
+            gate,
+            "pass",
+            "This source card has no owner guidance or prior owner edit notes yet.",
+            {
+              enforcement_mode: "source_card_owner_guidance",
+              source_card_id: input.sourceCardId ?? null,
+              owner_guidance_id: null,
+              required_owner_note_ids: [],
+            },
+          ));
+          continue;
+        }
+        const modelResult = input.modelGateResults?.find((item) => item.gate_key === gateKey);
+        const evidence = modelResult?.evidence
+          && typeof modelResult.evidence === "object"
+          && !Array.isArray(modelResult.evidence)
+          ? modelResult.evidence as Record<string, unknown>
+          : {};
+        const reviewedGuidanceId = String(evidence.owner_guidance_id ?? "");
+        const reviewedNoteIds = new Set(
+          Array.isArray(evidence.reviewed_owner_note_ids)
+            ? evidence.reviewed_owner_note_ids.map(String)
+            : [],
+        );
+        const missingOwnerNoteIds = requiredOwnerNoteIds.filter((id) => !reviewedNoteIds.has(id));
+        const guidanceMismatch = Boolean(ownerGuidance?.id)
+          && reviewedGuidanceId !== String(ownerGuidance.id);
+        if (!modelResult?.result || !modelResult?.rationale) {
           results.push(buildOperatorGateResult(
             gate,
             "fail",
-            "Manifest draft repeats language the owner explicitly hard-banned.",
+            "The active source-card owner guidance was not evaluated against this candidate.",
             {
-              enforcement_mode: "explicit_hard_bans_only",
-              context_fingerprint: expectedFingerprint,
-              matched_banned_surfaces: matchedBannedSurfaces,
+              enforcement_mode: "source_card_owner_guidance",
+              source_card_id: input.sourceCardId ?? null,
+              owner_guidance_id: ownerGuidance?.id ?? null,
+              required_owner_note_ids: requiredOwnerNoteIds,
             },
-            "Remove only the matched hard-ban wording. Keep the source hook, structure, meaning, tone, and payoff close to the original.",
+            "Review the full owner guidance and owner edit notes, then record whether this candidate follows them.",
+          ));
+        } else if (guidanceMismatch || missingOwnerNoteIds.length > 0) {
+          results.push(buildOperatorGateResult(
+            gate,
+            "fail",
+            "The owner-guidance review did not cover the complete current source-card evidence.",
+            {
+              enforcement_mode: "source_card_owner_guidance",
+              source_card_id: input.sourceCardId ?? null,
+              expected_owner_guidance_id: ownerGuidance?.id ?? null,
+              reviewed_owner_guidance_id: reviewedGuidanceId || null,
+              missing_owner_note_ids: missingOwnerNoteIds,
+            },
+            "Review the exact current owner guidance and every supplied owner edit note before evaluating the candidate again.",
           ));
         } else {
           results.push(buildOperatorGateResult(
             gate,
-            coverageComplete ? "pass" : "pass_with_caution",
-            coverageComplete
-              ? "Manifest draft contains no explicit owner hard-ban surface."
-              : "Manifest draft contains no hard-ban surface in the available compact rejection context.",
+            modelResult.result as OperatorGateResultValue,
+            String(modelResult.rationale),
             {
-              enforcement_mode: "explicit_hard_bans_only",
-              context_fingerprint: expectedFingerprint,
-              explicit_hard_ban_count: explicitBannedSurfaces.length,
-              coverage_status: rejectionContext?.coverage_status ?? null,
+              ...evidence,
+              enforcement_mode: "source_card_owner_guidance",
+              source_card_id: input.sourceCardId ?? null,
+              owner_guidance_id: ownerGuidance?.id ?? null,
+              reviewed_owner_note_ids: Array.from(reviewedNoteIds),
             },
+            dependencies.normalizeText(modelResult.repair_guidance, 1000, true),
           ));
         }
         continue;
