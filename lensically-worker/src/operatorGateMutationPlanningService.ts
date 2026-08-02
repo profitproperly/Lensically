@@ -296,8 +296,18 @@ export async function runOperatorGateEngine<TStage extends string>(
     : null;
   const draftText = dependencies.normalizeText(input.draftText, 20000, true) ?? "";
   const normalizedDraft = dependencies.normalizeComparableText(draftText);
-  const sourceContract = dependencies.normalizeSourceContract(sourceCard?.transformation_contract);
-  const manifestCloseMimicry = input.brandKey === "manifest_mental";
+    const manifestOwnerGuided = input.brandKey === "manifest_mental";
+  const sourceContract = dependencies.normalizeSourceContract(
+    manifestOwnerGuided ? {} : sourceCard?.transformation_contract,
+  );
+  const ownerGuidance = sourceCard?.owner_guidance
+    && typeof sourceCard.owner_guidance === "object"
+    && !Array.isArray(sourceCard.owner_guidance)
+    ? sourceCard.owner_guidance as Record<string, unknown>
+    : null;
+  const ownerEditNotes = Array.isArray(sourceCard?.owner_edit_notes)
+    ? sourceCard.owner_edit_notes as Array<Record<string, unknown>>
+    : [];
   const primarySource = sourceCard?.primary_source
     && typeof sourceCard.primary_source === "object"
     && !Array.isArray(sourceCard.primary_source)
