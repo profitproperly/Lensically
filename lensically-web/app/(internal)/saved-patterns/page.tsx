@@ -525,7 +525,137 @@ export default function SavedPatternsPage() {
                           <p className="text-slate-500">Captured</p>
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-900">{formatDateTime(pattern.updated_at)}</p>
                         </div>
-                      </div>
+                                            </div>
+
+                      {expandedPatternId === pattern.id ? (
+                        <div className="rounded-xl border border-slate-300 bg-white p-4">
+                          {loadingSourceCardId === pattern.id ? (
+                            <p className="text-sm text-slate-600">Loading linked source card...</p>
+                          ) : sourceCards[pattern.id] ? (
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-sm font-semibold text-slate-900">
+                                    {sourceCards[pattern.id]?.title || "Linked Source Card"}
+                                  </h3>
+                                  {sourceCards[pattern.id]?.status ? (
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                      {sourceCards[pattern.id]?.status}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-2 text-sm text-slate-700">
+                                  {sourceCards[pattern.id]?.generation_direction}
+                                </p>
+                              </div>
+
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                  <p className="text-xs font-medium text-slate-500">What this source shows</p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                                    {sourceCards[pattern.id]?.source_mechanism || "No source explanation has been recorded yet."}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                  <p className="text-xs font-medium text-slate-500">What the audience receives</p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                                    {sourceCards[pattern.id]?.required_product || "No audience result has been recorded yet."}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {sourceCards[pattern.id]?.recommended_direction ? (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                  <p className="text-xs font-medium text-slate-500">Current direction</p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                                    {sourceCards[pattern.id]?.recommended_direction}
+                                  </p>
+                                </div>
+                              ) : null}
+
+                              <div>
+                                <label className="block text-sm font-semibold text-slate-900" htmlFor={`source-card-guidance-${pattern.id}`}>
+                                  Permanent owner guidance
+                                </label>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Tell Lensically what is repeatable, what needs to change, what it misunderstood, and how to use this source next time. Your full wording stays attached to this source card.
+                                </p>
+                                <textarea
+                                  id={`source-card-guidance-${pattern.id}`}
+                                  value={guidanceDrafts[pattern.id] ?? ""}
+                                  onChange={(event) => setGuidanceDrafts((current) => ({
+                                    ...current,
+                                    [pattern.id]: event.target.value,
+                                  }))}
+                                  rows={9}
+                                  maxLength={20000}
+                                  placeholder="Write the full guidance you want Lensically to use whenever this source card is selected."
+                                  className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void saveSourceCardGuidance(pattern.id, true)}
+                                    disabled={savingGuidanceId === pattern.id || !(guidanceDrafts[pattern.id] ?? "").trim()}
+                                    className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {savingGuidanceId === pattern.id ? "Saving..." : "Save Guidance"}
+                                  </button>
+                                  {sourceCards[pattern.id]?.owner_guidance?.active ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void saveSourceCardGuidance(pattern.id, false)}
+                                      disabled={savingGuidanceId === pattern.id}
+                                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      Disable Guidance
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {(sourceCards[pattern.id]?.owner_learning?.owner_edit_notes?.length ?? 0) > 0 ? (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-slate-900">Previous owner corrections</h4>
+                                  <div className="mt-2 space-y-3">
+                                    {sourceCards[pattern.id]?.owner_learning?.owner_edit_notes?.slice(0, 6).map((revision) => (
+                                      <div key={revision.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p className="whitespace-pre-wrap text-sm font-medium text-slate-900">{revision.owner_note}</p>
+                                        {revision.previous_text ? (
+                                          <div className="mt-3">
+                                            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Model version</p>
+                                            <p className="mt-1 whitespace-pre-wrap text-xs text-slate-700">{revision.previous_text}</p>
+                                          </div>
+                                        ) : null}
+                                        {revision.revised_text ? (
+                                          <div className="mt-3">
+                                            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Owner version</p>
+                                            <p className="mt-1 whitespace-pre-wrap text-xs text-slate-700">{revision.revised_text}</p>
+                                          </div>
+                                        ) : null}
+                                        <p className="mt-3 text-xs text-slate-500">
+                                          {revision.became_published
+                                            ? revision.performance_24h
+                                              ? "This exact owner-edited revision published and has a recorded 24-hour result."
+                                              : "This exact owner-edited revision published; its 24-hour result is still pending."
+                                            : "This correction is preserved as source-card learning evidence."}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+                              <p className="text-sm font-medium text-slate-900">No linked source card yet</p>
+                              <p className="mt-1 text-xs text-slate-600">
+                                This Saved Pattern will show its source card here after Lensically creates or links one.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
 
                       <div className="border-t border-slate-200 pt-3 text-xs text-slate-500">
                         <div className="flex flex-col gap-1">
