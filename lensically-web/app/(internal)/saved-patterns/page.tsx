@@ -58,9 +58,17 @@ type SourceCardDetail = {
   id: string;
   title?: string;
   status?: string;
-  source_mechanism?: string;
-  required_product?: string;
-  recommended_direction?: string | null;
+  primary_source?: {
+    text?: string;
+    canonical_source_url?: string;
+    metrics?: {
+      views?: number;
+      likes?: number;
+      replies?: number;
+      reposts?: number;
+      shares?: number;
+    };
+  } | null;
   generation_direction?: string;
   owner_guidance?: { text?: string; version_number?: number; updated_at?: string; active?: boolean } | null;
   owner_learning?: {
