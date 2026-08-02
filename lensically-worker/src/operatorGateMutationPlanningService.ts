@@ -692,7 +692,7 @@ export async function runOperatorGateEngine<TStage extends string>(
           && !Array.isArray(modelResult.evidence)
           ? modelResult.evidence as Record<string, unknown>
           : {};
-                const expectedOwnerGuidanceId = ownerGuidance?.id ? String(ownerGuidance.id) : "";
+                        const expectedOwnerGuidanceId = ownerGuidance?.id ? String(ownerGuidance.id) : "";
         const reviewedGuidanceId = String(evidence.owner_guidance_id ?? "");
         const reviewedNoteIds = new Set(
           Array.isArray(evidence.reviewed_owner_note_ids)
@@ -700,8 +700,8 @@ export async function runOperatorGateEngine<TStage extends string>(
             : [],
         );
         const missingOwnerNoteIds = requiredOwnerNoteIds.filter((id) => !reviewedNoteIds.has(id));
-        const guidanceMismatch = Boolean(ownerGuidance?.id)
-          && reviewedGuidanceId !== String(ownerGuidance.id);
+        const guidanceMismatch = Boolean(expectedOwnerGuidanceId)
+          && reviewedGuidanceId !== expectedOwnerGuidanceId;
         if (!modelResult?.result || !modelResult?.rationale) {
           results.push(buildOperatorGateResult(
             gate,
@@ -710,7 +710,7 @@ export async function runOperatorGateEngine<TStage extends string>(
             {
               enforcement_mode: "source_card_owner_guidance",
               source_card_id: input.sourceCardId ?? null,
-              owner_guidance_id: ownerGuidance?.id ?? null,
+              owner_guidance_id: expectedOwnerGuidanceId || null,
               required_owner_note_ids: requiredOwnerNoteIds,
             },
             "Review the full owner guidance and owner edit notes, then record whether this candidate follows them.",
@@ -723,7 +723,7 @@ export async function runOperatorGateEngine<TStage extends string>(
             {
               enforcement_mode: "source_card_owner_guidance",
               source_card_id: input.sourceCardId ?? null,
-              expected_owner_guidance_id: ownerGuidance?.id ?? null,
+              expected_owner_guidance_id: expectedOwnerGuidanceId || null,
               reviewed_owner_guidance_id: reviewedGuidanceId || null,
               missing_owner_note_ids: missingOwnerNoteIds,
             },
@@ -738,7 +738,7 @@ export async function runOperatorGateEngine<TStage extends string>(
               ...evidence,
               enforcement_mode: "source_card_owner_guidance",
               source_card_id: input.sourceCardId ?? null,
-              owner_guidance_id: ownerGuidance?.id ?? null,
+              owner_guidance_id: expectedOwnerGuidanceId || null,
               reviewed_owner_note_ids: Array.from(reviewedNoteIds),
             },
             dependencies.normalizeText(modelResult.repair_guidance, 1000, true),
