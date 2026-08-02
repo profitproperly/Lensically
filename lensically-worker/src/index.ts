@@ -205,6 +205,16 @@ import {
   scheduleOperatorApprovedDraft,
   scheduleOperatorOwnerApprovedBatch,
 } from "./operatorScheduledPostEditMutationService";
+import {
+  ensureScheduledPostCurrentRevision,
+  normalizeOwnerNote,
+  prepareScheduledPostRevisionPlan,
+  readOwnerLearningSummary,
+  readSourceCardOwnerLearning,
+  resolveSavedPatternSourceCard,
+  saveSourceCardOwnerGuidance,
+} from "./operatorOwnerEditLearningService";
+
 
 
 
