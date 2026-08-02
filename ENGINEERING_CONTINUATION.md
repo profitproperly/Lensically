@@ -30,7 +30,7 @@ active_interrupt_precedence: none
 - Permanent prevention: every Worker release now fails closed unless the canonical Stripe product identities, checkout URL, root-to-API handoff, paid-session verification call, and support policy references remain present.
 - Validation: exact-head typecheck, lifecycle gate, push validation, all eight deterministic Operator shards, D1 migration release, Worker runtime verification, and Cloudflare Pages deployment passed.
 - Known verification limit: no real USD 997 customer transaction was created during engineering, so the first paid purchase remains the first live Stripe-to-download transaction proof.
-- Owner-only launch gate: set the Stripe account public support email to `support@lensically.com` in the Stripe Dashboard and verify that mailbox receives mail. Stripe requires Dashboard use for updating the platform account's own business profile.
+- Owner-only launch gate: completed on 2026-08-02. Stripe now reports public support email `support@lensically.com`; Cloudflare Email Routing receives that address, forwards it to the verified owner inbox, and Gmail sends replies through authenticated Brevo SMTP as `Lensically Support <support@lensically.com>`.
 - Superseded Stripe product, price, and Payment Link objects from the initial narrower-license draft are noncanonical and are not referenced by the public site or fulfillment gate. They may be archived later when native Stripe archive operations are added; they do not block sales.
 
 This root file is the sole authority for incomplete Lensically work. D1 work state, action-closure receipts, Growth Mission records, chat history, and other documents are non-authoritative telemetry.
