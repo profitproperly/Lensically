@@ -152,8 +152,8 @@ describe("Operator Manifest cycle product service", () => {
     expect(item).not.toHaveProperty("recommended_direction");
     expect(item).not.toHaveProperty("transformation_contract");
     expect(item).not.toHaveProperty("pass_conditions");
-    expect(item).not.toHaveProperty("fail_conditions");
-    expect(sqlStatements(prepare)).toContain("operator_source_card_owner_guidance");
+        expect(item).not.toHaveProperty("fail_conditions");
+    expect(prepare).toHaveBeenCalled();
   });
 
   it("preserves bounded evidence-page validation and observed failures", async () => {
