@@ -369,30 +369,45 @@ export default function SavedPatternsPage() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-slate-700">
-            {selectedIds.length ? `${formatMetric(selectedIds.length)} selected for GPT pattern memory` : "Select patterns to review them in bulk"}
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold text-slate-900">Owner learning</h2>
+          <p className="text-xs text-slate-500">
+            This separates untouched model work from the exact owner-edited versions that actually publish.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {[
-              ["approved", "Mark Useful"],
-              ["watch", "Watch"],
-              ["cooldown", "Cooldown"],
-              ["rejected", "Reject"],
-            ].map(([verdict, label]) => (
-              <button
-                key={verdict}
-                type="button"
-                onClick={() => void reviewSelectedPatterns(verdict as "approved" | "rejected" | "cooldown" | "watch")}
-                disabled={loading || deleting || reviewingId === -1 || selectedIds.length === 0}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {reviewingId === -1 ? "Saving..." : label}
-              </button>
-            ))}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs text-slate-500">Intervention rate</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {Math.round((ownerLearningSummary?.owner_intervention_rate ?? 0) * 100)}%
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs text-slate-500">Owner-edited posts</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {formatMetric(ownerLearningSummary?.owner_edited_count ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs text-slate-500">Substantial rewrites</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {formatMetric(ownerLearningSummary?.substantial_owner_rewrite_count ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs text-slate-500">Untouched model posts</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {formatMetric(ownerLearningSummary?.untouched_model_count ?? 0)}
+            </p>
           </div>
         </div>
+        {(ownerLearningSummary?.published_24h?.owner_edited_sample_size ?? 0) > 0
+          || (ownerLearningSummary?.published_24h?.untouched_model_sample_size ?? 0) > 0 ? (
+          <p className="mt-3 text-xs text-slate-500">
+            24-hour observational comparison: owner-edited median overall {ownerLearningSummary?.published_24h?.owner_edited_median_overall ?? "pending"} across {formatMetric(ownerLearningSummary?.published_24h?.owner_edited_sample_size ?? 0)} posts; untouched model median overall {ownerLearningSummary?.published_24h?.untouched_model_median_overall ?? "pending"} across {formatMetric(ownerLearningSummary?.published_24h?.untouched_model_sample_size ?? 0)} posts.
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
