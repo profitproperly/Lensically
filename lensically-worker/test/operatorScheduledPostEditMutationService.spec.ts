@@ -14,10 +14,17 @@ function createDependencies() {
   return {
     normalizeText,
     normalizeSpoilerPhrases: vi.fn((value: unknown) => Array.isArray(value) ? value : []),
-    updateScheduledPost: vi.fn(async () => ({
+        updateScheduledPost: vi.fn(async () => ({
       success: true,
       scheduledPost: { id: 42, text: "Updated post" },
       linkedDraftsUpdated: 2,
+      revision: {
+        id: "revision-42",
+        revisionNumber: 2,
+        editorType: "model",
+        changeMagnitude: "substantial",
+        ownerNote: null,
+      },
       statusCode: 200,
     })),
     loadLinkedDraft: vi.fn(async () => null),
@@ -61,8 +68,11 @@ describe("operator scheduled-post edit mutation", () => {
       date: undefined,
       time: undefined,
       timeZone: "America/New_York",
-      spoilerAllText: undefined,
+            spoilerAllText: undefined,
       spoilerPhrases: undefined,
+      ownerNote: undefined,
+      editorType: "model",
+      editSource: "mcp",
     });
     expect(dependencies.loadLinkedDraft).toHaveBeenCalledWith(42);
     expect(dependencies.parseStrategyJson).not.toHaveBeenCalled();
@@ -84,8 +94,15 @@ describe("operator scheduled-post edit mutation", () => {
       body: {
         success: true,
         scheduled_post: { id: 42, text: "Updated post" },
-        linked_drafts_updated: 2,
+                linked_drafts_updated: 2,
         linked_draft_id: null,
+        revision: {
+          id: "revision-42",
+          revisionNumber: 2,
+          editorType: "model",
+          changeMagnitude: "substantial",
+          ownerNote: null,
+        },
       },
     });
   });
@@ -105,8 +122,10 @@ describe("operator scheduled-post edit mutation", () => {
         date: " 2026-07-30 ",
         time: " 14:30 ",
         timezone: " America/Chicago ",
-        spoiler_all_text: true,
+                spoiler_all_text: true,
         spoiler_phrases: [" hidden "],
+        owner_note: "  Keep my full explanation exactly.  ",
+        editor_type: "owner",
       },
       scheduledPostId: 42,
       brandKey: "manifest_mental",
@@ -119,8 +138,11 @@ describe("operator scheduled-post edit mutation", () => {
       date: "2026-07-30",
       time: "14:30",
       timeZone: "America/Chicago",
-      spoilerAllText: true,
+            spoilerAllText: true,
       spoilerPhrases: ["hidden"],
+      ownerNote: "Keep my full explanation exactly.",
+      editorType: "owner",
+      editSource: "mcp",
     });
     expect(dependencies.normalizeSpoilerPhrases).toHaveBeenCalledWith([" hidden "]);
     expect(dependencies.parseStrategyJson).toHaveBeenCalledWith("{\"pillar\":\"money\"}");
@@ -140,8 +162,15 @@ describe("operator scheduled-post edit mutation", () => {
     expect(result.body).toEqual({
       success: true,
       scheduled_post: { id: 42, text: "Updated post" },
-      linked_drafts_updated: 2,
+            linked_drafts_updated: 2,
       linked_draft_id: "draft-42",
+      revision: {
+        id: "revision-42",
+        revisionNumber: 2,
+        editorType: "model",
+        changeMagnitude: "substantial",
+        ownerNote: null,
+      },
     });
   });
 
@@ -202,8 +231,9 @@ describe("operator scheduled-post edit mutation", () => {
         expect(success.body).toEqual({
       success: true,
       scheduled_post: { id: 42, text: "Updated post" },
-      linked_drafts_updated: 0,
+            linked_drafts_updated: 0,
       linked_draft_id: null,
+      revision: null,
     });
   });
 });
