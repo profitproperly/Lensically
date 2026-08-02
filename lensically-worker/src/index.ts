@@ -32772,8 +32772,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         date,
         time,
         timeZone: timezone,
-        spoilerAllText: normalizeSpoilerFlag(payload.spoiler_all_text),
+                spoilerAllText: normalizeSpoilerFlag(payload.spoiler_all_text),
         spoilerPhrases: normalizeSpoilerPhrasesInput(payload.spoiler_phrases),
+        ownerNote: normalizeOwnerNote(payload.owner_note),
+        editorType: "owner",
+        editSource: "ui",
       });
       if (!updated.success || !updated.scheduledPost) {
         return new Response(
