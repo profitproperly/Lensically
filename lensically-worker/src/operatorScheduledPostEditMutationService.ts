@@ -4,8 +4,11 @@ type ScheduledPostEditUpdateInput = {
   date?: string;
   time?: string;
   timeZone: string;
-  spoilerAllText?: boolean;
-    spoilerPhrases?: string[];
+    spoilerAllText?: boolean;
+  spoilerPhrases?: string[];
+  ownerNote?: string | null;
+  editorType?: "model" | "owner" | "system";
+  editSource?: "ui" | "mcp" | "backfill" | "publish" | "system";
 };
 
 type ScheduledPostEditUpdateResult<TScheduledPost> = {
