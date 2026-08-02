@@ -387,7 +387,28 @@ export async function runOperatorGateEngine<TStage extends string>(
       ));
       continue;
     }
-    if (gateKey === "source_transformation_contract_gate") {
+        if (gateKey === "source_transformation_contract_gate") {
+      if (manifestOwnerGuided) {
+        results.push(exactSourceCopy
+          ? buildOperatorGateResult(
+            gate,
+            "fail",
+            "The candidate exactly reproduces the complete source post.",
+            { source_text: primarySourceText },
+            "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+          )
+          : buildOperatorGateResult(
+            gate,
+            "pass",
+            "Manifest generation is governed by the source evidence and source-specific owner guidance, not the legacy transformation contract.",
+            {
+              owner_guidance_id: ownerGuidance?.id ?? null,
+              owner_note_count: ownerEditNotes.length,
+              legacy_transformation_contract_active: false,
+            },
+          ));
+        continue;
+      }
       const preservedFunctions = new Set(
         dependencies.normalizeSourceContractStringList(input.draftAnalysis?.preserved_functions)
           .map((item) => dependencies.normalizeComparableText(item)),
