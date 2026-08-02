@@ -14426,11 +14426,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       getWorkflowConflict: getLensicallySavedWorkflowConflict,
       normalizeText: normalizeOperatorText,
       normalizeAdaptationPlan: normalizeGenerationAdaptationPlan,
-      loadSourceCard: async (sourceCardId) => await getOperatorSourceCard(
-        env,
-        brand.brand_key,
-        sourceCardId,
-      ),
+            loadSourceCard: async (sourceCardId) => {
+        const sourceCard = await getOperatorSourceCard(env, brand.brand_key, sourceCardId);
+        return sourceCard ? buildActiveGenerationSourceCard(sourceCard, brand.brand_key) : null;
+      },
       loadCanonicalContext: async (sourceCard) => await getOperatorSourceCardHistory(
         env,
         brand,
