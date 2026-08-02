@@ -19,17 +19,18 @@ active_interrupt_precedence: none
 
 
 
-## Completed Commercial Sales Page Redesign — operator-sales-redesign-v3-20260802
+## Completed Commercial Sales Page Clarity Pass — operator-sales-clarity-v4-20260802
 
 - Status: completed and deployed.
 - Product page source: `lensically-worker/public/operator/index.html`.
-- Validated editorial redesign commit: `3649026affd9fb7614ffa887cf5c279e371fd21b`.
-- Cloudflare Pages deployment workflow `30768623807` completed successfully from that exact SHA.
+- Validated clarity-pass commit: `331d12c2386784bfcaa97c26e039d3c7eacc66fe`.
+- Cloudflare Pages deployment workflow `30768968771` completed successfully from that exact SHA.
 - Public entry route remains `lensically-worker/public/index.html`, which redirects buyers to `/operator/`.
-- The owner rejected the prior `5916017c7aba623886cca29619450c448cb53c0a` implementation because it still presented as a generic AI SaaS template: oversized broken headline, floating glass navigation, purple glow, fake perspective browser chrome, tiny unreadable dashboard detail, decorative floating cards, and weak first-viewport balance.
-- The accepted repair direction removed those template patterns and rebuilt the page around an editorial black/paper/acid design system, compact outcome-first hero, readable code-native product board, open row-based information architecture, large alternating product demonstrations, ownership comparison, AI-led installation, commercial offer, responsive navigation, and mobile purchase action.
+- The owner accepted the editorial v3 direction as materially better but identified a conversion defect: the first viewport still made visitors decode the system through a large product demonstration before clearly understanding what the $997 purchase contained.
+- The repair replaced the dashboard-led hero with a direct product definition, explicit full-package description, complete deliverables checklist, one-time price, primary purchase action, and a simplified four-part contents strip. Product demonstrations remain lower on the page as proof rather than serving as the initial explanation.
 - Product truth constraints remain enforced: no fabricated testimonials, no follower/revenue guarantees, no managed-service claim, and no change to the canonical $997 Stripe Payment Link or legal surfaces.
-- Permanent prevention: Lensically commercial pages may not use generic AI-SaaS defaults as a substitute for design. Prohibited defaults include floating glass nav pills, decorative purple fog, perspective browser mockups, unreadably dense fake dashboards, gradient headline treatment, arbitrary floating status cards, repeated bento grids, and first viewports dominated by oversized copy. Future redesigns must establish a specific editorial art direction, preserve readable product evidence at the target viewport, show the next section inside or immediately below the first screen, and verify proportion rather than relying on code volume or animation.
+- Permanent prevention: the first viewport of every Lensically commercial product page must answer, without inference, what the buyer receives, how delivery and installation work, what ownership rights are included, and what it costs. Architecture diagrams, dashboards, motion, metrics, and operational proof may support that definition only after the purchasable package is explicit. Visual novelty may not compete with purchase comprehension.
+- The earlier generic AI-SaaS prevention remains active: no floating glass nav pills, decorative purple fog, perspective browser mockups, unreadably dense fake dashboards, gradient headline treatment, arbitrary floating status cards, repeated bento grids, or first viewports dominated by oversized copy.
 
 
 ## Completed Commercial Release — lensically-operator-threads-v1-20260802
