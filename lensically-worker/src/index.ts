@@ -32726,7 +32726,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    if (url.pathname === "/api/threads/schedule/update" && request.method === "POST") {
+        if (url.pathname === "/api/threads/schedule/update" && request.method === "POST") {
       let payload: {
         app_user_id?: string;
         scheduled_post_id?: number | string;
@@ -32736,6 +32736,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         timezone?: string;
         spoiler_all_text?: boolean;
         spoiler_phrases?: string[];
+        owner_note?: string;
       };
       try {
         payload = await request.json();
