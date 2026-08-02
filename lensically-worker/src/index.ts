@@ -3805,7 +3805,30 @@ async function ensureScheduledPostsTable(env: Env): Promise<void> {
       "published_at",
       "failed_at",
       "cancelled_at",
-      "last_attempted_at",
+            "last_attempted_at",
+      "current_revision_id",
+      "published_revision_id",
+    ],
+  });
+}
+
+async function ensureOwnerEditLearningTables(env: Env): Promise<void> {
+  await ensureScheduledPostsTable(env);
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_scheduled_post_revisions",
+    columns: [
+      "id", "scheduled_post_id", "revision_number", "editor_type", "edit_source",
+      "previous_text", "revised_text", "owner_note", "brand_key", "account_id",
+      "threads_user_id", "source_card_id", "draft_id", "cycle_id", "cycle_plan_item_id",
+      "change_magnitude", "became_published", "published_post_id", "created_at",
+    ],
+  });
+  await assertDatabaseIntegrity(env.DB, {
+    table: "operator_source_card_owner_guidance",
+    columns: [
+      "id", "brand_key", "account_id", "threads_user_id", "source_card_id",
+      "guidance_text", "active", "version_number", "supersedes_guidance_id",
+      "created_by", "created_at", "updated_at",
     ],
   });
 }
