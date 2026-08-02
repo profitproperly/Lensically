@@ -66,8 +66,15 @@
     <footer><a href="/operator/">Return to product page</a> · <a href="/operator/license/">Commercial license</a></footer>
   </main>
 
-  <script>
+    <script>
     (() => {
+      if (window.location.hostname !== 'api.lensically.com') {
+        const apiDownloadPage = new URL('https://api.lensically.com/operator/download/');
+        apiDownloadPage.search = window.location.search;
+        window.location.replace(apiDownloadPage.toString());
+        return;
+      }
+
       const qs = new URLSearchParams(window.location.search);
       const sessionId = qs.get('session_id');
       const loading = document.getElementById('loading');
