@@ -1309,7 +1309,7 @@ export default function ScheduledPostsPage() {
                       <label className="block text-xs font-medium text-slate-700" htmlFor={`edit-post-text-${post.id}`}>
                         Post text
                       </label>
-                      <textarea
+                                            <textarea
                         id={`edit-post-text-${post.id}`}
                         value={editPostText}
                         onChange={(event) => setEditPostText(event.target.value)}
@@ -1317,6 +1317,23 @@ export default function ScheduledPostsPage() {
                         maxLength={500}
                         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                       />
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700" htmlFor={`edit-owner-note-${post.id}`}>
+                          Note to Lensically
+                        </label>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Explain what you changed, what the model misunderstood, and what it should understand next time. Your full note is preserved with this revision and its source card.
+                        </p>
+                        <textarea
+                          id={`edit-owner-note-${post.id}`}
+                          value={editOwnerNote}
+                          onChange={(event) => setEditOwnerNote(event.target.value)}
+                          rows={7}
+                          maxLength={12000}
+                          placeholder="Tell Lensically exactly what you want it to learn from this edit."
+                          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        />
+                      </div>
                       <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                         <label className="flex items-start gap-2 text-xs font-medium text-slate-700" htmlFor={`edit-spoiler-all-${post.id}`}>
                           <input
