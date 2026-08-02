@@ -156,9 +156,9 @@ function revisionInsertStatement(
        change_magnitude
      )
      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-     WHERE EXISTS (
+          WHERE EXISTS (
        SELECT 1 FROM scheduled_posts
-       WHERE id = ? AND threads_user_id = ? AND status = 'approved'
+       WHERE id = ? AND threads_user_id = ? AND status IN ('approved', 'posting')
      )`,
   ).bind(
     input.id,
