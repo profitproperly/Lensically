@@ -751,8 +751,9 @@ export default function ScheduledPostsPage() {
   }
 
   function cancelEditingScheduledPost() {
-    setEditingScheduledPostId(null);
+        setEditingScheduledPostId(null);
     setEditPostText("");
+    setEditOwnerNote("");
     setEditSpoilerAllText(false);
     setEditSpoilerPhrasesInput("");
     setEditScheduleDate("");
