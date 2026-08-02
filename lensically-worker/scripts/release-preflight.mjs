@@ -1058,7 +1058,7 @@ if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
 if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 63-tool account aggregation order")
     || !operatorMcpRegistryCompositionTests.includes("preserves engineering, admin, and intentional monthly-growth classifications")
     || !operatorMcpRegistryCompositionTests.includes("preserves guided Proceed membership without blocking list_accounts")
-        || !operatorMcpRegistryCompositionTests.includes("builds the exact 121 direct tools with deterministic priority ordering")
+        || !operatorMcpRegistryCompositionTests.includes("builds the exact 124 direct tools with deterministic priority ordering")
     || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }
