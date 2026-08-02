@@ -28931,8 +28931,11 @@ async function updateScheduledPostForAppUser(
     date?: string;
     time?: string;
     timeZone?: string;
-    spoilerAllText?: boolean;
+        spoilerAllText?: boolean;
     spoilerPhrases?: string[];
+    ownerNote?: string | null;
+    editorType?: "model" | "owner" | "system";
+    editSource?: "ui" | "mcp" | "backfill" | "publish" | "system";
   },
 ): Promise<{
   success: boolean;
@@ -28945,15 +28948,18 @@ async function updateScheduledPostForAppUser(
     scheduled_time_utc: string;
     spoiler_all_text: boolean;
     spoiler_phrases: string[];
+    current_revision_id: string;
   };
   linkedDraftsUpdated?: number;
+  revision?: Record<string, unknown> | null;
 }> {
   const hasText = input.text !== undefined;
   const hasDate = input.date !== undefined;
   const hasTime = input.time !== undefined;
   const hasSpoilerAllText = input.spoilerAllText !== undefined;
   const hasSpoilerPhrases = input.spoilerPhrases !== undefined;
-  if (!hasText && !hasDate && !hasTime && !hasSpoilerAllText && !hasSpoilerPhrases) {
+  const ownerNote = normalizeOwnerNote(input.ownerNote);
+  if (!hasText && !hasDate && !hasTime && !hasSpoilerAllText && !hasSpoilerPhrases && !ownerNote) {
     return { success: false, statusCode: 400, error: "at_least_one_edit_field_required" };
   }
   if (hasDate !== hasTime) {
