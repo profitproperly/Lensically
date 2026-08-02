@@ -156,27 +156,41 @@ describe("admitOperatorGenerationRun", () => {
     expect(dependencies.loadCanonicalContext).toHaveBeenCalledWith(card);
     expect(dependencies.loadAccountRejectionContext).toHaveBeenCalledOnce();
     expect(dependencies.loadPerformanceLearning).toHaveBeenCalledOnce();
-    expect(result).toEqual({
-      kind: "continue",
-      context: {
-        sourceCardId: "card-1",
-        sourceCard: card,
-        adaptationPlan: {
-          adaptation_goal: "Transform the payoff",
-          retained_exact_surfaces: ["hook"],
+        expect(result.kind).toBe("continue");
+    if (result.kind !== "continue") throw new Error("expected continuation");
+    expect(result.context).toMatchObject({
+      sourceCardId: "card-1",
+      sourceCard: card,
+      adaptationPlan: {
+        adaptation_goal: "Transform the payoff",
+        retained_exact_surfaces: ["hook"],
+      },
+      canonicalContext,
+      accountRejectionContext: rejectionContext,
+      performanceLearning,
+      priorAdaptationContext: {
+        family: { id: "family-1" },
+        versions: [{ id: "card-0" }, card],
+        source_evidence: {
+          title: null,
+          primary_source: null,
+          metrics_snapshot: null,
         },
-        canonicalContext,
-        accountRejectionContext: rejectionContext,
-        performanceLearning,
-        priorAdaptationContext: {
-          family: { id: "family-1" },
-          versions: [{ id: "card-0" }, card],
-          prior_runs: adaptationHistory.slice(-24),
-          account_rejection_context: rejectionContext,
-          performance_learning: performanceLearning,
-        },
+        owner_guidance: null,
+        owner_edit_notes: [],
+        generation_direction: null,
+        account_rejection_context: rejectionContext,
+        performance_learning: performanceLearning,
       },
     });
+    expect(result.context.priorAdaptationContext.prior_runs).toEqual(
+      adaptationHistory.slice(-24).map((run) => ({
+        run_id: run.run_id,
+        status: null,
+        created_at: null,
+        drafts: [],
+      })),
+    );
   });
 
   it("uses empty canonical defaults when optional history fields are malformed", async () => {
