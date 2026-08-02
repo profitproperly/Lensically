@@ -222,104 +222,88 @@ export default function SavedPatternsPage() {
     }
   }
 
-  async function reviewPattern(
-    pattern: SavedPatternRow,
-    verdict: "approved" | "rejected" | "cooldown" | "watch",
-  ) {
-    const note = window.prompt("Optional note for the GPT to remember about this pattern:", "");
-    if (note === null) {
+    async function toggleSourceCard(patternId: number) {
+    if (expandedPatternId === patternId) {
+      setExpandedPatternId(null);
       return;
     }
 
-    setReviewingId(pattern.id);
+    setExpandedPatternId(patternId);
     setError("");
     setMessage("");
+    if (Object.prototype.hasOwnProperty.call(sourceCards, patternId)) {
+      const existing = sourceCards[patternId];
+      setGuidanceDrafts((current) => ({
+        ...current,
+        [patternId]: existing?.owner_guidance?.text ?? "",
+      }));
+      return;
+    }
 
+    setLoadingSourceCardId(patternId);
     try {
-      const response = await fetch(REVIEW_PATTERN_URL, {
-        method: "POST",
+      const baseUrl = `${SOURCE_CARD_URL}?app_user_id=${encodeURIComponent(APP_USER_ID)}&saved_pattern_id=${patternId}`;
+      const response = await fetch(appendThreadsUserId(baseUrl, threadsUserId), {
+        cache: "no-store",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          threads_user_id: threadsUserId,
-          saved_pattern_ids: [pattern.id],
-          verdict,
-          note,
-          title: `Saved pattern review: ${verdict}`,
-          metadata: {
-            author_handle: pattern.author_handle ?? null,
-            source_url: pattern.source_url,
-            captured_likes: pattern.likes,
-            captured_replies: pattern.replies,
-            captured_reposts: pattern.reposts,
-            captured_shares: pattern.shares,
-            captured_views: pattern.views ?? null,
-          },
-          cooldown_days: verdict === "cooldown" ? 14 : 0,
-        }),
       });
-
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      const data = (await response.json().catch(() => null)) as
+        | { source_card?: SourceCardDetail | null; error?: string }
+        | null;
       if (!response.ok) {
-        throw new Error(data?.error || "Could not save pattern review.");
+        throw new Error(data?.error || "Could not load the linked source card.");
       }
-
-      setMessage(`Saved ${verdict} review for pattern ${pattern.id}.`);
-    } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : "Could not save pattern review.");
+      const sourceCard = data?.source_card ?? null;
+      setSourceCards((current) => ({ ...current, [patternId]: sourceCard }));
+      setGuidanceDrafts((current) => ({
+        ...current,
+        [patternId]: sourceCard?.owner_guidance?.text ?? "",
+      }));
+    } catch (sourceCardError) {
+      setExpandedPatternId(null);
+      setError(sourceCardError instanceof Error ? sourceCardError.message : "Could not load the linked source card.");
     } finally {
-      setReviewingId(null);
+      setLoadingSourceCardId(null);
     }
   }
 
-  async function reviewSelectedPatterns(verdict: "approved" | "rejected" | "cooldown" | "watch") {
-    if (!selectedIds.length) {
-      return;
-    }
-
-    const note = window.prompt("Optional note for the GPT to remember about these selected patterns:", "");
-    if (note === null) {
-      return;
-    }
-
-    setReviewingId(-1);
+  async function saveSourceCardGuidance(patternId: number, active: boolean) {
+    setSavingGuidanceId(patternId);
     setError("");
     setMessage("");
-
     try {
-      const response = await fetch(REVIEW_PATTERN_URL, {
+      const response = await fetch(SOURCE_CARD_GUIDANCE_URL, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          app_user_id: APP_USER_ID,
           threads_user_id: threadsUserId,
-          saved_pattern_ids: selectedIds,
-          verdict,
-          note,
-          title: `Selected saved patterns review: ${verdict}`,
-          metadata: {
-            selected_count: selectedIds.length,
-          },
-          cooldown_days: verdict === "cooldown" ? 14 : 0,
+          saved_pattern_id: patternId,
+          guidance_text: guidanceDrafts[patternId] ?? "",
+          active,
         }),
       });
-
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      const data = (await response.json().catch(() => null)) as
+        | { source_card?: SourceCardDetail | null; error?: string }
+        | null;
       if (!response.ok) {
-        throw new Error(data?.error || "Could not save selected pattern review.");
+        throw new Error(data?.error || "Could not save source-card guidance.");
       }
-
-      setMessage(`Saved ${verdict} review for ${formatMetric(selectedIds.length)} selected patterns.`);
-    } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : "Could not save selected pattern review.");
+      const sourceCard = data?.source_card ?? null;
+      setSourceCards((current) => ({ ...current, [patternId]: sourceCard }));
+      setGuidanceDrafts((current) => ({
+        ...current,
+        [patternId]: sourceCard?.owner_guidance?.text ?? "",
+      }));
+      setMessage(active ? "Permanent source-card guidance saved." : "Source-card guidance disabled.");
+    } catch (guidanceError) {
+      setError(guidanceError instanceof Error ? guidanceError.message : "Could not save source-card guidance.");
     } finally {
-      setReviewingId(null);
+      setSavingGuidanceId(null);
     }
   }
+
 
   function toggleSelection(id: number) {
     setSelectedIds((current) => (
