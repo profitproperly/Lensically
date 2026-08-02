@@ -122,13 +122,18 @@ export default function SavedPatternsPage() {
   const [patterns, setPatterns] = useState<SavedPatternRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [order, setOrder] = useState<"newest" | "likes">("newest");
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [total, setTotal] = useState(0);
   const [threadsUserId, setThreadsUserId] = useState("");
+  const [ownerLearningSummary, setOwnerLearningSummary] = useState<OwnerLearningSummary | null>(null);
+  const [expandedPatternId, setExpandedPatternId] = useState<number | null>(null);
+  const [loadingSourceCardId, setLoadingSourceCardId] = useState<number | null>(null);
+  const [savingGuidanceId, setSavingGuidanceId] = useState<number | null>(null);
+  const [sourceCards, setSourceCards] = useState<Record<number, SourceCardDetail | null>>({});
+  const [guidanceDrafts, setGuidanceDrafts] = useState<Record<number, string>>({});
 
   const loadPatterns = useCallback(async () => {
     setLoading(true);
