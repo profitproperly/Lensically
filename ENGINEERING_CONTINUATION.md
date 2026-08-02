@@ -26,6 +26,16 @@ active_interrupt_precedence: none
 
 
 
+## Completed Navigation CTA Correction Pass: operator-nav-cta-v10-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Public-page commit: `a083c11be58cbaedbec73c709f8c0d9ceae57ef3`.
+- Cloudflare Pages deployment workflow `30771717171` completed successfully from that exact SHA.
+- Owner correction: the prior edit changed the hero CTA instead of the top-right navigation CTA.
+- Final copy: desktop and mobile navigation buttons read `Get Lensically Operator`; the hero CTA reads `Get Lensically Operator for $997`.
+- Permanent prevention: CTA changes must target the named surface and CSS class, not shared visible text alone.
+
 ## Completed Hero CTA Simplification Pass: operator-hero-cta-v9-20260802
 
 - Status: completed and deployed.
