@@ -26,6 +26,20 @@ active_interrupt_precedence: none
 
 
 
+## Completed Platform-First Hero Positioning Pass: operator-platform-positioning-v6-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Validated public-page commit: `924579d5490ef9e530d527ead78a0f98baed1e67`.
+- Cloudflare Pages deployment workflow `30770441794` completed successfully from that exact SHA.
+- Owner correction: the prior hero overemphasized source code, hosting, account ownership, and AI-only operation while failing to lead with the tangible product.
+- Repair: repositioned Lensically as a complete Threads operating platform centered on a custom analytics website for insights, post saving, publishing, and scheduling.
+- Operating modes: the platform can be run manually, with selective AI assistance, or autonomously end to end through the custom MCP connection.
+- Package summary now names the custom analytics website, insights and performance tracking, publishing and scheduling, the personal and external Threads post saver, the custom MCP connection, and the three operating modes.
+- Copy rule: the public sales page must contain zero em dash characters. A verified bounded scan of the complete page returned zero matches.
+- Privacy verification: bounded scans returned zero matches for `Manifest Mental`, `opmg`, and `vectrix` before deployment.
+- Validation: push validation and fast validation completed successfully before deployment.
+
 ## Completed Commercial Hero Viewport-Fit Pass — operator-viewport-fit-v5-20260802
 
 - Status: completed and deployed.
