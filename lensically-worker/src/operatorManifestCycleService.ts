@@ -169,15 +169,40 @@ export async function handleOperatorManifestCycleServiceTool(
              c.pass_conditions_json,
              c.fail_conditions_json,
              c.source_selection_id,
-             c.version_number AS source_card_version_number,
+                          c.version_number AS source_card_version_number,
              f.source_type,
              f.internal_source_id,
-             f.canonical_source_url
+             f.canonical_source_url,
+             g.id AS owner_guidance_id,
+             g.guidance_text AS owner_guidance_text,
+             g.version_number AS owner_guidance_version,
+             g.updated_at AS owner_guidance_updated_at,
+             (
+               SELECT json_object(
+                 'id', r.id,
+                 'scheduled_post_id', r.scheduled_post_id,
+                 'owner_note', r.owner_note,
+                 'model_or_previous_text', r.previous_text,
+                 'owner_version', r.revised_text,
+                 'change_magnitude', r.change_magnitude,
+                 'became_published', r.became_published,
+                 'published_post_id', r.published_post_id,
+                 'created_at', r.created_at
+               )
+               FROM operator_scheduled_post_revisions r
+               WHERE r.source_card_id = c.id
+                 AND r.owner_note IS NOT NULL
+                 AND trim(r.owner_note) <> ''
+               ORDER BY datetime(r.created_at) DESC, r.revision_number DESC
+               LIMIT 1
+             ) AS latest_owner_edit_note_json
            FROM operator_source_selection_plans p
            LEFT JOIN operator_source_cards c
              ON c.id = p.source_card_id AND c.brand_key = p.brand_key
-           LEFT JOIN operator_source_card_families f
+                      LEFT JOIN operator_source_card_families f
              ON f.id = p.source_card_family_id AND f.brand_key = p.brand_key
+           LEFT JOIN operator_source_card_owner_guidance g
+             ON g.source_card_id = c.id AND g.active = 1
            WHERE p.brand_key = ? AND p.cycle_id = ? AND p.status = 'locked'
            ORDER BY p.selection_order ASC
            LIMIT ? OFFSET ?`,
@@ -201,7 +226,16 @@ export async function handleOperatorManifestCycleServiceTool(
           primary_source: compactLineupCue(parseJson(row.primary_source_json, {})),
           source_mechanism: String(row.source_mechanism ?? "").slice(0, 800),
           required_product: String(row.required_product ?? "").slice(0, 400),
-          recommended_direction: String(row.recommended_direction ?? "").slice(0, 800),
+                    recommended_direction: String(row.recommended_direction ?? "").slice(0, 800),
+          owner_guidance: row.owner_guidance_id ? {
+            id: row.owner_guidance_id,
+            text: String(row.owner_guidance_text ?? ""),
+            version_number: Number(row.owner_guidance_version ?? 1),
+            updated_at: row.owner_guidance_updated_at ?? null,
+            active: true,
+          } : null,
+          latest_owner_edit_note: parseJson(row.latest_owner_edit_note_json, null),
+          generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
           transformation_contract: compactLineupCue(parseJson(row.transformation_contract_json, {})),
           pass_conditions: compactLineupCue(parseJson(row.pass_conditions_json, [])),
           fail_conditions: compactLineupCue(parseJson(row.fail_conditions_json, [])),
