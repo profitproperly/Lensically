@@ -735,8 +735,9 @@ export default function ScheduledPostsPage() {
       return;
     }
 
-    setEditingScheduledPostId(post.id);
+        setEditingScheduledPostId(post.id);
     setEditPostText(post.text);
+    setEditOwnerNote("");
     setEditSpoilerAllText(post.spoiler_all_text === true);
     setEditSpoilerPhrasesInput(Array.isArray(post.spoiler_phrases) ? post.spoiler_phrases.join("\n") : "");
     setEditScheduleDate(localInput.date);
