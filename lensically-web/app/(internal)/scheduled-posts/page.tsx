@@ -325,7 +325,8 @@ export default function ScheduledPostsPage() {
   const [isBulkSelectionMode, setIsBulkSelectionMode] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [editingScheduledPostId, setEditingScheduledPostId] = useState<number | null>(null);
-  const [editPostText, setEditPostText] = useState("");
+    const [editPostText, setEditPostText] = useState("");
+  const [editOwnerNote, setEditOwnerNote] = useState("");
   const [editSpoilerAllText, setEditSpoilerAllText] = useState(false);
   const [editSpoilerPhrasesInput, setEditSpoilerPhrasesInput] = useState("");
   const [editScheduleDate, setEditScheduleDate] = useState("");
