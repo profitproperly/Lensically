@@ -595,17 +595,144 @@
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
       .reveal { opacity: 1; transform: none; }
     }
+      /* Clarity-first purchase hero: define the product before demonstrating it. */
+    .hero {
+      min-height: auto;
+      padding: 148px 0 88px;
+      align-items: stretch;
+      overflow: visible;
+    }
+    .hero::before { display: none; }
+    .hero-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(420px, 500px);
+      gap: 76px;
+      align-items: start;
+    }
+    .hero-copy { padding: 48px 0 0; }
+    .hero-copy .eyebrow { color: #92928b; }
+    .hero h1 {
+      max-width: 760px;
+      font-size: clamp(54px, 5.45vw, 82px);
+      line-height: .98;
+      letter-spacing: -.067em;
+    }
+    .hero-lede {
+      max-width: 700px;
+      margin-top: 26px;
+      color: #b7b7b0;
+      font-size: clamp(18px, 1.4vw, 20px);
+      line-height: 1.56;
+    }
+    .hero-actions { margin-top: 30px; }
+    .purchase-summary {
+      padding: 32px;
+      border: 1px solid rgba(10,10,10,.14);
+      border-radius: 22px;
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 0 34px 90px rgba(0,0,0,.34);
+    }
+    .summary-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding-bottom: 17px;
+      border-bottom: 1px solid var(--line-dark);
+      color: #666660;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .purchase-summary h2 {
+      margin: 25px 0 10px;
+      font-size: 38px;
+      line-height: 1.03;
+      letter-spacing: -.055em;
+    }
+    .purchase-summary > p {
+      margin: 0;
+      color: #666660;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .summary-list {
+      display: grid;
+      gap: 12px;
+      margin: 25px 0 27px;
+      padding: 0;
+      list-style: none;
+    }
+    .summary-list li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 9px;
+      color: #292925;
+      font-size: 13px;
+      line-height: 1.42;
+    }
+    .summary-list li::before {
+      content: "✓";
+      font-weight: 900;
+    }
+    .summary-price {
+      display: flex;
+      align-items: end;
+      gap: 10px;
+      padding-top: 23px;
+      border-top: 1px solid var(--line-dark);
+    }
+    .summary-price strong {
+      font-size: 54px;
+      line-height: .9;
+      letter-spacing: -.07em;
+    }
+    .summary-price span {
+      padding-bottom: 3px;
+      color: #707069;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .summary-buy {
+      width: 100%;
+      margin-top: 22px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+    }
+    .purchase-summary small {
+      display: block;
+      margin-top: 12px;
+      color: #787871;
+      font-size: 10px;
+      text-align: center;
+    }
+    @media (max-width: 1080px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 42px; }
+      .hero-copy { max-width: 850px; padding-top: 0; }
+      .purchase-summary { width: min(100%, 760px); }
+    }
+    @media (max-width: 720px) {
+      .hero { padding: 105px 0 58px; }
+      .hero h1 { font-size: 43px; line-height: 1; }
+      .hero-lede { font-size: 16px; }
+      .purchase-summary { padding: 24px; border-radius: 17px; }
+      .purchase-summary h2 { font-size: 31px; }
+      .summary-price strong { font-size: 46px; }
+    }
   </style>
 </head>
 <body>
   <header class="site-header">
     <nav class="shell nav" aria-label="Primary navigation">
       <a class="wordmark" href="/operator/">Lensically<span>.</span></a>
-      <div class="nav-links" id="nav-links">
-        <a href="#system">System</a>
-        <a href="#product">Product</a>
+            <div class="nav-links" id="nav-links">
+        <a href="#product">What's included</a>
+        <a href="#system">How it works</a>
         <a href="#ownership">Ownership</a>
-        <a href="#install">Install</a>
+        <a href="#install">Installation</a>
         <a href="#faq">FAQ</a>
       </div>
       <a class="nav-buy" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997</a>
@@ -614,79 +741,48 @@
   </header>
 
   <main>
-    <section class="hero">
+        <section class="hero">
       <div class="shell hero-grid">
         <div class="hero-copy reveal visible">
           <p class="eyebrow">Lensically Operator for Threads</p>
-          <h1>AI runs the operation. <span class="owned">You own the system.</span></h1>
-          <p class="hero-lede">Turn ChatGPT into a persistent operating layer for research, writing, scheduling, measurement, continuity, and recovery—inside infrastructure controlled by you.</p>
+          <h1>The complete AI operating system for running Threads accounts.</h1>
+          <p class="hero-lede">You are buying the full source code for a customer-owned system that researches content, generates posts, protects the schedule, measures results, remembers strategy across chats, and recovers from failure.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-            <a class="button button-secondary" href="#system">See the operating system</a>
+            <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Buy the complete system — $997 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+            <a class="button button-secondary" href="#product">See everything included</a>
           </div>
           <div class="hero-proof">
-            <span>Full source package</span>
-            <span>One-time commercial license</span>
-            <span>No revenue share</span>
+            <span>One-time purchase</span>
+            <span>Private versioned ZIP</span>
+            <span>AI-led installation</span>
           </div>
         </div>
 
-        <div class="product-stage reveal">
-          <div class="operator-board">
-            <div class="board-head">
-              <div class="board-brand"><i></i> Lensically / Manifest Mental</div>
-              <div class="board-status">Live operation</div>
-            </div>
-            <div class="board-body">
-              <div class="board-main">
-                <p class="board-kicker">Publishing runway</p>
-                <h2>24 of 24 hours protected.</h2>
-                <p>Next viable slot is already assigned. Strategy, source, and evidence remain attached.</p>
-                <div class="runway" aria-hidden="true">
-                  <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="next"></i><i></i><i></i><i></i><i></i>
-                </div>
-                <div class="cycle-line">
-                  <div class="cycle-step"><b>Research</b><span>complete</span></div>
-                  <div class="cycle-step"><b>Strategy</b><span>locked</span></div>
-                  <div class="cycle-step"><b>Generate</b><span>running</span></div>
-                  <div class="cycle-step"><b>Gate</b><span>queued</span></div>
-                  <div class="cycle-step"><b>Schedule</b><span>queued</span></div>
-                </div>
-                <div class="board-foot">
-                  <div class="board-stat"><strong>348</strong><span>saved patterns</span></div>
-                  <div class="board-stat"><strong>8</strong><span>cycle candidates</span></div>
-                  <div class="board-stat"><strong>4</strong><span>evidence windows</span></div>
-                </div>
-              </div>
-              <aside class="board-rail">
-                <div class="rail-label">Operator conversation</div>
-                <div class="operator-chat">
-                  <div class="chat-bubble chat-user">Fill the next 48 hours without repeating recent posts.</div>
-                  <div class="chat-bubble chat-ai"><b>Runway reconciled.</b><br>8 missing slots found. Sources locked. Generation is in progress.</div>
-                </div>
-                <div class="rail-panel">
-                  <strong>Next publish</strong>
-                  <span>Today · 6:00 PM ET</span>
-                  <div class="rail-row"><span>Main cycle</span><b>ACTIVE</b></div>
-                </div>
-                <div class="rail-panel">
-                  <strong>Continuity preserved</strong>
-                  <span>The next chat resumes from durable state instead of starting over.</span>
-                </div>
-              </aside>
-            </div>
-          </div>
-          <div class="stage-tag">Production architecture</div>
-        </div>
+        <aside class="purchase-summary reveal" aria-label="Lensically Operator purchase contents">
+          <div class="summary-top"><span>Complete commercial package</span><span>v1.0.0</span></div>
+          <h2>Lensically Operator for Threads</h2>
+          <p>One self-hosted system. Installed in accounts you own. Operated through ChatGPT or Codex.</p>
+          <ul class="summary-list">
+            <li>Full versioned source repository</li>
+            <li>Main AI Operator and independent Recovery Operator</li>
+            <li>Dashboard, scheduler, content intelligence, and evidence system</li>
+            <li>Durable memory and continuation across new chats</li>
+            <li>One-paste AI installation workflow</li>
+            <li>Commercial controlled-deployment license and v1.x defect fixes</li>
+          </ul>
+          <div class="summary-price"><strong>$997</strong><span>one-time payment</span></div>
+          <a class="button summary-buy" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Get the complete system</a>
+          <small>Third-party platform accounts and usage costs are separate.</small>
+        </aside>
       </div>
     </section>
 
     <div class="capability-strip">
       <div class="shell capability-grid">
-        <div class="capability"><strong>24 hourly slots</strong><span>Protected publishing runway</span></div>
-        <div class="capability"><strong>4 evidence windows</strong><span>6h, 12h, 18h, and 24h</span></div>
-        <div class="capability"><strong>2 control planes</strong><span>Main Operator plus Recovery</span></div>
-        <div class="capability"><strong>100% customer-owned</strong><span>Repository, infrastructure, and data</span></div>
+        <div class="capability"><strong>Full source code</strong><span>Private versioned repository package</span></div>
+        <div class="capability"><strong>Operator + Recovery</strong><span>Primary control and independent repair planes</span></div>
+        <div class="capability"><strong>Dashboard + scheduler</strong><span>Content, evidence, cycles, and publishing state</span></div>
+        <div class="capability"><strong>Commercial license</strong><span>Use, modify, and create controlled deployments</span></div>
       </div>
     </div>
 
