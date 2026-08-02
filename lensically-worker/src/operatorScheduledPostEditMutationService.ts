@@ -14,7 +14,8 @@ type ScheduledPostEditUpdateInput = {
 type ScheduledPostEditUpdateResult<TScheduledPost> = {
   success: boolean;
   scheduledPost: TScheduledPost | null;
-  linkedDraftsUpdated?: number;
+    linkedDraftsUpdated?: number;
+  revision?: Record<string, unknown> | null;
   error?: string | null;
   statusCode: number;
 };
