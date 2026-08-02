@@ -58,7 +58,7 @@ export const OPERATOR_MCP_STRATEGY_SCHEDULE_TOOLS: OperatorMcpToolDefinition[] =
   {
     name: "edit_scheduled_post",
     title: "Edit scheduled post",
-    description: "Edit the text, schedule, or spoiler settings of an existing approved unpublished scheduled post for the selected account, or safely retry one approved unpublished post that is already due. Omitted fields are preserved. Date and time must be provided together when rescheduling. Posting and posted records cannot be edited or retried.",
+        description: "Edit the text, schedule, spoiler settings, or verbatim owner note of an existing approved unpublished scheduled post. Text edits create immutable revisions and preserve exact authorship. Omitted fields are preserved. Date and time must be provided together when rescheduling. Posting and posted records cannot be edited or retried.",
     inputSchema: {
       type: "object",
       properties: {
