@@ -15501,6 +15501,17 @@ function sanitizeRepoPath(path: unknown): string {
   return normalized;
 }
 
+function resolveGitHubRepositoryTarget(defaultOwner: string, value: unknown): { owner: string; repo: string; full_name: string } | null {
+  const normalized = normalizeOperatorText(value, 220, true)?.replace(/\.git$/i, "") ?? "";
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length < 1 || parts.length > 2) return null;
+  const owner = parts.length === 2 ? parts[0] : defaultOwner;
+  const repo = parts.length === 2 ? parts[1] : parts[0];
+  const valid = /^[A-Za-z0-9_.-]+$/;
+  if (!valid.test(owner) || !valid.test(repo) || repo.endsWith(".git")) return null;
+  return { owner, repo, full_name: `${owner}/${repo}` };
+}
+
 function textToBase64Utf8(value: string): string {
   let binary = "";
   const bytes = new TextEncoder().encode(value);
@@ -17048,7 +17059,7 @@ const SOURCE_DEFINED_PRE_CALL_ROUTES = [
 ] as const;
 
 function operatorPreCallProvider(toolName: string): string {
-                        if (["getEngineeringContinuation", "getDatabaseSchemaState", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
+                        if (["getEngineeringContinuation", "getDatabaseSchemaState", "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "operateGitHubRepositories", "deleteRepoFile", "listGitHubWorkflowRuns", "runGitHubWorkflow", "getGitHubWorkflowRun", "deployBackend"].includes(toolName)) return "github";
         if (["createCloudflarePagesProject", "deployCloudflarePagesProject", "verifyDeployedMcpVersion", "deployMcpChanges", "rollbackMcpChanges", "getScheduledPostSchedulerState", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "runApprovedPostCanary"].includes(toolName)) return "cloudflare";
     if (["schedule_approved_draft", "schedule_manifest_review_batch", "delete_scheduled_post", "edit_scheduled_post", "list_scheduled_posts", "auditScheduledPost", "get_post_results", "get_performance_learning"].includes(toolName)) return "threads";
   return "lensically";
@@ -17416,7 +17427,7 @@ export function isExpectedHardeningControlResult(
 const HARDENING_REPAIR_TOOLS = new Set<string>([
       "getOperatorStartupContext", "getEngineeringContinuation", "getDatabaseSchemaState", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
-            "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
+            "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "operateGitHubRepositories", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
 ]);
 
@@ -19380,8 +19391,9 @@ async function handleOperatorMcpAdminTool(
                 "commitRepoFileWrite",
                 "createRepoFile",
                 "createGitHubRepository",
-        "upsertGitHubRepositoryFile",
-        "createCloudflarePagesProject",
+                "upsertGitHubRepositoryFile",
+        "operateGitHubRepositories",
+        "createCloudflarePagesProject\,
         "deployCloudflarePagesProject",
         "deleteRepoFile",
         "runGitHubWorkflow",
@@ -20356,7 +20368,229 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
+    if (toolName === "operateGitHubRepositories") {
+    const operation = normalizeOperatorMachineKey(args.operation, "");
+    const allowedOperations = new Set([
+      "list_repositories", "get_repository", "list_files", "read_file", "search_file",
+      "upsert_file", "patch_file", "delete_file", "list_workflow_runs", "dispatch_workflow", "get_workflow_run",
+    ]);
+    if (!allowedOperations.has(operation)) {
+      return { ok: false, error: "github_repository_operation_required", allowed_operations: [...allowedOperations] };
+    }
+
+    const summarizeRepository = (data: unknown): Record<string, unknown> => {
+      const repo = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
+      const permissions = repo.permissions && typeof repo.permissions === "object" && !Array.isArray(repo.permissions)
+        ? repo.permissions as Record<string, unknown>
+        : {};
+      return {
+        id: typeof repo.id === "number" ? repo.id : null,
+        name: normalizeOperatorText(repo.name, 100, true),
+        full_name: normalizeOperatorText(repo.full_name, 220, true),
+        private: repo.private === true,
+        visibility: normalizeOperatorText(repo.visibility, 40, true),
+        default_branch: normalizeOperatorText(repo.default_branch, 120, true),
+        archived: repo.archived === true,
+        disabled: repo.disabled === true,
+        fork: repo.fork === true,
+        html_url: normalizeOperatorText(repo.html_url, 500, true),
+        updated_at: repo.updated_at ?? null,
+        permissions: {
+          admin: permissions.admin === true,
+          maintain: permissions.maintain === true,
+          push: permissions.push === true,
+          triage: permissions.triage === true,
+          pull: permissions.pull === true,
+        },
+      };
+    };
+
+    if (operation === "list_repositories") {
+      const limit = Math.min(Math.max(Number(args.limit ?? 100), 1), 500);
+      const repositories: Record<string, unknown>[] = [];
+      let page = 1;
+      while (repositories.length < limit && page <= 5) {
+        const perPage = Math.min(100, limit - repositories.length);
+        const result = await githubApi(env, `/user/repos?visibility=all&affiliation=owner%2Ccollaborator%2Corganization_member&sort=updated&direction=desc&per_page=${perPage}&page=${page}`);
+        if (!result.ok || !Array.isArray(result.data)) {
+          return { ok: false, error: "github_repository_list_failed", status: result.status, repositories, returned_count: repositories.length };
+        }
+        const batch = result.data.map(summarizeRepository);
+        repositories.push(...batch);
+        if (batch.length < perPage) break;
+        page += 1;
+      }
+      return {
+        ok: true,
+        authenticated: Boolean(config.token),
+        access_scope: "all_repositories_visible_to_configured_token",
+        repositories: repositories.slice(0, limit),
+        returned_count: Math.min(repositories.length, limit),
+        truncated: repositories.length >= limit,
+        external_requests: page,
+      };
+    }
+
+    const target = resolveGitHubRepositoryTarget(config.owner, args.repository);
+    if (!target) return { ok: false, error: "valid_repository_required", accepted_formats: ["repository", "owner/repository"] };
+    const repositoryEndpoint = `/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
+    const repositoryResult = await githubApi(env, repositoryEndpoint);
+    if (!repositoryResult.ok) {
+      return { ok: false, error: "github_repository_access_failed", status: repositoryResult.status, repository: target.full_name };
+    }
+    if (operation === "get_repository") {
+      return { ok: true, repository: summarizeRepository(repositoryResult.data) };
+    }
+
+    const repositoryRecord = repositoryResult.data && typeof repositoryResult.data === "object" && !Array.isArray(repositoryResult.data)
+      ? repositoryResult.data as Record<string, unknown>
+      : {};
+    const explicitBranch = normalizeOperatorText(args.branch, 120, true);
+    const branch = explicitBranch ?? normalizeOperatorText(repositoryRecord.default_branch, 120, true) ?? "main";
+    if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.includes("..") || branch.startsWith("/") || branch.endsWith("/")) {
+      return { ok: false, error: "invalid_repository_branch", repository: target.full_name, branch };
+    }
+    const repoApi = (path: string, init: RequestInit = {}) => githubApi(env, `${repositoryEndpoint}${path}`, init);
+    const loadFile = async (path: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> => {
+      const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
+      const contents = await repoApi(`/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`);
+      if (!contents.ok || !contents.data || typeof contents.data !== "object" || Array.isArray(contents.data)) {
+        return { ok: false, status: contents.status, sha: null, content: null, size: 0 };
+      }
+      const record = contents.data as Record<string, unknown>;
+      const sha = normalizeOperatorText(record.sha, 80, true);
+      const encoded = typeof record.content === "string" ? record.content : "";
+      if (sha && encoded) {
+        try {
+          return { ok: true, status: contents.status, sha, content: base64ToTextUtf8(encoded), size: Number(record.size ?? 0) };
+        } catch {
+          return { ok: false, status: 422, sha, content: null, size: Number(record.size ?? 0) };
+        }
+      }
+      if (!sha) return { ok: false, status: contents.status, sha: null, content: null, size: 0 };
+      const blob = await repoApi(`/git/blobs/${encodeURIComponent(sha)}`);
+      const blobRecord = blob.data && typeof blob.data === "object" && !Array.isArray(blob.data) ? blob.data as Record<string, unknown> : {};
+      const blobContent = typeof blobRecord.content === "string" ? blobRecord.content : "";
+      if (!blob.ok || !blobContent) return { ok: false, status: blob.status, sha, content: null, size: Number(record.size ?? 0) };
+      try {
+        return { ok: true, status: blob.status, sha, content: base64ToTextUtf8(blobContent), size: Number(record.size ?? blobRecord.size ?? 0) };
+      } catch {
+        return { ok: false, status: 422, sha, content: null, size: Number(record.size ?? blobRecord.size ?? 0) };
+      }
+    };
+
+    if (operation === "list_files") {
+      const rawPrefix = normalizeOperatorText(args.prefix, 500, true) ?? "";
+      const prefix = rawPrefix ? sanitizeRepoPath(rawPrefix) : "";
+      if (rawPrefix && !prefix) return { ok: false, error: "invalid_repository_prefix", repository: target.full_name };
+      const limit = Math.min(Math.max(Number(args.limit ?? 200), 1), 500);
+      const treeResult = await repoApi(`/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+      if (!treeResult.ok || !treeResult.data || typeof treeResult.data !== "object" || Array.isArray(treeResult.data)) {
+        return { ok: false, error: "github_repository_tree_failed", status: treeResult.status, repository: target.full_name, branch };
+      }
+      const treeRecord = treeResult.data as Record<string, unknown>;
+      const tree = Array.isArray(treeRecord.tree) ? treeRecord.tree as Array<Record<string, unknown>> : [];
+      const matching = tree.filter((item) => item.type === "blob" && typeof item.path === "string" && (!prefix || String(item.path).startsWith(prefix)));
+      const files = matching.slice(0, limit).map((item) => ({ path: item.path, size: item.size ?? null, sha: item.sha ?? null }));
+      return { ok: true, repository: target.full_name, branch, files, returned_count: files.length, total_matching: matching.length, truncated: treeRecord.truncated === true || matching.length > files.length };
+    }
+
+    if (["read_file", "search_file", "upsert_file", "patch_file", "delete_file"].includes(operation)) {
+      const path = sanitizeRepoPath(args.path);
+      if (!path) return { ok: false, error: "valid_repository_file_path_required", repository: target.full_name, branch };
+      const existing = await loadFile(path);
+
+      if (operation === "read_file") {
+        if (!existing.ok || existing.content === null) return { ok: false, error: "github_repository_file_read_failed", status: existing.status, repository: target.full_name, branch, path };
+        const startLine = Math.max(Number(args.start_line ?? 1), 1);
+        const maxLines = Math.min(Math.max(Number(args.max_lines ?? 200), 1), 400);
+        const lines = existing.content.split(/\r?\n/);
+        const selected = lines.slice(startLine - 1, startLine - 1 + maxLines);
+        return { ok: true, repository: target.full_name, branch, path, sha: existing.sha, size: existing.size, start_line: startLine, returned_lines: selected.length, total_lines: lines.length, content: selected.join("\n"), truncated: startLine - 1 + maxLines < lines.length };
+      }
+
+      if (operation === "search_file") {
+        const query = normalizeOperatorText(args.query, 500);
+        const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+        if (!query) return { ok: false, error: "repository_file_search_query_required", repository: target.full_name, branch, path };
+        if (!existing.ok || existing.content === null) return { ok: false, error: "github_repository_file_read_failed", status: existing.status, repository: target.full_name, branch, path };
+        const search = searchKnownRepositoryFileContent(existing.content, query, limit);
+        return { ok: true, repository: target.full_name, branch, path, query, ...search, returned_count: search.matches.length, verified_complete_for_known_file: true };
+      }
+
+      const operationId = normalizeOperatorText(args.operation_id, 120, true);
+      const message = normalizeOperatorText(args.message, 200);
+      if (!operationId || !message) return { ok: false, error: "operation_id_and_commit_message_required", repository: target.full_name, branch, path };
+      const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
+      const fileEndpoint = `/contents/${encodedPath}`;
+
+      if (operation === "delete_file") {
+        const ownerResponse = normalizeOperatorText(args.owner_response, 8000, true);
+        if (!ownerResponse) return { ok: false, error: "exact_owner_approval_required_for_repository_file_delete", repository: target.full_name, branch, path };
+        if (!existing.ok || !existing.sha) return { ok: false, error: "github_repository_file_not_found", status: existing.status, repository: target.full_name, branch, path };
+        const deleted = await repoApi(fileEndpoint, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, sha: existing.sha, branch }) });
+        await recordEngineeringAudit(env, { action: "operateGitHubRepositories:delete_file", filesChanged: [`${target.full_name}:${path}`], diffSummary: `Deleted ${target.full_name}:${path}.`, result: deleted.ok ? "ok" : "failed", ownerApproval: ownerResponse, metadata: { operation_id: operationId, repository: target.full_name, branch, path, status: deleted.status } });
+        return { ok: deleted.ok, status: deleted.status, operation, operation_id: operationId, repository: target.full_name, branch, path };
+      }
+
+      let nextContent = typeof args.content === "string" ? args.content : "";
+      if (operation === "patch_file") {
+        const find = normalizeOperatorText(args.find, 100000);
+        const replace = typeof args.replace === "string" ? args.replace : "";
+        if (!find) return { ok: false, error: "exact_find_text_required", repository: target.full_name, branch, path };
+        if (!existing.ok || existing.content === null) return { ok: false, error: "github_repository_file_read_failed", status: existing.status, repository: target.full_name, branch, path };
+        const count = existing.content.split(find).length - 1;
+        if (count !== 1) return { ok: false, error: "find_must_match_once", match_count: count, repository: target.full_name, branch, path };
+        nextContent = existing.content.replace(find, replace);
+      }
+      if (new TextEncoder().encode(nextContent).length > 100000) return { ok: false, error: "repository_file_content_too_large", max_bytes: 100000, repository: target.full_name, branch, path };
+      const patchSafety = validateRepositoryPatchContent(path, nextContent);
+      if (!patchSafety.ok) return { ...patchSafety, repository: target.full_name, branch, path, no_commit_created: true };
+      if (existing.ok && existing.content === nextContent) return { ok: true, no_change: true, no_commit_created: true, operation, operation_id: operationId, repository: target.full_name, branch, path, sha: existing.sha };
+      const put = await repoApi(fileEndpoint, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, content: textToBase64Utf8(nextContent), branch, ...(existing.sha ? { sha: existing.sha } : {}) }) });
+      const putRecord = put.data && typeof put.data === "object" && !Array.isArray(put.data) ? put.data as Record<string, unknown> : {};
+      const commitRecord = putRecord.commit && typeof putRecord.commit === "object" && !Array.isArray(putRecord.commit) ? putRecord.commit as Record<string, unknown> : {};
+      const commitSha = normalizeOperatorText(commitRecord.sha, 80, true);
+      await recordEngineeringAudit(env, { action: `operateGitHubRepositories:${operation}`, filesChanged: [`${target.full_name}:${path}`], diffSummary: `${operation === "patch_file" ? "Patched" : "Upserted"} ${target.full_name}:${path}.`, result: put.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: target.full_name, branch, path, status: put.status, commit_sha: commitSha } });
+      return { ok: put.ok, status: put.status, operation, operation_id: operationId, repository: target.full_name, branch, path, created: !existing.ok, commit_sha: commitSha };
+    }
+
+    if (operation === "list_workflow_runs") {
+      const workflowId = normalizeOperatorText(args.workflow_id, 200, true);
+      const limit = Math.min(Math.max(Number(args.limit ?? 10), 1), 100);
+      const workflowPath = workflowId
+        ? `/actions/workflows/${encodeURIComponent(workflowId)}/runs?per_page=${limit}`
+        : `/actions/runs?per_page=${limit}`;
+      const result = await repoApi(workflowPath);
+      const resultRecord = result.data && typeof result.data === "object" && !Array.isArray(result.data) ? result.data as Record<string, unknown> : {};
+      const runs = Array.isArray(resultRecord.workflow_runs) ? (resultRecord.workflow_runs as Array<Record<string, unknown>>).map((run) => ({ id: run.id, name: run.name, event: run.event, status: run.status, conclusion: run.conclusion, head_branch: run.head_branch, head_sha: run.head_sha, created_at: run.created_at, html_url: run.html_url })) : [];
+      return { ok: result.ok, status: result.status, repository: target.full_name, workflow_id: workflowId ?? null, runs, returned_count: runs.length };
+    }
+
+    if (operation === "dispatch_workflow") {
+      const workflowId = normalizeOperatorText(args.workflow_id, 200, true);
+      const ref = normalizeOperatorText(args.ref, 120, true) ?? branch;
+      const operationId = normalizeOperatorText(args.operation_id, 120, true);
+      if (!workflowId || !operationId) return { ok: false, error: "workflow_id_and_operation_id_required", repository: target.full_name };
+      if (!/^[A-Za-z0-9._/-]+$/.test(ref) || ref.includes("..") || ref.startsWith("/") || ref.endsWith("/")) return { ok: false, error: "invalid_workflow_ref", repository: target.full_name, ref };
+      const rawInputs = args.inputs && typeof args.inputs === "object" && !Array.isArray(args.inputs) ? args.inputs as Record<string, unknown> : {};
+      const inputs = Object.fromEntries(Object.entries(rawInputs).slice(0, 50).map(([key, value]) => [key, String(value)]));
+      const result = await repoApi(`/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref, inputs }) });
+      await recordEngineeringAudit(env, { action: "operateGitHubRepositories:dispatch_workflow", filesChanged: [], diffSummary: `Dispatched ${workflowId} in ${target.full_name} at ${ref}.`, result: result.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: target.full_name, workflow_id: workflowId, ref, status: result.status } });
+      return { ok: result.ok, status: result.status, operation, operation_id: operationId, repository: target.full_name, workflow_id: workflowId, ref, dispatched: result.ok };
+    }
+
+    const runId = Number(args.run_id);
+    if (!Number.isSafeInteger(runId) || runId < 1) return { ok: false, error: "valid_workflow_run_id_required", repository: target.full_name };
+    const [runResult, jobsResult] = await Promise.all([repoApi(`/actions/runs/${runId}`), repoApi(`/actions/runs/${runId}/jobs?per_page=100`)]);
+    const runRecord = runResult.data && typeof runResult.data === "object" && !Array.isArray(runResult.data) ? runResult.data as Record<string, unknown> : {};
+    const jobsRecord = jobsResult.data && typeof jobsResult.data === "object" && !Array.isArray(jobsResult.data) ? jobsResult.data as Record<string, unknown> : {};
+    const jobs = Array.isArray(jobsRecord.jobs) ? (jobsRecord.jobs as Array<Record<string, unknown>>).map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion, started_at: job.started_at, completed_at: job.completed_at })) : [];
+    return { ok: runResult.ok, status: runResult.status, jobs_ok: jobsResult.ok, jobs_status: jobsResult.status, repository: target.full_name, run: { id: runRecord.id, name: runRecord.name, event: runRecord.event, status: runRecord.status, conclusion: runRecord.conclusion, head_branch: runRecord.head_branch, head_sha: runRecord.head_sha, html_url: runRecord.html_url }, jobs };
+  }
+
   if (toolName === "listRepoFiles") {
+
     const prefix = sanitizeRepoPath(args.prefix ?? "");
     const limit = Math.min(Math.max(Number(args.limit ?? 200), 1), 500);
     const branch = await githubRepoApi(env, `/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
