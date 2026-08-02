@@ -29108,10 +29108,12 @@ async function updateScheduledPostForAppUser(
       text,
       status: SCHEDULED_POST_STATUS_APPROVED,
       scheduled_time_utc: scheduledUtc,
-      spoiler_all_text: spoilerAllText,
+            spoiler_all_text: spoilerAllText,
       spoiler_phrases: spoilerPhrases,
+      current_revision_id: revisionPlan.currentRevisionId,
     },
     linkedDraftsUpdated,
+    revision: revisionPlan.createdRevision,
   };
 }
 
