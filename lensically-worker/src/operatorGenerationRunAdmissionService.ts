@@ -58,17 +58,7 @@ export async function admitOperatorGenerationRun(
     };
   }
 
-  const adaptationPlan = dependencies.normalizeAdaptationPlan(input.payload.adaptation_plan);
-  if (
-    input.brandKey === "manifest_mental"
-    && !dependencies.normalizeText(adaptationPlan.adaptation_goal, 1500, true)
-  ) {
-    return {
-      kind: "response",
-      status: 400,
-      body: { success: false, error: "manifest_adaptation_goal_required" },
-    };
-  }
+    const adaptationPlan = dependencies.normalizeAdaptationPlan(input.payload.adaptation_plan);
 
   const [canonicalContext, accountRejectionContext, performanceLearning] = await Promise.all([
     dependencies.loadCanonicalContext(sourceCard),
