@@ -29030,7 +29030,7 @@ async function updateScheduledPostForAppUser(
     text,
     buildSpoilerFingerprint(spoilerAllText, spoilerPhrases),
   );
-      const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
+        const hasDraftTable = await doesTableExist(env, "gpt_generation_drafts");
   const linkedDraftCount = hasDraftTable
     ? await env.DB.prepare(
       `SELECT COUNT(*) AS total
@@ -29040,6 +29040,17 @@ async function updateScheduledPostForAppUser(
     ).bind(input.scheduledPostId, existing.threads_user_id).first<{ total: number | string }>()
     : null;
   const linkedDraftsUpdated = Number(linkedDraftCount?.total ?? 0);
+  const revisionPlan = await prepareScheduledPostRevisionPlan(env.DB, {
+    scheduledPostId: input.scheduledPostId,
+    userId: input.appUserId,
+    threadsUserId: existing.threads_user_id,
+    currentText: existing.post_text,
+    currentRevisionId: existing.current_revision_id,
+    revisedText: text,
+    editorType: input.editorType ?? "owner",
+    editSource: input.editSource ?? "ui",
+    ownerNote,
+  });
   try {
     const statements = [
       env.DB.prepare(
@@ -29048,7 +29059,8 @@ async function updateScheduledPostForAppUser(
              spoiler_all_text = ?,
              spoiler_phrases_json = ?,
              scheduled_time = ?,
-             idempotency_key = ?
+             idempotency_key = ?,
+             current_revision_id = ?
          WHERE id = ?
            AND user_id = ?
            AND threads_user_id = ?
@@ -29059,11 +29071,13 @@ async function updateScheduledPostForAppUser(
         serializeSpoilerPhrases(spoilerPhrases),
         scheduledUtc,
         scheduleIdempotencyKey,
+        revisionPlan.currentRevisionId,
         input.scheduledPostId,
         input.appUserId,
         existing.threads_user_id,
         SCHEDULED_POST_STATUS_APPROVED,
       ),
+      ...revisionPlan.statements,
     ];
     if (hasDraftTable) {
       statements.push(
@@ -29079,7 +29093,6 @@ async function updateScheduledPostForAppUser(
     if (Number(results[0]?.meta?.changes ?? 0) <= 0) {
       return { success: false, statusCode: 409, error: "scheduled_post_could_not_be_updated" };
     }
-    
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return { success: false, statusCode: 409, error: "identical_scheduled_post_exists" };
