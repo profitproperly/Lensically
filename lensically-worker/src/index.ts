@@ -7962,8 +7962,24 @@ async function getOperatorSourceCardHistory(
         status: row.draft_status,
         strategy: safeParseJsonString(String(row.strategy_json ?? "{}")) ?? {},
         score: safeParseJsonString(String(row.score_json ?? "{}")) ?? {},
-        scheduled_post_id: row.scheduled_post_id ?? null,
+                scheduled_post_id: row.scheduled_post_id ?? null,
         published_post_id: publishedPostId,
+        published_execution: row.published_revision_id ? {
+          revision_id: row.published_revision_id,
+          editor_type: row.published_editor_type ?? null,
+          change_magnitude: row.published_change_magnitude ?? null,
+          model_or_previous_text: row.published_previous_text ?? null,
+          exact_published_text: row.published_revision_text ?? row.draft_text,
+          owner_note: row.published_owner_note ?? null,
+          became_published: Number(row.revision_became_published ?? 0) === 1,
+          attribution_label: row.published_editor_type === "owner"
+            ? row.published_change_magnitude === "substantial"
+              ? "substantially_owner_rewritten_execution"
+              : "owner_edited_execution"
+            : row.published_editor_type === "model"
+              ? "untouched_model_execution"
+              : "system_corrected_execution",
+        } : null,
         metric_history: publishedPostId ? metricsByPost.get(publishedPostId) ?? [] : [],
         created_at: row.draft_created_at,
       });
