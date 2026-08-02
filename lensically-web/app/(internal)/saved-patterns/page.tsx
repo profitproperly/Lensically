@@ -557,29 +557,23 @@ export default function SavedPatternsPage() {
                                 </p>
                               </div>
 
-                              <div className="grid gap-3 md:grid-cols-2">
+                                                            <div className="grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <p className="text-xs font-medium text-slate-500">What this source shows</p>
+                                  <p className="text-xs font-medium text-slate-500">Original source</p>
                                   <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                                    {sourceCards[pattern.id]?.source_mechanism || "No source explanation has been recorded yet."}
+                                    {sourceCards[pattern.id]?.primary_source?.text || pattern.post_text}
                                   </p>
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <p className="text-xs font-medium text-slate-500">What the audience receives</p>
-                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                                    {sourceCards[pattern.id]?.required_product || "No audience result has been recorded yet."}
-                                  </p>
+                                  <p className="text-xs font-medium text-slate-500">Source performance</p>
+                                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-700">
+                                    <span>Likes: {formatMetric(sourceCards[pattern.id]?.primary_source?.metrics?.likes ?? pattern.likes)}</span>
+                                    <span>Views: {formatMetric(sourceCards[pattern.id]?.primary_source?.metrics?.views ?? pattern.views ?? 0)}</span>
+                                    <span>Replies: {formatMetric(sourceCards[pattern.id]?.primary_source?.metrics?.replies ?? pattern.replies)}</span>
+                                    <span>Reposts: {formatMetric(sourceCards[pattern.id]?.primary_source?.metrics?.reposts ?? pattern.reposts)}</span>
+                                  </div>
                                 </div>
                               </div>
-
-                              {sourceCards[pattern.id]?.recommended_direction ? (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <p className="text-xs font-medium text-slate-500">Current direction</p>
-                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                                    {sourceCards[pattern.id]?.recommended_direction}
-                                  </p>
-                                </div>
-                              ) : null}
 
                               <div>
                                 <label className="block text-sm font-semibold text-slate-900" htmlFor={`source-card-guidance-${pattern.id}`}>
