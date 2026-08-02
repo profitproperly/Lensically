@@ -42,7 +42,7 @@ export const GENERATION_ADAPTATION_PLAN_SCHEMA = {
 
 export const SOURCE_DRAFT_ANALYSIS_SCHEMA = {
   type: "object",
-  description: "Gate evidence for the active source contract. For Manifest, record preserved hook/function/time requirements and audience reward; transformed_elements is optional because close source mimicry is preferred.",
+    description: "Gate evidence for how the candidate used the active source evidence and source-specific owner guidance. Do not infer a universal mimicry or novelty level from this schema.",
   properties: {
     opening_phrase: { type: "string" },
     realm_entrance_key: { type: "string" },
