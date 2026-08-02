@@ -85,7 +85,7 @@ export const OPERATOR_MCP_SOURCE_DRAFT_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "run_gates",
     title: "Run operator gates",
-    description: "Evaluate source-card or draft gates. For Manifest, close source mimicry is preferred: preserve the hook, structure, meaning, tone, and payoff; block an exact source copy, explicit owner hard bans, and missing required gates. Do not require semantic review of every rejected draft or model fingerprint evidence. Gate evaluation remains silent after source-card approval.",
+        description: "Evaluate the configured source-card and draft gates, including active source-specific owner guidance and required execution evidence. Gate evaluation remains silent after source-card approval.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, source_card_id: { type: "string" }, draft_text: { type: "string" }, stage: { type: "string" }, lane_key: { type: "string" }, content_type: { type: "string" }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "stage"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
