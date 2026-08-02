@@ -3,867 +3,604 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Lensically Operator turns ChatGPT into the operating layer for a customer-owned Threads content business—research, generation, scheduling, measurement, learning, and recovery.">
+  <meta name="description" content="Lensically Operator turns ChatGPT into a persistent operating layer for a customer-owned Threads content business—research, generation, scheduling, measurement, continuity, and recovery.">
   <meta name="robots" content="index,follow">
   <meta property="og:title" content="Lensically Operator for Threads">
-  <meta property="og:description" content="Run your Threads brand like a company without becoming the content department. Own the source, infrastructure, operator, dashboard, scheduling system, evidence, and recovery plane.">
+  <meta property="og:description" content="AI runs the operation. You own the system.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://lensically.com/operator/">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="theme-color" content="#07080b">
+  <meta name="theme-color" content="#0a0a0a">
   <title>Lensically Operator for Threads</title>
   <link rel="canonical" href="https://lensically.com/operator/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #07080b;
-      --bg-soft: #0b0d12;
-      --surface: #10131a;
-      --surface-2: #151923;
-      --surface-3: #1a1f2b;
-      --text: #f7f8fc;
-      --muted: #9da6b7;
-      --muted-2: #737d90;
-      --line: rgba(255,255,255,.10);
-      --line-strong: rgba(255,255,255,.17);
-      --violet: #a889ff;
-      --violet-2: #7c5cff;
-      --cyan: #67d8ff;
-      --mint: #7ce6b2;
-      --rose: #ff7da8;
-      --amber: #f9ca72;
-      --shadow: 0 34px 100px rgba(0,0,0,.46);
-      --radius-xl: 30px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --shell: min(1180px, calc(100% - 40px));
+      --ink: #0a0a0a;
+      --ink-2: #111111;
+      --paper: #f1f0ea;
+      --paper-2: #e6e4dc;
+      --white: #ffffff;
+      --text: #f6f6f2;
+      --muted: #a5a59d;
+      --muted-dark: #5d5d57;
+      --line: rgba(255,255,255,.14);
+      --line-dark: rgba(10,10,10,.14);
+      --acid: #c7ff45;
+      --blue: #8797ff;
+      --orange: #ff8b54;
+      --shell: min(1280px, calc(100% - 48px));
+      --radius: 22px;
+      --mono: "DM Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+    html { scroll-behavior: smooth; scroll-padding-top: 84px; }
     body {
       margin: 0;
       min-width: 320px;
       overflow-x: hidden;
-      background:
-        radial-gradient(circle at 13% 2%, rgba(124,92,255,.16), transparent 34rem),
-        radial-gradient(circle at 91% 12%, rgba(103,216,255,.10), transparent 30rem),
-        var(--bg);
+      background: var(--ink);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "Manrope", system-ui, sans-serif;
       font-size: 16px;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: -3;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-      background-size: 56px 56px;
-      mask-image: linear-gradient(to bottom, black 0, transparent 82%);
-    }
-
-    body::after {
-      content: "";
-      position: fixed;
-      width: 520px;
-      height: 520px;
-      left: calc(var(--spot-x, 50vw) - 260px);
-      top: calc(var(--spot-y, 18vh) - 260px);
-      z-index: -2;
-      pointer-events: none;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(142,111,255,.10), transparent 67%);
-      transition: left .12s linear, top .12s linear;
-    }
-
     a { color: inherit; }
-    button, a { -webkit-tap-highlight-color: transparent; }
     button { font: inherit; }
-    img, svg { display: block; }
+    svg { display: block; }
     .shell { width: var(--shell); margin: 0 auto; }
-    .section { position: relative; padding: 112px 0; }
-    .section-tight { padding: 78px 0; }
-    .section-rule { border-top: 1px solid var(--line); }
-    .muted { color: var(--muted); }
-    .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
-    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+    .mono { font-family: var(--mono); }
+    .eyebrow {
+      margin: 0 0 22px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.2;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
 
-    .nav-wrap {
+    .site-header {
       position: fixed;
-      top: 16px;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      pointer-events: none;
+      inset: 0 0 auto;
+      z-index: 50;
+      height: 76px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      background: rgba(10,10,10,.82);
+      backdrop-filter: blur(18px);
     }
-
     .nav {
-      width: min(1040px, calc(100% - 28px));
-      min-height: 64px;
-      margin: 0 auto;
-      padding: 9px 10px 9px 15px;
-      display: flex;
+      height: 76px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 18px;
-      background: rgba(10,12,17,.76);
-      box-shadow: 0 18px 52px rgba(0,0,0,.28);
-      backdrop-filter: blur(20px) saturate(150%);
-      pointer-events: auto;
+      gap: 26px;
     }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 11px;
+    .wordmark {
+      justify-self: start;
+      color: #fff;
       text-decoration: none;
       font-weight: 800;
-      letter-spacing: -.025em;
+      font-size: 19px;
+      letter-spacing: -.05em;
     }
-
-    .brand-mark {
-      position: relative;
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,.20);
-      border-radius: 11px;
-      background: linear-gradient(145deg, rgba(168,137,255,.98), rgba(103,216,255,.90));
-      color: #07080b;
-      font-size: 17px;
-      font-weight: 950;
-      box-shadow: 0 10px 28px rgba(111,111,255,.26);
-    }
-
-    .brand-mark::after {
-      content: "";
-      position: absolute;
-      width: 26px;
-      height: 60px;
-      left: -18px;
-      top: -14px;
-      transform: rotate(22deg);
-      background: rgba(255,255,255,.45);
-      animation: markShine 5s ease-in-out infinite;
-    }
-
-    @keyframes markShine {
-      0%, 66%, 100% { transform: translateX(-18px) rotate(22deg); opacity: 0; }
-      74% { opacity: .75; }
-      86% { transform: translateX(70px) rotate(22deg); opacity: 0; }
-    }
-
-    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .wordmark span { color: var(--acid); }
+    .nav-links { display: flex; align-items: center; gap: 30px; }
     .nav-links a {
-      padding: 9px 11px;
-      border-radius: 10px;
-      color: #b9c0cf;
+      color: #b8b8b0;
       text-decoration: none;
       font-size: 13px;
       font-weight: 650;
-      transition: color .18s ease, background .18s ease;
+      transition: color .2s ease;
     }
-    .nav-links a:hover { color: #fff; background: rgba(255,255,255,.055); }
+    .nav-links a:hover { color: #fff; }
+    .nav-buy {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 999px;
+      background: var(--acid);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      transition: transform .2s ease;
+    }
+    .nav-buy:hover { transform: translateY(-2px); }
+    .menu-button {
+      display: none;
+      justify-self: end;
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: transparent;
+      color: #fff;
+    }
+    .menu-button::before, .menu-button::after {
+      content: "";
+      display: block;
+      width: 17px;
+      height: 1px;
+      margin: 5px auto;
+      background: currentColor;
+      transition: transform .2s ease;
+    }
+    .menu-button[aria-expanded="true"]::before { transform: translateY(3px) rotate(45deg); }
+    .menu-button[aria-expanded="true"]::after { transform: translateY(-3px) rotate(-45deg); }
 
-    .nav-cta, .button {
+    .hero {
       position: relative;
+      min-height: 820px;
+      padding: 142px 0 64px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 88%);
+    }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0,.88fr) minmax(560px,1.12fr);
+      align-items: center;
+      gap: 64px;
+    }
+    .hero-copy { padding-bottom: 18px; }
+    .hero-copy .eyebrow { color: var(--acid); }
+    h1 {
+      max-width: 680px;
+      margin: 0;
+      font-size: clamp(58px, 6.2vw, 88px);
+      line-height: .94;
+      letter-spacing: -.075em;
+      font-weight: 700;
+    }
+    h1 .owned {
+      position: relative;
+      display: inline-block;
+      color: var(--ink);
+      z-index: 0;
+    }
+    h1 .owned::before {
+      content: "";
+      position: absolute;
+      inset: .08em -.08em .02em;
+      z-index: -1;
+      background: var(--acid);
+      transform: rotate(-1.5deg);
+    }
+    .hero-lede {
+      max-width: 590px;
+      margin: 28px 0 0;
+      color: #b9b9b2;
+      font-size: clamp(18px, 1.5vw, 21px);
+      line-height: 1.58;
+      letter-spacing: -.02em;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+    .button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      min-height: 50px;
-      padding: 0 20px;
-      overflow: hidden;
+      min-height: 54px;
+      padding: 0 22px;
       border: 1px solid transparent;
-      border-radius: 14px;
+      border-radius: 999px;
       text-decoration: none;
-      font-weight: 780;
-      letter-spacing: -.015em;
-      cursor: pointer;
-      transition: transform .2s ease, border-color .2s ease, filter .2s ease, background .2s ease;
+      font-weight: 800;
+      font-size: 14px;
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
     }
+    .button:hover { transform: translateY(-2px); }
+    .button-primary { background: var(--acid); color: var(--ink); }
+    .button-secondary { border-color: var(--line); color: #fff; background: rgba(255,255,255,.03); }
+    .button-secondary:hover { border-color: rgba(255,255,255,.30); background: rgba(255,255,255,.06); }
+    .button svg { width: 17px; height: 17px; }
+    .hero-proof {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      margin-top: 20px;
+      color: #85857f;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+    .hero-proof span { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-proof span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--acid); }
 
-    .nav-cta { min-height: 44px; padding: 0 16px; border-radius: 12px; font-size: 13px; }
-    .button:hover, .nav-cta:hover { transform: translateY(-2px); filter: brightness(1.06); }
-    .button-primary, .nav-cta {
-      color: #08090d;
-      background: linear-gradient(135deg, #b79eff 0%, #74ddff 100%);
-      box-shadow: 0 16px 44px rgba(104,129,255,.24);
-    }
-    .button-primary::after, .nav-cta::after {
+    .product-stage { position: relative; min-height: 570px; }
+    .product-stage::before {
       content: "";
       position: absolute;
-      inset: -2px;
-      background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.52) 44%, transparent 66%);
-      transform: translateX(-120%);
-      animation: buttonShimmer 5.4s ease-in-out infinite;
-    }
-    @keyframes buttonShimmer {
-      0%, 58%, 100% { transform: translateX(-120%); }
-      76% { transform: translateX(120%); }
-    }
-    .button-secondary {
-      color: #eef0f6;
-      border-color: var(--line-strong);
-      background: rgba(255,255,255,.035);
-      box-shadow: inset 0 1px rgba(255,255,255,.05);
-    }
-    .button-secondary:hover { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.06); }
-    .button svg { width: 18px; height: 18px; }
-
-    .menu-button {
-      display: none;
-      width: 42px;
-      height: 42px;
-      border: 1px solid var(--line);
-      border-radius: 11px;
-      background: rgba(255,255,255,.035);
-      color: #fff;
-      cursor: pointer;
-    }
-    .menu-button span, .menu-button::before, .menu-button::after {
-      content: "";
-      display: block;
-      width: 18px;
-      height: 2px;
-      margin: 4px auto;
-      border-radius: 2px;
-      background: currentColor;
-      transition: transform .2s ease, opacity .2s ease;
-    }
-    .menu-button[aria-expanded="true"] span { opacity: 0; }
-    .menu-button[aria-expanded="true"]::before { transform: translateY(6px) rotate(45deg); }
-    .menu-button[aria-expanded="true"]::after { transform: translateY(-6px) rotate(-45deg); }
-
-    .hero {
-      position: relative;
-      min-height: 880px;
-      padding: 164px 0 92px;
-      overflow: clip;
-    }
-
-    .hero-orb {
-      position: absolute;
-      width: 760px;
-      height: 760px;
-      right: -250px;
-      top: 20px;
-      z-index: -1;
+      width: 460px;
+      height: 460px;
+      right: -90px;
+      top: 28px;
       border-radius: 50%;
-      background:
-        radial-gradient(circle at 35% 35%, rgba(140,109,255,.25), transparent 31%),
-        radial-gradient(circle at 68% 65%, rgba(87,217,255,.14), transparent 36%);
-      filter: blur(10px);
-      animation: orbFloat 12s ease-in-out infinite alternate;
+      background: #191919;
+      filter: blur(2px);
     }
-    @keyframes orbFloat { to { transform: translate3d(-60px, 34px, 0) scale(1.06); } }
-
-    .hero-grid {
-      display: grid;
-      grid-template-columns: minmax(0, .96fr) minmax(480px, 1.04fr);
-      align-items: center;
-      gap: 56px;
-    }
-
-    .hero-copy { position: relative; z-index: 2; }
-    .hero h1 {
-      max-width: 690px;
-      margin: 0;
-      font-size: clamp(55px, 6.8vw, 94px);
-      line-height: .94;
-      letter-spacing: -.068em;
-      font-weight: 820;
-    }
-    .hero h1 .gradient-text {
-      display: block;
-      color: transparent;
-      background: linear-gradient(115deg, #fff 4%, #c9baff 46%, #79dcff 92%);
-      -webkit-background-clip: text;
-      background-clip: text;
-    }
-    .hero-lede {
-      max-width: 650px;
-      margin: 28px 0 0;
-      color: #aeb6c6;
-      font-size: clamp(18px, 2vw, 22px);
-      line-height: 1.6;
-      letter-spacing: -.014em;
-    }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 34px; }
-    .hero-note { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 18px; color: #7e8798; font-size: 13px; }
-    .hero-note span { display: inline-flex; align-items: center; gap: 7px; }
-    .hero-note span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 12px rgba(124,230,178,.55); }
-
-    .operator-stage {
-      position: relative;
-      min-height: 592px;
-      perspective: 1300px;
-    }
-    .stage-glow {
+    .operator-board {
       position: absolute;
-      inset: 16% -14% -8% 12%;
-      z-index: -1;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(126,99,255,.22), transparent 66%);
-      filter: blur(30px);
-    }
-    .app-window {
-      position: absolute;
-      inset: 24px 0 0 0;
+      inset: 28px 0 12px 0;
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.18);
       border-radius: 26px;
-      background: linear-gradient(145deg, rgba(23,27,38,.98), rgba(10,12,17,.98));
-      box-shadow: 0 45px 120px rgba(0,0,0,.56), inset 0 1px rgba(255,255,255,.05);
-      transform: rotateY(-6deg) rotateX(2deg);
-      transform-origin: 50% 50%;
-      transition: transform .35s ease;
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 0 46px 120px rgba(0,0,0,.48);
     }
-    .operator-stage:hover .app-window { transform: rotateY(-2deg) rotateX(0deg) translateY(-4px); }
-    .window-chrome {
-      height: 49px;
+    .board-head {
+      height: 58px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.018);
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line-dark);
     }
-    .traffic { display: flex; gap: 7px; }
-    .traffic i { width: 8px; height: 8px; border-radius: 50%; background: #3a4050; }
-    .traffic i:nth-child(1) { background: #ff7d8e; }
-    .traffic i:nth-child(2) { background: #f7c86f; }
-    .traffic i:nth-child(3) { background: #6fe0a4; }
-    .window-title { color: #8b94a6; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
-    .live-chip { display: flex; align-items: center; gap: 7px; color: #a8b2c4; font-size: 11px; }
-    .live-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 12px rgba(124,230,178,.8); animation: livePulse 1.8s ease-out infinite; }
-    @keyframes livePulse { 50% { box-shadow: 0 0 0 6px rgba(124,230,178,0); } }
-    .app-layout { display: grid; grid-template-columns: 155px 1fr; min-height: 515px; }
-    .app-sidebar { padding: 18px 13px; border-right: 1px solid var(--line); background: rgba(0,0,0,.12); }
-    .side-label { margin: 3px 8px 12px; color: #5f697b; font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-    .side-item { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 0 9px; margin: 2px 0; border-radius: 9px; color: #7f899c; font-size: 11px; }
-    .side-item svg { width: 13px; height: 13px; }
-    .side-item.active { color: #f3f4f9; background: linear-gradient(90deg, rgba(168,137,255,.16), rgba(103,216,255,.06)); border: 1px solid rgba(168,137,255,.15); }
-    .sidebar-brand { display: flex; align-items: center; gap: 8px; margin: 0 6px 23px; font-size: 12px; font-weight: 800; }
-    .sidebar-brand b { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; color: #08090d; background: linear-gradient(140deg, var(--violet), var(--cyan)); }
-    .app-main { padding: 20px; min-width: 0; }
-    .app-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-    .app-top h3 { margin: 0; font-size: 18px; letter-spacing: -.035em; }
-    .app-top p { margin: 3px 0 0; color: #737d90; font-size: 10px; }
-    .app-status { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid rgba(124,230,178,.16); border-radius: 9px; background: rgba(124,230,178,.06); color: #99e8bd; font-size: 9px; font-weight: 750; }
-    .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
-    .metric-card { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
-    .metric-card small { display: block; overflow: hidden; color: #697487; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap; }
-    .metric-card strong { display: block; margin-top: 7px; font-size: 18px; letter-spacing: -.04em; }
-    .metric-card span { color: #7fe0b0; font-size: 8px; }
-    .cycle-card { margin-top: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.022); }
-    .cycle-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-    .cycle-head strong { font-size: 11px; }
-    .cycle-head span { color: #7d8798; font-size: 8px; }
-    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 13px; }
-    .pipe-step { position: relative; min-width: 0; padding: 9px 7px; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.022); }
-    .pipe-step::after { content: ""; position: absolute; left: 0; bottom: 0; width: var(--fill, 100%); height: 2px; background: linear-gradient(90deg, var(--violet), var(--cyan)); }
-    .pipe-step em { display: block; color: #657084; font-size: 7px; font-style: normal; text-transform: uppercase; }
-    .pipe-step b { display: block; margin-top: 5px; overflow: hidden; color: #d9deea; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-    .schedule-card { margin-top: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.018); }
-    .schedule-head { display: flex; justify-content: space-between; color: #8e98aa; font-size: 9px; }
-    .schedule-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 10px; }
-    .slot { height: 25px; border: 1px solid rgba(255,255,255,.07); border-radius: 6px; background: rgba(255,255,255,.025); }
-    .slot.filled { background: linear-gradient(180deg, rgba(168,137,255,.30), rgba(103,216,255,.11)); border-color: rgba(154,140,255,.25); }
-    .slot.next { position: relative; background: rgba(124,230,178,.09); border-color: rgba(124,230,178,.28); }
-    .slot.next::after { content: ""; position: absolute; inset: 5px; border-radius: 3px; background: rgba(124,230,178,.55); animation: slotPulse 2s ease-in-out infinite; }
-    @keyframes slotPulse { 50% { opacity: .28; } }
-    .float-card {
-      position: absolute;
-      z-index: 3;
-      padding: 12px 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 14px;
-      background: rgba(18,21,29,.88);
-      box-shadow: 0 18px 50px rgba(0,0,0,.34);
-      backdrop-filter: blur(16px);
-      font-size: 11px;
-      animation: floatCard 4.8s ease-in-out infinite alternate;
-    }
-    .float-card strong { display: block; margin-bottom: 3px; color: #eff2f8; }
-    .float-card span { color: #7f899b; }
-    .float-one { right: -30px; top: 3px; }
-    .float-two { left: -38px; bottom: 30px; animation-delay: -2s; }
-    @keyframes floatCard { to { transform: translateY(-9px); } }
-
-    .signal-rail {
-      position: relative;
-      overflow: hidden;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.018);
-    }
-    .signal-track {
-      width: max-content;
-      display: flex;
-      align-items: center;
-      gap: 0;
-      animation: marquee 30s linear infinite;
-    }
-    .signal-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 11px;
-      padding: 18px 30px;
-      color: #adb5c5;
-      font-size: 13px;
-      font-weight: 650;
-      white-space: nowrap;
-    }
-    .signal-item b { color: #f1f3f8; font-size: 16px; letter-spacing: -.025em; }
-    .signal-item i { width: 5px; height: 5px; border-radius: 50%; background: linear-gradient(135deg, var(--violet), var(--cyan)); box-shadow: 0 0 12px rgba(117,178,255,.7); }
-    @keyframes marquee { to { transform: translateX(-50%); } }
-
-    .section-intro { max-width: 820px; }
-    .section-intro.center { margin: 0 auto; text-align: center; }
-    .kicker { margin: 0 0 18px; color: #9f8dff; font-size: 12px; font-weight: 850; letter-spacing: .14em; text-transform: uppercase; }
-    .section h2 {
-      margin: 0;
-      font-size: clamp(42px, 5.2vw, 70px);
-      line-height: 1.02;
-      letter-spacing: -.058em;
-      font-weight: 790;
-    }
-    .section-intro > p:not(.kicker) { max-width: 720px; margin: 22px 0 0; color: var(--muted); font-size: 19px; line-height: 1.65; }
-    .section-intro.center > p:not(.kicker) { margin-left: auto; margin-right: auto; }
-
-    .problem-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 72px; align-items: start; margin-top: 62px; }
-    .manual-stack { display: grid; gap: 10px; }
-    .manual-item {
+    .board-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 13px; }
+    .board-brand i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
+    .board-status { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .board-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #3fd878; box-shadow: 0 0 0 5px rgba(63,216,120,.14); }
+    .board-body { display: grid; grid-template-columns: minmax(0,1.22fr) minmax(250px,.78fr); min-height: 485px; }
+    .board-main { padding: 30px; border-right: 1px solid var(--line-dark); }
+    .board-kicker { margin: 0; color: var(--muted-dark); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .board-main h2 { margin: 10px 0 7px; font-size: 38px; line-height: 1; letter-spacing: -.055em; }
+    .board-main > p { margin: 0; color: #686862; font-size: 13px; }
+    .runway {
       display: grid;
-      grid-template-columns: 42px 1fr auto;
-      gap: 15px;
-      align-items: center;
-      min-height: 73px;
-      padding: 13px 16px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: linear-gradient(110deg, rgba(255,255,255,.025), rgba(255,255,255,.01));
+      grid-template-columns: repeat(12, 1fr);
+      gap: 6px;
+      margin: 28px 0 25px;
     }
-    .manual-icon { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: #94a0b4; background: rgba(255,255,255,.025); }
-    .manual-icon svg { width: 18px; height: 18px; }
-    .manual-item strong { display: block; font-size: 14px; }
-    .manual-item span { color: #6f798c; font-size: 12px; }
-    .manual-badge { padding: 6px 8px; border: 1px solid rgba(255,125,168,.15); border-radius: 999px; color: #d97d9d; background: rgba(255,125,168,.05); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .runway i { height: 43px; border: 1px solid var(--line-dark); border-radius: 7px; background: rgba(10,10,10,.035); }
+    .runway i.done { background: var(--ink); }
+    .runway i.next { position: relative; background: var(--acid); }
+    .runway i.next::after { content: "NEXT"; position: absolute; left: 50%; bottom: -19px; transform: translateX(-50%); font-family: var(--mono); font-size: 7px; letter-spacing: .08em; }
+    .cycle-line {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      padding-top: 20px;
+    }
+    .cycle-line::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: #d2d0c8; }
+    .cycle-line::after { content: ""; position: absolute; left: 0; width: 68%; top: 4px; height: 2px; background: var(--ink); }
+    .cycle-step { min-width: 0; }
+    .cycle-step b { display: block; font-size: 11px; }
+    .cycle-step span { display: block; margin-top: 3px; color: #777771; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+    .board-foot {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 10px;
+      margin-top: 28px;
+    }
+    .board-stat { padding-top: 13px; border-top: 1px solid var(--line-dark); }
+    .board-stat strong { display: block; font-size: 17px; letter-spacing: -.04em; }
+    .board-stat span { color: #777771; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+    .board-rail { padding: 24px; background: #e9e7df; }
+    .rail-label { color: #6a6a65; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .operator-chat { margin-top: 12px; display: grid; gap: 10px; }
+    .chat-bubble { padding: 12px 13px; border-radius: 13px; font-size: 11px; line-height: 1.48; }
+    .chat-user { margin-left: 28px; background: #d6d3c9; }
+    .chat-ai { margin-right: 12px; background: var(--ink); color: #fff; }
+    .chat-ai b { color: var(--acid); }
+    .rail-panel { margin-top: 20px; padding: 14px; border: 1px solid var(--line-dark); border-radius: 14px; background: var(--paper); }
+    .rail-panel strong { display: block; font-size: 13px; }
+    .rail-panel span { display: block; margin-top: 3px; color: #73736d; font-size: 10px; }
+    .rail-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-dark); font-family: var(--mono); font-size: 9px; }
+    .stage-tag {
+      position: absolute;
+      right: -18px;
+      top: 0;
+      padding: 10px 13px;
+      border: 1px solid rgba(255,255,255,.17);
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      transform: rotate(4deg);
+    }
 
-    .operating-model {
+    .capability-strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .capability-grid { display: grid; grid-template-columns: repeat(4,1fr); }
+    .capability { padding: 25px 22px; border-right: 1px solid var(--line); }
+    .capability:last-child { border-right: 0; }
+    .capability strong { display: block; font-size: 18px; letter-spacing: -.04em; }
+    .capability span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+    .paper-section { background: var(--paper); color: var(--ink); }
+    .section { padding: 118px 0; }
+    .section-head { max-width: 860px; }
+    .section-head .eyebrow { color: #66665f; }
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(43px, 5vw, 72px);
+      line-height: 1.02;
+      letter-spacing: -.065em;
+      font-weight: 700;
+    }
+    .section-head p:not(.eyebrow) { max-width: 700px; margin: 22px 0 0; color: #686862; font-size: 18px; line-height: 1.58; }
+
+    .problem-layout { display: grid; grid-template-columns: 1.15fr .85fr; gap: 72px; margin-top: 70px; align-items: start; }
+    .job-list { border-top: 1px solid var(--line-dark); }
+    .job-row {
+      display: grid;
+      grid-template-columns: 50px 1fr auto;
+      align-items: center;
+      gap: 18px;
+      min-height: 88px;
+      border-bottom: 1px solid var(--line-dark);
+    }
+    .job-row em { color: #7b7b74; font-family: var(--mono); font-size: 10px; font-style: normal; }
+    .job-row strong { display: block; font-size: 18px; }
+    .job-row span { color: #73736d; font-size: 13px; }
+    .job-row b { padding: 6px 9px; border: 1px solid var(--line-dark); border-radius: 999px; font-family: var(--mono); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+    .loop-card {
       position: sticky;
       top: 112px;
-      overflow: hidden;
+      min-height: 440px;
       padding: 30px;
-      border: 1px solid rgba(255,255,255,.13);
-      border-radius: 28px;
-      background:
-        radial-gradient(circle at 90% 5%, rgba(103,216,255,.09), transparent 34%),
-        linear-gradient(145deg, rgba(20,23,32,.95), rgba(10,12,17,.95));
-      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: #fff;
+      overflow: hidden;
     }
-    .operating-model::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(120deg, transparent, rgba(168,137,255,.035), transparent); }
-    .model-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-    .model-top h3 { margin: 0; font-size: 22px; letter-spacing: -.035em; }
-    .model-top span { color: #7f899b; font-size: 11px; }
-    .model-center { position: relative; width: 238px; height: 238px; display: grid; place-items: center; margin: 34px auto 28px; }
-    .model-ring { position: absolute; inset: 0; border: 1px solid rgba(168,137,255,.18); border-radius: 50%; animation: ringSpin 18s linear infinite; }
-    .model-ring::before, .model-ring::after { content: ""; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 22px rgba(168,137,255,.8); }
-    .model-ring::before { left: 16px; top: 43px; }
-    .model-ring::after { right: 10px; bottom: 62px; background: var(--cyan); box-shadow: 0 0 22px rgba(103,216,255,.8); }
-    .model-ring:nth-child(2) { inset: 24px; animation-direction: reverse; animation-duration: 12s; border-color: rgba(103,216,255,.18); }
-    @keyframes ringSpin { to { transform: rotate(360deg); } }
-    .model-core { width: 116px; height: 116px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.16); border-radius: 34px; background: linear-gradient(145deg, rgba(168,137,255,.24), rgba(103,216,255,.10)); box-shadow: 0 22px 60px rgba(89,78,190,.22), inset 0 1px rgba(255,255,255,.08); text-align: center; }
-    .model-core b { display: block; font-size: 21px; letter-spacing: -.04em; }
-    .model-core span { color: #a6afbf; font-size: 10px; }
-    .model-flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .model-flow div { padding: 12px 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.022); text-align: center; }
-    .model-flow b { display: block; color: #dfe3ec; font-size: 11px; }
-    .model-flow span { color: #677285; font-size: 9px; }
+    .loop-card::after { content: ""; position: absolute; width: 260px; height: 260px; right: -90px; bottom: -90px; border-radius: 50%; background: var(--acid); }
+    .loop-card .eyebrow { color: var(--acid); }
+    .loop-card h3 { max-width: 360px; margin: 0; font-size: 42px; line-height: 1.02; letter-spacing: -.06em; }
+    .loop-card p { max-width: 360px; margin: 18px 0 0; color: #a9a9a2; font-size: 15px; }
+    .loop-steps { position: relative; z-index: 1; display: grid; gap: 8px; margin-top: 32px; }
+    .loop-step { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.13); font-size: 13px; }
+    .loop-step i { width: 8px; height: 8px; border-radius: 50%; background: var(--acid); }
 
-    .workflow-wrap { margin-top: 68px; }
-    .workflow-line { position: absolute; left: 31px; top: 32px; bottom: 32px; width: 1px; background: linear-gradient(to bottom, var(--violet), var(--cyan), var(--mint)); opacity: .45; }
-    .workflow { position: relative; display: grid; gap: 13px; max-width: 930px; margin: 0 auto; }
-    .workflow-step {
-      position: relative;
+    .dark-section { background: var(--ink); color: #fff; }
+    .dark-section .section-head .eyebrow { color: var(--acid); }
+    .dark-section .section-head p:not(.eyebrow) { color: #a5a59d; }
+    .workflow { margin-top: 68px; border-top: 1px solid var(--line); }
+    .workflow-row {
       display: grid;
-      grid-template-columns: 64px 1fr auto;
-      gap: 20px;
+      grid-template-columns: 88px minmax(230px,.72fr) minmax(0,1.28fr) 210px;
+      gap: 28px;
       align-items: center;
-      min-height: 114px;
-      padding: 20px 22px 20px 0;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      background: linear-gradient(105deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
-      transition: transform .2s ease, border-color .2s ease, background .2s ease;
+      min-height: 150px;
+      border-bottom: 1px solid var(--line);
     }
-    .workflow-step:hover { transform: translateX(5px); border-color: rgba(168,137,255,.28); background: linear-gradient(105deg, rgba(168,137,255,.07), rgba(103,216,255,.02)); }
-    .step-number { position: relative; z-index: 2; width: 64px; height: 64px; display: grid; place-items: center; color: #edf0f7; font-size: 14px; font-weight: 850; }
-    .step-number::before { content: ""; position: absolute; width: 34px; height: 34px; z-index: -1; border: 1px solid rgba(255,255,255,.15); border-radius: 11px; background: #151923; box-shadow: 0 0 0 7px #0a0c11; }
-    .step-copy h3 { margin: 0; font-size: 18px; letter-spacing: -.026em; }
-    .step-copy p { margin: 6px 0 0; color: #838da0; font-size: 14px; }
-    .step-output { min-width: 150px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.15); }
-    .step-output small { display: block; color: #5f697c; font-size: 8px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
-    .step-output b { display: block; margin-top: 5px; color: #aeb8c9; font-size: 11px; }
+    .workflow-row .number { color: #666660; font-family: var(--mono); font-size: 11px; }
+    .workflow-row h3 { margin: 0; font-size: 27px; letter-spacing: -.045em; }
+    .workflow-row p { margin: 0; color: #a8a8a0; font-size: 14px; }
+    .workflow-output { justify-self: end; min-width: 185px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; }
+    .workflow-output span { display: block; color: #707069; font-family: var(--mono); font-size: 8px; text-transform: uppercase; letter-spacing: .07em; }
+    .workflow-output b { display: block; margin-top: 5px; font-size: 12px; }
 
-    .product-showcase {
-      margin-top: 68px;
-      overflow: hidden;
+    .product-section { background: #171717; color: #fff; }
+    .product-section .section-head .eyebrow { color: var(--blue); }
+    .product-section .section-head p:not(.eyebrow) { color: #a9a9a1; }
+    .product-stack { display: grid; gap: 28px; margin-top: 70px; }
+    .product-panel {
+      display: grid;
+      grid-template-columns: .78fr 1.22fr;
+      min-height: 500px;
       border: 1px solid rgba(255,255,255,.13);
-      border-radius: 30px;
-      background: linear-gradient(145deg, rgba(20,23,32,.97), rgba(9,11,15,.97));
-      box-shadow: var(--shadow);
+      border-radius: 26px;
+      overflow: hidden;
+      background: #0f0f0f;
     }
-    .showcase-tabs { display: flex; gap: 2px; padding: 10px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.018); overflow-x: auto; scrollbar-width: none; }
-    .showcase-tabs::-webkit-scrollbar { display: none; }
-    .showcase-tab { flex: 0 0 auto; padding: 10px 14px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #7d8799; font-size: 12px; font-weight: 750; cursor: pointer; transition: .18s ease; }
-    .showcase-tab:hover { color: #dce1ea; }
-    .showcase-tab[aria-selected="true"] { color: #fff; border-color: rgba(168,137,255,.22); background: linear-gradient(90deg, rgba(168,137,255,.13), rgba(103,216,255,.06)); }
-    .showcase-panel { display: none; min-height: 510px; grid-template-columns: .34fr .66fr; }
-    .showcase-panel.active { display: grid; }
-    .showcase-copy { padding: 44px; border-right: 1px solid var(--line); }
-    .showcase-copy small { color: #9f8dff; font-size: 10px; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
-    .showcase-copy h3 { margin: 15px 0 14px; font-size: 32px; line-height: 1.08; letter-spacing: -.047em; }
-    .showcase-copy p { margin: 0; color: #8f99aa; font-size: 15px; line-height: 1.7; }
-    .showcase-list { display: grid; gap: 10px; margin-top: 26px; }
-    .showcase-list span { display: flex; gap: 10px; align-items: flex-start; color: #b6bfce; font-size: 13px; }
-    .showcase-list span::before { content: ""; flex: 0 0 7px; width: 7px; height: 7px; margin-top: 7px; border-radius: 50%; background: linear-gradient(135deg, var(--violet), var(--cyan)); box-shadow: 0 0 12px rgba(117,177,255,.5); }
-    .showcase-visual { position: relative; min-width: 0; padding: 32px; overflow: hidden; background: radial-gradient(circle at 90% 0, rgba(103,216,255,.07), transparent 40%); }
-    .data-window { height: 100%; min-height: 440px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #0c0e13; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
-    .data-toolbar { height: 45px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02); color: #788294; font-size: 10px; }
-    .data-toolbar b { color: #cbd1dc; font-size: 11px; }
-    .dashboard-canvas { padding: 16px; }
-    .dashboard-statline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .dash-stat { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.02); }
-    .dash-stat small { color: #697486; font-size: 7px; text-transform: uppercase; letter-spacing: .08em; }
-    .dash-stat strong { display: block; margin-top: 5px; font-size: 17px; }
-    .chart-area { position: relative; height: 180px; margin-top: 10px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: linear-gradient(to bottom, rgba(168,137,255,.04), transparent); }
-    .chart-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 100% 36px, 58px 100%; }
-    .chart-area svg { position: absolute; inset: 14px 8px 8px; width: calc(100% - 16px); height: calc(100% - 22px); }
-    .chart-line { fill: none; stroke: url(#chartGradient); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 760; stroke-dashoffset: 760; animation: drawChart 2.2s ease forwards; }
-    .chart-fill { fill: url(#chartFill); opacity: .45; }
-    @keyframes drawChart { to { stroke-dashoffset: 0; } }
-    .activity-list { display: grid; gap: 7px; margin-top: 10px; }
-    .activity-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid rgba(255,255,255,.065); border-radius: 10px; }
-    .activity-dot { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: #a8b3c6; background: rgba(168,137,255,.09); font-size: 9px; font-weight: 800; }
-    .activity-row b { display: block; font-size: 9px; }
-    .activity-row span { color: #667185; font-size: 8px; }
-    .activity-row time { color: #687285; font-size: 8px; }
+    .product-panel:nth-child(even) { grid-template-columns: 1.22fr .78fr; }
+    .product-panel:nth-child(even) .product-copy { order: 2; }
+    .product-copy { padding: 46px; display: flex; flex-direction: column; justify-content: space-between; }
+    .product-index { color: #696962; font-family: var(--mono); font-size: 10px; }
+    .product-copy h3 { max-width: 410px; margin: 18px 0 0; font-size: 42px; line-height: 1.03; letter-spacing: -.055em; }
+    .product-copy p { max-width: 440px; margin: 18px 0 0; color: #a5a59d; }
+    .product-points { display: grid; gap: 9px; margin-top: 28px; }
+    .product-points span { display: flex; align-items: center; gap: 10px; color: #d7d7d1; font-size: 13px; }
+    .product-points span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--acid); }
+    .product-visual { padding: 26px; background: #202020; display: flex; align-items: center; justify-content: center; }
+    .ui-card { width: 100%; min-height: 400px; border-radius: 18px; background: var(--paper); color: var(--ink); overflow: hidden; box-shadow: 0 25px 70px rgba(0,0,0,.25); }
+    .ui-top { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--line-dark); font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+    .ui-main { padding: 24px; }
+    .ui-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .ui-title h4 { margin: 0; font-size: 25px; letter-spacing: -.05em; }
+    .ui-title span { padding: 6px 9px; border-radius: 999px; background: #d9f7c0; color: #24652f; font-family: var(--mono); font-size: 8px; }
+    .ui-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 22px; }
+    .ui-stat { padding: 14px; border: 1px solid var(--line-dark); border-radius: 12px; }
+    .ui-stat small { display: block; color: #75756f; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+    .ui-stat strong { display: block; margin-top: 8px; font-size: 20px; }
+    .ui-table { margin-top: 12px; border: 1px solid var(--line-dark); border-radius: 12px; overflow: hidden; }
+    .ui-row { display: grid; grid-template-columns: 74px 1fr 90px; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line-dark); font-size: 10px; }
+    .ui-row:last-child { border-bottom: 0; }
+    .ui-row span:first-child { font-family: var(--mono); color: #71716b; }
+    .ui-row b { justify-self: end; font-size: 9px; }
+    .ui-chat { display: grid; gap: 12px; margin-top: 18px; }
+    .ui-chat div { max-width: 82%; padding: 13px 15px; border-radius: 14px; font-size: 11px; line-height: 1.5; }
+    .ui-chat .you { justify-self: end; background: #d7d4ca; }
+    .ui-chat .operator { background: var(--ink); color: #fff; }
+    .ui-chat .operator strong { color: var(--acid); }
+    .recovery-visual { display: grid; grid-template-columns: 1fr 42px 1fr; gap: 14px; align-items: center; min-height: 350px; }
+    .plane { padding: 20px; border: 1px solid var(--line-dark); border-radius: 14px; background: #fff; }
+    .plane small { color: #777771; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+    .plane h4 { margin: 8px 0 0; font-size: 19px; }
+    .plane ul { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; color: #66665f; font-size: 10px; }
+    .bridge { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--acid); color: var(--ink); font-weight: 900; }
 
-    .chat-canvas { display: grid; grid-template-rows: 1fr auto; height: calc(100% - 45px); min-height: 394px; }
-    .chat-stream { padding: 18px; overflow: hidden; }
-    .chat-message { max-width: 83%; margin-bottom: 13px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; color: #aeb7c7; background: rgba(255,255,255,.025); font-size: 10px; line-height: 1.55; }
-    .chat-message.user { margin-left: auto; color: #e5e9f1; border-color: rgba(168,137,255,.18); background: rgba(168,137,255,.09); }
-    .tool-call { max-width: 88%; margin: 8px 0 13px; padding: 10px 12px; border: 1px solid rgba(124,230,178,.14); border-radius: 11px; background: rgba(124,230,178,.035); font-size: 9px; }
-    .tool-call b { color: #98e3b9; }
-    .tool-call span { display: block; margin-top: 4px; color: #667486; }
-    .chat-input { margin: 0 15px 15px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; color: #657084; background: rgba(255,255,255,.02); font-size: 9px; }
+    .ownership-section { background: var(--paper); color: var(--ink); }
+    .ownership-table { margin-top: 66px; border-top: 1px solid var(--line-dark); }
+    .ownership-row { display: grid; grid-template-columns: 1.2fr .9fr .9fr; gap: 24px; min-height: 84px; align-items: center; border-bottom: 1px solid var(--line-dark); }
+    .ownership-row.header { min-height: 54px; color: #777771; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+    .ownership-row strong { font-size: 16px; }
+    .ownership-row span { font-size: 13px; }
+    .ownership-row .lensically { font-weight: 800; }
+    .ownership-row .lensically::before { content: "✓"; margin-right: 9px; }
+    .ownership-row .saas { color: #7b7b74; }
 
-    .cycle-canvas { padding: 16px; }
-    .cycle-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-    .cycle-header h4 { margin: 0; font-size: 12px; }
-    .cycle-switch { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; }
-    .cycle-switch span { padding: 6px 9px; border-radius: 6px; color: #687386; font-size: 8px; }
-    .cycle-switch span.active { color: #eee; background: rgba(168,137,255,.13); }
-    .decision-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-    .decision-card { min-height: 94px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.018); }
-    .decision-card small { color: #647084; font-size: 7px; text-transform: uppercase; letter-spacing: .08em; }
-    .decision-card b { display: block; margin-top: 7px; font-size: 10px; }
-    .decision-card p { margin: 5px 0 0; color: #737f92; font-size: 8px; line-height: 1.45; }
-    .lineup-table { margin-top: 10px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; }
-    .lineup-row { display: grid; grid-template-columns: 44px 1.2fr 1fr 72px; min-height: 36px; align-items: center; padding: 0 10px; border-top: 1px solid rgba(255,255,255,.055); color: #8893a5; font-size: 8px; }
-    .lineup-row:first-child { border-top: 0; color: #626d80; background: rgba(255,255,255,.018); text-transform: uppercase; letter-spacing: .07em; }
-    .lineup-row b { color: #cbd2de; font-weight: 650; }
-    .role-chip { display: inline-flex; width: fit-content; padding: 4px 6px; border-radius: 6px; color: #a9cdec; background: rgba(103,216,255,.07); }
+    .install-section { background: var(--acid); color: var(--ink); }
+    .install-section .section-head .eyebrow { color: #3d4918; }
+    .install-section .section-head p:not(.eyebrow) { color: #3f481f; }
+    .install-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; margin-top: 64px; border-top: 1px solid rgba(10,10,10,.22); border-left: 1px solid rgba(10,10,10,.22); }
+    .install-step { min-height: 270px; padding: 26px; border-right: 1px solid rgba(10,10,10,.22); border-bottom: 1px solid rgba(10,10,10,.22); }
+    .install-step em { font-family: var(--mono); font-size: 10px; font-style: normal; }
+    .install-step h3 { margin: 55px 0 0; font-size: 24px; letter-spacing: -.045em; }
+    .install-step p { margin: 12px 0 0; color: #465020; font-size: 13px; }
 
-    .recovery-canvas { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; padding: 16px; }
-    .recovery-map { position: relative; min-height: 342px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: radial-gradient(circle at center, rgba(168,137,255,.07), transparent 55%); }
-    .node { position: absolute; min-width: 90px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: #121620; text-align: center; box-shadow: 0 12px 28px rgba(0,0,0,.25); }
-    .node b { display: block; font-size: 9px; }
-    .node span { color: #667185; font-size: 7px; }
-    .node.main { left: 50%; top: 50%; transform: translate(-50%,-50%); border-color: rgba(168,137,255,.25); }
-    .node.github { left: 8%; top: 14%; }
-    .node.cloudflare { right: 7%; top: 14%; }
-    .node.recovery { right: 7%; bottom: 12%; border-color: rgba(124,230,178,.22); }
-    .node.data { left: 8%; bottom: 12%; }
-    .node-line { position: absolute; height: 1px; transform-origin: left center; background: linear-gradient(90deg, rgba(168,137,255,.45), rgba(103,216,255,.18)); }
-    .node-line.l1 { width: 142px; left: 21%; top: 32%; transform: rotate(28deg); }
-    .node-line.l2 { width: 142px; left: 53%; top: 48%; transform: rotate(-31deg); }
-    .node-line.l3 { width: 142px; left: 53%; top: 55%; transform: rotate(30deg); }
-    .node-line.l4 { width: 142px; left: 22%; top: 69%; transform: rotate(-29deg); }
-    .recovery-log { min-height: 342px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: #090b0f; }
-    .log-title { display: flex; justify-content: space-between; color: #7e899b; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
-    .log-line { display: grid; grid-template-columns: 44px 1fr; gap: 8px; margin-top: 12px; color: #6e7b8f; font-size: 8px; line-height: 1.55; }
-    .log-line time { color: #4f596b; }
-    .log-line.good span { color: #8ddcaf; }
+    .offer-section { background: var(--ink); color: #fff; }
+    .offer-wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 70px; align-items: start; }
+    .offer-copy .eyebrow { color: var(--acid); }
+    .offer-copy h2 { margin: 0; font-size: clamp(50px,5vw,76px); line-height: .98; letter-spacing: -.07em; }
+    .offer-copy > p:not(.eyebrow) { max-width: 640px; color: #aaa9a2; font-size: 18px; }
+    .value-list { margin-top: 40px; border-top: 1px solid var(--line); }
+    .value-row { display: grid; grid-template-columns: 1fr auto; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+    .value-row strong { font-size: 14px; }
+    .value-row span { color: #74746e; font-family: var(--mono); font-size: 9px; }
+    .price-card { position: sticky; top: 112px; padding: 34px; border-radius: 24px; background: var(--paper); color: var(--ink); }
+    .price-card .label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .price { margin: 13px 0 0; font-size: 72px; line-height: 1; letter-spacing: -.075em; font-weight: 700; }
+    .price small { font-size: 14px; letter-spacing: 0; font-weight: 600; }
+    .price-card > p { color: #686862; font-size: 13px; }
+    .price-list { margin: 24px 0; padding: 0; list-style: none; display: grid; gap: 11px; }
+    .price-list li { display: flex; gap: 10px; color: #393934; font-size: 13px; }
+    .price-list li::before { content: "✓"; font-weight: 900; }
+    .price-card .button { width: 100%; background: var(--ink); color: #fff; }
+    .price-legal { margin-top: 12px; color: #777771; font-size: 10px; text-align: center; }
 
-    .feature-mosaic { display: grid; grid-template-columns: 1.15fr .85fr; grid-template-areas: "memory operator" "memory recovery" "multi ownership"; gap: 16px; margin-top: 64px; }
-    .feature-card { position: relative; min-height: 250px; overflow: hidden; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(145deg, rgba(20,23,32,.9), rgba(10,12,17,.9)); }
-    .feature-card h3 { max-width: 470px; margin: 0; font-size: 26px; line-height: 1.08; letter-spacing: -.043em; }
-    .feature-card p { max-width: 480px; margin: 13px 0 0; color: #8993a5; font-size: 14px; line-height: 1.65; }
-    .feature-card.memory { grid-area: memory; min-height: 516px; }
-    .feature-card.operator { grid-area: operator; }
-    .feature-card.recovery { grid-area: recovery; }
-    .feature-card.multi { grid-area: multi; }
-    .feature-card.ownership { grid-area: ownership; }
-    .feature-icon { width: 43px; height: 43px; display: grid; place-items: center; margin-bottom: 22px; border: 1px solid rgba(255,255,255,.13); border-radius: 13px; color: #c2b8ff; background: rgba(168,137,255,.07); }
-    .feature-icon svg { width: 20px; height: 20px; }
-    .memory-timeline { position: absolute; left: 30px; right: 30px; bottom: 28px; display: grid; gap: 9px; }
-    .memory-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid rgba(255,255,255,.075); border-radius: 11px; background: rgba(0,0,0,.13); color: #7d899c; font-size: 9px; }
-    .memory-row time { color: #5d687a; }
-    .memory-row b { color: #c0c8d5; font-size: 10px; }
-    .memory-row span { padding: 4px 6px; border-radius: 6px; color: #8bdbad; background: rgba(124,230,178,.06); }
-    .terminal-mini { margin-top: 20px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: #090b0f; color: #7d899b; font-size: 9px; line-height: 1.7; }
-    .terminal-mini b { color: #a995ff; }
-    .recovery-beacon { position: absolute; right: -38px; bottom: -50px; width: 180px; height: 180px; border: 1px solid rgba(124,230,178,.16); border-radius: 50%; }
-    .recovery-beacon::before, .recovery-beacon::after { content: ""; position: absolute; border: 1px solid rgba(124,230,178,.12); border-radius: 50%; }
-    .recovery-beacon::before { inset: 27px; }
-    .recovery-beacon::after { inset: 54px; background: rgba(124,230,178,.08); box-shadow: 0 0 45px rgba(124,230,178,.12); }
-    .account-stack { display: flex; gap: 8px; margin-top: 25px; }
-    .account-pill { flex: 1; min-height: 64px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.018); }
-    .account-pill i { display: block; width: 18px; height: 18px; margin-bottom: 8px; border-radius: 6px; background: linear-gradient(135deg, var(--violet), var(--cyan)); opacity: .75; }
-    .account-pill b { display: block; font-size: 9px; }
-    .account-pill span { color: #647084; font-size: 8px; }
-    .ownership-code { margin-top: 20px; color: #7b8799; font-size: 10px; line-height: 1.8; }
-    .ownership-code strong { color: #c9d0dc; font-weight: 600; }
+    .faq-section { background: var(--paper); color: var(--ink); }
+    .faq-grid { display: grid; grid-template-columns: .72fr 1.28fr; gap: 70px; align-items: start; }
+    .faq-side { position: sticky; top: 112px; }
+    .faq-side .eyebrow { color: #777771; }
+    .faq-side h2 { margin: 0; font-size: 58px; line-height: 1; letter-spacing: -.065em; }
+    .faq { border-top: 1px solid var(--line-dark); }
+    details { border-bottom: 1px solid var(--line-dark); }
+    summary { position: relative; padding: 24px 44px 24px 0; cursor: pointer; list-style: none; font-weight: 700; font-size: 17px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; position: absolute; right: 0; top: 20px; font-size: 25px; font-weight: 400; }
+    details[open] summary::after { content: "−"; }
+    details p { margin: -8px 0 24px; max-width: 720px; color: #66665f; font-size: 14px; }
 
-    .ownership-section { overflow: hidden; background: linear-gradient(180deg, transparent, rgba(168,137,255,.035) 45%, transparent); }
-    .comparison { margin-top: 64px; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 26px; background: rgba(14,16,22,.8); box-shadow: var(--shadow); }
-    .comparison-row { display: grid; grid-template-columns: 1.05fr .9fr .9fr; min-height: 78px; align-items: center; border-top: 1px solid var(--line); }
-    .comparison-row:first-child { min-height: 64px; border-top: 0; background: rgba(255,255,255,.022); }
-    .comparison-row > div { height: 100%; display: flex; align-items: center; padding: 18px 24px; border-left: 1px solid var(--line); }
-    .comparison-row > div:first-child { border-left: 0; }
-    .comparison-row strong { letter-spacing: -.02em; }
-    .comparison-row span { color: #8b95a7; font-size: 14px; }
-    .comparison-row .lensically-col { color: #ecf0f7; background: linear-gradient(90deg, rgba(168,137,255,.05), rgba(103,216,255,.025)); }
-    .comparison-row .lensically-col::before { content: "✓"; width: 23px; height: 23px; display: grid; place-items: center; margin-right: 10px; border-radius: 7px; color: #08100c; background: var(--mint); font-size: 12px; font-weight: 900; }
-    .comparison-row.header .lensically-col::before { display: none; }
-    .comparison-row .typical-col::before { content: "—"; margin-right: 10px; color: #687386; }
-    .comparison-row.header .typical-col::before { display: none; }
-
-    .install-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 64px; }
-    .install-card { position: relative; min-height: 330px; padding: 28px; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(145deg, rgba(20,23,32,.9), rgba(10,12,17,.92)); }
-    .install-number { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 40px; border: 1px solid rgba(168,137,255,.25); border-radius: 12px; color: #c7bcff; background: rgba(168,137,255,.08); font-size: 12px; font-weight: 850; }
-    .install-card h3 { margin: 0; font-size: 23px; letter-spacing: -.038em; }
-    .install-card p { margin: 12px 0 0; color: #8490a2; font-size: 14px; line-height: 1.65; }
-    .install-art { position: absolute; left: 28px; right: 28px; bottom: 26px; }
-    .download-file { display: flex; align-items: center; gap: 11px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.18); }
-    .file-icon { width: 34px; height: 38px; display: grid; place-items: center; border-radius: 9px; color: #08090d; background: linear-gradient(145deg, var(--violet), var(--cyan)); font-size: 9px; font-weight: 900; }
-    .download-file b { display: block; font-size: 9px; }
-    .download-file span { color: #667185; font-size: 8px; }
-    .prompt-box { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #090b0f; color: #707d90; font-size: 8px; line-height: 1.65; }
-    .prompt-box b { color: #9e8bff; }
-    .deploy-list { display: grid; gap: 7px; }
-    .deploy-line { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; color: #7b8698; background: rgba(0,0,0,.14); font-size: 8px; }
-    .deploy-line i { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px rgba(124,230,178,.6); }
-
-    .audience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 58px; }
-    .audience-panel { padding: 32px; border: 1px solid var(--line); border-radius: 24px; background: rgba(255,255,255,.02); }
-    .audience-panel.good { border-color: rgba(124,230,178,.17); background: linear-gradient(145deg, rgba(124,230,178,.04), rgba(255,255,255,.015)); }
-    .audience-panel.not { border-color: rgba(255,125,168,.14); background: linear-gradient(145deg, rgba(255,125,168,.035), rgba(255,255,255,.015)); }
-    .audience-panel h3 { margin: 0 0 22px; font-size: 24px; letter-spacing: -.035em; }
-    .audience-list { display: grid; gap: 13px; }
-    .audience-list div { display: flex; gap: 12px; align-items: flex-start; color: #aab3c2; font-size: 14px; }
-    .audience-list div::before { content: ""; flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--mint); }
-    .audience-panel.not .audience-list div::before { background: var(--rose); }
-
-    .pricing-wrap { display: grid; grid-template-columns: .88fr 1.12fr; gap: 52px; align-items: center; }
-    .pricing-copy h2 { max-width: 570px; }
-    .pricing-copy > p { max-width: 560px; margin: 22px 0 0; color: var(--muted); font-size: 18px; line-height: 1.65; }
-    .value-list { display: grid; gap: 10px; margin-top: 30px; }
-    .value-list span { display: flex; align-items: center; gap: 11px; color: #afb8c8; font-size: 14px; }
-    .value-list span::before { content: "✓"; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; color: #07100b; background: var(--mint); font-size: 11px; font-weight: 900; }
-    .price-card { position: relative; overflow: hidden; padding: 38px; border: 1px solid rgba(255,255,255,.16); border-radius: 30px; background: linear-gradient(150deg, rgba(29,31,43,.98), rgba(10,12,17,.98)); box-shadow: 0 50px 130px rgba(0,0,0,.55); }
-    .price-card::before { content: ""; position: absolute; width: 420px; height: 420px; right: -220px; top: -230px; border-radius: 50%; background: radial-gradient(circle, rgba(103,216,255,.17), transparent 68%); }
-    .price-card > * { position: relative; }
-    .price-label { color: #9f8dff; font-size: 11px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-    .price-line { display: flex; align-items: flex-end; gap: 11px; margin: 13px 0 4px; }
-    .price-line strong { font-size: 78px; line-height: .95; letter-spacing: -.07em; }
-    .price-line span { padding-bottom: 9px; color: #8c96a8; font-size: 14px; }
-    .price-card > p { margin: 17px 0 0; color: #929cad; }
-    .price-includes { display: grid; gap: 11px; margin: 27px 0; padding: 24px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .price-includes span { display: flex; justify-content: space-between; gap: 14px; color: #aeb7c7; font-size: 13px; }
-    .price-includes b { color: #f0f2f7; font-weight: 700; }
-    .price-card .button { width: 100%; min-height: 58px; }
-    .price-legal { margin: 13px 0 0 !important; color: #6e788a !important; font-size: 11px; line-height: 1.55; text-align: center; }
-
-    .faq { max-width: 930px; margin: 58px auto 0; display: grid; gap: 10px; }
-    .faq details { border: 1px solid var(--line); border-radius: 17px; background: rgba(255,255,255,.018); transition: border-color .2s ease, background .2s ease; }
-    .faq details[open] { border-color: rgba(168,137,255,.24); background: rgba(168,137,255,.035); }
-    .faq summary { position: relative; padding: 21px 56px 21px 22px; list-style: none; cursor: pointer; font-weight: 720; letter-spacing: -.015em; }
-    .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after { content: "+"; position: absolute; right: 21px; top: 50%; width: 26px; height: 26px; display: grid; place-items: center; transform: translateY(-50%); border: 1px solid var(--line); border-radius: 8px; color: #9da6b6; font-size: 18px; font-weight: 400; transition: transform .2s ease; }
-    .faq details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
-    .faq details p { margin: 0; padding: 0 22px 22px; color: #8e98aa; font-size: 14px; line-height: 1.7; }
-
-    .final-cta { padding: 58px 0 104px; }
-    .final-box { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr auto; gap: 36px; align-items: center; padding: 48px; border: 1px solid rgba(255,255,255,.14); border-radius: 30px; background: linear-gradient(125deg, rgba(168,137,255,.13), rgba(103,216,255,.055), rgba(255,255,255,.02)); box-shadow: var(--shadow); }
-    .final-box::after { content: ""; position: absolute; width: 360px; height: 360px; right: -100px; top: -230px; border-radius: 50%; background: radial-gradient(circle, rgba(103,216,255,.16), transparent 68%); }
-    .final-box > * { position: relative; z-index: 1; }
-    .final-box h2 { max-width: 760px; font-size: clamp(36px, 5vw, 62px); }
-    .final-box p { margin: 14px 0 0; color: #98a2b4; }
-
-    footer { padding: 28px 0 44px; border-top: 1px solid var(--line); color: #727c8e; font-size: 12px; }
-    .footer-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
-    .footer-links { display: flex; gap: 17px; flex-wrap: wrap; }
-    .footer-links a { color: #818b9d; text-decoration: none; }
-    .footer-links a:hover { color: #e8ebf1; }
-
-    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .75s ease, transform .75s cubic-bezier(.2,.8,.2,1); }
-    .reveal.visible { opacity: 1; transform: none; }
-    .reveal-delay-1 { transition-delay: .08s; }
-    .reveal-delay-2 { transition-delay: .16s; }
-    .reveal-delay-3 { transition-delay: .24s; }
+    footer { padding: 34px 0 46px; border-top: 1px solid var(--line); background: var(--ink); color: #777771; }
+    .footer-row { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; font-size: 11px; }
+    .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .footer-links a { text-decoration: none; }
+    .footer-links a:hover { color: #fff; }
 
     .mobile-buy { display: none; }
 
-    @media (max-width: 1040px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .hero-copy { max-width: 820px; text-align: center; margin: 0 auto; }
-      .hero-lede { margin-left: auto; margin-right: auto; }
-      .hero-actions, .hero-note { justify-content: center; }
-      .operator-stage { width: min(720px, 100%); margin: 32px auto 0; }
-      .hero { padding-top: 148px; }
-      .problem-grid { grid-template-columns: 1fr; }
-      .operating-model { position: relative; top: auto; }
-      .feature-mosaic { grid-template-columns: 1fr 1fr; grid-template-areas: "memory memory" "operator recovery" "multi ownership"; }
-      .pricing-wrap { grid-template-columns: 1fr; }
-      .pricing-copy { max-width: 780px; }
-    }
-
-    @media (max-width: 840px) {
-      :root { --shell: min(100% - 28px, 1180px); }
-      .section { padding: 88px 0; }
-      .nav { align-items: center; }
-      .nav-links {
-        position: absolute;
-        left: 14px;
-        right: 14px;
-        top: 72px;
-        display: none;
-        flex-direction: column;
-        align-items: stretch;
-        padding: 10px;
-        border: 1px solid var(--line);
-        border-radius: 15px;
-        background: rgba(10,12,17,.96);
-        box-shadow: 0 24px 60px rgba(0,0,0,.45);
-        backdrop-filter: blur(20px);
-      }
+    @media (max-width: 1080px) {
+      :root { --shell: min(100% - 36px, 980px); }
+      .nav { grid-template-columns: 1fr auto; }
+      .nav-links { display: none; position: absolute; left: 18px; right: 18px; top: 76px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #111; flex-direction: column; align-items: stretch; gap: 4px; }
       .nav-links.open { display: flex; }
-      .nav-links a { padding: 12px; }
-      .nav > .nav-cta { display: none; }
+      .nav-links a { padding: 11px; }
+      .nav-buy { display: none; }
       .menu-button { display: block; }
-      .hero { min-height: auto; padding-bottom: 74px; }
-      .operator-stage { min-height: 530px; }
-      .app-layout { grid-template-columns: 126px 1fr; }
-      .app-sidebar { padding-left: 8px; padding-right: 8px; }
-      .app-main { padding: 15px; }
-      .float-card { display: none; }
-      .workflow-step { grid-template-columns: 58px 1fr; padding-right: 18px; }
-      .step-output { grid-column: 2; width: 100%; }
-      .showcase-panel.active { grid-template-columns: 1fr; }
-      .showcase-copy { border-right: 0; border-bottom: 1px solid var(--line); }
-      .feature-mosaic { grid-template-columns: 1fr; grid-template-areas: "memory" "operator" "recovery" "multi" "ownership"; }
-      .comparison-row { grid-template-columns: 1fr 1fr; }
-      .comparison-row > div:first-child { grid-column: 1 / -1; min-height: 48px; border-bottom: 1px solid var(--line); }
-      .comparison-row.header > div:first-child { display: none; }
-      .install-grid { grid-template-columns: 1fr; }
-      .install-card { min-height: 300px; }
-      .audience-grid { grid-template-columns: 1fr; }
-      .final-box { grid-template-columns: 1fr; padding: 34px; }
-      .mobile-buy { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 99; display: flex; min-height: 54px; }
-      footer { padding-bottom: 92px; }
+      .hero { min-height: auto; padding-top: 128px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 38px; }
+      .hero-copy { max-width: 820px; }
+      .product-stage { min-height: 600px; }
+      .operator-board { right: 2%; left: 2%; }
+      .stage-tag { right: 0; }
+      .problem-layout, .offer-wrap, .faq-grid { grid-template-columns: 1fr; }
+      .loop-card, .price-card, .faq-side { position: static; }
+      .workflow-row { grid-template-columns: 58px .8fr 1.2fr; }
+      .workflow-output { display: none; }
+      .product-panel, .product-panel:nth-child(even) { grid-template-columns: 1fr; }
+      .product-panel:nth-child(even) .product-copy { order: 0; }
+      .install-grid { grid-template-columns: repeat(2,1fr); }
+      .mobile-buy { display: flex; position: fixed; z-index: 45; left: 14px; right: 14px; bottom: 14px; min-height: 54px; align-items: center; justify-content: center; border-radius: 999px; background: var(--acid); color: var(--ink); text-decoration: none; font-weight: 850; box-shadow: 0 20px 50px rgba(0,0,0,.38); }
     }
 
-    @media (max-width: 600px) {
-      .nav-wrap { top: 8px; }
-      .nav { width: calc(100% - 16px); min-height: 58px; border-radius: 15px; }
-      .brand { font-size: 14px; }
-      .brand-mark { width: 31px; height: 31px; border-radius: 10px; }
-      .hero { padding-top: 118px; }
-      .hero h1 { font-size: clamp(46px, 14vw, 66px); }
+    @media (max-width: 720px) {
+      :root { --shell: min(100% - 24px, 680px); }
+      .site-header, .nav { height: 66px; }
+      .nav-links { top: 66px; }
+      .hero { padding: 108px 0 54px; }
+      h1 { font-size: 51px; }
       .hero-lede { font-size: 17px; }
       .hero-actions { flex-direction: column; }
       .button { width: 100%; }
-      .operator-stage { min-height: 432px; margin-top: 18px; }
-      .app-window { border-radius: 19px; transform: none; }
-      .operator-stage:hover .app-window { transform: none; }
-      .app-layout { grid-template-columns: 1fr; min-height: 378px; }
-      .app-sidebar { display: none; }
-      .window-title { display: none; }
-      .metrics-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .metric-card { padding: 9px; }
-      .metric-card strong { font-size: 14px; }
-      .pipeline { grid-template-columns: repeat(5, minmax(56px, 1fr)); overflow-x: auto; }
-      .schedule-grid { grid-template-columns: repeat(8, 1fr); }
-      .slot:nth-child(n+17) { display: none; }
-      .section h2 { font-size: 42px; }
-      .section-intro > p:not(.kicker) { font-size: 17px; }
-      .problem-grid, .workflow-wrap, .product-showcase, .feature-mosaic, .comparison, .install-grid, .audience-grid, .faq { margin-top: 44px; }
-      .manual-item { grid-template-columns: 42px 1fr; }
-      .manual-badge { grid-column: 2; width: fit-content; }
-      .operating-model { padding: 22px; }
-      .model-center { transform: scale(.86); margin-top: 20px; margin-bottom: 12px; }
-      .model-flow { grid-template-columns: 1fr; }
-      .workflow-step { grid-template-columns: 48px 1fr; gap: 10px; padding: 16px 14px 16px 0; }
-      .step-number { width: 48px; }
-      .workflow-line { left: 23px; }
-      .showcase-copy { padding: 27px; }
-      .showcase-visual { padding: 14px; }
-      .data-window { min-height: 392px; }
-      .dashboard-statline { grid-template-columns: repeat(2, 1fr); }
-      .showcase-panel { min-height: 0; }
-      .decision-board { grid-template-columns: 1fr; }
-      .decision-card:nth-child(n+3) { display: none; }
-      .lineup-row { grid-template-columns: 35px 1fr 65px; }
-      .lineup-row > *:nth-child(3) { display: none; }
-      .recovery-canvas { grid-template-columns: 1fr; }
-      .recovery-log { min-height: 260px; }
-      .feature-card, .feature-card.memory { min-height: 310px; padding: 24px; }
-      .memory-timeline { left: 24px; right: 24px; }
-      .memory-row { grid-template-columns: 58px 1fr; }
-      .memory-row span { display: none; }
-      .comparison-row > div { padding: 15px 14px; font-size: 13px; }
-      .comparison-row span { font-size: 12px; }
-      .install-card { min-height: 315px; padding: 24px; }
-      .install-art { left: 24px; right: 24px; }
-      .audience-panel { padding: 25px; }
-      .price-card { padding: 28px 23px; }
-      .price-line strong { font-size: 64px; }
-      .price-includes span { flex-direction: column; gap: 2px; }
-      .final-cta { padding-bottom: 88px; }
-      .footer-row { align-items: flex-start; flex-direction: column; }
+      .product-stage { min-height: 530px; }
+      .operator-board { inset: 12px 0 8px; border-radius: 18px; }
+      .board-body { grid-template-columns: 1fr; min-height: 410px; }
+      .board-main { padding: 20px; border-right: 0; }
+      .board-main h2 { font-size: 29px; }
+      .board-rail { display: none; }
+      .runway { grid-template-columns: repeat(8,1fr); }
+      .runway i:nth-child(n+9) { display: none; }
+      .cycle-line { gap: 7px; }
+      .cycle-step b { font-size: 9px; }
+      .cycle-step span { display: none; }
+      .stage-tag { display: none; }
+      .capability-grid { grid-template-columns: repeat(2,1fr); }
+      .capability:nth-child(2) { border-right: 0; }
+      .capability:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .section { padding: 86px 0; }
+      .section-head h2 { font-size: 43px; }
+      .section-head p:not(.eyebrow) { font-size: 16px; }
+      .problem-layout { gap: 36px; margin-top: 44px; }
+      .job-row { grid-template-columns: 34px 1fr; min-height: 82px; }
+      .job-row b { display: none; }
+      .loop-card h3 { font-size: 34px; }
+      .workflow { margin-top: 44px; }
+      .workflow-row { grid-template-columns: 40px 1fr; gap: 15px; min-height: 130px; padding: 20px 0; }
+      .workflow-row p { grid-column: 2; }
+      .product-stack { margin-top: 44px; }
+      .product-copy { padding: 28px; }
+      .product-copy h3 { font-size: 34px; }
+      .product-visual { padding: 14px; }
+      .ui-card { min-height: 350px; }
+      .ui-grid { grid-template-columns: 1fr; }
+      .ui-stat:nth-child(n+2) { display: none; }
+      .ui-row { grid-template-columns: 58px 1fr; }
+      .ui-row b { display: none; }
+      .recovery-visual { grid-template-columns: 1fr; }
+      .bridge { transform: rotate(90deg); margin: 0 auto; }
+      .ownership-row { grid-template-columns: 1.2fr .8fr; }
+      .ownership-row > :last-child { display: none; }
+      .install-grid { grid-template-columns: 1fr; }
+      .install-step { min-height: 210px; }
+      .install-step h3 { margin-top: 35px; }
+      .offer-copy h2, .faq-side h2 { font-size: 46px; }
+      .price { font-size: 62px; }
+      .footer-row { flex-direction: column; }
+      body { padding-bottom: 78px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
       .reveal { opacity: 1; transform: none; }
     }
   </style>
 </head>
 <body>
-  <div class="nav-wrap">
-    <nav class="nav" aria-label="Primary navigation">
-      <a class="brand" href="/operator/" aria-label="Lensically Operator home">
-        <span class="brand-mark">L</span>
-        <span>Lensically</span>
-      </a>
+  <header class="site-header">
+    <nav class="shell nav" aria-label="Primary navigation">
+      <a class="wordmark" href="/operator/">Lensically<span>.</span></a>
       <div class="nav-links" id="nav-links">
         <a href="#system">System</a>
         <a href="#product">Product</a>
@@ -871,304 +608,308 @@
         <a href="#install">Install</a>
         <a href="#faq">FAQ</a>
       </div>
-      <a class="nav-cta" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own it — $997</a>
-      <button class="menu-button" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Open navigation"><span></span></button>
+      <a class="nav-buy" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997</a>
+      <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="nav-links"></button>
     </nav>
-  </div>
+  </header>
 
   <main>
     <section class="hero">
-      <div class="hero-orb" aria-hidden="true"></div>
       <div class="shell hero-grid">
         <div class="hero-copy reveal visible">
-          <h1>Run your Threads brand like a company. <span class="gradient-text">Without becoming the content department.</span></h1>
-          <p class="hero-lede">Lensically Operator turns ChatGPT into the operating layer for your Threads business—researching, generating, scheduling, measuring, learning, and recovering inside infrastructure you own.</p>
+          <p class="eyebrow">Lensically Operator for Threads</p>
+          <h1>AI runs the operation. <span class="owned">You own the system.</span></h1>
+          <p class="hero-lede">Turn ChatGPT into a persistent operating layer for research, writing, scheduling, measurement, continuity, and recovery—inside infrastructure controlled by you.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">
-              Own Lensically — $997
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </a>
+            <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
             <a class="button button-secondary" href="#system">See the operating system</a>
           </div>
-          <div class="hero-note">
+          <div class="hero-proof">
+            <span>Full source package</span>
             <span>One-time commercial license</span>
-            <span>Customer-owned infrastructure</span>
             <span>No revenue share</span>
           </div>
         </div>
 
-        <div class="operator-stage reveal reveal-delay-1" aria-label="Lensically Operator product preview">
-          <div class="stage-glow" aria-hidden="true"></div>
-          <div class="app-window">
-            <div class="window-chrome">
-              <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
-              <div class="window-title">Lensically · Operator Console</div>
-              <div class="live-chip">Production ready</div>
+        <div class="product-stage reveal">
+          <div class="operator-board">
+            <div class="board-head">
+              <div class="board-brand"><i></i> Lensically / Manifest Mental</div>
+              <div class="board-status">Live operation</div>
             </div>
-            <div class="app-layout">
-              <aside class="app-sidebar" aria-hidden="true">
-                <div class="sidebar-brand"><b>L</b><span>Operator</span></div>
-                <div class="side-label">Workspace</div>
-                <div class="side-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
-                <div class="side-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Insights</div>
-                <div class="side-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>Schedule</div>
-                <div class="side-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>Cycles</div>
-                <div class="side-label" style="margin-top:22px">System</div>
-                <div class="side-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10V6l8-4z"/></svg>Gates</div>
-                <div class="side-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>Lineage</div>
+            <div class="board-body">
+              <div class="board-main">
+                <p class="board-kicker">Publishing runway</p>
+                <h2>24 of 24 hours protected.</h2>
+                <p>Next viable slot is already assigned. Strategy, source, and evidence remain attached.</p>
+                <div class="runway" aria-hidden="true">
+                  <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="next"></i><i></i><i></i><i></i><i></i>
+                </div>
+                <div class="cycle-line">
+                  <div class="cycle-step"><b>Research</b><span>complete</span></div>
+                  <div class="cycle-step"><b>Strategy</b><span>locked</span></div>
+                  <div class="cycle-step"><b>Generate</b><span>running</span></div>
+                  <div class="cycle-step"><b>Gate</b><span>queued</span></div>
+                  <div class="cycle-step"><b>Schedule</b><span>queued</span></div>
+                </div>
+                <div class="board-foot">
+                  <div class="board-stat"><strong>348</strong><span>saved patterns</span></div>
+                  <div class="board-stat"><strong>8</strong><span>cycle candidates</span></div>
+                  <div class="board-stat"><strong>4</strong><span>evidence windows</span></div>
+                </div>
+              </div>
+              <aside class="board-rail">
+                <div class="rail-label">Operator conversation</div>
+                <div class="operator-chat">
+                  <div class="chat-bubble chat-user">Fill the next 48 hours without repeating recent posts.</div>
+                  <div class="chat-bubble chat-ai"><b>Runway reconciled.</b><br>8 missing slots found. Sources locked. Generation is in progress.</div>
+                </div>
+                <div class="rail-panel">
+                  <strong>Next publish</strong>
+                  <span>Today · 6:00 PM ET</span>
+                  <div class="rail-row"><span>Main cycle</span><b>ACTIVE</b></div>
+                </div>
+                <div class="rail-panel">
+                  <strong>Continuity preserved</strong>
+                  <span>The next chat resumes from durable state instead of starting over.</span>
+                </div>
               </aside>
-              <div class="app-main">
-                <div class="app-top">
-                  <div><h3>Operating overview</h3><p>One system coordinating the complete publishing loop.</p></div>
-                  <div class="app-status">All systems healthy</div>
-                </div>
-                <div class="metrics-row">
-                  <div class="metric-card"><small>Hourly coverage</small><strong>24 / 24</strong><span>Runway protected</span></div>
-                  <div class="metric-card"><small>Active cycle</small><strong>Main</strong><span>Strategy locked</span></div>
-                  <div class="metric-card"><small>Evidence windows</small><strong>4</strong><span>6h · 12h · 18h · 24h</span></div>
-                </div>
-                <div class="cycle-card">
-                  <div class="cycle-head"><strong>Autonomous publishing cycle</strong><span>Operation in progress</span></div>
-                  <div class="pipeline">
-                    <div class="pipe-step" style="--fill:100%"><em>01</em><b>Research</b></div>
-                    <div class="pipe-step" style="--fill:100%"><em>02</em><b>Strategy</b></div>
-                    <div class="pipe-step" style="--fill:84%"><em>03</em><b>Generate</b></div>
-                    <div class="pipe-step" style="--fill:45%"><em>04</em><b>Gate</b></div>
-                    <div class="pipe-step" style="--fill:12%"><em>05</em><b>Schedule</b></div>
-                  </div>
-                </div>
-                <div class="schedule-card">
-                  <div class="schedule-head"><span>48-hour publishing runway</span><span>Next viable hour protected</span></div>
-                  <div class="schedule-grid" aria-hidden="true">
-                    <i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot filled"></i><i class="slot next"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i>
-                    <i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i><i class="slot"></i>
+            </div>
+          </div>
+          <div class="stage-tag">Production architecture</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="capability-strip">
+      <div class="shell capability-grid">
+        <div class="capability"><strong>24 hourly slots</strong><span>Protected publishing runway</span></div>
+        <div class="capability"><strong>4 evidence windows</strong><span>6h, 12h, 18h, and 24h</span></div>
+        <div class="capability"><strong>2 control planes</strong><span>Main Operator plus Recovery</span></div>
+        <div class="capability"><strong>100% customer-owned</strong><span>Repository, infrastructure, and data</span></div>
+      </div>
+    </div>
+
+    <section id="system" class="section paper-section">
+      <div class="shell">
+        <div class="section-head reveal">
+          <p class="eyebrow">The real workload</p>
+          <h2>The work does not end when a post is written.</h2>
+          <p>A reliable Threads operation has to research, decide, generate, schedule, measure, remember, and recover. Most tools solve one fragment. Lensically coordinates the entire loop.</p>
+        </div>
+        <div class="problem-layout">
+          <div class="job-list">
+            <div class="job-row reveal"><em>01</em><div><strong>Research the market</strong><span>Find patterns, angles, and source material.</span></div><b>Operator</b></div>
+            <div class="job-row reveal"><em>02</em><div><strong>Choose what deserves a slot</strong><span>Rank evidence, manage fatigue, and preserve variety.</span></div><b>Operator</b></div>
+            <div class="job-row reveal"><em>03</em><div><strong>Generate and quality-check</strong><span>Write from source evidence and enforce brand rules.</span></div><b>Operator</b></div>
+            <div class="job-row reveal"><em>04</em><div><strong>Protect the schedule</strong><span>Fill gaps without collisions, backfills, or duplicates.</span></div><b>Operator</b></div>
+            <div class="job-row reveal"><em>05</em><div><strong>Measure comparable evidence</strong><span>Capture results at consistent maturity windows.</span></div><b>Operator</b></div>
+            <div class="job-row reveal"><em>06</em><div><strong>Remember and recover</strong><span>Carry decisions across chats and repair failures.</span></div><b>Operator</b></div>
+          </div>
+          <aside class="loop-card reveal">
+            <p class="eyebrow">One persistent operating layer</p>
+            <h3>Lensically owns the loop—not just the writing step.</h3>
+            <p>Every action leaves durable evidence, state, and a verified next move.</p>
+            <div class="loop-steps">
+              <div class="loop-step"><i></i>Think from evidence</div>
+              <div class="loop-step"><i></i>Act through controlled tools</div>
+              <div class="loop-step"><i></i>Verify the result</div>
+              <div class="loop-step"><i></i>Record what happens next</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dark-section">
+      <div class="shell">
+        <div class="section-head reveal">
+          <p class="eyebrow">The operating cycle</p>
+          <h2>One instruction can trigger a complete publishing operation.</h2>
+          <p>Lensically does not stop after returning text. It coordinates the work before, during, and after every post.</p>
+        </div>
+        <div class="workflow">
+          <article class="workflow-row reveal"><div class="number">01</div><h3>Source intelligence</h3><p>Collect proven patterns, preserve source evidence, and convert opportunities into durable source cards.</p><div class="workflow-output"><span>Output</span><b>Locked source lineage</b></div></article>
+          <article class="workflow-row reveal"><div class="number">02</div><h3>Account strategy</h3><p>Rank mature evidence, identify fatigue and opportunity, then lock a source-backed lineup.</p><div class="workflow-output"><span>Output</span><b>Versioned strategy</b></div></article>
+          <article class="workflow-row reveal"><div class="number">03</div><h3>Generation and gates</h3><p>Create each post from its assigned source, enforce brand rules, block duplicates, and preserve revisions.</p><div class="workflow-output"><span>Output</span><b>Approved post package</b></div></article>
+          <article class="workflow-row reveal"><div class="number">04</div><h3>Protected scheduling</h3><p>Fill the next viable hours without backfilling missed time, colliding slots, or breaking account isolation.</p><div class="workflow-output"><span>Output</span><b>Durable runway</b></div></article>
+          <article class="workflow-row reveal"><div class="number">05</div><h3>Measurement and learning</h3><p>Capture comparable 6, 12, 18, and 24-hour evidence and carry the lesson into the next cycle.</p><div class="workflow-output"><span>Output</span><b>Normalized evidence</b></div></article>
+          <article class="workflow-row reveal"><div class="number">06</div><h3>Continuity and recovery</h3><p>Persist unfinished work, restore context in new chats, and repair the main operating plane independently.</p><div class="workflow-output"><span>Output</span><b>Operation that survives</b></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="product" class="section product-section">
+      <div class="shell">
+        <div class="section-head reveal">
+          <p class="eyebrow">The actual product</p>
+          <h2>Software you can see, operate, inspect, and own.</h2>
+          <p>The package includes the AI control surface, the dashboard, the scheduling and evidence systems, durable continuity, and an independent recovery plane.</p>
+        </div>
+
+        <div class="product-stack">
+          <article class="product-panel reveal">
+            <div class="product-copy">
+              <div>
+                <span class="product-index">01 / OPERATOR</span>
+                <h3>Operate the business through conversation.</h3>
+                <p>Ask for an outcome. The Operator restores state, diagnoses the real situation, selects tools, executes the work, verifies the result, and records what happens next.</p>
+                <div class="product-points"><span>Direct typed tools</span><span>Durable checkpoints</span><span>Evidence-gated action</span></div>
+              </div>
+            </div>
+            <div class="product-visual">
+              <div class="ui-card">
+                <div class="ui-top"><span>Lensically Operator</span><span>Connected</span></div>
+                <div class="ui-main">
+                  <div class="ui-title"><h4>Conversation with memory</h4><span>State restored</span></div>
+                  <div class="ui-chat">
+                    <div class="you">Run a full cycle and fill every missing slot.</div>
+                    <div class="operator"><strong>Coverage reconciled.</strong><br>7 missing slots remain inside the 48-hour runway. The strategy is locked and the first generation batch is ready.</div>
+                    <div class="you">Proceed.</div>
+                    <div class="operator"><strong>Executing.</strong><br>I will stop on any blocker, repair the root cause, verify the result, and continue from durable state.</div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div class="float-card float-one"><strong>Strategy persisted</strong><span>Survives every new chat</span></div>
-          <div class="float-card float-two"><strong>Recovery plane ready</strong><span>Independent repair authority</span></div>
-        </div>
-      </div>
-    </section>
+          </article>
 
-    <div class="signal-rail" aria-label="System capabilities">
-      <div class="signal-track">
-        <div class="signal-item"><i></i><b>24</b> hourly publishing slots</div>
-        <div class="signal-item"><i></i><b>48h</b> protected runway</div>
-        <div class="signal-item"><i></i><b>4</b> evidence windows</div>
-        <div class="signal-item"><i></i><b>2</b> independent control planes</div>
-        <div class="signal-item"><i></i><b>100%</b> customer-owned infrastructure</div>
-        <div class="signal-item"><i></i><b>24</b> hourly publishing slots</div>
-        <div class="signal-item"><i></i><b>48h</b> protected runway</div>
-        <div class="signal-item"><i></i><b>4</b> evidence windows</div>
-        <div class="signal-item"><i></i><b>2</b> independent control planes</div>
-        <div class="signal-item"><i></i><b>100%</b> customer-owned infrastructure</div>
-      </div>
-    </div>
-
-    <section id="system" class="section">
-      <div class="shell">
-        <div class="section-intro reveal">
-          <p class="kicker">The real problem</p>
-          <h2>Your content business has six jobs. You are probably doing all six.</h2>
-          <p>Most content tools solve one isolated task. The strategy still lives in your head, scheduling still needs supervision, performance data gets forgotten, and every new AI chat starts from zero.</p>
-        </div>
-
-        <div class="problem-grid">
-          <div class="manual-stack">
-            <div class="manual-item reveal"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div><strong>Research the market</strong><span>Find patterns, angles, and source material.</span></div><div class="manual-badge">Manual</div></div>
-            <div class="manual-item reveal reveal-delay-1"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><div><strong>Generate every post</strong><span>Brief, write, revise, and quality-check.</span></div><div class="manual-badge">Manual</div></div>
-            <div class="manual-item reveal reveal-delay-2"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div><div><strong>Manage the schedule</strong><span>Fill gaps, prevent collisions, preserve runway.</span></div><div class="manual-badge">Manual</div></div>
-            <div class="manual-item reveal"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></div><div><strong>Measure performance</strong><span>Capture evidence at comparable maturity windows.</span></div><div class="manual-badge">Manual</div></div>
-            <div class="manual-item reveal reveal-delay-1"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div><div><strong>Remember what worked</strong><span>Carry decisions and lessons across every session.</span></div><div class="manual-badge">Manual</div></div>
-            <div class="manual-item reveal reveal-delay-2"><div class="manual-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div><div><strong>Recover when systems fail</strong><span>Diagnose, repair, redeploy, and verify.</span></div><div class="manual-badge">Manual</div></div>
-          </div>
-
-          <div class="operating-model reveal">
-            <div class="model-top"><div><h3>One operating system</h3><span>Lensically coordinates the complete loop.</span></div><span class="mono">ACTIVE</span></div>
-            <div class="model-center" aria-hidden="true">
-              <div class="model-ring"></div><div class="model-ring"></div>
-              <div class="model-core"><div><b>Lensically</b><span>AI operating layer</span></div></div>
+          <article class="product-panel reveal">
+            <div class="product-copy">
+              <div>
+                <span class="product-index">02 / DASHBOARD</span>
+                <h3>See what the system is doing and why.</h3>
+                <p>Account, follower, content, schedule, archive, saved-pattern, insight, and cycle views expose operational state without making the dashboard the source of authority.</p>
+                <div class="product-points"><span>Publishing coverage</span><span>Cycle decisions</span><span>Evidence lineage</span></div>
+              </div>
             </div>
-            <div class="model-flow">
-              <div><b>Think</b><span>Evidence + strategy</span></div>
-              <div><b>Act</b><span>Generate + schedule</span></div>
-              <div><b>Improve</b><span>Measure + learn</span></div>
+            <div class="product-visual">
+              <div class="ui-card">
+                <div class="ui-top"><span>Manifest Mental</span><span>Dashboard</span></div>
+                <div class="ui-main">
+                  <div class="ui-title"><h4>Operating overview</h4><span>Healthy</span></div>
+                  <div class="ui-grid">
+                    <div class="ui-stat"><small>Runway</small><strong>24 / 24</strong></div>
+                    <div class="ui-stat"><small>Cycle</small><strong>Main</strong></div>
+                    <div class="ui-stat"><small>Evidence</small><strong>4 windows</strong></div>
+                  </div>
+                  <div class="ui-table">
+                    <div class="ui-row"><span>5:00 PM</span><div>Source-backed post package</div><b>Scheduled</b></div>
+                    <div class="ui-row"><span>6:00 PM</span><div>Controlled variation</div><b>Scheduled</b></div>
+                    <div class="ui-row"><span>7:00 PM</span><div>Mechanism expansion</div><b>Ready</b></div>
+                    <div class="ui-row"><span>8:00 PM</span><div>Adjacent experiment</div><b>Queued</b></div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </article>
+
+          <article class="product-panel reveal">
+            <div class="product-copy">
+              <div>
+                <span class="product-index">03 / RECOVERY</span>
+                <h3>A second control plane exists for the moment the first one fails.</h3>
+                <p>The independent Recovery Worker can inspect GitHub and Cloudflare, restore the primary operator, redeploy an exact SHA, and verify live behavior without depending on the broken surface.</p>
+                <div class="product-points"><span>Independent authority</span><span>Exact-SHA deployment</span><span>Live verification</span></div>
+              </div>
+            </div>
+            <div class="product-visual">
+              <div class="ui-card">
+                <div class="ui-top"><span>Recovery architecture</span><span>Standby</span></div>
+                <div class="ui-main recovery-visual">
+                  <div class="plane"><small>Primary plane</small><h4>Main Operator</h4><ul><li>Account workflows</li><li>Content operations</li><li>Engineering and deployment</li></ul></div>
+                  <div class="bridge">↔</div>
+                  <div class="plane"><small>Independent plane</small><h4>Recovery Operator</h4><ul><li>GitHub repair path</li><li>Cloudflare recovery</li><li>Exact-SHA verification</li></ul></div>
+                </div>
+              </div>
+            </div>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="section section-rule">
+    <section id="ownership" class="section ownership-section">
       <div class="shell">
-        <div class="section-intro center reveal">
-          <p class="kicker">The operating cycle</p>
-          <h2>One prompt. One system. A complete publishing loop.</h2>
-          <p>Lensically does not stop after generating text. It coordinates the work before, during, and after every post—and preserves the evidence needed to make the next cycle smarter.</p>
+        <div class="section-head reveal">
+          <p class="eyebrow">Ownership changes the economics</p>
+          <h2>This is not another dashboard you rent forever.</h2>
+          <p>Lensically runs in the buyer’s accounts. The repository, infrastructure, operational data, and platform connections remain under the buyer’s control.</p>
         </div>
-        <div class="workflow-wrap">
-          <div class="workflow">
-            <div class="workflow-line" aria-hidden="true"></div>
-            <article class="workflow-step reveal"><div class="step-number">01</div><div class="step-copy"><h3>Source intelligence</h3><p>Collect proven patterns, preserve source evidence, and turn each opportunity into a durable source card.</p></div><div class="step-output"><small>Output</small><b>Locked source lineage</b></div></article>
-            <article class="workflow-step reveal reveal-delay-1"><div class="step-number">02</div><div class="step-copy"><h3>Account strategy</h3><p>Rank mature performance, identify fatigue and opportunity, then lock a source-backed lineup.</p></div><div class="step-output"><small>Output</small><b>Versioned cycle strategy</b></div></article>
-            <article class="workflow-step reveal reveal-delay-2"><div class="step-number">03</div><div class="step-copy"><h3>Generation and gates</h3><p>Create each post from its assigned source, enforce brand rules, block duplicates, and preserve revision history.</p></div><div class="step-output"><small>Output</small><b>Approved post package</b></div></article>
-            <article class="workflow-step reveal"><div class="step-number">04</div><div class="step-copy"><h3>Protected scheduling</h3><p>Fill the next viable hours without backfilling missed time, colliding slots, or breaking account isolation.</p></div><div class="step-output"><small>Output</small><b>Durable 48-hour runway</b></div></article>
-            <article class="workflow-step reveal reveal-delay-1"><div class="step-number">05</div><div class="step-copy"><h3>Measurement and learning</h3><p>Capture comparable 6, 12, 18, and 24-hour evidence and carry the lesson into the next strategy.</p></div><div class="step-output"><small>Output</small><b>Maturity-normalized evidence</b></div></article>
-            <article class="workflow-step reveal reveal-delay-2"><div class="step-number">06</div><div class="step-copy"><h3>Recovery and continuity</h3><p>Persist unfinished work, restore context in new chats, and use an independent repair plane when the main surface fails.</p></div><div class="step-output"><small>Output</small><b>Operation that survives failure</b></div></article>
-          </div>
+        <div class="ownership-table">
+          <div class="ownership-row header"><span></span><span>Lensically</span><span>Typical SaaS</span></div>
+          <div class="ownership-row"><strong>Source code</strong><span class="lensically">Buyer owns the package</span><span class="saas">Vendor controlled</span></div>
+          <div class="ownership-row"><strong>Infrastructure</strong><span class="lensically">Buyer’s Cloudflare account</span><span class="saas">Vendor account</span></div>
+          <div class="ownership-row"><strong>Operational data</strong><span class="lensically">Buyer’s database</span><span class="saas">Vendor database</span></div>
+          <div class="ownership-row"><strong>Account connections</strong><span class="lensically">Buyer-controlled secrets</span><span class="saas">Stored by vendor</span></div>
+          <div class="ownership-row"><strong>Pricing model</strong><span class="lensically">One-time commercial license</span><span class="saas">Recurring subscription</span></div>
+          <div class="ownership-row"><strong>Recovery authority</strong><span class="lensically">Independent repair plane</span><span class="saas">Wait for support</span></div>
         </div>
       </div>
     </section>
 
-    <section id="product" class="section section-rule">
+    <section id="install" class="section install-section">
       <div class="shell">
-        <div class="section-intro reveal">
-          <p class="kicker">The actual product</p>
-          <h2>Not a prompt pack. A visible, inspectable operating layer.</h2>
-          <p>Every important action has state, evidence, authorization, and a durable result. Use the product views below to explore the system buyers receive.</p>
+        <div class="section-head reveal">
+          <p class="eyebrow">AI-led installation</p>
+          <h2>Checkout. Download. Paste one prompt. Let the installation agent work.</h2>
+          <p>The buyer handles identity-bound actions such as sign-in, 2FA, OAuth approval, secret entry, and third-party terms. The installation agent handles the routine technical work.</p>
         </div>
-
-        <div class="product-showcase reveal">
-          <div class="showcase-tabs" role="tablist" aria-label="Lensically product views">
-            <button class="showcase-tab" id="tab-dashboard" role="tab" aria-selected="true" aria-controls="panel-dashboard">Dashboard</button>
-            <button class="showcase-tab" id="tab-operator" role="tab" aria-selected="false" aria-controls="panel-operator">Operator</button>
-            <button class="showcase-tab" id="tab-cycles" role="tab" aria-selected="false" aria-controls="panel-cycles">Cycles</button>
-            <button class="showcase-tab" id="tab-recovery" role="tab" aria-selected="false" aria-controls="panel-recovery">Recovery</button>
-          </div>
-
-          <div class="showcase-panel active" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
-            <div class="showcase-copy"><small>01 · Dashboard</small><h3>See what the operation is doing.</h3><p>Account state, follower trajectory, schedule coverage, publishing activity, source intelligence, and performance evidence are visible in one customer-owned workspace.</p><div class="showcase-list"><span>Operational status instead of black-box automation</span><span>Schedule, archive, saved patterns, insights, and cycle views</span><span>Data remains inside the buyer’s infrastructure</span></div></div>
-            <div class="showcase-visual"><div class="data-window"><div class="data-toolbar"><b>Manifest Mental · Dashboard</b><span>America/New_York</span></div><div class="dashboard-canvas"><div class="dashboard-statline"><div class="dash-stat"><small>Coverage</small><strong>48h</strong></div><div class="dash-stat"><small>Cycle</small><strong>Main</strong></div><div class="dash-stat"><small>Gates</small><strong>Pass</strong></div><div class="dash-stat"><small>Recovery</small><strong>Ready</strong></div></div><div class="chart-area"><div class="chart-grid"></div><svg viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="chartGradient" x1="0" x2="1"><stop offset="0" stop-color="#a889ff"/><stop offset="1" stop-color="#67d8ff"/></linearGradient><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a889ff" stop-opacity=".45"/><stop offset="1" stop-color="#67d8ff" stop-opacity="0"/></linearGradient></defs><path class="chart-fill" d="M0 138 C55 132 70 115 112 120 C160 127 170 82 222 92 C275 102 293 64 343 76 C397 89 415 42 463 58 C515 74 548 24 600 34 L600 160 L0 160Z"/><path class="chart-line" d="M0 138 C55 132 70 115 112 120 C160 127 170 82 222 92 C275 102 293 64 343 76 C397 89 415 42 463 58 C515 74 548 24 600 34"/></svg></div><div class="activity-list"><div class="activity-row"><div class="activity-dot">01</div><div><b>Strategy locked for next cycle</b><span>24 source-backed assignments preserved</span></div><time>Now</time></div><div class="activity-row"><div class="activity-dot">02</div><div><b>Coverage reconciliation complete</b><span>No gaps inside protected runway</span></div><time>4m</time></div><div class="activity-row"><div class="activity-dot">03</div><div><b>Performance evidence captured</b><span>24-hour maturity window recorded</span></div><time>12m</time></div></div></div></div></div>
-          </div>
-
-          <div class="showcase-panel" id="panel-operator" role="tabpanel" aria-labelledby="tab-operator" hidden>
-            <div class="showcase-copy"><small>02 · Operator</small><h3>Talk to an AI that can actually operate.</h3><p>The connected Operator exposes direct tools for research, content, scheduling, diagnostics, engineering, deployment, and recovery—with server-side controls behind every action.</p><div class="showcase-list"><span>Direct typed tools instead of browser macros</span><span>Authorization, idempotency, gates, and continuity</span><span>Routine work executes without pushing it back to the owner</span></div></div>
-            <div class="showcase-visual"><div class="data-window"><div class="data-toolbar"><b>ChatGPT · Lensically Operator Mode</b><span>Connected</span></div><div class="chat-canvas"><div class="chat-stream"><div class="chat-message user">Fill the next incomplete publishing day and preserve the current strategy.</div><div class="tool-call"><b>get_hourly_coverage</b><span>Reconciled next viable hour, open slots, and locked plan assignments.</span></div><div class="tool-call"><b>persist_manifest_autonomous_post</b><span>Post validated, duplicate-safe, source-backed, and scheduled to the exact locked slot.</span></div><div class="chat-message">The next incomplete day is now covered. All persisted posts match the locked lineup, the 48-hour runway is protected, and no past hours were backfilled.</div></div><div class="chat-input">Ask Lensically to operate the business…</div></div></div></div>
-          </div>
-
-          <div class="showcase-panel" id="panel-cycles" role="tabpanel" aria-labelledby="tab-cycles" hidden>
-            <div class="showcase-copy"><small>03 · Cycles</small><h3>Strategy becomes an auditable operating record.</h3><p>Main and Innovation cycles preserve the account conclusion, strongest and weakest evidence, directives, risks, experiments, and every source-to-slot assignment.</p><div class="showcase-list"><span>Evidence-backed decisions instead of AI improvisation</span><span>Innovation test bed separated from production Main</span><span>Every post retains source and strategy lineage</span></div></div>
-            <div class="showcase-visual"><div class="data-window"><div class="data-toolbar"><b>Cycles · Strategy workspace</b><span>Version 1.0.0</span></div><div class="cycle-canvas"><div class="cycle-header"><h4>Current operating cycle</h4><div class="cycle-switch"><span class="active">Main</span><span>Innovation</span></div></div><div class="decision-board"><div class="decision-card"><small>Account conclusion</small><b>Protect proven mechanisms</b><p>Increase variation without abandoning the strongest audience rewards.</p></div><div class="decision-card"><small>Primary risk</small><b>Wording fatigue</b><p>Distinctive surfaces must materially change before repeat exposure.</p></div><div class="decision-card"><small>Exploration</small><b>Controlled share</b><p>Reserve bounded slots for source-backed adjacent mechanisms.</p></div></div><div class="lineup-table"><div class="lineup-row"><span>Slot</span><span>Source family</span><span>Strategic role</span><span>Mode</span></div><div class="lineup-row"><span>08:00</span><b>Universe request</b><span>Franchise</span><span class="role-chip">Exploit</span></div><div class="lineup-row"><span>09:00</span><b>Financial reset</b><span>Healthy</span><span class="role-chip">Hybrid</span></div><div class="lineup-row"><span>10:00</span><b>Identity prompt</b><span>Prospect</span><span class="role-chip">Explore</span></div><div class="lineup-row"><span>11:00</span><b>Future scenario</b><span>Healthy</span><span class="role-chip">Exploit</span></div><div class="lineup-row"><span>12:00</span><b>Audience question</b><span>Prospect</span><span class="role-chip">Explore</span></div><div class="lineup-row"><span>13:00</span><b>Abundance cue</b><span>Franchise</span><span class="role-chip">Exploit</span></div></div></div></div></div>
-          </div>
-
-          <div class="showcase-panel" id="panel-recovery" role="tabpanel" aria-labelledby="tab-recovery" hidden>
-            <div class="showcase-copy"><small>04 · Recovery</small><h3>The system can repair the system.</h3><p>An independent break-glass Recovery plane remains separate from the Main Operator. When the primary Worker or deployment path fails, Recovery can inspect, repair, release, and verify it.</p><div class="showcase-list"><span>Independent Cloudflare and GitHub repair authority</span><span>Exact-SHA release and live verification</span><span>Root-cause prevention recorded in source control</span></div></div>
-            <div class="showcase-visual"><div class="data-window"><div class="data-toolbar"><b>Recovery · Independent control plane</b><span>Standby</span></div><div class="recovery-canvas"><div class="recovery-map"><div class="node-line l1"></div><div class="node-line l2"></div><div class="node-line l3"></div><div class="node-line l4"></div><div class="node github"><b>GitHub</b><span>Source authority</span></div><div class="node cloudflare"><b>Cloudflare</b><span>Runtime plane</span></div><div class="node main"><b>Main Operator</b><span>Primary surface</span></div><div class="node recovery"><b>Recovery</b><span>Break-glass repair</span></div><div class="node data"><b>Durable state</b><span>Continuity authority</span></div></div><div class="recovery-log"><div class="log-title"><span>Verification log</span><span>Live</span></div><div class="log-line"><time>17:20</time><span>Primary health check passed.</span></div><div class="log-line"><time>17:20</time><span>Repository access verified.</span></div><div class="log-line"><time>17:20</time><span>Deployment plane reachable.</span></div><div class="log-line good"><time>17:20</time><span>Recovery authority ready.</span></div><div class="log-line"><time>17:20</time><span>Production SHA reconciled.</span></div><div class="log-line good"><time>17:20</time><span>No unresolved blockers.</span></div></div></div></div></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-rule">
-      <div class="shell">
-        <div class="section-intro reveal">
-          <p class="kicker">Built to keep operating</p>
-          <h2>The parts other tools leave out are the parts that make autonomy real.</h2>
-          <p>Generation is the easy part. Lensically is built around the durable operating machinery required to act, verify, remember, recover, and continue.</p>
-        </div>
-
-        <div class="feature-mosaic">
-          <article class="feature-card memory reveal"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div><h3>A system that remembers after the chat ends.</h3><p>Strategy versions, setup state, current actions, evidence, revisions, failures, and next checkpoints live in durable authority—not fragile conversation history.</p><div class="memory-timeline"><div class="memory-row"><time>Cycle 01</time><b>Strategy locked</b><span>Persisted</span></div><div class="memory-row"><time>Post 008</time><b>Owner revision learned</b><span>Linked</span></div><div class="memory-row"><time>24h</time><b>Performance matured</b><span>Measured</span></div><div class="memory-row"><time>Next chat</time><b>Exact work restored</b><span>Continued</span></div></div></article>
-          <article class="feature-card operator reveal reveal-delay-1"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 7 .9-5 4.8 1.3 6.8L12 17l-6.3 3.5L7 13.7 2 8.9 9 8z"/></svg></div><h3>An operator that can act.</h3><p>Direct tools connect AI reasoning to guarded business operations instead of leaving every decision as advice for the owner.</p><div class="terminal-mini mono"><b>operator.execute</b><br>→ diagnose<br>→ act<br>→ verify<br>→ record<br>→ continue</div></article>
-          <article class="feature-card recovery reveal reveal-delay-2"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7L20 19v-6h-6l2.2 2.2"/></svg></div><h3>A recovery plane that survives the failure.</h3><p>Main cannot be responsible for repairing Main when Main is unavailable. Lensically includes an independent repair surface.</p><div class="recovery-beacon" aria-hidden="true"></div></article>
-          <article class="feature-card multi reveal"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="7" r="2"/><path d="M2 20c0-4 2.7-7 6-7s6 3 6 7M14 13c3 0 5 2.6 5 6"/></svg></div><h3>Multi-account by architecture.</h3><p>Account-scoped keys, data, schedules, tokens, gates, and continuity prevent one brand from bleeding into another.</p><div class="account-stack"><div class="account-pill"><i></i><b>Brand 01</b><span>Isolated state</span></div><div class="account-pill"><i></i><b>Brand 02</b><span>Isolated state</span></div><div class="account-pill"><i></i><b>Brand 03</b><span>Isolated state</span></div></div></article>
-          <article class="feature-card ownership reveal reveal-delay-1"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18v14H3z"/><path d="M7 9l-2 3 2 3M17 9l2 3-2 3M14 7l-4 10"/></svg></div><h3>Commercial source ownership.</h3><p>Use and modify the software for your business and create controlled customer-specific deployments under the commercial license.</p><div class="ownership-code mono"><strong>repository:</strong> customer-owned<br><strong>infrastructure:</strong> customer-owned<br><strong>data:</strong> customer-owned</div></article>
-        </div>
-      </div>
-    </section>
-
-    <section id="ownership" class="section ownership-section section-rule">
-      <div class="shell">
-        <div class="section-intro center reveal">
-          <p class="kicker">Own the machine</p>
-          <h2>Not another SaaS login you can lose.</h2>
-          <p>Lensically runs in the buyer’s GitHub, Cloudflare, Meta, Threads, and AI accounts. The operating system remains under the buyer’s control after purchase.</p>
-        </div>
-
-        <div class="comparison reveal">
-          <div class="comparison-row header"><div><strong>Operating layer</strong></div><div class="typical-col"><strong>Typical content tool</strong></div><div class="lensically-col"><strong>Lensically Operator</strong></div></div>
-          <div class="comparison-row"><div><strong>Infrastructure</strong></div><div class="typical-col"><span>Vendor-controlled</span></div><div class="lensically-col"><span>Customer-controlled</span></div></div>
-          <div class="comparison-row"><div><strong>Source code</strong></div><div class="typical-col"><span>Closed or inaccessible</span></div><div class="lensically-col"><span>Full versioned package</span></div></div>
-          <div class="comparison-row"><div><strong>AI memory</strong></div><div class="typical-col"><span>Session-dependent</span></div><div class="lensically-col"><span>Durable continuation authority</span></div></div>
-          <div class="comparison-row"><div><strong>Automation</strong></div><div class="typical-col"><span>Single-task workflows</span></div><div class="lensically-col"><span>Complete operating cycle</span></div></div>
-          <div class="comparison-row"><div><strong>Failure recovery</strong></div><div class="typical-col"><span>Wait for the vendor</span></div><div class="lensically-col"><span>Independent Recovery MCP</span></div></div>
-          <div class="comparison-row"><div><strong>Commercial use</strong></div><div class="typical-col"><span>Subscription access only</span></div><div class="lensically-col"><span>Controlled deployment rights</span></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="install" class="section section-rule">
-      <div class="shell">
-        <div class="section-intro center reveal">
-          <p class="kicker">AI-led installation</p>
-          <h2>Pay. Download. Paste one prompt. Let your AI install it.</h2>
-          <p>The package is designed for ChatGPT or Codex to perform routine setup work and ask you only for identity-bound actions such as sign-in, 2FA, OAuth approval, protected secret entry, and acceptance of third-party terms.</p>
-        </div>
-
         <div class="install-grid">
-          <article class="install-card reveal"><div class="install-number">01</div><h3>Download the private release.</h3><p>Stripe verifies payment and issues a short-lived one-time download for the exact versioned package.</p><div class="install-art"><div class="download-file"><div class="file-icon">ZIP</div><div><b>Lensically-Operator-Threads-v1.0.0.zip</b><span>Versioned · checksum included · commercial license recorded</span></div></div></div></article>
-          <article class="install-card reveal reveal-delay-1"><div class="install-number">02</div><h3>Paste the install prompt.</h3><p>Open the package with your AI and paste <span class="mono">INSTALL_PROMPT.txt</span>. The installation authority takes over.</p><div class="install-art"><div class="prompt-box mono"><b>Read START_HERE.md as the controlling installation authority.</b><br>Configure this system in my customer-owned accounts. Preserve setup state, stop on real blockers, verify every deployment, and continue until operational.</div></div></article>
-          <article class="install-card reveal reveal-delay-2"><div class="install-number">03</div><h3>Own the running system.</h3><p>Your AI connects the required accounts, deploys the infrastructure, validates the first controlled publish, and hands you the Operator.</p><div class="install-art"><div class="deploy-list"><div class="deploy-line"><span>GitHub repository</span><i></i></div><div class="deploy-line"><span>Cloudflare operating layer</span><i></i></div><div class="deploy-line"><span>Threads authorization</span><i></i></div><div class="deploy-line"><span>Main + Recovery MCP</span><i></i></div></div></div></article>
+          <article class="install-step reveal"><em>01</em><h3>Download the release</h3><p>Stripe verifies payment and issues a short-lived one-time download for the exact versioned ZIP.</p></article>
+          <article class="install-step reveal"><em>02</em><h3>Open it with AI</h3><p>Upload the package to ChatGPT or open it in Codex and paste <code>INSTALL_PROMPT.txt</code>.</p></article>
+          <article class="install-step reveal"><em>03</em><h3>Connect your accounts</h3><p>The agent guides GitHub, Cloudflare, Meta, Threads, and AI access without exposing secrets.</p></article>
+          <article class="install-step reveal"><em>04</em><h3>Deploy and verify</h3><p>The Worker, database, Recovery plane, dashboard, and Operator surfaces are deployed and checked.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="section section-rule">
-      <div class="shell">
-        <div class="section-intro reveal">
-          <p class="kicker">Who it is built for</p>
-          <h2>Made for operators. Not dabblers.</h2>
-          <p>This is substantial infrastructure for buyers who want to own a serious content operation—not a shortcut promising effortless growth.</p>
+    <section class="section offer-section">
+      <div class="shell offer-wrap">
+        <div class="offer-copy reveal">
+          <p class="eyebrow">Commercial release v1.0.0</p>
+          <h2>Buy the system. Own the operation.</h2>
+          <p>One commercial license includes the production-parity source package, the installation authority, the main Operator, the independent Recovery plane, the dashboard, the scheduling and evidence architecture, and v1.x product-defect fixes.</p>
+          <div class="value-list">
+            <div class="value-row"><strong>Versioned source package</strong><span>INCLUDED</span></div>
+            <div class="value-row"><strong>Main Operator and Recovery MCP</strong><span>INCLUDED</span></div>
+            <div class="value-row"><strong>Dashboard, scheduler, lineage, and continuity</strong><span>INCLUDED</span></div>
+            <div class="value-row"><strong>AI-led installation workflow</strong><span>INCLUDED</span></div>
+            <div class="value-row"><strong>Commercial controlled-deployment rights</strong><span>INCLUDED</span></div>
+            <div class="value-row"><strong>v1.x product-defect fixes</strong><span>INCLUDED</span></div>
+          </div>
         </div>
-        <div class="audience-grid">
-          <div class="audience-panel good reveal"><h3>Lensically fits when you are…</h3><div class="audience-list"><div>A creator building Threads as a durable business asset.</div><div>An agency that wants controlled customer-specific deployments.</div><div>A portfolio operator managing multiple isolated brands.</div><div>A technical founder who values ownership, evidence, and recovery.</div></div></div>
-          <div class="audience-panel not reveal reveal-delay-1"><h3>Lensically is not…</h3><div class="audience-list"><div>A prompt pack or collection of viral post templates.</div><div>A managed service where Lensically runs your accounts for you.</div><div>A guarantee of followers, reach, revenue, or platform approval.</div><div>A resale license for redistributing the source package.</div></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-rule">
-      <div class="shell pricing-wrap">
-        <div class="pricing-copy reveal">
-          <p class="kicker">The commercial package</p>
-          <h2>Buy the system once. Build on what you own.</h2>
-          <p>The license includes the complete production-parity package and the installation authority required to deploy it inside your own accounts.</p>
-          <div class="value-list"><span>Full versioned source package</span><span>Main Operator and independent Recovery MCP</span><span>Dashboard, scheduler, gates, lineage, and continuity</span><span>AI-led installation system and setup state</span><span>Commercial controlled-deployment rights</span><span>v1.x product-defect fixes</span></div>
-        </div>
-        <aside class="price-card reveal reveal-delay-1" aria-label="Commercial license pricing">
-          <div class="price-label">Commercial launch price</div>
-          <div class="price-line"><strong>$997</strong><span>one time</span></div>
-          <p>A complete customer-owned operating system—not a recurring software seat.</p>
-          <div class="price-includes"><span><b>Software</b> Full private v1.0.0 package</span><span><b>License</b> Commercial controlled deployment</span><span><b>Installation</b> AI-led setup authority</span><span><b>Updates</b> v1.x defect fixes</span></div>
-          <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Purchase securely with Stripe <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-          <p class="price-legal">One-time payment. Third-party platform costs are separate. Purchase is governed by the commercial license and refund policy.</p>
+        <aside class="price-card reveal">
+          <div class="label">Launch price</div>
+          <div class="price">$997 <small>one time</small></div>
+          <p>A complete customer-owned software system—not a prompt pack, course, or managed service.</p>
+          <ul class="price-list">
+            <li>Private versioned download</li>
+            <li>One commercial license</li>
+            <li>No subscription to Lensically</li>
+            <li>No revenue share</li>
+            <li>Secure Stripe checkout</li>
+          </ul>
+          <a class="button" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Purchase Lensically securely</a>
+          <div class="price-legal">Third-party platform costs are separate. Purchase is governed by the commercial license and refund policy.</div>
         </aside>
       </div>
     </section>
 
-    <section id="faq" class="section section-rule">
-      <div class="shell">
-        <div class="section-intro center reveal"><p class="kicker">Questions before ownership</p><h2>Everything that should be clear before you buy.</h2></div>
-        <div class="faq">
-          <details class="reveal"><summary>Is this a managed service?</summary><p>No. Lensically Operator is a customer-owned software package and commercial license. The installation workflow is AI-led, but the repository, infrastructure, platform accounts, and operational data belong to the buyer.</p></details>
-          <details class="reveal"><summary>What exactly happens after payment?</summary><p>Stripe redirects you to a Lensically verification page. After the paid Checkout Session is verified, you receive a short-lived one-time download for the private v1.0.0 ZIP, its SHA-256 checksum, and a recorded license key.</p></details>
-          <details class="reveal"><summary>Do I need to be a developer?</summary><p>You need to be comfortable creating and approving customer-owned accounts, signing in, completing 2FA, authorizing OAuth, entering protected secrets, and accepting third-party terms. The included installation authority is designed for ChatGPT or Codex to perform the routine technical work.</p></details>
-          <details class="reveal"><summary>Which third-party accounts are required?</summary><p>A customer-owned GitHub account or organization, Cloudflare account, Meta Developer account, Threads account, and AI access capable of running the installation and connected Operator workflow. A custom domain is optional.</p></details>
-          <details class="reveal"><summary>Are Cloudflare, GitHub, Meta, or AI usage costs included?</summary><p>No. The purchase price covers the Lensically software license. Third-party services use the buyer’s own accounts and remain governed by their pricing, terms, availability, and approval requirements.</p></details>
-          <details class="reveal"><summary>Can an agency deploy it for clients?</summary><p>Yes, when customer-specific deployments remain owned and controlled by the purchaser. The source package itself cannot be redistributed, sublicensed, resold, published, or shared, and a substantially equivalent white-label package cannot be sold.</p></details>
-          <details class="reveal"><summary>Does Lensically guarantee followers, reach, or revenue?</summary><p>No. Lensically provides operational infrastructure, workflows, evidence, controls, continuity, and recovery. Audience growth, reach, revenue, continuous third-party availability, and platform approval are not guaranteed.</p></details>
-          <details class="reveal"><summary>What support and refund protection are included?</summary><p>v1.x product-defect fixes are included. The refund policy covers a verified product defect reported within the stated window when it prevents the documented installation and cannot be repaired after reasonable cooperation.</p></details>
+    <section id="faq" class="section faq-section">
+      <div class="shell faq-grid">
+        <div class="faq-side reveal">
+          <p class="eyebrow">Questions before ownership</p>
+          <h2>Still deciding?</h2>
         </div>
-      </div>
-    </section>
-
-    <section class="final-cta">
-      <div class="shell final-box reveal">
-        <div><h2>Stop renting isolated tools. Own the operating layer.</h2><p>Lensically Operator for Threads · Commercial license · $997 one time.</p></div>
-        <a class="button button-primary" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically</a>
+        <div class="faq">
+          <details><summary>Is this a managed service?</summary><p>No. Lensically Operator is a customer-owned software package and commercial license. The installation workflow is AI-led, but the repository and infrastructure belong to the buyer.</p></details>
+          <details><summary>Does Lensically guarantee followers, reach, revenue, or platform approval?</summary><p>No. The system provides operational infrastructure, workflows, evidence, continuity, and controls. Audience growth, revenue, continuous availability, and third-party approval are not guaranteed.</p></details>
+          <details><summary>Can an agency use it for customer-specific deployments?</summary><p>Yes, when those deployments remain owned and controlled by the purchaser. The source package itself cannot be redistributed, sublicensed, resold, published, or shared, and a substantially equivalent white-label package cannot be sold.</p></details>
+          <details><summary>Are Cloudflare, Meta, GitHub, or OpenAI costs included?</summary><p>No. Third-party services use the buyer’s own accounts and are governed by their own pricing, limits, availability, and terms.</p></details>
+          <details><summary>What happens after payment?</summary><p>Stripe redirects to a Lensically verification page. After the paid session is verified, the buyer receives a short-lived one-time download for the private v1.0.0 release, its SHA-256 checksum, and a recorded license key.</p></details>
+          <details><summary>What support is included?</summary><p>v1.x product-defect fixes are included. The refund policy covers a verified product defect reported within the stated window when it prevents the documented installation and cannot be repaired after reasonable cooperation.</p></details>
+          <details><summary>What accounts do I need?</summary><p>A GitHub account, a Cloudflare account, a Meta Developer account and Threads authorization, plus ChatGPT, Codex, or compatible OpenAI access. A custom domain is optional.</p></details>
+          <details><summary>Can I inspect and modify the code?</summary><p>Yes. The commercial license permits the purchaser to use and modify the software for their own business and controlled customer-specific deployments, subject to the license restrictions.</p></details>
+        </div>
       </div>
     </section>
   </main>
@@ -1186,62 +927,30 @@
     </div>
   </footer>
 
-  <a class="button button-primary mobile-buy" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997</a>
+  <a class="mobile-buy" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Own Lensically — $997</a>
 
   <script>
     (() => {
-      const root = document.documentElement;
-      let frame = null;
-      window.addEventListener('pointermove', (event) => {
-        if (frame) return;
-        frame = requestAnimationFrame(() => {
-          root.style.setProperty('--spot-x', `${event.clientX}px`);
-          root.style.setProperty('--spot-y', `${event.clientY}px`);
-          frame = null;
-        });
-      }, { passive: true });
-
-      const revealObserver = new IntersectionObserver((entries) => {
+      const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add('visible');
-            revealObserver.unobserve(entry.target);
+            observer.unobserve(entry.target);
           }
         });
-      }, { threshold: 0.12, rootMargin: '0px 0px -40px' });
-      document.querySelectorAll('.reveal:not(.visible)').forEach((element) => revealObserver.observe(element));
+      }, { threshold: 0.12, rootMargin: '0px 0px -36px' });
+      document.querySelectorAll('.reveal:not(.visible)').forEach((element) => observer.observe(element));
 
-      const tabs = [...document.querySelectorAll('.showcase-tab')];
-      const panels = [...document.querySelectorAll('.showcase-panel')];
-      tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
-          panels.forEach((panel) => {
-            const active = panel.id === tab.getAttribute('aria-controls');
-            panel.classList.toggle('active', active);
-            panel.hidden = !active;
-          });
-        });
-        tab.addEventListener('keydown', (event) => {
-          if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-          event.preventDefault();
-          const current = tabs.indexOf(tab);
-          const next = event.key === 'ArrowRight' ? (current + 1) % tabs.length : (current - 1 + tabs.length) % tabs.length;
-          tabs[next].focus();
-          tabs[next].click();
-        });
+      const button = document.querySelector('.menu-button');
+      const links = document.querySelector('.nav-links');
+      button?.addEventListener('click', () => {
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        links?.classList.toggle('open', !expanded);
       });
-
-      const menuButton = document.querySelector('.menu-button');
-      const navLinks = document.querySelector('.nav-links');
-      menuButton?.addEventListener('click', () => {
-        const expanded = menuButton.getAttribute('aria-expanded') === 'true';
-        menuButton.setAttribute('aria-expanded', String(!expanded));
-        navLinks?.classList.toggle('open', !expanded);
-      });
-      navLinks?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => {
-        navLinks.classList.remove('open');
-        menuButton?.setAttribute('aria-expanded', 'false');
+      links?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => {
+        links.classList.remove('open');
+        button?.setAttribute('aria-expanded', 'false');
       }));
     })();
   </script>
