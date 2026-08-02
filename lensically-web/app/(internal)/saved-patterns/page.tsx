@@ -153,9 +153,10 @@ export default function SavedPatternsPage() {
       }
 
       const nextPatterns = Array.isArray(data?.patterns) ? data.patterns : [];
-      setPatterns(nextPatterns);
+            setPatterns(nextPatterns);
       setSelectedIds((current) => current.filter((id) => nextPatterns.some((pattern) => pattern.id === id)));
       setTotal(typeof data?.total === "number" ? data.total : nextPatterns.length);
+      setOwnerLearningSummary(data?.owner_learning_summary ?? null);
     } catch (fetchError) {
       setPatterns([]);
       setSelectedIds([]);
