@@ -2058,14 +2058,17 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
 
 const OPERATOR_REJECTION_MEMORY_CONTRACT = {
   version: HUMAN_FREE_AUTONOMY_CONTRACT.version,
-  infrastructure_scope: "universal",
-  evidence_scope: "disabled",
+  infrastructure_scope: "source_card_scoped",
+  evidence_scope: "active_owner_guidance_and_published_revision",
+  generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
   required_generation_behavior: [
-    "Do not read owner approvals, rejections, edits, taste feedback, guided-review history, or deletion history during generation.",
-    "Use only fixed account configuration, the locked source card, objective market evidence, and operational state.",
+    "Load the active owner guidance and relevant verbatim owner edit notes attached to the selected source card.",
+    "Keep each note source-card-specific unless the owner explicitly creates broader account guidance.",
+    "Preserve the owner’s original wording as the authority; internal interpretations may assist execution but may not replace or weaken it.",
+    "Learn separately from the owner correction and from the exact published revision's performance.",
   ],
   required_gate_keys: ["required_gate_execution_gate"],
-  showability_rule: "A draft is blocked only by fixed account configuration, platform safety, exact duplication or copying, source-contract failure, inventory collision, or missing required gate execution.",
+  showability_rule: "Owner guidance is an active generation input. The exact published revision remains the only text credited with the resulting performance.",
 } as const;
 
 
