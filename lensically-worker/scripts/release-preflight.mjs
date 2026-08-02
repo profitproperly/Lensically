@@ -851,7 +851,7 @@ if (!operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEER
     || !operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEERING_TOOLS")) {
   lifecycleErrors.push("operator_mcp_engineering_registry_module_incomplete");
 }
-if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 33-tool engineering registry without duplicates")
+if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 34-tool engineering registry without duplicates")
     || !operatorMcpEngineeringRegistryTests.includes("preserves exact workflow and deployment controls")) {
   lifecycleErrors.push("operator_mcp_engineering_registry_tests_incomplete");
 }
