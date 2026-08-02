@@ -2763,33 +2763,57 @@ export async function finalizeScheduledPostPublished(
   publishRequestId: string,
   publishedPostId: string,
 ): Promise<boolean> {
-  const result = await env.DB.prepare(
-    `UPDATE scheduled_posts
-     SET
-       status = ?,
-       publish_request_id = ?,
-       published_post_id = ?,
-       publish_error_message = NULL,
-       published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
-       processing_started_at = NULL
-     WHERE id = ?`,
-  )
-    .bind(
+  await ensureOwnerEditLearningTables(env);
+  const scheduled = await env.DB.prepare(
+    `SELECT id, user_id, threads_user_id, post_text, current_revision_id
+     FROM scheduled_posts WHERE id = ? LIMIT 1`,
+  ).bind(postId).first<{
+    id: number | string;
+    user_id: string;
+    threads_user_id: string;
+    post_text: string;
+    current_revision_id: string | null;
+  }>();
+  if (!scheduled) return false;
+  const revisionId = await ensureScheduledPostCurrentRevision(env.DB, {
+    scheduledPostId: postId,
+    userId: scheduled.user_id,
+    threadsUserId: scheduled.threads_user_id,
+    currentText: scheduled.post_text,
+    currentRevisionId: scheduled.current_revision_id,
+  });
+  const statements = [
+    env.DB.prepare(
+      `UPDATE scheduled_posts
+       SET status = ?, publish_request_id = ?, published_post_id = ?,
+           published_revision_id = ?, publish_error_message = NULL,
+           published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
+           processing_started_at = NULL
+       WHERE id = ?`,
+    ).bind(
       SCHEDULED_POST_STATUS_POSTED,
       publishRequestId,
       publishedPostId,
+      revisionId,
       postId,
-    )
-    .run();
-  const changed = Number(result.meta?.changes ?? 0) > 0;
-  if (changed && await doesTableExist(env, "gpt_generation_drafts")) {
-    await env.DB.prepare(
-      `UPDATE gpt_generation_drafts
-       SET status = 'published', published_post_id = ?
-       WHERE scheduled_post_id = ?`,
-    ).bind(publishedPostId, postId).run();
+    ),
+    env.DB.prepare(
+      `UPDATE operator_scheduled_post_revisions
+       SET became_published = 1, published_post_id = ?
+       WHERE id = ? AND scheduled_post_id = ?`,
+    ).bind(publishedPostId, revisionId, postId),
+  ];
+  if (await doesTableExist(env, "gpt_generation_drafts")) {
+    statements.push(
+      env.DB.prepare(
+        `UPDATE gpt_generation_drafts
+         SET status = 'published', published_post_id = ?
+         WHERE scheduled_post_id = ?`,
+      ).bind(publishedPostId, postId),
+    );
   }
-  return changed;
+  const results = await env.DB.batch(statements);
+  return Number(results[0]?.meta?.changes ?? 0) > 0;
 }
 
 export async function recoverStalePostingScheduledPosts(env: Env): Promise<void> {
