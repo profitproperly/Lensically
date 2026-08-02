@@ -26,6 +26,16 @@ active_interrupt_precedence: none
 
 
 
+## Completed Hero Sentence Alignment Pass: operator-hero-copy-alignment-v8-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Public-page commit: `d93b80c85cef173436aff21a70d991f87b82ffa0`.
+- Cloudflare Pages deployment workflow `30771127240` completed successfully from that exact SHA.
+- Owner-directed correction: the second sentence in the hero description began on the first sentence's final line and appeared visually cut off.
+- Repair: inserted a deliberate line break after the first sentence so `Run everything yourself...` starts directly beneath it.
+- Verification: bounded source scan confirmed the exact line break in the hero copy.
+
 ## Completed Hero Copy Refinement Pass: operator-hero-copy-refinement-v7-20260802
 
 - Status: completed and deployed.
