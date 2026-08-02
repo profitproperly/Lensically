@@ -92,7 +92,7 @@ export const OPERATOR_MCP_SOURCE_DRAFT_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "submit_candidate_draft",
     title: "Submit candidate draft",
-    description: "Save a candidate draft, record source-contract evidence, run all mandatory gates, persist results, and learn whether the draft is showable. For Manifest, the backend allows close source mimicry and blocks only an exact source copy, explicit owner hard bans, inventory collisions not authorized by the source hook, and missing required gate execution. No historical model-review evidence is required. Only present the draft when showable=true.",
+        description: "Save a candidate draft, record the source-card evidence and active owner guidance used, run all mandatory gates, persist results, and learn whether the draft is showable. Only present the draft when showable=true.",
     inputSchema: { type: "object", properties: { brand_key: BRAND_KEY_SCHEMA, run_id: { type: "string" }, source_card_id: { type: "string" }, text: { type: "string" }, draft_index: { type: "integer" }, score: { type: "object", additionalProperties: true }, strategy: { type: "object", additionalProperties: true }, draft_analysis: SOURCE_DRAFT_ANALYSIS_SCHEMA, model_gate_results: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["brand_key", "run_id", "source_card_id", "text", "draft_analysis"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
