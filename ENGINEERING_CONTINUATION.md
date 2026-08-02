@@ -19,6 +19,17 @@ active_interrupt_precedence: none
 
 
 
+## Completed Commercial Sales Page Redesign — operator-sales-redesign-20260802
+
+- Status: completed and deployed.
+- Product page source: `lensically-worker/public/operator/index.html`.
+- Validated redesign commit: `5916017c7aba623886cca29619450c448cb53c0a`.
+- Cloudflare Pages deployment workflow `30768283707` completed successfully from that exact SHA.
+- Public entry route remains `lensically-worker/public/index.html`, which redirects buyers to `/operator/`.
+- The redesign replaced the documentation-first specification page with an outcome-first commercial narrative, code-native product previews, interactive Dashboard/Operator/Cycles/Recovery views, stronger offer architecture, premium responsive motion, mobile navigation, and a persistent mobile purchase action.
+- Product truth constraints remain enforced: no fabricated testimonials, no follower/revenue guarantees, no managed-service claim, and no change to the canonical $997 Stripe Payment Link or legal surfaces.
+- Prevention rule: future commercial page work must begin with buyer outcome, product proof, transformation, ownership, installation, offer, and objections before technical requirements or legal detail. A documentation-first card grid may not be treated as a finished sales page.
+
 ## Completed Commercial Release — lensically-operator-threads-v1-20260802
 
 - Engineering status: completed and deployed from exact validated SHA `f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4`.
