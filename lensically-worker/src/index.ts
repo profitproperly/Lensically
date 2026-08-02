@@ -28966,10 +28966,10 @@ async function updateScheduledPostForAppUser(
     return { success: false, statusCode: 400, error: "date_and_time_must_be_provided_together" };
   }
 
-  await ensureScheduledPostsTable(env);
+    await ensureOwnerEditLearningTables(env);
   const existing = await env.DB.prepare(
     `SELECT id, status, threads_user_id, post_text, scheduled_time,
-            spoiler_all_text, spoiler_phrases_json
+            spoiler_all_text, spoiler_phrases_json, current_revision_id
      FROM scheduled_posts
      WHERE id = ?
        AND user_id = ?
