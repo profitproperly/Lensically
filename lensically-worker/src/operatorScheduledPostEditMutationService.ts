@@ -115,8 +115,9 @@ export async function editOperatorScheduledPost<TBrand, TScheduledPost extends {
     body: {
       success: true,
       scheduled_post: updated.scheduledPost,
-      linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
+            linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
       linked_draft_id: linkedDraft?.id ?? null,
+      revision: updated.revision ?? null,
     },
   };
 }
