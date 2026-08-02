@@ -18,7 +18,7 @@ export const SOURCE_TRANSFORMATION_CONTRACT_SCHEMA = {
     forbidden_complete_combinations: { type: "array", items: {}, description: "Optional source packages that cannot be reproduced together. Manifest already blocks an exact full-source copy." },
     audience_reward: { type: "string", description: "The same emotional or practical product the source delivers." },
     time_or_context_requirements: { type: "array", items: { type: "string" }, description: "Only timing or context already present in the source; do not invent new scenes or events." },
-    notes: { type: "string", description: "For Manifest, state that only slight wording changes are needed and no scenes, characters, activities, settings, events, metaphors, or premises may be invented." },
+        notes: { type: "string", description: "Source-specific context and owner guidance. Preserve its wording without prescribing a universal amount or type of change." },
   },
   additionalProperties: false,
 };
