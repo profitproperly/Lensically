@@ -7829,6 +7829,7 @@ async function getOperatorSourceCardHistory(
   brand: GptResolvedBrand,
   card: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  await ensureOwnerEditLearningTables(env);
   const familyId = normalizeOperatorText(card.family_id, 120, true);
   const family = familyId
     ? await env.DB.prepare(
