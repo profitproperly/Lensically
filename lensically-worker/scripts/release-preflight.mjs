@@ -778,12 +778,15 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 82-tool public surface and required Main Cycle dependencies")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 85-tool public surface and required Main Cycle dependencies")
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("persist_manifest_shadow_batch")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")')
+        || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getStripeAccountState")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("readStripeObjects")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("operateStripe")')
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
 }
@@ -880,7 +883,10 @@ if (!operatorMcpSchemas.includes("export const BRAND_KEY_SCHEMA")
 if (!operatorMcpConstants.includes('export const OPERATOR_WORKFLOW_TEMPLATE_KEY = "content_operator_v1"')) {
   lifecycleErrors.push("operator_mcp_shared_constants_incomplete");
 }
-if (!operatorMcpAdminRegistryTests.includes("preserves the intentional 25-name classification and 24 static definitions")
+if (!operatorMcpAdminRegistryTests.includes("preserves the intentional 28-name classification and 27 static definitions")
+        || !operatorMcpAdminRegistryTests.includes('"getStripeAccountState"')
+    || !operatorMcpAdminRegistryTests.includes('"readStripeObjects"')
+    || !operatorMcpAdminRegistryTests.includes('"operateStripe"')
     || !operatorMcpAdminRegistryTests.includes("preserves protected scheduler and decision schemas")
     || !operatorMcpAdminRegistryTests.includes("preserves workflow and gate compatibility schemas")) {
   lifecycleErrors.push("operator_mcp_admin_registry_tests_incomplete");
