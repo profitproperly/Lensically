@@ -19,6 +19,16 @@ active_interrupt_precedence: none
 
 
 
+## Resolved Interrupt — public-sales-page-account-identity-exposure-20260802
+
+- Severity: P1, resolved before further sales-page work.
+- Observed defect: the public product demonstration exposed the owner's live Threads account identity `Manifest Mental` inside `lensically-worker/public/operator/index.html`.
+- Root cause: a production-account label was reused while constructing marketing UI instead of using an explicitly fictionalized demo workspace.
+- Repair: replaced the live account identity with `Example Workspace` and labeled the surface `Sample dashboard`.
+- Scope audit: bounded complete scans of the public sales page found no `opmg`, `vectrix`, or other known Lensically account identifiers; the only exposed known account identity was the repaired `Manifest Mental` occurrence.
+- Permanent prevention: public marketing pages and screenshots may contain only Lensically product branding and explicitly fictionalized sample workspaces. Live account names, handles, post text, follower counts, operating metrics, contact identities, or customer data are prohibited from public demo UI. Every public-page release must perform a known-identity scan before deployment.
+- Tool-routing incident: a repository-wide `search_file` attempt was incorrectly invoked without the required exact path. The validated bounded known-file scan was used instead; future searches through that tool must include `path`, while multi-file audits must enumerate the bounded public file list.
+
 ## Completed Commercial Sales Page Clarity Pass — operator-sales-clarity-v4-20260802
 
 - Status: completed and deployed.
