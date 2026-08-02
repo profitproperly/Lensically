@@ -529,20 +529,20 @@ export async function runOperatorGateEngine<TStage extends string>(
       }
       continue;
     }
-    if (gateKey === "source_surface_copy_gate") {
-      if (manifestCloseMimicry) {
+        if (gateKey === "source_surface_copy_gate") {
+      if (manifestOwnerGuided) {
         results.push(exactSourceCopy
           ? buildOperatorGateResult(
             gate,
             "fail",
-            "Manifest draft exactly copies the source post.",
+            "The candidate exactly reproduces the complete source post.",
             { source_text: primarySourceText },
-            "Change a small amount of wording while preserving the hook, structure, meaning, tone, and payoff.",
+            "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
           )
           : buildOperatorGateResult(
             gate,
             "pass",
-            "Manifest draft is not an exact source copy; close source mimicry is allowed.",
+            "The active Manifest decision remains governed by source evidence and source-specific owner guidance.",
           ));
         continue;
       }
