@@ -6,13 +6,19 @@ import {
 import { BRAND_KEY_SCHEMA, SOURCE_DRAFT_ANALYSIS_SCHEMA } from "../src/operatorMcpSchemas";
 
 describe("Operator MCP admin registry", () => {
-  it("preserves the intentional 25-name classification and 24 static definitions", () => {
-    expect(OPERATOR_MCP_ADMIN_TOOL_NAMES).toHaveLength(25);
-    expect(OPERATOR_MCP_ADMIN_TOOLS).toHaveLength(24);
-    expect(new Set(OPERATOR_MCP_ADMIN_TOOL_NAMES).size).toBe(25);
-    expect(new Set(OPERATOR_MCP_ADMIN_TOOLS.map((tool) => tool.name)).size).toBe(24);
+  it("preserves the intentional 28-name classification and 27 static definitions", () => {
+    expect(OPERATOR_MCP_ADMIN_TOOL_NAMES).toHaveLength(28);
+    expect(OPERATOR_MCP_ADMIN_TOOLS).toHaveLength(27);
+    expect(new Set(OPERATOR_MCP_ADMIN_TOOL_NAMES).size).toBe(28);
+    expect(new Set(OPERATOR_MCP_ADMIN_TOOLS.map((tool) => tool.name)).size).toBe(27);
     expect(OPERATOR_MCP_ADMIN_TOOL_NAMES).toContain("get_monthly_growth_review");
-    expect(OPERATOR_MCP_ADMIN_TOOLS.map((tool) => tool.name)).not.toContain("get_monthly_growth_review");
+        expect(OPERATOR_MCP_ADMIN_TOOLS.map((tool) => tool.name)).not.toContain("get_monthly_growth_review");
+    expect(OPERATOR_MCP_ADMIN_TOOLS.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "getStripeAccountState",
+      "readStripeObjects",
+      "operateStripe",
+    ]));
+
     for (const tool of OPERATOR_MCP_ADMIN_TOOLS) {
       expect(OPERATOR_MCP_ADMIN_TOOL_NAMES).toContain(tool.name);
     }

@@ -58,8 +58,8 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-                                it("preserves the exact 82-tool public surface and required Main Cycle dependencies", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(82);
+                                it("preserves the exact 85-tool public surface and required Main Cycle dependencies", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(85);
     expect(isOperatorPublicDirectToolName("operateGitHubRepositories")).toBe(true);
     expect(isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")).toBe(true);
     expect(isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")).toBe(true);
@@ -68,7 +68,11 @@ describe("Operator MCP tool directory", () => {
     expect(isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")).toBe(true);
         expect(isOperatorPublicDirectToolName("prepare_manifest_autonomous_cycle")).toBe(true);
     expect(isOperatorPublicDirectToolName("persist_manifest_autonomous_batch")).toBe(true);
-    expect(isOperatorPublicDirectToolName("engineeringPrecheck")).toBe(true);
+        expect(isOperatorPublicDirectToolName("engineeringPrecheck")).toBe(true);
+    expect(isOperatorPublicDirectToolName("getStripeAccountState")).toBe(true);
+    expect(isOperatorPublicDirectToolName("readStripeObjects")).toBe(true);
+    expect(isOperatorPublicDirectToolName("operateStripe")).toBe(true);
+
     expect(isOperatorPublicDirectToolName("start_workflow_session")).toBe(false);
     expect(RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has("start_workflow_session")).toBe(true);
     expect(FORBIDDEN_RETIRED_TOOL_NAMES.has("routeAndExecuteLensicallyCall")).toBe(true);
