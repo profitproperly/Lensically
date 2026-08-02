@@ -32791,8 +32791,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return new Response(
         JSON.stringify({
           success: true,
-          scheduled_post: updated.scheduledPost,
+                    scheduled_post: updated.scheduledPost,
           linked_drafts_updated: updated.linkedDraftsUpdated ?? 0,
+          revision: updated.revision ?? null,
         }),
         {
           status: 200,
