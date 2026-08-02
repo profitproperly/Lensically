@@ -283,11 +283,11 @@ export async function prepareScheduledPostRevisionPlan(
          SET owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
          WHERE scheduled_post_id = ? AND threads_user_id = ?`,
       ).bind(ownerNote, input.scheduledPostId, input.threadsUserId),
-      db.prepare(
+            db.prepare(
         `UPDATE operator_autonomous_lineup_items
          SET owner_feedback = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE scheduled_post_id = ? AND threads_user_id IS NULL OR scheduled_post_id = ?`,
-      ).bind(ownerNote, input.scheduledPostId, input.scheduledPostId),
+         WHERE scheduled_post_id = ?`,
+      ).bind(ownerNote, input.scheduledPostId),
     );
   }
 
