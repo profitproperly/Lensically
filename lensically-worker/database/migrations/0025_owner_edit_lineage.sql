@@ -1,3 +1,9 @@
+-- lensically-migration-class: small-data
+-- lensically-migration-owner: operator-engineering
+-- lensically-migration-risk: medium
+
+-- Adds immutable revision lineage and performs a bounded one-time recovery of existing scheduled-post authorship.
+
 ALTER TABLE scheduled_posts ADD COLUMN current_revision_id TEXT;
 ALTER TABLE scheduled_posts ADD COLUMN published_revision_id TEXT;
 
