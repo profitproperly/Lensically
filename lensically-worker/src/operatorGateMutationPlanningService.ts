@@ -692,6 +692,7 @@ export async function runOperatorGateEngine<TStage extends string>(
           && !Array.isArray(modelResult.evidence)
           ? modelResult.evidence as Record<string, unknown>
           : {};
+                const expectedOwnerGuidanceId = ownerGuidance?.id ? String(ownerGuidance.id) : "";
         const reviewedGuidanceId = String(evidence.owner_guidance_id ?? "");
         const reviewedNoteIds = new Set(
           Array.isArray(evidence.reviewed_owner_note_ids)
