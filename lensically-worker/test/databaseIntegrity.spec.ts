@@ -30,18 +30,25 @@ describe("database integrity runtime cache", () => {
   });
 
   it("does not cache a failed probe", async () => {
-    let calls = 0;
-    const db = databaseWith(async () => {
-      calls += 1;
-      if (calls === 1) throw new Error("temporary_d1_failure");
-      return { results: [] };
-    });
+    let prepareCalls = 0;
+    const db = {
+      prepare() {
+        prepareCalls += 1;
+        if (prepareCalls === 1) throw new Error("temporary_d1_failure");
+        return {
+          async all() {
+            return { results: [] };
+          },
+        } as unknown as D1PreparedStatement;
+      },
+    } as unknown as D1Database;
 
     await expect(assertDatabaseIntegrity(db, { table: "operator_workflow_requirements", columns: ["id"] }))
       .rejects.toThrow("database_integrity_failed:operator_workflow_requirements:temporary_d1_failure");
     await expect(assertDatabaseIntegrity(db, { table: "operator_workflow_requirements", columns: ["id"] }))
       .resolves.toBeUndefined();
 
-    expect(calls).toBe(2);
+    expect(prepareCalls).toBe(2);
   });
 });
+
