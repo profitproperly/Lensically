@@ -10115,10 +10115,10 @@ async function applyManifestContentFocusToPool(
             focus_status: focusStatus,
       focus_weight: focusStatus === "hold" ? 0 : 1,
 
-      autonomous_role: lifetimeLabel,
+            autonomous_role: lifetimeLabel,
       autonomous_recommended_role: lifetimeLabel,
-      actual_decay: candidate.recent_label === "cooling" || candidate.recent_label === "cold",
-      portfolio_reason: `Deterministic ${SOURCE_FAMILY_LABEL_POLICY_VERSION} lifetime and rolling-28-day evidence state.`,
+      actual_decay: false,
+      portfolio_reason: `Deterministic ${SOURCE_FAMILY_LABEL_POLICY_VERSION} unified lifecycle, confidence-adjusted rank, and continuous recency weighting.`, 
     };
   });
 }
