@@ -599,17 +599,17 @@ export async function refreshSourceFamilyLabels(
         probability_below_underperformance_floor = excluded.probability_below_underperformance_floor,
         state_json = excluded.state_json,
         updated_at = CURRENT_TIMESTAMP`,
-    ).bind(
+        ).bind(
       crypto.randomUUID(), brandKey, familyId, sourceIdentityKey, SOURCE_FAMILY_LABEL_POLICY_VERSION,
-      lifetime.label, recent.label, lifetime.confidence_label, lifetimeLikes.length, recentLikes.length,
-      accountLifetimeMedian, accountRecentMedian, familyLifetimeMedian, familyRecentMedian,
-      lifetime.median_index, recent.median_index, recent.latest_two_index,
+      lifetime.label, "no_recent_data", lifetime.confidence_label, lifetimeLikes.length, 0,
+      accountLifetimeMedian, 0, familyLifetimeMedian, null,
+      lifetime.unified_rating, null, null,
       lifetime.probability_above_median, lifetime.probability_above_franchise_floor,
       lifetime.probability_below_underperformance_floor, JSON.stringify(state),
     ));
     const previousLifetime = previous ? String(previous.lifetime_label ?? "") : null;
     const previousRecent = previous ? String(previous.recent_label ?? "") : null;
-    if (previousLifetime !== lifetime.label || previousRecent !== recent.label) {
+    if (previousLifetime !== lifetime.label) {
       transitionStatements.push(db.prepare(
         `INSERT INTO operator_source_family_label_transitions (
           id, brand_key, source_card_family_id, source_identity_key, label_policy_version,
@@ -617,7 +617,7 @@ export async function refreshSourceFamilyLabels(
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         crypto.randomUUID(), brandKey, familyId, sourceIdentityKey, SOURCE_FAMILY_LABEL_POLICY_VERSION,
-        previousLifetime, lifetime.label, previousRecent, recent.label, JSON.stringify(state),
+        previousLifetime, lifetime.label, previousRecent, "no_recent_data", JSON.stringify(state),
       ));
     }
   }
@@ -627,13 +627,13 @@ export async function refreshSourceFamilyLabels(
   for (let index = 0; index < transitionStatements.length; index += 50) {
     await db.batch(transitionStatements.slice(index, index + 50));
   }
-  return {
+    return {
     policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
-        family_count: eligibleFamilyRows.length,
+    family_count: eligibleFamilyRows.length,
     mature_account_post_count: accountLifetimeLikes.length,
-    recent_account_post_count: accountRecentLikes.length,
     account_lifetime_median_likes: accountLifetimeMedian,
-    account_28d_median_likes: accountRecentMedian,
+    recent_classification_retired: true,
+    continuous_recency_weighting: true,
     label_counts: labelCounts,
     transition_count: transitionStatements.length,
   };
