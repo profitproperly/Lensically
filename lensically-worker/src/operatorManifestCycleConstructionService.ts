@@ -237,10 +237,12 @@ export async function constructOperatorManifestAutonomousCycle(
   const operationId = explicitOperationId
     ?? `${brandKey}:autonomous-runway:${local.date}:${String(local.hour).padStart(2, "0")}`;
   const targetSlots = dependencies.buildTargetSlots(local.date, local.hour, horizonHours);
-  const coverage = await dependencies.buildCoverage(targetSlots, timezone, effectiveNowMs);
+    const [coverage, deliveryReconciliation] = await Promise.all([
+    dependencies.buildCoverage(targetSlots, timezone, effectiveNowMs),
+    dependencies.reconcileDelivery(timezone, effectiveNowMs),
+    dependencies.ensureRequiredSchemas(),
+  ]);
   const missingSlots = targetSlots.filter((slot) => !coverage.occupied.has(slot.key));
-  const deliveryReconciliation = await dependencies.reconcileDelivery(timezone, effectiveNowMs);
-  await dependencies.ensureRequiredSchemas();
 
   const performanceEvaluation = record(boundedThreadsSnapshot.performance_evaluation);
     const readySnapshotReused = performanceEvaluation.ready_snapshot_reused === true;
@@ -269,6 +271,14 @@ export async function constructOperatorManifestAutonomousCycle(
       : "Autonomous preparation refreshed bounded live Threads evidence, persisted every currently due maturity checkpoint, and recomputed evaluator intelligence before strategy consumption.",
   };
 
+    const accountPositionPromise = dependencies.buildAccountPosition({
+    targetSlots,
+    coverage,
+    clock,
+    threadsSnapshot: boundedThreadsSnapshot,
+    deliveryReconciliation,
+  });
+  const existingCyclePromise = dependencies.readExistingCycle(operationId, brandKey);
   const patternStates = await dependencies.readSavedPatternStates(accountId, brandKey);
   const qualifiedPatternCount = Number(patternStates.qualified?.total ?? 0);
   const derivedPatternCount = Number(patternStates.derived?.total ?? 0);
@@ -330,19 +340,14 @@ export async function constructOperatorManifestAutonomousCycle(
     strategy_change_warranted: decisionIntelligence.strategy_change_warranted === true,
     consumption_contract: decisionIntelligence.consumption_contract ?? {},
   };
-        const accountPosition = await dependencies.buildAccountPosition({
-    targetSlots,
-    coverage,
-    clock,
-    threadsSnapshot: boundedThreadsSnapshot,
-    deliveryReconciliation,
-  });
+          const [accountPosition, existing] = await Promise.all([
+    accountPositionPromise,
+    existingCyclePromise,
+  ]);
   const persistedAccountPosition = dependencies.compactPersistedValue(
     accountPosition,
     "manifest_cycle.account_position",
   );
-
-  const existing = await dependencies.readExistingCycle(operationId, brandKey);
   const cycleId = existing?.id ?? dependencies.createId();
   const cycleStatus = missingSlots.length > 0 ? "prepared" : "completed";
   const defaultHorizonKey = `${local.date}T${dependencies.hourlySlot(local.hour + 1)}`;
@@ -362,11 +367,14 @@ export async function constructOperatorManifestAutonomousCycle(
     accountPosition: persistedAccountPosition,
   });
 
-      let lockedSourceSelectionPlan = await dependencies.readLockedSourceSelectionPlan(brandKey, cycleId);
+        const [initialLockedSourceSelectionPlan, sourceExclusions] = await Promise.all([
+    dependencies.readLockedSourceSelectionPlan(brandKey, cycleId),
+    missingSlots.length > 0
+      ? dependencies.loadSourceExclusions(brandKey)
+      : Promise.resolve([]),
+  ]);
+  let lockedSourceSelectionPlan = initialLockedSourceSelectionPlan;
   const currentMissingSlotKeys = missingSlots.map((slot) => slot.key);
-  const sourceExclusions = missingSlots.length > 0
-    ? await dependencies.loadSourceExclusions(brandKey)
-    : [];
   const excludedIdentities = new Set(sourceExclusions.map(String));
   const planMatchesCurrentHorizon = (plan: JsonRecord[]) => {
     const planSlotKeys = plan.map((row) => String(row.slot_key ?? ""));
@@ -420,18 +428,19 @@ export async function constructOperatorManifestAutonomousCycle(
     }
   }
 
-  const rollingEvidence = await dependencies.buildRollingEvidence({
-    cycle_id: cycleId,
-    as_of: clock.effective_now_iso,
-    effective_now_ms: effectiveNowMs,
-    timezone,
-    future_schedule: coverage.scheduled_records.map((recordItem) => ({ ...recordItem })),
-  });
+    const [rollingEvidence, intelligencePolicy, latestStrategyVersion] = await Promise.all([
+    dependencies.buildRollingEvidence({
+      cycle_id: cycleId,
+      as_of: clock.effective_now_iso,
+      effective_now_ms: effectiveNowMs,
+      timezone,
+      future_schedule: coverage.scheduled_records.map((recordItem) => ({ ...recordItem })),
+    }),
+    dependencies.ensureIntelligencePolicy(brandKey),
+    dependencies.getLatestStrategyVersion(brandKey),
+  ]);
   const evidenceSnapshot = record(rollingEvidence.snapshot);
-  await dependencies.attachEvidenceSnapshot(cycleId, brandKey, evidenceSnapshot.id ?? null);
-
-  const intelligencePolicy = await dependencies.ensureIntelligencePolicy(brandKey);
-  const inputStrategyVersion = (await dependencies.getLatestStrategyVersion(brandKey)) ?? {
+  const inputStrategyVersion = latestStrategyVersion ?? {
     id: null,
     strategy: null,
     status: "legacy_strategy_unavailable",
@@ -439,16 +448,19 @@ export async function constructOperatorManifestAutonomousCycle(
   const recentEvidence = record(evidenceSnapshot.recent_exposure);
   const publishedExposure = asRecords(recentEvidence.posts);
   const scheduledExposure = coverage.scheduled_records.map((recordItem) => ({ ...recordItem }));
-  const exposureSnapshot = await dependencies.createExposureSnapshot({
-    cycleId,
-    brandKey,
-    asOf: clock.effective_now_iso,
-    timezone,
-    horizonStartLocal: targetSlots[0]?.key ?? null,
-    horizonEndLocal: targetSlots[targetSlots.length - 1]?.key ?? null,
-    published: publishedExposure,
-    scheduled: scheduledExposure,
-  });
+  const [, exposureSnapshot] = await Promise.all([
+    dependencies.attachEvidenceSnapshot(cycleId, brandKey, evidenceSnapshot.id ?? null),
+    dependencies.createExposureSnapshot({
+      cycleId,
+      brandKey,
+      asOf: clock.effective_now_iso,
+      timezone,
+      horizonStartLocal: targetSlots[0]?.key ?? null,
+      horizonEndLocal: targetSlots[targetSlots.length - 1]?.key ?? null,
+      published: publishedExposure,
+      scheduled: scheduledExposure,
+    }),
+  ]);
     const rollingMaturityRefresh = record(rollingEvidence.maturity_refresh);
   const persistedHorizonPlan = dependencies.compactPersistedValue({
     target_slots: targetSlots,
@@ -531,10 +543,12 @@ export async function constructOperatorManifestAutonomousCycle(
       effective_now_iso: clock.effective_now_iso,
     },
   });
-  if (phasedPreparation && explicitOperationId) {
-    await dependencies.clearPrepareCheckpoint(brandKey, explicitOperationId);
-  }
-  const preparedCycle = await dependencies.readPreparedCycle(brandKey, cycleId);
+    const [preparedCycle] = await Promise.all([
+    dependencies.readPreparedCycle(brandKey, cycleId),
+    phasedPreparation && explicitOperationId
+      ? dependencies.clearPrepareCheckpoint(brandKey, explicitOperationId)
+      : Promise.resolve(undefined),
+  ]);
 
   const strategyRequired = missingSlots.length > 0 && lockedSourceSelectionPlan.length > 0;
   const nextAction = strategyRequired

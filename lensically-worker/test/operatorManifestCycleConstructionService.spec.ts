@@ -12,6 +12,14 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function normalizeText(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().slice(0, maxLength);
@@ -484,6 +492,72 @@ describe("Operator Manifest cycle construction service", () => {
       },
     });
     expect(String(result.next_action)).toContain("prepared horizon is covered");
+  });
+
+      it("overlaps independent construction reads without crossing dependency boundaries", async () => {
+    const { dependencies, mocks } = createHarness();
+    const coverage = deferred<{
+      occupied: Map<string, JsonRecord>;
+      scheduled_records: JsonRecord[];
+    }>();
+    const patternStates = deferred<{
+      qualified: { total: number; latest_updated_at: string };
+      derived: { total: number; latest_source_updated_at: string };
+    }>();
+    const rollingEvidence = deferred<JsonRecord>();
+    const evidenceAttachment = deferred<void>();
+
+    mocks.buildCoverage.mockReturnValueOnce(coverage.promise);
+    mocks.readSavedPatternStates.mockReturnValueOnce(patternStates.promise);
+    mocks.buildRollingEvidence.mockReturnValueOnce(rollingEvidence.promise);
+    mocks.attachEvidenceSnapshot.mockReturnValueOnce(evidenceAttachment.promise);
+
+    const construction = constructOperatorManifestAutonomousCycle(input, dependencies);
+
+    await vi.waitFor(() => {
+      expect(mocks.reconcileDelivery).toHaveBeenCalledTimes(1);
+      expect(mocks.ensureRequiredSchemas).toHaveBeenCalledTimes(1);
+    });
+    expect(mocks.readSavedPatternStates).not.toHaveBeenCalled();
+
+    coverage.resolve({
+      occupied: new Map<string, JsonRecord>(),
+      scheduled_records: [],
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.readSavedPatternStates).toHaveBeenCalledTimes(1);
+      expect(mocks.buildAccountPosition).toHaveBeenCalledTimes(1);
+      expect(mocks.readExistingCycle).toHaveBeenCalledTimes(1);
+    });
+
+    patternStates.resolve({
+      qualified: { total: 2, latest_updated_at: "2026-07-27T18:00:00Z" },
+      derived: { total: 1, latest_source_updated_at: "2026-07-26T18:00:00Z" },
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.buildRollingEvidence).toHaveBeenCalledTimes(1);
+      expect(mocks.ensureIntelligencePolicy).toHaveBeenCalledTimes(1);
+      expect(mocks.getLatestStrategyVersion).toHaveBeenCalledTimes(1);
+    });
+
+    rollingEvidence.resolve({
+      snapshot: {
+        id: "evidence-1",
+        page_count: 3,
+        recent_exposure: { posts: [{ id: "published-1" }] },
+      },
+      maturity_refresh: { refreshed: true },
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.attachEvidenceSnapshot).toHaveBeenCalledTimes(1);
+      expect(mocks.createExposureSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    evidenceAttachment.resolve(undefined);
+    await construction;
   });
 
     it("bounds oversized evidence snapshot metadata before D1 persistence", () => {
