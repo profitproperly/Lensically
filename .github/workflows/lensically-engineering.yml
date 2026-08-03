@@ -688,7 +688,7 @@ jobs:
               cycles_page_ok=true
             fi
             if curl --fail-with-body --silent --show-error "https://lensically.com/site.webmanifest" > /tmp/lensically-site.webmanifest \
-              && jq -e '.cycles_contract == "cycles-glossary-v1"' /tmp/lensically-site.webmanifest > /dev/null; then
+              && jq -e '.cycles_contract == "unified-source-ranking-v2"' /tmp/lensically-site.webmanifest > /dev/null; then
               cycles_contract_ok=true
             fi
 

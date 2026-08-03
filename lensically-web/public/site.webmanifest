@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#ffffff",
     "theme_color": "#ffffff",
-  "cycles_contract": "cycles-glossary-v1",
+  "cycles_contract": "unified-source-ranking-v2",
   "icons": [
 
     {

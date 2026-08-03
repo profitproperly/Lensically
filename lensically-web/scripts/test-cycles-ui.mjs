@@ -27,14 +27,19 @@ assert.match(page, /Show all/, "Cycle details must start compact and expose Show
 assert.match(page, /toggleSelectionDetail/, "Selection details must be expansion-driven");
 assert.match(page, /Scheduled output and source evidence/, "Main Cycle must separate scheduled output from source evidence");
 assert.match(page, /Source used:/, "Main Cycle rows must identify the locked source separately");
-assert.match(page, /How to read this page/, "Cycles must include a visible plain-English glossary");
-assert.equal(manifest.cycles_contract, "cycles-glossary-v1", "Deployed web manifest must identify the Cycles glossary contract");
+assert.match(page, /How source selection works/, "Cycles must include a visible plain-English source-selection glossary");
+assert.equal(manifest.cycles_contract, "unified-source-ranking-v2", "Deployed web manifest must identify the unified source-ranking contract");
 
-assert.match(page, /Proven mechanism, untested source/, "Glossary must explain mechanism and exact-source scope separately");
-assert.match(page, /Selection lane:/, "Cycle badges must use plain-English selection-lane wording");
-assert.match(page, /Exact-source status:/, "Cycle badges must identify exact-source scope explicitly");
+assert.match(page, /Exact source-card family/, "Glossary must define the exact Saved Pattern lineage scope");
+assert.match(page, /Unified rating/, "Cycles must explain and display the unified rating");
+assert.match(page, /Lifecycle:/, "Cycle badges must expose the single lifecycle vocabulary");
+assert.match(page, /Lane:/, "Cycle badges must expose Exploit, Develop, or Explore");
+assert.match(page, /No cooldown penalty/, "Glossary must state that winners are not suppressed by a cooldown");
+assert.doesNotMatch(page, /Proven mechanism, untested source/, "Cycles must not introduce a mechanism-family ranking layer");
+assert.doesNotMatch(page, /Recent label/, "Cycles must not expose the retired Hot or Cooling classification system");
+assert.doesNotMatch(page, /72-hour cooldown/, "Cycles must not describe the retired hard cooldown as active");
 assert.doesNotMatch(page, /Source allocation:/, "Cycles must not expose the ambiguous Source allocation badge wording");
-assert.doesNotMatch(page, /<KeyValue label="Family state"/, "Exact-source status must not be presented as broad family performance");
+assert.doesNotMatch(page, /Exact-source status:/, "Cycles must not expose a competing audition-status badge");
 assert.doesNotMatch(page, /\bCompare\b/, "Cycles must not include a Compare surface");
 
 assert.doesNotMatch(page, /dropdown|submenu|chevron/i, "Cycles must not introduce dropdown behavior");
