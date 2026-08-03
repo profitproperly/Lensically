@@ -1557,14 +1557,77 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     slot_keys: ["2026-01-03T00:00"],
     seed: "pending-evidence",
   });
-  const selectedWinnerCounts = mixedSelection.selected.reduce<Record<string, number>>((counts, candidate) => {
+    const selectedWinnerCounts = mixedSelection.selected.reduce<Record<string, number>>((counts, candidate) => {
     const identity = String(candidate.source_identity_key ?? "");
     if (identity.startsWith("winner-")) counts[identity] = Number(counts[identity] ?? 0) + 1;
     return counts;
   }, {});
+  const developmentFairnessSelection = selectSourceFamilyLineup({
+    candidates: [
+      {
+        source_identity_key: "develop-needs-evidence",
+        source_card_id: "develop-needs-evidence-card",
+        source_card_family_id: "develop-needs-evidence-family",
+        lifetime_label: "prospect",
+        lifetime_sample_size: 1,
+        unified_rating: 1.05,
+        ranking_score: 1,
+        lifetime_index: 1.05,
+        historical_opportunity_count: 1,
+        hours_since_last_use: 720,
+        uses_24h: 0,
+      },
+      {
+        source_identity_key: "develop-many-opportunities",
+        source_card_id: "develop-many-opportunities-card",
+        source_card_family_id: "develop-many-opportunities-family",
+        lifetime_label: "prospect",
+        lifetime_sample_size: 5,
+        unified_rating: 1.45,
+        ranking_score: 1.4,
+        lifetime_index: 1.45,
+        historical_opportunity_count: 5,
+        hours_since_last_use: 24,
+        uses_24h: 0,
+      },
+    ],
+    slot_keys: ["2026-01-04T00:00"],
+    seed: "development-fairness",
+  });
+  const explorationFairnessSelection = selectSourceFamilyLineup({
+    candidates: [
+      {
+        source_identity_key: "explore-never-used",
+        source_card_id: "explore-never-used-card",
+        source_card_family_id: "explore-never-used-family",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        historical_opportunity_count: 0,
+        hours_since_last_use: null,
+        uses_24h: 0,
+      },
+      {
+        source_identity_key: "explore-used-three-times",
+        source_card_id: "explore-used-three-times-card",
+        source_card_family_id: "explore-used-three-times-family",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        historical_opportunity_count: 3,
+        hours_since_last_use: 720,
+        uses_24h: 0,
+      },
+    ],
+    slot_keys: ["2026-01-05T00:00"],
+    seed: "exploration-fairness",
+  });
   const assertions = {
-    one_breakout_enters_development: oneBreakout.label === "prospect" && oneBreakout.selection_lane === "develop",
+        one_breakout_enters_development: oneBreakout.label === "prospect" && oneBreakout.selection_lane === "develop",
     repeated_winners_franchise: repeatedWinners.label === "franchise" && repeatedWinners.selection_lane === "exploit",
+    unequal_sample_rank_is_conservative: oneBreakout.ranking_score < repeatedWinners.ranking_score,
     viral_plus_failures_not_winner: viralPlusFailures.label === "underperforming",
     repeated_losers_underperforming: repeatedLosers.label === "underperforming",
     recent_classification_retired: recentRetired.label === "no_recent_data",
@@ -1573,7 +1636,11 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     new_account_explores_all: new Set(newAccountSelection.selected.map((item) => item.source_identity_key)).size === 24,
     winner_reuse_allowed: mixedSelection.selected.filter((item) => String(item.source_identity_key).startsWith("winner-")).length === 5,
     qualified_winners_covered_before_repeat: Object.keys(selectedWinnerCounts).length === 3,
-    pending_unresolved_source_waits: pendingSelection.selected[0]?.source_identity_key === "fresh-untested",
+        pending_unresolved_source_waits: pendingSelection.selected[0]?.source_identity_key === "fresh-untested",
+    development_evidence_debt_prevents_starvation:
+      developmentFairnessSelection.selected[0]?.source_identity_key === "develop-needs-evidence",
+    exploration_fewest_opportunities_first:
+      explorationFairnessSelection.selected[0]?.source_identity_key === "explore-never-used",
     deterministic_replay: JSON.stringify(newAccountSelection.receipts) === JSON.stringify(selectSourceFamilyLineup({
       candidates: newAccountCandidates,
       slot_keys: newAccountSlots,
@@ -1590,8 +1657,10 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
       repeatedLosers,
       recentRetired,
       laneTargets16,
-      laneTargets33,
+            laneTargets33,
       selectedWinnerCounts,
+      developmentFairnessSelection: developmentFairnessSelection.receipts,
+      explorationFairnessSelection: explorationFairnessSelection.receipts,
     },
   };
 }
