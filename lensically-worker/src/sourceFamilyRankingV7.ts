@@ -40,7 +40,7 @@ const OBSERVATION_VARIANCE = 0.25;
 const RANKING_CONFIDENCE_Z = 1.2815515655446004;
 const RECENCY_HALF_LIFE_DAYS = 90;
 const MINIMUM_HISTORICAL_WEIGHT = 0.2;
-const PASS_FLOOR = 0.85;
+const PASS_FLOOR = 1;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
