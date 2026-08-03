@@ -511,8 +511,19 @@ export async function refreshSourceFamilyLabels(
       return 0;
     }
   };
-  const accountLifetimeLikes = (accountRows.results ?? []).map(likesFromRow);
+    const accountTimeline = [...(accountRows.results ?? [])].sort((left, right) =>
+    String(left.posted_at ?? left.captured_at).localeCompare(String(right.posted_at ?? right.captured_at))
+  );
+  const accountLifetimeLikes = accountTimeline.map(likesFromRow);
   const accountLifetimeMedian = median(accountLifetimeLikes) ?? 0;
+  const rollingBaselineByPostId = new Map<string, number>();
+  for (let index = 0; index < accountTimeline.length; index += 1) {
+    const window = accountTimeline.slice(Math.max(0, index - 39), index + 1).map(likesFromRow);
+    rollingBaselineByPostId.set(
+      String(accountTimeline[index].published_post_id ?? ""),
+      median(window) ?? accountLifetimeMedian,
+    );
+  }
   const evidenceByFamily = new Map<string, Record<string, unknown>[]>();
   for (const row of evidenceRows.results ?? []) {
     const familyId = String(row.source_card_family_id ?? "");
@@ -531,8 +542,11 @@ export async function refreshSourceFamilyLabels(
     const rows = (evidenceByFamily.get(familyId) ?? []).sort((left, right) =>
       String(left.posted_at ?? left.captured_at).localeCompare(String(right.posted_at ?? right.captured_at))
     );
-        const lifetimeLikes = rows.map(likesFromRow);
-    const lifetimeIndexes = lifetimeLikes.map((likes) => normalizedIndex(likes, accountLifetimeMedian));
+            const lifetimeLikes = rows.map(likesFromRow);
+    const lifetimeIndexes = rows.map((row) => normalizedIndex(
+      likesFromRow(row),
+      rollingBaselineByPostId.get(String(row.published_post_id ?? "")) ?? accountLifetimeMedian,
+    ));
     const ageDays = rows.map((row) => {
       const observedMs = parseTimeMs(row.posted_at ?? row.captured_at);
       return observedMs === null ? 0 : Math.max(0, (nowMs - observedMs) / 86400000);
@@ -564,6 +578,11 @@ export async function refreshSourceFamilyLabels(
         probability_above_median: lifetime.probability_above_median,
         probability_above_franchise_floor: lifetime.probability_above_franchise_floor,
         probability_below_underperformance_floor: lifetime.probability_below_underperformance_floor,
+      },
+            normalization_contract: {
+        maturity_horizon_hours: 24,
+        account_baseline: "rolling_previous_40_matured_posts_including_current",
+        comparable_across_account_growth: true,
       },
       recent_classification: "retired",
       confidence_label: lifetime.confidence_label,
@@ -633,7 +652,8 @@ export async function refreshSourceFamilyLabels(
     mature_account_post_count: accountLifetimeLikes.length,
     account_lifetime_median_likes: accountLifetimeMedian,
     recent_classification_retired: true,
-    continuous_recency_weighting: true,
+        continuous_recency_weighting: true,
+    normalization_contract: "rolling_40_matured_account_median_at_observation",
     label_counts: labelCounts,
     transition_count: transitionStatements.length,
   };
