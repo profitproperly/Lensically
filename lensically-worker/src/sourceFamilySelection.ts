@@ -262,6 +262,7 @@ function confidenceLabel(probabilities: number[]): SourceFamilyConfidenceLabel {
 
 export function classifySourceFamilyLifetime(input: {
   indexes: number[];
+  age_days?: number[];
 }): {
   label: SourceFamilyLifetimeLabel;
   audition_state: SourceFamilyAuditionState;
@@ -270,81 +271,53 @@ export function classifySourceFamilyLifetime(input: {
   audition_opportunities_remaining: number;
   graduated: boolean;
   median_index: number | null;
+  unified_rating: number;
+  ranking_score: number;
+  effective_sample_size: number;
+  selection_lane: UnifiedSelectionLane;
   probability_above_median: number;
   probability_above_franchise_floor: number;
   probability_below_underperformance_floor: number;
   confidence_label: SourceFamilyConfidenceLabel;
 } {
   const indexes = input.indexes.filter(Number.isFinite).map((value) => Math.max(0, value));
-  if (!indexes.length) {
-    return {
-      label: "untested",
-      audition_state: "untested",
-      audition_passes: 0,
-      audition_failures: 0,
-      audition_opportunities_remaining: 2,
-      graduated: false,
-      median_index: null,
-      probability_above_median: 0.5,
-      probability_above_franchise_floor: 0.5,
-      probability_below_underperformance_floor: 0.5,
-      confidence_label: "low",
-    };
-  }
-  const medianIndex = median(indexes) ?? 1;
-  const aboveMedian = posteriorThresholdProbability(indexes, 1, "above");
-  const aboveFranchiseFloor = posteriorThresholdProbability(indexes, 1.25, "above");
-  const belowUnderperformanceFloor = posteriorThresholdProbability(indexes, 0.85, "below");
-  const auditionIndexes = indexes.slice(0, 3);
-  const auditionPasses = auditionIndexes.filter((value) => value >= 0.85).length;
-  const auditionFailures = auditionIndexes.length - auditionPasses;
-  let auditionState: SourceFamilyAuditionState;
-  let auditionOpportunitiesRemaining = 0;
-  let graduated = false;
-  if (indexes.length === 1) {
-    auditionState = indexes[0] >= 0.85 ? "provisional_pass" : "probation";
-    auditionOpportunitiesRemaining = 1;
-  } else if (indexes.length === 2) {
-    if (auditionPasses === 2) {
-      auditionState = "graduated";
-      graduated = true;
-    } else if (auditionFailures === 2) {
-      auditionState = "underperforming";
-    } else {
-      auditionState = "tiebreaker";
-      auditionOpportunitiesRemaining = 1;
-    }
-  } else if (auditionPasses >= 2) {
-    auditionState = "graduated";
-    graduated = true;
-  } else {
-    auditionState = "underperforming";
-  }
-    let label: SourceFamilyLifetimeLabel = "untested";
-  if (auditionState === "underperforming") label = "underperforming";
-  else if (!graduated && auditionPasses > 0) {
-    label = medianIndex >= 1.15 ? "emerging" : "prospect";
-  } else if (graduated) {
-    label = "prospect";
-    if (medianIndex < 0.85) label = "underperforming";
-    else if (medianIndex >= 1.5 && aboveFranchiseFloor >= 0.9) label = "franchise";
-    else if (aboveMedian >= 0.8) label = "proven";
-    else if (medianIndex >= 1.15) label = "emerging";
-  }
-
-  if (label === "underperforming") auditionState = "underperforming";
+  const unified = classifyUnifiedSourceFamily(indexes.map((index, position) => ({
+    index,
+    age_days: input.age_days?.[position] ?? 0,
+  })));
+  const label = unified.lifecycle_label as SourceFamilyLifetimeLabel;
+  const auditionState: SourceFamilyAuditionState = label === "untested"
+    ? "untested"
+    : label === "probation"
+      ? "probation"
+      : label === "tiebreaker"
+        ? "tiebreaker"
+        : label === "underperforming"
+          ? "underperforming"
+          : indexes.length === 1
+            ? "provisional_pass"
+            : "graduated";
+  const auditionOpportunitiesRemaining = label === "untested"
+    ? 2
+    : label === "probation" || label === "tiebreaker" || indexes.length === 1
+      ? 1
+      : 0;
   return {
     label,
     audition_state: auditionState,
-    audition_passes: auditionPasses,
-    audition_failures: auditionFailures,
+    audition_passes: unified.pass_count,
+    audition_failures: unified.failure_count,
     audition_opportunities_remaining: auditionOpportunitiesRemaining,
-    graduated: graduated && label !== "underperforming",
-    median_index: medianIndex,
-    probability_above_median: aboveMedian,
-    probability_above_franchise_floor: aboveFranchiseFloor,
-    probability_below_underperformance_floor: belowUnderperformanceFloor,
-    confidence_label: confidenceLabel([aboveMedian, aboveFranchiseFloor, belowUnderperformanceFloor]),
+    graduated: ["emerging", "proven", "franchise"].includes(label) || (label === "prospect" && indexes.length >= 2),
+    median_index: indexes.length ? unified.raw_weighted_index : null,
+    unified_rating: unified.unified_rating,
+    ranking_score: unified.ranking_score,
+    effective_sample_size: unified.effective_sample_size,
+    selection_lane: unified.selection_lane,
+    probability_above_median: unified.probability_above_median,
+    probability_above_franchise_floor: unified.probability_above_franchise_floor,
+    probability_below_underperformance_floor: unified.probability_below_underperformance_floor,
+    confidence_label: unified.confidence_label,
   };
 }
 
