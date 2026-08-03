@@ -133,12 +133,18 @@ type SelectionRow = {
   scheduled_post_id?: number | null;
   scheduled_post_status?: string | null;
   source_history_scope?: string | null;
-  family_state?: string | null;
+    family_state?: string | null;
+  lifecycle_label?: string | null;
   audition_state?: string | null;
   allocation_tier?: string | null;
+  selection_lane?: string | null;
   lifetime_label?: string | null;
   recent_label?: string | null;
   confidence_label?: string | null;
+  matured_result_count?: number | null;
+  unified_rating?: number | null;
+  ranking_score?: number | null;
+  global_rank?: number | null;
   score?: number | null;
   engine_version?: string | null;
   preselection_policy_version?: string | null;
@@ -275,44 +281,68 @@ const EXECUTION_MODE_COPY: Record<string, { label: string; description: string }
 };
 
 const ALLOCATION_COPY: Record<string, { label: string; description: string }> = {
+  exploit: {
+    label: "Exploit",
+    description: "Proven and Franchise source families compete for engagement-focused distribution and may earn repeated placements.",
+  },
   winner: {
-    label: "Winner lane",
-    description: "The exact source identity has enough account evidence to be treated as proven or franchise-level.",
+    label: "Exploit",
+    description: "Legacy receipt name for the Exploit lane.",
+  },
+  develop: {
+    label: "Develop",
+    description: "Probation, Tiebreaker, Prospect, and Emerging families receive evidence-resolving opportunities.",
   },
   development: {
-    label: "Development lane",
-    description: "The exact source identity has encouraging evidence but has not fully earned winner status.",
+    label: "Develop",
+    description: "Legacy receipt name for the Develop lane.",
+  },
+  explore: {
+    label: "Explore",
+    description: "Untested source families receive their first fair opportunity to produce account evidence.",
   },
   exploration: {
-    label: "Evidence-building lane",
-    description: "The exact source identity needs more account evidence. This does not mean the broader hook, mechanism, or format is new.",
+    label: "Explore",
+    description: "Legacy receipt name for the Explore lane.",
+  },
+  bench: {
+    label: "Bench",
+    description: "Underperforming source families receive no normal distribution.",
   },
 };
 
-const EXACT_SOURCE_STATUS_COPY: Record<string, { label: string; description: string }> = {
+const LIFECYCLE_COPY: Record<string, { label: string; description: string }> = {
   untested: {
-    label: "No exact-source results yet",
-    description: "No matured Manifest Mental result is linked to this exact Saved Pattern identity.",
+    label: "Untested",
+    description: "No matured Manifest Mental result is linked to this exact source-card family yet.",
   },
   probation: {
-    label: "One weak result",
-    description: "The exact source has one failed audition result and one remaining chance before it is benched.",
-  },
-  provisional_pass: {
-    label: "One positive result",
-    description: "The exact source has one passing result and needs another result to graduate.",
+    label: "Probation",
+    description: "One weak matured result. One evidence opportunity remains before normal distribution is removed.",
   },
   tiebreaker: {
-    label: "One pass, one fail",
-    description: "The exact source needs one more result to determine whether it graduates or is benched.",
+    label: "Tiebreaker",
+    description: "The early evidence is mixed and one more matured result is needed to resolve it.",
   },
-  graduated: {
-    label: "Exact source graduated",
-    description: "The exact source earned at least two passing audition results.",
+  prospect: {
+    label: "Prospect",
+    description: "Early positive or inconclusive evidence deserves continued development but is not yet reliable.",
+  },
+  emerging: {
+    label: "Emerging",
+    description: "Repeated positive evidence is building, but the family has not yet reached Proven reliability.",
+  },
+  proven: {
+    label: "Proven",
+    description: "The family has reliable evidence that it outperforms the account baseline.",
+  },
+  franchise: {
+    label: "Franchise",
+    description: "The family currently has elite, reliable performance and competes near the top of the source pool.",
   },
   underperforming: {
-    label: "Exact source underperforming",
-    description: "The exact source accumulated enough weak results to be suppressed or benched.",
+    label: "Underperforming",
+    description: "The family has resolved negative evidence and is benched from normal selection.",
   },
 };
 
@@ -330,17 +360,17 @@ function allocationCopy(value: string | null | undefined) {
   };
 }
 
-function exactSourceStatusCopy(value: string | null | undefined) {
-  return EXACT_SOURCE_STATUS_COPY[String(value ?? "")] ?? {
+function lifecycleCopy(value: string | null | undefined) {
+  return LIFECYCLE_COPY[String(value ?? "")] ?? {
     label: titleCase(value),
-    description: "The audition status of this exact Saved Pattern identity only.",
+    description: "The current lifecycle classification of this exact source-card family.",
   };
 }
 
 function filterLabel(value: string): string {
   return EXECUTION_MODE_COPY[value]?.label
     ?? ALLOCATION_COPY[value]?.label
-    ?? EXACT_SOURCE_STATUS_COPY[value]?.label
+    ?? LIFECYCLE_COPY[value]?.label
     ?? titleCase(value);
 }
 
