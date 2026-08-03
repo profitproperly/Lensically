@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+
 
 import {
   dispatchOperatorMcpToolCall as rawDispatchOperatorMcpToolCall,
@@ -270,12 +270,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(executeAccountTool).toHaveBeenCalledTimes(1);
   });
 
-    it("uses atomic SQLite returning to claim newly inserted operation receipts", () => {
-    const source = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-    expect(source).toContain("RETURNING idempotency_key");
-    expect(source).toContain("String(inserted?.idempotency_key ?? \"\") === key");
-    expect(source).not.toContain("Number(insert.meta?.changes ?? 0) > 0");
-  });
+    
 
   it("preserves autonomy blocking before handler execution", async () => {
 

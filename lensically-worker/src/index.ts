@@ -58,7 +58,12 @@ import {
 } from "./humanFreeAutonomy";
 
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import {
+  OPERATOR_OPERATION_RECEIPT_INSERT_SQL,
+  operatorOperationReceiptInsertCreated,
+} from "./operatorOperationReceiptInsert";
 import { readCycleObservability } from "./cycleObservabilityService";
+
 import {
     OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
@@ -18509,12 +18514,8 @@ async function beginOperatorOperationReceipt(
     }
     return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created: false };
   }
-    const inserted = await env.DB.prepare(
-    `INSERT OR IGNORE INTO operator_operation_receipts (
-      idempotency_key, brand_key, workflow_session_id, operation_type, tool_name, request_fingerprint, status
-    ) VALUES (?, ?, ?, ?, ?, ?, 'started')
-    RETURNING idempotency_key`,
-  ).bind(
+      const inserted = await env.DB.prepare(OPERATOR_OPERATION_RECEIPT_INSERT_SQL).bind(
+
     key,
         OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args),
     normalizeOperatorText(args.workflow_session_id, 120, true),
@@ -18522,7 +18523,8 @@ async function beginOperatorOperationReceipt(
     toolName,
     fingerprint,
   ).first<{ idempotency_key: string }>();
-  const created = String(inserted?.idempotency_key ?? "") === key;
+    const created = operatorOperationReceiptInsertCreated(inserted, key);
+
   return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created };
 
 }
