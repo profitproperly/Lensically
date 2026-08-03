@@ -1020,29 +1020,38 @@ export function selectSourceFamilyLineup(input: {
       const identity = String(candidate.source_identity_key);
       const familyId = String(candidate.source_card_family_id);
       const sourceCardId = String(candidate.source_card_id);
-      const n = Math.max(0, finiteNumber(candidate.lifetime_sample_size));
+            const n = Math.max(0, finiteNumber(candidate.lifetime_sample_size));
+      const lifecycleLabel = normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label);
+      const selectionLane = selectionLaneForLifecycle(lifecycleLabel);
       const lifetimeIndex = Math.max(0, finiteNumber(candidate.lifetime_index, 1));
-      const shrunkPerformance = (2 + n * lifetimeIndex) / (n + 2);
-      const recentFactor = candidate.recent_index === null || candidate.recent_index === undefined
-        ? 1
-        : clamp(finiteNumber(candidate.recent_index, 1), 0.75, 1.25);
-      const explorationBonus = 0.5 / Math.sqrt(n + 1);
+      const unifiedRating = Math.max(0, finiteNumber(candidate.unified_rating, lifetimeIndex));
+      const rankingScore = Math.max(0, finiteNumber(candidate.ranking_score, unifiedRating));
+      const globalRank = candidate.global_rank === null || candidate.global_rank === undefined
+        ? null
+        : Math.max(1, finiteNumber(candidate.global_rank, 1));
+      const shrunkPerformance = rankingScore;
+      const recentFactor = 1;
+      const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
+      const cycleCoverageBonus = allocationTier === "winner" && plannedUses === 0 ? 100 : 0;
+      const developmentPriority = allocationTier === "development"
+        ? developmentResolutionPriority(lifecycleLabel)
+        : 0;
+      const explorationBonus = allocationTier === "exploration" ? 1 / Math.sqrt(n + 1) : 0;
       const uses24h = Math.max(0, finiteNumber(candidate.uses_24h));
       const uses7d = Math.max(0, finiteNumber(candidate.uses_7d));
       const uses28d = Math.max(0, finiteNumber(candidate.uses_28d));
-      const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
-      const semanticKey = String(candidate.semantic_key ?? "unknown");
-      const semanticOverlapCount = (plannedSemanticSlots.get(semanticKey) ?? []).length;
+      const semanticKey = String(candidate.semantic_key ?? "source_identity_only");
+      const semanticOverlapCount = 0;
       const publishedUses72h = Math.max(0, finiteNumber(candidate.published_uses_72h));
       const futureScheduledUses = Math.max(0, finiteNumber(candidate.future_scheduled_uses));
       const semanticPublishedUses24h = Math.max(0, finiteNumber(candidate.semantic_published_uses_24h));
       const semanticFutureScheduledUses = Math.max(0, finiteNumber(candidate.semantic_future_scheduled_uses));
-      const exposureBurden = 1 + 0.75 * uses7d + 0.25 * uses28d + 2 * plannedUses + 0.5 * semanticOverlapCount;
-            const negativeEvidenceMultiplier = 1;
+      const exposureBurden = 1;
+      const negativeEvidenceMultiplier = 1;
       const preselectionAdjustment = sourcePreselectionAdjustmentForCandidate(input.preselection_policy, candidate);
       const preselectionScoreMultiplier = preselectionAdjustment?.score_multiplier ?? 1;
       const preselectionScoreAddend = preselectionAdjustment?.score_addend ?? 0;
-      const baseScore = ((shrunkPerformance * recentFactor + explorationBonus) / exposureBurden) * negativeEvidenceMultiplier;
+      const baseScore = rankingScore + cycleCoverageBonus + developmentPriority + explorationBonus;
       const score = baseScore * preselectionScoreMultiplier + preselectionScoreAddend;
 
       const deterministicTiebreak = stableUnit(`${input.seed}|${slotKey}|${identity}`);
@@ -1061,11 +1070,17 @@ export function selectSourceFamilyLineup(input: {
           audition_opportunities_remaining: Math.max(0, finiteNumber(candidate.audition_opportunities_remaining)),
           recent_label: candidate.recent_label ?? "no_recent_data",
 
-          lifetime_sample_size: n,
+                    lifetime_sample_size: n,
           lifetime_index: lifetimeIndex,
+          unified_rating: unifiedRating,
+          ranking_score: rankingScore,
+          global_rank: globalRank,
+          selection_lane: selectionLane,
           recent_factor: recentFactor,
           shrunk_performance: shrunkPerformance,
           exploration_bonus: explorationBonus,
+          cycle_coverage_bonus: cycleCoverageBonus,
+          development_resolution_priority: developmentPriority,
           uses_24h: uses24h,
           uses_7d: uses7d,
           uses_28d: uses28d,
