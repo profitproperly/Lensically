@@ -1,15 +1,15 @@
 # Lensically Continuation Ledger
 
 status: completed
-updated_at: 2026-08-02
+updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: null
 active_checkpoint: null
-validated_source_head: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
-documentation_source_head: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
-production_sha: f24f79d57e13b936c1e6ee6c0d497fc5d5c764b4
+validated_source_head: 2601060cd173813db454bcb466fd40fe85a94f2b
+documentation_source_head: 2601060cd173813db454bcb466fd40fe85a94f2b
+production_sha: 2601060cd173813db454bcb466fd40fe85a94f2b
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
@@ -25,6 +25,20 @@ active_interrupt_precedence: none
 
 
 
+
+## Completed Manifest Ready Backend Pass: manifest-ready-backend-v1-20260803
+
+- Status: completed, validated, migrated, and deployed. No Main, Innovation, shadow, generation, persistence, scheduling, or content cycle was run during implementation or verification.
+- Exact production SHA: `2601060cd173813db454bcb466fd40fe85a94f2b`.
+- Exact-SHA release: GitHub Actions run `30835974724` completed successfully; migration planning, migration application, production migration-ledger verification, Worker deployment, and production runtime verification all passed.
+- Durable readiness: added `operator_manifest_ready_snapshots` under canonical migration `0027_manifest_ready_snapshot.sql` with versioned payloads and learning-brief, qualified Saved Pattern, derived-pattern, and owner-revision watermarks.
+- Continuous preparation: the recurring full performance evaluator now writes a finalized Ready Snapshot after intelligence, measurement audit, and Content Focus complete, so unchanged work is prepared before Main begins.
+- Delta preparation: after bounded live Threads collection and evaluator reconciliation, Main reuses the Ready Snapshot only when no new due maturity checkpoints were processed, the snapshot is within its age limit, its schema version matches, and every watermark remains unchanged. Otherwise the existing complete rebuild path remains authoritative.
+- Server-owned contract: canonical source transformation functions and transform roles are injected from the locked source card during persistence; the model no longer has to echo exact backend-owned contract strings. Deterministic server gates, hard bans, repetition checks, source lineage, and text checks remain enforced.
+- Accurate observability: cycle construction now records whether intelligence was recomputed or reused, the Ready Snapshot ID, and the correct refresh owner and reason.
+- Prevention: runtime DDL was rejected by database-authority validation, moved into the canonical migration directory, and runtime schema creation was removed. Compact snapshot and contract-injection regressions permanently cover the new behavior.
+- Validation: exact-head typecheck and lifecycle validation passed in run `30835743575`; all eight deterministic Operator test shards passed in run `30835754749`; full push validation passed in run `30835734614`.
+- Session note: existing MCP sessions are deployment-pinned; refresh Lensically Operator Mode before inspecting the newly deployed runtime.
 
 ## Completed Navigation CTA Correction Pass: operator-nav-cta-v10-20260802
 
