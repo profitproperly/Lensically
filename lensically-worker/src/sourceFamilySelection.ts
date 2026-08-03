@@ -502,7 +502,7 @@ export async function refreshSourceFamilyLabels(
     `SELECT * FROM operator_source_family_evidence_states WHERE brand_key = ?`,
   ).bind(brandKey).all<Record<string, unknown>>();
   const previousByFamily = new Map((previousRows.results ?? []).map((row) => [String(row.source_card_family_id), row]));
-  const cutoffMs = (parseTimeMs(nowIso) ?? Date.now()) - 28 * 86400000;
+    const nowMs = parseTimeMs(nowIso) ?? Date.now();
   const likesFromRow = (row: Record<string, unknown>): number => {
     try {
       const metrics = JSON.parse(String(row.metrics_json ?? "{}")) as Record<string, unknown>;
@@ -511,14 +511,8 @@ export async function refreshSourceFamilyLabels(
       return 0;
     }
   };
-  const isRecent = (row: Record<string, unknown>): boolean => {
-    const postedMs = parseTimeMs(row.posted_at ?? row.captured_at);
-    return postedMs !== null && postedMs >= cutoffMs;
-  };
   const accountLifetimeLikes = (accountRows.results ?? []).map(likesFromRow);
-  const accountRecentLikes = (accountRows.results ?? []).filter(isRecent).map(likesFromRow);
   const accountLifetimeMedian = median(accountLifetimeLikes) ?? 0;
-  const accountRecentMedian = median(accountRecentLikes) ?? accountLifetimeMedian;
   const evidenceByFamily = new Map<string, Record<string, unknown>[]>();
   for (const row of evidenceRows.results ?? []) {
     const familyId = String(row.source_card_family_id ?? "");
