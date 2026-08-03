@@ -330,18 +330,8 @@ export function classifySourceFamilyRecent(input: {
   median_index: number | null;
   latest_two_index: number | null;
 } {
-  const indexes = input.recent_indexes.filter(Number.isFinite).map((value) => Math.max(0, value));
-  if (!indexes.length) return { label: "no_recent_data", median_index: null, latest_two_index: null };
-  const medianIndex = median(indexes) ?? 1;
-  const latestTwoIndex = median(indexes.slice(-2));
-  const previousWasWeak = input.previous_label === "cooling" || input.previous_label === "cold";
-  if (previousWasWeak && indexes.length >= 2 && Number(latestTwoIndex ?? 0) >= 1) {
-    return { label: "recovering", median_index: medianIndex, latest_two_index: latestTwoIndex };
-  }
-  if (medianIndex >= 1.5) return { label: "hot", median_index: medianIndex, latest_two_index: latestTwoIndex };
-  if (medianIndex >= 0.9) return { label: "healthy", median_index: medianIndex, latest_two_index: latestTwoIndex };
-  if (medianIndex >= 0.75) return { label: "cooling", median_index: medianIndex, latest_two_index: latestTwoIndex };
-  return { label: "cold", median_index: medianIndex, latest_two_index: latestTwoIndex };
+  void input;
+  return { label: "no_recent_data", median_index: null, latest_two_index: null };
 }
 
 function stableHash(value: string): number {
