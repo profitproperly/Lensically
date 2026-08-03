@@ -35,8 +35,9 @@ export type UnifiedSourceFamilyClassification = {
   minimum_historical_weight: number;
 };
 
-const PRIOR_STRENGTH = 2;
+const PRIOR_STRENGTH = 4;
 const OBSERVATION_VARIANCE = 0.25;
+const RANKING_CONFIDENCE_Z = 1.2815515655446004;
 const RECENCY_HALF_LIFE_DAYS = 90;
 const MINIMUM_HISTORICAL_WEIGHT = 0.2;
 const PASS_FLOOR = 0.85;
@@ -133,7 +134,7 @@ export function classifyUnifiedSourceFamily(
   const posteriorMeanLog = (weightedLogTotal / OBSERVATION_VARIANCE) / posteriorPrecision;
   const posteriorSd = Math.sqrt(1 / posteriorPrecision);
   const unifiedRating = Math.exp(posteriorMeanLog);
-  const rankingScore = Math.exp(posteriorMeanLog - 0.5 * posteriorSd);
+    const rankingScore = Math.exp(posteriorMeanLog - RANKING_CONFIDENCE_Z * posteriorSd);
   const rawWeightedIndex = Math.exp(weightedLogTotal / Math.max(effectiveSampleSize, Number.EPSILON));
   const probabilityAboveMedian = probabilityAboveThreshold(posteriorMeanLog, posteriorSd, 1);
   const probabilityAboveFranchiseFloor = probabilityAboveThreshold(posteriorMeanLog, posteriorSd, 1.25);
