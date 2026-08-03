@@ -1000,7 +1000,14 @@ export default function CyclesPage() {
                   const detailResponse = detailKey ? detailCache[detailKey] : null;
                   const detail = detailResponse?.selection ?? null;
                   const expanded = expandedSlot === slotKey;
-                  const score = typeof row.score === "number" && Number.isFinite(row.score) ? row.score.toFixed(2) : "Unavailable";
+                                    const rating = typeof row.unified_rating === "number" && Number.isFinite(row.unified_rating)
+                    ? row.unified_rating.toFixed(2)
+                    : "Unavailable";
+                  const rank = typeof row.global_rank === "number" && Number.isFinite(row.global_rank)
+                    ? `#${formatNumber(row.global_rank)}`
+                    : "Unranked";
+                  const lifecycle = row.lifecycle_label || row.lifetime_label || row.family_state;
+                  const lane = row.selection_lane || row.allocation_tier;
                   return (
                     <article key={`${slotKey}-${row.source_card_id || index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                       <button
@@ -1017,11 +1024,11 @@ export default function CyclesPage() {
                                 Execution mode: {executionModeCopy(row.scheduled_generation_mode).label}
                               </Badge>
                             ) : null}
-                            <Badge title={allocationCopy(row.allocation_tier).description}>
-                              Selection lane: {allocationCopy(row.allocation_tier).label}
+                                                        <Badge title={allocationCopy(lane).description}>
+                              Lane: {allocationCopy(lane).label}
                             </Badge>
-                            <Badge title={exactSourceStatusCopy(row.audition_state || row.family_state).description}>
-                              Exact-source status: {exactSourceStatusCopy(row.audition_state || row.family_state).label}
+                            <Badge title={lifecycleCopy(lifecycle).description}>
+                              Lifecycle: {lifecycleCopy(lifecycle).label}
                             </Badge>
 
                           </div>
@@ -1035,10 +1042,16 @@ export default function CyclesPage() {
                           ) : null}
                           {row.persisted_reason ? <p className="mt-2 text-xs text-slate-500">{row.persisted_reason}</p> : null}
                         </div>
-                        <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
-                          <div className="text-right">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Score</p>
-                            <p className="mt-1 text-lg font-semibold text-slate-950">{score}</p>
+                                                <div className="flex shrink-0 items-center gap-4 sm:flex-col sm:items-end">
+                          <div className="flex gap-4 text-right">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Rating</p>
+                              <p className="mt-1 text-lg font-semibold text-slate-950">{rating}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Rank</p>
+                              <p className="mt-1 text-lg font-semibold text-slate-950">{rank}</p>
+                            </div>
                           </div>
                           <span className="text-xs font-semibold text-slate-600">{expanded ? "Hide details" : "Open details"}</span>
                         </div>
@@ -1081,11 +1094,14 @@ export default function CyclesPage() {
                                   <h3 className="text-sm font-semibold text-slate-950">Why it qualified</h3>
                                   <p className="mt-3 text-sm leading-6 text-slate-700">{detail.persisted_reason || "A concise persisted reason is unavailable for this historical receipt."}</p>
                                   <dl className="mt-3">
-                                                                                                            <KeyValue label="Exact-source status" value={exactSourceStatusCopy(detail.audition_state || detail.family_state).label} />
-                                    <KeyValue label="What that means" value={exactSourceStatusCopy(detail.audition_state || detail.family_state).description} />
-                                    <KeyValue label="History scope" value="This exact Saved Pattern identity only, not the broader hook or mechanism" />
-                                    <KeyValue label="Selection lane" value={allocationCopy(detail.allocation_tier).label} />
-                                    <KeyValue label="Why that lane" value={allocationCopy(detail.allocation_tier).description} />
+                                                                                                                                                <KeyValue label="Lifecycle" value={lifecycleCopy(detail.lifecycle_label || detail.lifetime_label || detail.family_state).label} />
+                                    <KeyValue label="What that means" value={lifecycleCopy(detail.lifecycle_label || detail.lifetime_label || detail.family_state).description} />
+                                    <KeyValue label="History scope" value="This exact Saved Pattern lineage and its source-card versions only" />
+                                    <KeyValue label="Selection lane" value={allocationCopy(detail.selection_lane || detail.allocation_tier).label} />
+                                    <KeyValue label="Why that lane" value={allocationCopy(detail.selection_lane || detail.allocation_tier).description} />
+                                    <KeyValue label="Unified rating" value={typeof detail.unified_rating === "number" ? detail.unified_rating.toFixed(3) : "Unavailable"} />
+                                    <KeyValue label="Global rank" value={typeof detail.global_rank === "number" ? `#${formatNumber(detail.global_rank)}` : "Unranked"} />
+                                    <KeyValue label="Matured results" value={formatNumber(detail.matured_result_count)} />
 
                                     <KeyValue label="Selector" value={detail.engine_version || "Unavailable"} />
                                     <KeyValue label="Policy" value={detail.preselection_policy_version || "Unavailable"} />
