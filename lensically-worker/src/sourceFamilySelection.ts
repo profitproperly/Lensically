@@ -81,7 +81,9 @@ export type SourceSelectionCandidate = Record<string, unknown> & {
   semantic_exposure_times?: string[];
   semantic_published_uses_24h?: number;
   semantic_future_scheduled_uses?: number;
-  hours_since_last_use?: number | null;
+    hours_since_last_use?: number | null;
+  lifetime_published_uses?: number;
+  historical_opportunity_count?: number;
   semantic_key?: string;
 };
 
@@ -107,8 +109,11 @@ export type SourceSelectionReceipt = {
   recent_factor: number;
   shrunk_performance: number;
   exploration_bonus: number;
-  cycle_coverage_bonus: number;
+    cycle_coverage_bonus: number;
   development_resolution_priority: number;
+  evidence_debt_bonus: number;
+  waiting_priority: number;
+  historical_opportunity_count: number;
   uses_24h: number;
   uses_7d: number;
   uses_28d: number;
@@ -785,13 +790,12 @@ export async function enrichSourceCandidatesForSelection(
      WHERE fam.brand_key = ?
        AND draft.scheduled_post_id IS NOT NULL
        AND sp.cancelled_at IS NULL
-       AND (
-         (sp.status = 'posted'
-          AND datetime(COALESCE(sp.published_at, archive.post_timestamp, sp.scheduled_time)) >= datetime(?, '-28 days'))
+              AND (
+         sp.status = 'posted'
          OR
          (sp.status IN ('approved', 'posting') AND datetime(sp.scheduled_time) >= datetime(?))
        )`,
-  ).bind(brandKey, nowIso, nowIso).all<Record<string, unknown>>();
+  ).bind(brandKey, nowIso).all<Record<string, unknown>>();
     const stateByIdentity = new Map((stateRows.results ?? []).map((row) => [String(row.source_identity_key), row]));
   const rankedIdentities = (stateRows.results ?? [])
     .map((row) => {
@@ -864,9 +868,11 @@ export async function enrichSourceCandidatesForSelection(
       recent_sample_size: 0,
       lifetime_index: finiteNumber(persistedState.unified_rating, finiteNumber(state?.lifetime_index, 1)),
       recent_index: null,
-      uses_24h: countPublishedSince(24),
+            uses_24h: countPublishedSince(24),
       uses_7d: countPublishedSince(24 * 7),
-      uses_28d: publishedTimes.length,
+      uses_28d: countPublishedSince(24 * 28),
+      lifetime_published_uses: publishedTimes.length,
+      historical_opportunity_count: publishedTimes.length + scheduledTimes.length,
       published_uses_72h: countPublishedSince(72),
       future_scheduled_uses: scheduledTimes.length,
       latest_published_at: latestPublishedAt,
