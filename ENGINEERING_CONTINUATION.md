@@ -1,30 +1,26 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
-validated_source_head: 2601060cd173813db454bcb466fd40fe85a94f2b
-documentation_source_head: 2601060cd173813db454bcb466fd40fe85a94f2b
-production_sha: 2601060cd173813db454bcb466fd40fe85a94f2b
+active_job_id: unified-source-ranking-v2-20260803
+active_checkpoint: validation_and_release
+validated_source_head: 71a5da57604e73dcea882de85e7b379edbf510c1
+documentation_source_head: a59db310b0aca18377b9a09d0c9f5eb41bd46a98
+production_sha: 71a5da57604e73dcea882de85e7b379edbf510c1
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
 
+## ACTIVE Unified Source Ranking Pass: unified-source-ranking-v2-20260803
 
-
-
-
-
-
-
-
-
-
-
+- Owner-authorized scope: replace cooldown-driven and overlapping source classifications with one exact source-card-family lifecycle, one unified rating, one global rank, and deterministic Exploit, Develop, Explore, and Bench lanes. Do not create a mechanism-family grouping.
+- Current action: finish validation, repair every regression, release the exact validated SHA, verify production, then close this job. Do not run Main, Innovation, shadow, generation, persistence, scheduling, or content cycles.
+- Implemented direction: Hot, Healthy, Cooling, Cold, and Recovering are retired; recency remains only as continuous evidence weighting. Fixed 40/30/30 allocation, the 72-hour source blocker, and semantic-spacing blockers are retired. Established winners may repeat; unresolved sources receive one fair opportunity and wait for 24-hour maturity before another test.
+- Incident `9cdff0f2-6bce-4626-8080-76fc13b5ba97` is closed with no repository side effect. Root cause: `operateGitHubRepositories.search_file` was incorrectly invoked as a repository-wide search even though it requires one explicit file path. Permanent prevention: use `listRepoFiles` to identify candidate paths, then use bounded `searchRepoFiles` on each known path; never invoke `search_file` without `path`.
+- Release evidence required: exact-head typecheck, source-selection edge cases, Operator tests, full push validation, exact-SHA deployment, production verification, and final ledger closure.
 
 ## Completed Manifest Ready Backend Pass: manifest-ready-backend-v1-20260803
 
