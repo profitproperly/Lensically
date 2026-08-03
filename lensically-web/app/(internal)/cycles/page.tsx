@@ -445,27 +445,27 @@ function GlossaryTerm({ term, meaning }: { term: string; meaning: string }) {
 function CycleGlossary() {
   return (
     <details open className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
-      <summary className="cursor-pointer text-sm font-semibold text-sky-950">How to read this page</summary>
+      <summary className="cursor-pointer text-sm font-semibold text-sky-950">How source selection works</summary>
       <p className="mt-3 max-w-4xl text-sm leading-6 text-sky-900">
-        Every slot contains two separate objects: the actual scheduled post and the exact Saved Pattern source used to create it. Labels about the exact source do not automatically describe the broader hook or mechanism.
+        Every independently saved source stands on its own evidence. The system assigns one lifecycle, one numerical rating, one rank, and one selection lane to that exact source-card family.
       </p>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <GlossaryTerm term="Scheduled output" meaning="The exact post text that was scheduled for the displayed hour." />
-        <GlossaryTerm term="Source used" meaning="The Saved Pattern or source card that supplied the premise, structure, hook, or payoff." />
-        <GlossaryTerm term="Mechanism" meaning="The broader repeatable idea, such as a finger-touch activation, Universe request, money question, or reader-address hook." />
-        <GlossaryTerm term="Exact source identity" meaning="One specific Saved Pattern record. Two similar finger-touch sources can have different exact-source histories." />
-        <GlossaryTerm term="Execution mode" meaning="How the model adapted the source for the scheduled post. Controlled variation is not automatically an experiment." />
-        <GlossaryTerm term="Selection lane" meaning="How much evidence the selector has for the exact source identity: Winner, Development, or Evidence-building." />
-        <GlossaryTerm term="Experimental / exploration" meaning="The exact source is being used to gather evidence. It does not mean the account has never used or proven the broader mechanism." />
-        <GlossaryTerm term="Exact-source status" meaning="The audition record for this exact source only: no results, one pass, one fail, tiebreaker, graduated, or underperforming." />
-        <GlossaryTerm term="Lifetime label" meaning="Long-run exact-source performance: Untested, Prospect, Emerging, Proven, Franchise, or Underperforming." />
-        <GlossaryTerm term="Recent label" meaning="Recent exact-source direction: No recent data, Hot, Healthy, Cooling, Cold, or Recovering." />
-        <GlossaryTerm term="Confidence" meaning="How dependable the exact-source classification is: Low, Developing, Directional, or Reliable." />
-        <GlossaryTerm term="Score" meaning="A selector ranking used within that cycle. It is not a predicted like count or an overall quality grade." />
-        <GlossaryTerm term="72-hour cooldown" meaning="The same exact source cannot be reused too soon. Separate semantic checks can also block a different source that produces a very similar post." />
-        <GlossaryTerm term="Proven mechanism, untested source" meaning="A valid combination: the account may have proven the broader hook while this particular Saved Pattern identity has no linked matured results." />
-        <GlossaryTerm term="Franchise deployment" meaning="The strategy intentionally uses an account-level mechanism it already considers strong. This is different from an exact source receiving the Franchise lifetime label." />
+        <GlossaryTerm term="Exact source-card family" meaning="One Saved Pattern lineage and its revised source-card versions. Similar Saved Patterns remain separate families with separate evidence." />
+        <GlossaryTerm term="Lifecycle" meaning="The single current classification: Untested, Probation, Tiebreaker, Prospect, Emerging, Proven, Franchise, or Underperforming." />
+        <GlossaryTerm term="Unified rating" meaning="A continuously updated performance estimate normalized against the account median. Newer results weigh more, but older evidence never abruptly disappears." />
+        <GlossaryTerm term="Rank" meaning="The family’s conservative mathematical position against the other qualified source-card families. Unequal sample sizes are adjusted for uncertainty." />
+        <GlossaryTerm term="Exploit" meaning="Proven and Franchise families earn engagement-focused distribution. Winners remain eligible and may receive multiple placements." />
+        <GlossaryTerm term="Develop" meaning="Probation, Tiebreaker, Prospect, and Emerging families receive opportunities needed to reach a clearer verdict." />
+        <GlossaryTerm term="Explore" meaning="Untested families receive fair first opportunities so the system can discover new winners." />
+        <GlossaryTerm term="Bench" meaning="Underperforming families receive no normal distribution until an explicit future policy changes their status." />
+        <GlossaryTerm term="Dynamic allocation" meaning="The requested slot count can be any size. Active lanes begin with equal claims, then unused capacity moves to lanes that still have useful inventory." />
+        <GlossaryTerm term="Winner coverage" meaning="Qualified winners receive a first-appearance boost so several winners can appear before the strongest ones earn additional placements." />
+        <GlossaryTerm term="Pending evidence" meaning="Develop and Explore families wait for a prior post’s 24-hour result before receiving another test. Winners do not have that restriction." />
+        <GlossaryTerm term="No cooldown penalty" meaning="A strong source is not blocked or penalized because it was used recently. Performance math determines winner distribution." />
+        <GlossaryTerm term="Matured result" meaning="A valid 24-hour likes result connected through exact source-card lineage and eligible for learning." />
+        <GlossaryTerm term="Scheduled output" meaning="The exact generated post assigned to the displayed slot. It is shown separately from the source used to create it." />
+        <GlossaryTerm term="Execution mode" meaning="How the model adapted the selected source for that scheduled output. It does not determine the source family’s lifecycle or rank." />
       </div>
     </details>
   );
