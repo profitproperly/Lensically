@@ -142,8 +142,12 @@ function createHarness() {
       id: "card-1",
       family_id: "family-1",
       source_selection_id: "selection-1",
-      status: "locked",
+            status: "locked",
       version_number: 1,
+      transformation_contract: {
+        must_preserve_function: ["Preserve the source hook function."],
+        must_transform: [{ role: "closing" }],
+      },
     } as JsonRecord)),
     linkHypothesisResult: vi.fn(async () => undefined),
     listHardBans: vi.fn(async () => [{
@@ -283,6 +287,33 @@ describe("operatorManifestPersistenceService", () => {
       modelGateResults: [],
     }));
     expect(harness.mocks.createScheduledPost).toHaveBeenCalledTimes(1);
+  });
+
+    it("injects locked source-contract declarations without requiring model echo", async () => {
+    const harness = createHarness();
+    harness.context.post = { score: { quality: 1 } };
+
+    const result = await persistOperatorManifestCandidate({
+      brandKey: "manifest_mental",
+      accountId: "account-1",
+      threadsUserId: "threads-1",
+      context: harness.context,
+    }, harness.dependencies);
+
+    expect(result).toMatchObject({
+      success: true,
+      server_checks: {
+        source_contract_declarations_server_owned: true,
+        model_source_contract_echo_required: false,
+      },
+    });
+    expect(harness.mocks.runGateSuite).toHaveBeenCalledWith(expect.objectContaining({
+      draftAnalysis: expect.objectContaining({
+        preserved_functions: ["Preserve the source hook function."],
+        transformed_elements: ["closing"],
+        contract_declarations_injected_by_backend: true,
+      }),
+    }));
   });
 
   it("blocks publication and records exact missing lineage stages", async () => {

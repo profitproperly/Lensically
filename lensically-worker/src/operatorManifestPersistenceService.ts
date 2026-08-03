@@ -400,18 +400,38 @@ export async function persistOperatorManifestCandidate(
     }, slotKey);
   }
 
+    const sourceTransformationContract = record(sourceCard.transformation_contract);
+  const contractPreservedFunctions = Array.isArray(sourceTransformationContract.must_preserve_function)
+    ? sourceTransformationContract.must_preserve_function.map(String)
+    : [];
+  const contractTransformedRoles = records(sourceTransformationContract.must_transform)
+    .map((item) => dependencies.normalizeText(item.role, 240, true))
+    .filter((item): item is string => Boolean(item));
+  const modelPreservedFunctions = Array.isArray(post.preserved_functions)
+    ? post.preserved_functions.map(String)
+    : [];
+  const modelTransformedElements = Array.isArray(post.transformed_elements)
+    ? post.transformed_elements.map(String)
+    : [];
   const draftAnalysis = {
     opening_phrase: dependencies.extractOpeningPhrase(text),
     hook_style: dependencies.normalizeText(postStrategy.hook_style, 120, true),
     lane_key: dependencies.normalizeMachineKey(postStrategy.pillar, ""),
-    preserved_functions: Array.isArray(post.preserved_functions) ? post.preserved_functions.map(String) : [],
-    transformed_elements: Array.isArray(post.transformed_elements) ? post.transformed_elements.map(String) : [],
+    preserved_functions: Array.from(new Set([
+      ...contractPreservedFunctions,
+      ...modelPreservedFunctions,
+    ])),
+    transformed_elements: Array.from(new Set([
+      ...contractTransformedRoles,
+      ...modelTransformedElements,
+    ])),
     satisfied_time_or_context_requirements: Array.isArray(post.satisfied_time_or_context_requirements)
       ? post.satisfied_time_or_context_requirements.map(String)
       : Array.isArray(modelEvaluation.satisfied_time_or_context_requirements)
         ? modelEvaluation.satisfied_time_or_context_requirements.map(String)
         : [],
     audience_reward_delivered: true,
+    contract_declarations_injected_by_backend: true,
   };
     const suppliedGateSummary = record(modelEvaluation.gate_summary);
   const suppliedGateResults = records(suppliedGateSummary.results);
@@ -565,7 +585,9 @@ export async function persistOperatorManifestCandidate(
       exact_duplicate: false,
             canonical_hard_bans_complete: canonicalHardBans.length >= 0,
       canonical_hard_bans_server_owned: true,
-      model_hard_ban_pass_evidence_required: false,
+            model_hard_ban_pass_evidence_required: false,
+      source_contract_declarations_server_owned: true,
+      model_source_contract_echo_required: false,
       source_fidelity_passed: true,
       semantic_repetition_collision: false,
       semantic_repetition_summary: {
