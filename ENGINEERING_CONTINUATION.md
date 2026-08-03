@@ -1,26 +1,34 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: unified-source-ranking-v2-20260803
-active_checkpoint: validation_and_release
-validated_source_head: 71a5da57604e73dcea882de85e7b379edbf510c1
-documentation_source_head: a59db310b0aca18377b9a09d0c9f5eb41bd46a98
-production_sha: 71a5da57604e73dcea882de85e7b379edbf510c1
+active_job_id: null
+active_checkpoint: null
+validated_source_head: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
+documentation_source_head: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
+production_sha: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
 
-## ACTIVE Unified Source Ranking Pass: unified-source-ranking-v2-20260803
+## Completed Unified Source Ranking Pass: unified-source-ranking-v2-20260803
 
-- Owner-authorized scope: replace cooldown-driven and overlapping source classifications with one exact source-card-family lifecycle, one unified rating, one global rank, and deterministic Exploit, Develop, Explore, and Bench lanes. Do not create a mechanism-family grouping.
-- Current action: finish validation, repair every regression, release the exact validated SHA, verify production, then close this job. Do not run Main, Innovation, shadow, generation, persistence, scheduling, or content cycles.
-- Implemented direction: Hot, Healthy, Cooling, Cold, and Recovering are retired; recency remains only as continuous evidence weighting. Fixed 40/30/30 allocation, the 72-hour source blocker, and semantic-spacing blockers are retired. Established winners may repeat; unresolved sources receive one fair opportunity and wait for 24-hour maturity before another test.
-- Incident `9cdff0f2-6bce-4626-8080-76fc13b5ba97` is closed with no repository side effect. Root cause: `operateGitHubRepositories.search_file` was incorrectly invoked as a repository-wide search even though it requires one explicit file path. Permanent prevention: use `listRepoFiles` to identify candidate paths, then use bounded `searchRepoFiles` on each known path; never invoke `search_file` without `path`.
-- Release evidence required: exact-head typecheck, source-selection edge cases, Operator tests, full push validation, exact-SHA deployment, production verification, and final ledger closure.
+- Status: completed, validated, and deployed. No Main, Innovation, shadow, generation, persistence, scheduling, or content cycle was run.
+- Exact production SHA: `c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0`.
+- Canonical model: every independently saved source remains one exact source-card family with separate evidence. No mechanism-family grouping was introduced.
+- One lifecycle vocabulary: Untested, Probation, Tiebreaker, Prospect, Emerging, Proven, Franchise, and Underperforming. Hot, Healthy, Cooling, Cold, Recovering, competing audition labels, and fixed recent classifications were retired from selection authority.
+- Unified mathematics: every matured 24-hour result is normalized against the rolling account median at that historical observation; continuous recency weighting, Bayesian shrinkage, conservative unequal-sample ranking, dynamic promotion, and dynamic demotion produce one rating and global rank.
+- Deterministic lanes: Franchise and Proven enter Exploit; Probation, Tiebreaker, Prospect, and Emerging enter Develop; Untested enters Explore; Underperforming enters Bench. Any requested slot count is distributed by equal active-lane claims with unused capacity deterministically reassigned.
+- Winner policy: the 72-hour exact-source blocker, semantic-spacing blocker, fatigue penalty, and forced unique-winner rule were removed. Winners may repeat, while a first-appearance boost represents qualified winners before additional placements are awarded by rank.
+- Fair evidence policy: Develop and Explore sources receive one opportunity per cycle, wait for an existing 24-hour result to mature, and gain deterministic evidence-debt and waiting priority so unresolved sources cannot be starved. Two below-median matured results bench an unresolved source.
+- Single authority: strategy text, experiments, and model output cannot reserve sources, change lanes, or multiply selection scores. Explicit hard bans and owner exclusions remain enforceable.
+- Owner-facing Cycles UI: shows Lifecycle, Lane, Unified Rating, Global Rank, and Matured Results; technical legacy fields are collapsed; mechanism-family, Hot/Cooling, and cooldown language was removed. The deployed manifest contract is `unified-source-ranking-v2`.
+- Validation: exact-head typecheck passed in run `30854246388`; all eight deterministic Operator shards passed in run `30854257833`; full push validation and exact web artifact validation passed in run `30854235806`.
+- Deployment: exact-SHA release run `30854525623` deployed the validated Worker and web heads and passed production runtime, scheduler-retention, website-contract, and legacy-surface verification.
+- Incident `9cdff0f2-6bce-4626-8080-76fc13b5ba97` closed with no repository side effect. Root cause: repository-wide search was routed to a single-file function without a path. Permanent prevention: list candidate paths first, then use bounded known-file search.
 
 ## Completed Manifest Ready Backend Pass: manifest-ready-backend-v1-20260803
 
