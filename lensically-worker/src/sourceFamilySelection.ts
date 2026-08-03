@@ -964,10 +964,8 @@ export function selectSourceFamilyLineup(input: {
 
   const selected: SourceSelectionCandidate[] = [];
   const receipts: SourceSelectionReceipt[] = [];
-  const usedSources = new Set<string>();
+    const usedSources = new Set<string>();
   const plannedCounts = new Map<string, number>();
-  const plannedLastSlot = new Map<string, string>();
-  const plannedSemanticSlots = new Map<string, string[]>();
   const relaxationCounts: Record<string, number> = { strict: 0, half: 0, exhausted: 0 };
   const slotRankings: Record<string, unknown>[] = [];
 
@@ -991,26 +989,15 @@ export function selectSourceFamilyLineup(input: {
       }
     }
 
-    const slotEligible = active.filter((candidate) => {
-
+        const slotEligible = active.filter((candidate) => {
       const identity = String(candidate.source_identity_key);
-      const familyId = String(candidate.source_card_family_id);
-      const semanticKey = String(candidate.semantic_key ?? "unknown");
-            if (usedSources.has(identity)) return false;
+      const candidateTier = allocationTierForCandidate(candidate, input.preselection_policy);
+      if (candidateTier !== "winner" && usedSources.has(identity)) return false;
       if (activeReservation) {
         if (!sourcePreselectionTargetMatchesCandidate(activeReservation, candidate)) return false;
       } else if (pendingReservedCandidateKeys.has(identity)) {
         return false;
       }
-      const plannedLast = plannedLastSlot.get(familyId);
-
-      if (plannedLast && slotDistanceHours(slotKey, plannedLast) < cooldownHours) return false;
-      const historicalSemanticTimes = Array.isArray(candidate.semantic_exposure_times)
-        ? candidate.semantic_exposure_times
-        : [];
-      if (historicalSemanticTimes.some((value) => slotDistanceHours(slotKey, value) < semanticSpacingHours)) return false;
-      const plannedSemanticTimes = plannedSemanticSlots.get(semanticKey) ?? [];
-      if (plannedSemanticTimes.some((value) => slotDistanceHours(slotKey, value) < semanticSpacingHours)) return false;
       return true;
     });
     if (!slotEligible.length) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
