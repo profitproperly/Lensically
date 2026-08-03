@@ -375,8 +375,9 @@ function slotDistanceHours(left: string, right: string): number {
 }
 
 function allocationTierForLabel(label: SourceFamilyLifetimeLabel | undefined): SourceAllocationTier {
-  if (label === "franchise" || label === "proven") return "winner";
-  if (label === "emerging" || label === "prospect") return "development";
+  const lane = selectionLaneForLifecycle(normalizeSourceFamilyLifetimeLabel(label));
+  if (lane === "exploit") return "winner";
+  if (lane === "develop") return "development";
   return "exploration";
 }
 
@@ -384,9 +385,6 @@ function allocationTierForCandidate(
   candidate: SourceSelectionCandidate,
   policy?: SourcePreselectionPolicy,
 ): SourceAllocationTier {
-  if (["probation", "provisional_pass", "tiebreaker"].includes(String(candidate.audition_state ?? ""))) {
-    return "exploration";
-  }
   return sourcePreselectionAdjustmentForCandidate(policy, candidate)?.allocation_tier_override
     ?? allocationTierForLabel(candidate.lifetime_label);
 }
@@ -398,29 +396,17 @@ function buildAllocationTargets(
 ): Record<SourceAllocationTier, number> {
   const available: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
   for (const candidate of candidates) available[allocationTierForCandidate(candidate, policy)] += 1;
-
-    const desiredWinner = Math.floor(requestedSlots * 0.4);
-  const desiredDevelopment = Math.floor(requestedSlots * 0.3);
-  const desiredExploration = requestedSlots - desiredWinner - desiredDevelopment;
-  const targets: Record<SourceAllocationTier, number> = {
-    winner: Math.min(available.winner, desiredWinner),
-    development: Math.min(available.development, desiredDevelopment),
-    exploration: Math.min(available.exploration, desiredExploration),
+  const dynamic = buildDynamicLaneTargets({
+    requested_slots: requestedSlots,
+    exploit_source_count: available.winner,
+    develop_source_count: available.development,
+    explore_source_count: available.exploration,
+  });
+  return {
+    winner: dynamic.exploit,
+    development: dynamic.develop,
+    exploration: dynamic.explore,
   };
-  let remaining = requestedSlots - targets.winner - targets.development - targets.exploration;
-  const expansionOrder: SourceAllocationTier[] = ["exploration", "development", "winner"];
-  while (remaining > 0) {
-    let allocated = false;
-    for (const tier of expansionOrder) {
-      if (targets[tier] >= available[tier]) continue;
-      targets[tier] += 1;
-      remaining -= 1;
-      allocated = true;
-      if (remaining === 0) break;
-    }
-    if (!allocated) throw new Error(`insufficient_hardened_source_families:${requestedSlots - remaining}:${requestedSlots}`);
-  }
-  return targets;
 }
 
 function chooseAllocationTier(
