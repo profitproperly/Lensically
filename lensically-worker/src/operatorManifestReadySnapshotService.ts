@@ -133,25 +133,10 @@ async function safeFirst(
   }
 }
 
-export async function ensureManifestReadySnapshotTable(db: D1Database): Promise<void> {
-  await db.prepare(
-    `CREATE TABLE IF NOT EXISTS operator_manifest_ready_snapshots (
-      id TEXT PRIMARY KEY,
-      brand_key TEXT NOT NULL UNIQUE,
-      snapshot_version TEXT NOT NULL,
-      learning_brief_id TEXT,
-      generated_at TEXT NOT NULL,
-      watermark_json TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ).run();
-  await db.prepare(
-    `CREATE INDEX IF NOT EXISTS idx_operator_manifest_ready_snapshots_brand
-     ON operator_manifest_ready_snapshots(brand_key, updated_at)`,
-  ).run();
+export async function ensureManifestReadySnapshotTable(_db: D1Database): Promise<void> {
+  // Schema ownership is exclusively lensically-worker/database/migrations/0027_manifest_ready_snapshot.sql.
 }
+
 
 export async function readManifestReadyWatermarks(
   db: D1Database,
