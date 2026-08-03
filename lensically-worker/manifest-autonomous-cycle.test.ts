@@ -97,11 +97,15 @@ describe("Manifest preparation checkpoints", () => {
       complete: true,
       published_count: 40,
       due_checkpoint_count: 2,
-            performance_evaluation: {
+                        performance_evaluation: {
         evaluator_version: "performance-evaluator-v3",
         maturity_scores_upserted: 2,
         evidence_records: 120,
         manifest_layers_deferred: false,
+        manifest_layers_finalized: false,
+        durable_snapshot_reused: false,
+        ready_snapshot_reused: false,
+        ready_snapshot_id: null,
       },
     }));
   });
