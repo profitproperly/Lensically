@@ -1059,10 +1059,24 @@ export function selectSourceFamilyLineup(input: {
       const recentFactor = 1;
       const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
       const cycleCoverageBonus = allocationTier === "winner" && plannedUses === 0 ? 100 : 0;
-      const developmentPriority = allocationTier === "development"
-        ? developmentResolutionPriority(lifecycleLabel)
+            const developmentPriority = allocationTier === "development"
+        ? developmentResolutionPriority(lifecycleLabel) * 10
         : 0;
-      const explorationBonus = allocationTier === "exploration" ? 1 / Math.sqrt(n + 1) : 0;
+      const historicalOpportunityCount = Math.max(0, finiteNumber(candidate.historical_opportunity_count, n));
+      const evidenceDebtBonus = allocationTier === "development"
+        ? 10 / (n + 1)
+        : allocationTier === "exploration"
+          ? 10 / (historicalOpportunityCount + 1)
+          : 0;
+      const hoursSinceLastUse = candidate.hours_since_last_use === null || candidate.hours_since_last_use === undefined
+        ? null
+        : Math.max(0, finiteNumber(candidate.hours_since_last_use));
+      const waitingPriority = allocationTier === "winner"
+        ? 0
+        : hoursSinceLastUse === null
+          ? 2
+          : Math.min(2, hoursSinceLastUse / (24 * 30));
+      const explorationBonus = 0;
       const uses24h = Math.max(0, finiteNumber(candidate.uses_24h));
       const uses7d = Math.max(0, finiteNumber(candidate.uses_7d));
       const uses28d = Math.max(0, finiteNumber(candidate.uses_28d));
@@ -1077,7 +1091,9 @@ export function selectSourceFamilyLineup(input: {
             const preselectionAdjustment = sourcePreselectionAdjustmentForCandidate(input.preselection_policy, candidate);
       const preselectionScoreMultiplier = 1;
       const preselectionScoreAddend = 0;
-      const baseScore = rankingScore + cycleCoverageBonus + developmentPriority + explorationBonus;
+            const baseScore = allocationTier === "winner"
+        ? rankingScore + cycleCoverageBonus
+        : rankingScore + developmentPriority + evidenceDebtBonus + waitingPriority;
       const score = baseScore;
 
       const deterministicTiebreak = stableUnit(`${input.seed}|${slotKey}|${identity}`);
@@ -1105,8 +1121,11 @@ export function selectSourceFamilyLineup(input: {
           recent_factor: recentFactor,
           shrunk_performance: shrunkPerformance,
           exploration_bonus: explorationBonus,
-          cycle_coverage_bonus: cycleCoverageBonus,
+                    cycle_coverage_bonus: cycleCoverageBonus,
           development_resolution_priority: developmentPriority,
+          evidence_debt_bonus: evidenceDebtBonus,
+          waiting_priority: waitingPriority,
+          historical_opportunity_count: historicalOpportunityCount,
           uses_24h: uses24h,
           uses_7d: uses7d,
           uses_28d: uses28d,
@@ -1161,8 +1180,10 @@ export function selectSourceFamilyLineup(input: {
       ranking_score: Number(winner.receipt.ranking_score.toFixed(6)),
       shrunk_performance: Number(winner.receipt.shrunk_performance.toFixed(6)),
       exploration_bonus: Number(winner.receipt.exploration_bonus.toFixed(6)),
-      cycle_coverage_bonus: Number(winner.receipt.cycle_coverage_bonus.toFixed(6)),
+            cycle_coverage_bonus: Number(winner.receipt.cycle_coverage_bonus.toFixed(6)),
       development_resolution_priority: Number(winner.receipt.development_resolution_priority.toFixed(6)),
+      evidence_debt_bonus: Number(winner.receipt.evidence_debt_bonus.toFixed(6)),
+      waiting_priority: Number(winner.receipt.waiting_priority.toFixed(6)),
       recent_factor: Number(winner.receipt.recent_factor.toFixed(6)),
       exposure_burden: Number(winner.receipt.exposure_burden.toFixed(6)),
       deterministic_tiebreak: Number(winner.receipt.deterministic_tiebreak.toFixed(8)),
