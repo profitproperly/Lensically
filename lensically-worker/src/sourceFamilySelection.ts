@@ -905,17 +905,12 @@ export function selectSourceFamilyLineup(input: {
         if (!candidate.source_card_family_id) return "source_family_missing";
     const preselectionExclusion = sourcePreselectionExclusionForCandidate(input.preselection_policy, candidate);
     if (preselectionExclusion) return preselectionExclusion.reason;
-    if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
-
-    if (finiteNumber(candidate.published_uses_72h) > 0) return "source_published_within_72h";
-
-    if (finiteNumber(candidate.future_scheduled_uses) > 0) return "source_already_future_scheduled";
-    const semanticExposureTimes = Array.isArray(candidate.semantic_exposure_times)
-      ? candidate.semantic_exposure_times
-      : [];
-    if (input.slot_keys.length > 0 && semanticExposureTimes.length > 0 && input.slot_keys.every((slotKey) =>
-      semanticExposureTimes.some((value) => slotDistanceHours(slotKey, value) < 24)
-    )) return "semantic_exposure_blocks_horizon";
+        if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
+    const allocationTier = allocationTierForCandidate(candidate, input.preselection_policy);
+    if (
+      allocationTier !== "winner"
+      && (finiteNumber(candidate.future_scheduled_uses) > 0 || finiteNumber(candidate.uses_24h) > 0)
+    ) return "unresolved_source_pending_24h_evidence";
     return null;
   };
     const exclusions = normalizedCandidates
@@ -932,14 +927,14 @@ export function selectSourceFamilyLineup(input: {
     }));
     const active = normalizedCandidates.filter((candidate) => exclusionReason(candidate) === null);
 
-  if (active.length < input.slot_keys.length) {
-    throw new Error(`insufficient_hardened_source_families:${active.length}:${input.slot_keys.length}`);
+    if (!active.length && input.slot_keys.length > 0) {
+    throw new Error(`insufficient_active_source_capacity:0:${input.slot_keys.length}`);
   }
   const eligibleFamilyCount = new Set(active.map((candidate) => String(candidate.source_card_family_id))).size;
-  const cooldownHours = 72;
-  const semanticSpacingHours = 24;
-  const requireUniqueSource = input.slot_keys.length > 0;
-    const allocationTargets = buildAllocationTargets(active, input.slot_keys.length, input.preselection_policy);
+  const cooldownHours = 0;
+  const semanticSpacingHours = 0;
+  const requireUniqueSource = false;
+  const allocationTargets = buildAllocationTargets(active, input.slot_keys.length, input.preselection_policy);
   const reservations = [...(input.preselection_policy?.experiment_reservations ?? [])];
   const reservationCandidate = new Map(reservations.map((reservation) => [
     reservation.reservation_key,
