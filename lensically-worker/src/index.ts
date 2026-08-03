@@ -62,7 +62,9 @@ import {
   OPERATOR_OPERATION_RECEIPT_INSERT_SQL,
   operatorOperationReceiptInsertCreated,
 } from "./operatorOperationReceiptInsert";
+import { readOptionalLegacyWorkflowSession } from "./operatorOptionalLegacyWorkflowSession";
 import { readCycleObservability } from "./cycleObservabilityService";
+
 
 import {
     OPERATOR_GOVERNING_STANDARDS,
@@ -12536,14 +12538,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
       const accountCoverageRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
-    get_account_state: async () => {
+        get_account_state: async () => {
     const state = await readOperatorAccountState({
       brandKey: brand.brand_key,
       accountId: brand.account_id,
       threadsUserId: brand.profile.threads_user_id,
     }, {
-      getActiveSession: (brandKey) => getActiveOperatorSession(env, brandKey as GptBrandKey),
+      getActiveSession: (brandKey) => readOptionalLegacyWorkflowSession(
+        () => getActiveOperatorSession(env, brandKey as GptBrandKey),
+      ),
       getSourceCard: (brandKey, sourceCardId) => getOperatorSourceCard(
+
         env,
         brandKey as GptBrandKey,
         sourceCardId,
