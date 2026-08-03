@@ -772,7 +772,20 @@ export async function enrichSourceCandidatesForSelection(
          (sp.status IN ('approved', 'posting') AND datetime(sp.scheduled_time) >= datetime(?))
        )`,
   ).bind(brandKey, nowIso, nowIso).all<Record<string, unknown>>();
-  const stateByIdentity = new Map((stateRows.results ?? []).map((row) => [String(row.source_identity_key), row]));
+    const stateByIdentity = new Map((stateRows.results ?? []).map((row) => [String(row.source_identity_key), row]));
+  const rankedIdentities = (stateRows.results ?? [])
+    .map((row) => {
+      const persisted = parseJsonRecord(row.state_json);
+      const label = normalizeSourceFamilyLifetimeLabel(row.lifetime_label);
+      return {
+        identity: String(row.source_identity_key ?? ""),
+        label,
+        ranking_score: finiteNumber(persisted.ranking_score, finiteNumber(row.lifetime_index, 1)),
+      };
+    })
+    .filter((row) => row.identity && row.label !== "untested" && row.label !== "underperforming")
+    .sort((left, right) => right.ranking_score - left.ranking_score || left.identity.localeCompare(right.identity));
+  const globalRankByIdentity = new Map(rankedIdentities.map((row, index) => [row.identity, index + 1]));
   const nowMs = parseTimeMs(nowIso) ?? Date.now();
   type AudienceExposure = { published: string[]; scheduled: string[] };
   const exposureByIdentity = new Map<string, AudienceExposure>();
@@ -815,19 +828,22 @@ export async function enrichSourceCandidatesForSelection(
       ...candidate,
       source_card_family_id: state?.source_card_family_id ? String(state.source_card_family_id) : null,
       source_card_id: state?.current_source_card_id ? String(state.current_source_card_id) : null,
-            lifetime_label: normalizeSourceFamilyLifetimeLabel(state?.lifetime_label),
+                  lifetime_label: normalizeSourceFamilyLifetimeLabel(state?.lifetime_label),
       audition_state: String(persistedLifetime.audition_state ?? "untested") as SourceFamilyAuditionState,
       audition_passes: finiteNumber(persistedLifetime.audition_passes),
       audition_failures: finiteNumber(persistedLifetime.audition_failures),
       audition_opportunities_remaining: finiteNumber(persistedLifetime.audition_opportunities_remaining),
       graduated: persistedLifetime.graduated === true,
-      recent_label: (state?.recent_label ?? "no_recent_data") as SourceFamilyRecentLabel,
-
+      recent_label: "no_recent_data" as SourceFamilyRecentLabel,
       confidence_label: (state?.confidence_label ?? "low") as SourceFamilyConfidenceLabel,
       lifetime_sample_size: finiteNumber(state?.lifetime_sample_size),
-      recent_sample_size: finiteNumber(state?.recent_sample_size),
-      lifetime_index: finiteNumber(state?.lifetime_index, 1),
-      recent_index: state?.recent_index === null || state?.recent_index === undefined ? null : finiteNumber(state.recent_index, 1),
+      unified_rating: finiteNumber(persistedState.unified_rating, finiteNumber(state?.lifetime_index, 1)),
+      ranking_score: finiteNumber(persistedState.ranking_score, finiteNumber(state?.lifetime_index, 1)),
+      global_rank: globalRankByIdentity.get(identity) ?? null,
+      selection_lane: String(persistedState.selection_lane ?? selectionLaneForLifecycle(normalizeSourceFamilyLifetimeLabel(state?.lifetime_label))) as UnifiedSelectionLane,
+      recent_sample_size: 0,
+      lifetime_index: finiteNumber(persistedState.unified_rating, finiteNumber(state?.lifetime_index, 1)),
+      recent_index: null,
       uses_24h: countPublishedSince(24),
       uses_7d: countPublishedSince(24 * 7),
       uses_28d: publishedTimes.length,
