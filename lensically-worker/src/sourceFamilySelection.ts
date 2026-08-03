@@ -1119,7 +1119,8 @@ export function selectSourceFamilyLineup(input: {
         allocation_tier: allocationTier,
         ranked_source_identity_keys: scored.map((entry) => entry.receipt.source_identity_key),
         ranked_source_card_ids: scored.map((entry) => entry.receipt.source_card_id),
-                cooldown_relaxation: 1,
+                        winner_reuse_allowed: true,
+        recent_classification_retired: true,
         experiment_reservation_key: activeReservation?.reservation_key ?? null,
         preselection_policy_hash: input.preselection_policy?.policy_hash ?? null,
       });
@@ -1129,9 +1130,13 @@ export function selectSourceFamilyLineup(input: {
     if (!winner) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
     const receipt = {
       ...winner.receipt,
-      score: Number(winner.receipt.score.toFixed(8)),
+            score: Number(winner.receipt.score.toFixed(8)),
+      unified_rating: Number(winner.receipt.unified_rating.toFixed(6)),
+      ranking_score: Number(winner.receipt.ranking_score.toFixed(6)),
       shrunk_performance: Number(winner.receipt.shrunk_performance.toFixed(6)),
       exploration_bonus: Number(winner.receipt.exploration_bonus.toFixed(6)),
+      cycle_coverage_bonus: Number(winner.receipt.cycle_coverage_bonus.toFixed(6)),
+      development_resolution_priority: Number(winner.receipt.development_resolution_priority.toFixed(6)),
       recent_factor: Number(winner.receipt.recent_factor.toFixed(6)),
       exposure_burden: Number(winner.receipt.exposure_burden.toFixed(6)),
       deterministic_tiebreak: Number(winner.receipt.deterministic_tiebreak.toFixed(8)),
@@ -1139,12 +1144,8 @@ export function selectSourceFamilyLineup(input: {
     selected.push({ ...winner.candidate, selection_receipt: receipt, assigned_slot_key: slotKey });
     receipts.push(receipt);
     usedSources.add(receipt.source_identity_key);
-    plannedCounts.set(receipt.source_card_family_id, receipt.planned_uses + 1);
-    plannedLastSlot.set(receipt.source_card_family_id, slotKey);
-    const semanticSlots = plannedSemanticSlots.get(receipt.semantic_key) ?? [];
-    semanticSlots.push(slotKey);
-    plannedSemanticSlots.set(receipt.semantic_key, semanticSlots);
-        selectedTierCounts[receipt.allocation_tier] += 1;
+        plannedCounts.set(receipt.source_card_family_id, receipt.planned_uses + 1);
+    selectedTierCounts[receipt.allocation_tier] += 1;
     if (receipt.experiment_reservation_key) fulfilledReservations.add(receipt.experiment_reservation_key);
     relaxationCounts.strict += 1;
 
