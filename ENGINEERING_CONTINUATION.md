@@ -1,32 +1,38 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-main-cycle-20260803-1739
-active_checkpoint: resume_live_persistence_with_authoritative_plan_ids
-validated_source_head: 22c443b8203c492c269e14427493a4098142da86
-documentation_source_head: 22c443b8203c492c269e14427493a4098142da86
-production_sha: 22c443b8203c492c269e14427493a4098142da86
-active_interrupt_id: eadaa187-715f-4ad8-a05c-991e389ce011
-active_interrupt_state: recorded
-active_interrupt_precedence: refresh_live_plan_ids_then_resume_same_cycle
+active_job_id: null
+active_checkpoint: null
+validated_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
+documentation_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
+production_sha: 368bb74fb7817d2206edc52b0db52b4d864df4dc
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
-## ACTIVE Manifest Main Cycle: manifest-main-cycle-20260803-1739
+## Completed Manifest Main Cycle: manifest-main-cycle-20260803-1739
 
-- Owner authorization: run one live Main Manifest Mental cycle end to end.
-- Canonical cycle operation ID: `manifest-main-2026-08-03-1739`.
+- Status: completed after durable repairs. The canonical receipt has `unresolved_issue_count: 0`, `open_defect_count: 0`, `blocking_open_defect_count: 0`, and five resolved defect receipts.
+- Canonical operation ID: `manifest-main-2026-08-03-1739`.
 - Canonical cycle ID: `3a5ab59d-2fd4-47e3-9752-51afccc5e6b3`.
-- Durable progress: preparation, measurement audit, all 48 canonical lineup pages, and strategy `e6027da2-c3aa-42ba-aaf5-dc9e868c065c` are complete. Fourteen exact hourly posts are persisted and scheduled as IDs `869` through `882`; 34 locked slots remain.
-- Resolved production repairs: D1 integrity checks are runtime-cached; production-sized decision bundles use page-backed lineup authority; fresh operation receipts use atomic `INSERT OR IGNORE ... RETURNING` ownership detection. Current exact production SHA is `22c443b8203c492c269e14427493a4098142da86`, validated by typecheck `30860081178`, Operator tests `30860089567`, push validation `30860074114`, and release `30860247198`.
-- Live lease verification: the first post-repair batch reached candidate persistence immediately instead of returning `operation_already_in_progress`, proving the false two-minute lease was removed.
-- Active P1 interruption: hardening incident `eadaa187-715f-4ad8-a05c-991e389ce011` rejected slots `2026-08-04T09:00` and `2026-08-04T10:00` because stale transcribed plan UUIDs were supplied. No candidate, draft, schedule row, or lineage record was created. Production returned the authoritative plan item IDs `55586330-7da3-459f-806a-39d5cc354076` and `ba277586-2fe5-42f8-b379-431605d221f1`.
-- Permanent prevention: for every persistence wave, read the current cycle's live `next_cycle_plan_items` and use those exact UUIDs. Chat summaries and manually transcribed plan IDs are never authoritative. The existing `manifest_cycle_plan_item_mismatch` gate remains the mutation-prevention control.
-- Current action: persist the two rejected slots with the production-returned UUIDs, close the P1 after verified success, then continue the same cycle in live eight-slot waves until zero missing slots, complete lineage, healthy scheduler state, and no unresolved defects remain.
+- Canonical cycle receipt ID: `46b5644d-5171-4749-8c20-b8ff66960c78`.
+- Locked strategy ID: `e6027da2-c3aa-42ba-aaf5-dc9e868c065c`; strategy hash `4a1abd2f5e369a7bf972ca556f77eebaa94173fe1c0ebc6b618e4ec5a85a7a4a`.
+- Decision evidence: snapshot `fc9a963e-1c74-425f-a18d-50d0cebcaeee`; bundle `0261ed95-5560-4e1d-ac19-1d2380eb6841`; bundle hash `00cc63fc7b6f0cb4c4870f903a1f11dce1fef038b35a0b19cd72ffab635db914`.
+- Exact schedule: 48 hourly posts from August 3, 2026 at 7:00 PM through August 5, 2026 at 6:00 PM America/New_York, scheduled as post IDs `869` through `916`.
+- Completion proof: 48 plan items, 48 persisted posts, zero remaining missing slots, zero elapsed unfilled slots, all deterministic gates passed, source lineage complete, intelligence lineage complete, and no source substitution.
+- Scheduler proof: scheduler healthy, current overdue count zero, no timeout, no delivery error, and next poll scheduled.
+- Live account-state proof: `get_account_state` returned HTTP 200 on production with `active_workflow_session: null` and no warnings after the retired-table fallback deployed.
+- Repaired defects: repeated D1 integrity probes now use runtime success caching; production-sized decision bundles use page-backed locked-lineup authority; completed batch operation receipts use atomic SQLite `RETURNING` ownership; an external pre-call ambiguity was regenerated without changing source or slot; the read-only account-state surface treats the retired legacy workflow-session table as optional while preserving strict unrelated failures.
+- Live persistence proof: consecutive distinct batches succeeded immediately after the receipt-ownership repair, eliminating the false two-minute operation lease. The stale plan-ID hard gate also prevented mutation and established live `next_cycle_plan_items` as the only UUID authority.
+- Final production SHA: `368bb74fb7817d2206edc52b0db52b4d864df4dc`.
+- Final repair validation: typecheck `30861287603`, all eight Operator shards `30861297740`, full push validation `30861278734`, exact-SHA deployment and production verification `30861452174`.
+- No Main, Innovation, shadow, or unrelated cycle remains active.
 
-- Prohibited diversion: do not start another Main, Innovation, shadow, or unrelated engineering job while this active cycle remains incomplete.
+
 
 ## Completed Unified Source Ranking Pass: unified-source-ranking-v2-20260803
 
