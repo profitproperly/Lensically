@@ -906,8 +906,13 @@ function projectSelectionDetail(row: JsonRecord): JsonRecord {
       ranking_score: Number.isFinite(Number(receipt.ranking_score)) ? Number(receipt.ranking_score) : null,
       global_rank: Number.isFinite(Number(receipt.global_rank)) ? Number(receipt.global_rank) : null,
       cycle_coverage_bonus: Number.isFinite(Number(receipt.cycle_coverage_bonus)) ? Number(receipt.cycle_coverage_bonus) : null,
-      development_resolution_priority: Number.isFinite(Number(receipt.development_resolution_priority))
+            development_resolution_priority: Number.isFinite(Number(receipt.development_resolution_priority))
         ? Number(receipt.development_resolution_priority)
+        : null,
+      evidence_debt_bonus: Number.isFinite(Number(receipt.evidence_debt_bonus)) ? Number(receipt.evidence_debt_bonus) : null,
+      waiting_priority: Number.isFinite(Number(receipt.waiting_priority)) ? Number(receipt.waiting_priority) : null,
+      historical_opportunity_count: Number.isFinite(Number(receipt.historical_opportunity_count))
+        ? Number(receipt.historical_opportunity_count)
         : null,
       exploration_bonus: Number.isFinite(Number(receipt.exploration_bonus)) ? Number(receipt.exploration_bonus) : null,
       recent_factor: Number.isFinite(Number(receipt.recent_factor)) ? Number(receipt.recent_factor) : null,
