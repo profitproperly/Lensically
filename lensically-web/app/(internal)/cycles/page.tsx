@@ -1109,28 +1109,27 @@ export default function CyclesPage() {
                                   </dl>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                  <h3 className="text-sm font-semibold text-slate-950">Source contract</h3>
+                                                                    <h3 className="text-sm font-semibold text-slate-950">Source lineage</h3>
                                   <dl className="mt-3">
-                                    <KeyValue label="Mechanism" value={detail.source_mechanism || "Unavailable"} />
-                                    <KeyValue label="Required product" value={detail.required_product || "Unavailable"} />
-                                    <KeyValue label="Direction" value={detail.recommended_direction || "Unavailable"} />
-                                    <KeyValue label="Source card" value={<code className="break-all text-xs">{detail.source_card_id || "Unavailable"}</code>} />
-                                    <KeyValue label="Family" value={<code className="break-all text-xs">{detail.source_card_family_id || "Unavailable"}</code>} />
+                                    <KeyValue label="Required output" value={detail.required_product || "Unavailable"} />
+                                    <KeyValue label="Recommended direction" value={detail.recommended_direction || "Unavailable"} />
+                                    <KeyValue label="Current source card" value={<code className="break-all text-xs">{detail.source_card_id || "Unavailable"}</code>} />
+                                    <KeyValue label="Exact source-card family" value={<code className="break-all text-xs">{detail.source_card_family_id || "Unavailable"}</code>} />
                                   </dl>
                                 </div>
                               </div>
 
                               <div className="grid gap-4 lg:grid-cols-3">
-                                <details className="rounded-2xl border border-slate-200 bg-white p-4" open>
-                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Score factors</summary>
+                                                                <details className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Technical ranking factors</summary>
                                   <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-slate-700">{JSON.stringify(detail.score_factors ?? {}, null, 2)}</pre>
                                 </details>
-                                <details className="rounded-2xl border border-slate-200 bg-white p-4" open>
-                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Exposure checks</summary>
+                                                                <details className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Historical usage evidence</summary>
                                   <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-slate-700">{JSON.stringify(detail.exposure_checks ?? {}, null, 2)}</pre>
                                 </details>
-                                <details className="rounded-2xl border border-slate-200 bg-white p-4" open>
-                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Audition state</summary>
+                                                                <details className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">Legacy evidence fields</summary>
                                   <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-slate-700">{JSON.stringify(detail.audition ?? {}, null, 2)}</pre>
                                 </details>
                               </div>
