@@ -808,7 +808,7 @@ async function readInnovationSummary(
 
 function selectionFilterTokens(receipt: JsonRecord): string[] {
   const tokens = new Set<string>();
-  for (const key of ["allocation_tier", "audition_state", "lifetime_label", "recent_label", "strategic_role"]) {
+    for (const key of ["selection_lane", "allocation_tier", "lifetime_label", "strategic_role"]) {
     const value = asText(receipt[key])?.toLowerCase().replace(/\s+/g, "_");
     if (value) tokens.add(value);
   }
@@ -825,9 +825,15 @@ function projectSelectionRow(row: JsonRecord): JsonRecord {
     ?? asText(receipt.source_text)
     ?? extractSourceText(primarySource);
   const title = asText(row.title);
-  const auditionState = asText(receipt.audition_state) ?? asText(row.lifetime_label);
+    const lifetimeLabel = asText(receipt.lifetime_label ?? row.lifetime_label);
+  const auditionState = asText(receipt.audition_state) ?? lifetimeLabel;
   const allocationTier = asText(receipt.allocation_tier) ?? asText(receipt.strategic_role);
+  const selectionLane = asText(receipt.selection_lane)
+    ?? (allocationTier === "winner" ? "exploit" : allocationTier === "development" ? "develop" : "explore");
   const score = Number.isFinite(Number(receipt.score)) ? Number(receipt.score) : null;
+  const unifiedRating = Number.isFinite(Number(receipt.unified_rating)) ? Number(receipt.unified_rating) : null;
+  const rankingScore = Number.isFinite(Number(receipt.ranking_score)) ? Number(receipt.ranking_score) : null;
+  const globalRank = Number.isFinite(Number(receipt.global_rank)) ? Number(receipt.global_rank) : null;
   const persistedReason = extractPersistedReason(receipt);
   return {
     slot_key: asText(row.slot_key ?? row.assigned_slot_key),
@@ -845,13 +851,19 @@ function projectSelectionRow(row: JsonRecord): JsonRecord {
       ? null
       : asNumber(row.scheduled_post_id),
     scheduled_post_status: asText(row.scheduled_post_status),
-    source_history_scope: "exact_source_identity",
-    family_state: auditionState,
+        source_history_scope: "exact_source_identity",
+    family_state: lifetimeLabel,
+    lifecycle_label: lifetimeLabel,
     audition_state: auditionState,
     allocation_tier: allocationTier,
-    lifetime_label: asText(receipt.lifetime_label ?? row.lifetime_label),
-    recent_label: asText(receipt.recent_label ?? row.recent_label),
+    selection_lane: selectionLane,
+    lifetime_label: lifetimeLabel,
+    recent_label: null,
     confidence_label: asText(receipt.confidence_label ?? row.confidence_label),
+    matured_result_count: Number.isFinite(Number(receipt.lifetime_sample_size)) ? Number(receipt.lifetime_sample_size) : null,
+    unified_rating: unifiedRating,
+    ranking_score: rankingScore,
+    global_rank: globalRank,
     score,
     engine_version: asText(row.engine_version ?? receipt.policy_version ?? receipt.engine_version),
     preselection_policy_version: asText(receipt.preselection_policy_version),
@@ -888,8 +900,15 @@ function projectSelectionDetail(row: JsonRecord): JsonRecord {
     required_product: asText(row.required_product ?? receipt.required_product),
     recommended_direction: asText(row.recommended_direction ?? receipt.recommended_direction),
     persisted_reason: extractPersistedReason(receipt),
-    score_factors: {
+        score_factors: {
       score: Number.isFinite(Number(receipt.score)) ? Number(receipt.score) : null,
+      unified_rating: Number.isFinite(Number(receipt.unified_rating)) ? Number(receipt.unified_rating) : null,
+      ranking_score: Number.isFinite(Number(receipt.ranking_score)) ? Number(receipt.ranking_score) : null,
+      global_rank: Number.isFinite(Number(receipt.global_rank)) ? Number(receipt.global_rank) : null,
+      cycle_coverage_bonus: Number.isFinite(Number(receipt.cycle_coverage_bonus)) ? Number(receipt.cycle_coverage_bonus) : null,
+      development_resolution_priority: Number.isFinite(Number(receipt.development_resolution_priority))
+        ? Number(receipt.development_resolution_priority)
+        : null,
       exploration_bonus: Number.isFinite(Number(receipt.exploration_bonus)) ? Number(receipt.exploration_bonus) : null,
       recent_factor: Number.isFinite(Number(receipt.recent_factor)) ? Number(receipt.recent_factor) : null,
       shrunk_performance: Number.isFinite(Number(receipt.shrunk_performance)) ? Number(receipt.shrunk_performance) : null,
