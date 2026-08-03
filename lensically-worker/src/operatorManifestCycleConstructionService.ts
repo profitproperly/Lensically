@@ -181,7 +181,11 @@ function compactOperatorManifestThreadsSnapshot(snapshot: JsonRecord): JsonRecor
       evaluator_version: evaluation.evaluator_version ?? null,
       maturity_scores_upserted: Number(evaluation.maturity_scores_upserted ?? 0),
       evidence_records: Number(evaluation.evidence_records ?? 0),
-      manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
+            manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
+      manifest_layers_finalized: evaluation.manifest_layers_finalized === true,
+      durable_snapshot_reused: evaluation.durable_snapshot_reused === true,
+      ready_snapshot_reused: evaluation.ready_snapshot_reused === true,
+      ready_snapshot_id: evaluation.ready_snapshot_id ?? null,
     },
     error: snapshot.error ?? null,
   };
@@ -239,10 +243,15 @@ export async function constructOperatorManifestAutonomousCycle(
   await dependencies.ensureRequiredSchemas();
 
   const performanceEvaluation = record(boundedThreadsSnapshot.performance_evaluation);
+    const readySnapshotReused = performanceEvaluation.ready_snapshot_reused === true;
   const intelligenceEngineRefresh = {
-    mode: "autonomous_prepare_live_refresh",
-    recomputed: true,
-    refresh_owner: "autonomous_prepare",
+    mode: readySnapshotReused
+      ? "durable_ready_snapshot_reused"
+      : "autonomous_prepare_live_refresh",
+    recomputed: !readySnapshotReused,
+    refresh_owner: readySnapshotReused
+      ? "performance_evaluator_and_insights_cycle"
+      : "autonomous_prepare",
     due_checkpoint_post_count: boundedThreadsSnapshot.due_checkpoint_post_count,
     due_checkpoint_count: boundedThreadsSnapshot.due_checkpoint_count,
     processed_due_checkpoint_count: boundedThreadsSnapshot.processed_due_checkpoint_count,
@@ -253,7 +262,11 @@ export async function constructOperatorManifestAutonomousCycle(
     evaluator_version: performanceEvaluation.evaluator_version ?? null,
     maturity_scores_upserted: Number(performanceEvaluation.maturity_scores_upserted ?? 0),
     evidence_records: Number(performanceEvaluation.evidence_records ?? 0),
-    reason: "Autonomous preparation refreshed bounded live Threads evidence, persisted every currently due maturity checkpoint, and recomputed evaluator intelligence before strategy consumption.",
+        ready_snapshot_reused: readySnapshotReused,
+    ready_snapshot_id: performanceEvaluation.ready_snapshot_id ?? null,
+    reason: readySnapshotReused
+      ? "Autonomous preparation refreshed only live deltas and reused the watermark-validated Ready Snapshot produced by the recurring evaluator."
+      : "Autonomous preparation refreshed bounded live Threads evidence, persisted every currently due maturity checkpoint, and recomputed evaluator intelligence before strategy consumption.",
   };
 
   const patternStates = await dependencies.readSavedPatternStates(accountId, brandKey);

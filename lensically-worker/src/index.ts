@@ -112,6 +112,10 @@ import {
 import { handleOperatorHourlyCoverageService } from "./operatorHourlyCoverageService";
 import { orchestrateOperatorManifestPrepareCheckpoint } from "./operatorManifestPreparationOrchestratorService";
 import {
+  readManifestReadySnapshot,
+  writeManifestReadySnapshot,
+} from "./operatorManifestReadySnapshotService";
+import {
   buildManifestDecisionBundle,
   consumeManifestDecisionBundle,
 } from "./operatorManifestDecisionBundleService";
@@ -11213,7 +11217,11 @@ export function compactManifestPrepareThreadsSnapshot(
       evaluator_version: evaluation.evaluator_version ?? null,
       maturity_scores_upserted: Number(evaluation.maturity_scores_upserted ?? 0),
       evidence_records: Number(evaluation.evidence_records ?? 0),
-      manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
+            manifest_layers_deferred: evaluation.manifest_layers_deferred === true,
+      manifest_layers_finalized: evaluation.manifest_layers_finalized === true,
+      durable_snapshot_reused: evaluation.durable_snapshot_reused === true,
+      ready_snapshot_reused: evaluation.ready_snapshot_reused === true,
+      ready_snapshot_id: evaluation.ready_snapshot_id ?? null,
     },
     error: snapshot.error ?? null,
   };
@@ -11285,11 +11293,27 @@ async function prepareManifestAutonomousCycle(
        ORDER BY datetime(generated_at) DESC LIMIT 1`,
     ).bind(brandKey).first<Record<string, unknown>>(),
     parseJson: safeParseJsonString,
-    updateActiveLearningBrief: (input) => env.DB.prepare(
+        updateActiveLearningBrief: (input) => env.DB.prepare(
       `UPDATE operator_generation_learning_briefs
        SET brief_json = ?
        WHERE id = ? AND brand_key = ?`,
     ).bind(normalizeOperatorJson(input.brief, {}), input.id, input.brandKey).run(),
+    readReadySnapshot: (input) => readManifestReadySnapshot(env.DB, {
+      brandKey: String(input.brand_key ?? brand.brand_key),
+      accountId: String(input.account_id ?? brand.account_id),
+      savedPatternsAppUserId: SAVED_PATTERNS_APP_USER_ID,
+      sourceMinimumVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      nowMs: Date.now(),
+    }) as Promise<Record<string, unknown>>,
+    writeReadySnapshot: (input) => writeManifestReadySnapshot(env.DB, {
+      brandKey: String(input.brand_key ?? brand.brand_key),
+      accountId: String(input.account_id ?? brand.account_id),
+      savedPatternsAppUserId: SAVED_PATTERNS_APP_USER_ID,
+      sourceMinimumVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      learningBriefId: String(input.learning_brief_id ?? ""),
+      generatedAt: String(input.generated_at ?? new Date().toISOString()),
+      payload: operatorRecord(input.payload),
+    }),
     now: () => new Date().toISOString(),
   });
   if (checkpointResult.handled) return checkpointResult.response;
@@ -27597,12 +27621,30 @@ async function refreshOperatorPerformanceEvaluator(
     briefId, brandKey, selectedCheckpoint?.checkpoint ?? null, matureSampleSize,
     normalizeOperatorJson(brief, {}), OPERATOR_PERFORMANCE_EVALUATOR_VERSION, generatedAt,
     ).run();
-    const contentFocus = deferManifestLayers ? null : await refreshOperatorContentFocus(env, brandKey);
+        const contentFocus = deferManifestLayers ? null : await refreshOperatorContentFocus(env, brandKey);
+  const readySnapshot = deferManifestLayers
+    ? null
+    : await writeManifestReadySnapshot(env.DB, {
+      brandKey,
+      accountId,
+      savedPatternsAppUserId: SAVED_PATTERNS_APP_USER_ID,
+      sourceMinimumVerifiedLikes: MANIFEST_SOURCE_MIN_VERIFIED_LIKES,
+      learningBriefId: briefId,
+      generatedAt,
+      payload: {
+        manifest_layers_finalized: true,
+        evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+        intelligence_engine: intelligenceEngine,
+        measurement_audit: measurementAudit,
+        content_focus: contentFocus,
+      },
+    });
   return {
     ok: true,
-    evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
+        evaluator_version: OPERATOR_PERFORMANCE_EVALUATOR_VERSION,
     manifest_layers_deferred: deferManifestLayers,
                 content_focus: contentFocus,
+    ready_snapshot: readySnapshot,
     intelligence_engine: intelligenceEngine,
     measurement_audit: measurementAudit,
     fingerprinted_posts: fingerprintedPosts,
