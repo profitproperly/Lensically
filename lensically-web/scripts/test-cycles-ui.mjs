@@ -25,8 +25,13 @@ assert.match(page, /Show all/, "Cycle details must start compact and expose Show
 assert.match(page, /toggleSelectionDetail/, "Selection details must be expansion-driven");
 assert.match(page, /Scheduled output and source evidence/, "Main Cycle must separate scheduled output from source evidence");
 assert.match(page, /Source used:/, "Main Cycle rows must identify the locked source separately");
-assert.match(page, /Exact-source history/, "Exact-source audition state must be scoped honestly");
+assert.match(page, /How to read this page/, "Cycles must include a visible plain-English glossary");
+assert.match(page, /Proven mechanism, untested source/, "Glossary must explain mechanism and exact-source scope separately");
+assert.match(page, /Selection lane:/, "Cycle badges must use plain-English selection-lane wording");
+assert.match(page, /Exact-source status:/, "Cycle badges must identify exact-source scope explicitly");
+assert.doesNotMatch(page, /Source allocation:/, "Cycles must not expose the ambiguous Source allocation badge wording");
 assert.doesNotMatch(page, /<KeyValue label="Family state"/, "Exact-source status must not be presented as broad family performance");
 assert.doesNotMatch(page, /\bCompare\b/, "Cycles must not include a Compare surface");
+
 assert.doesNotMatch(page, /dropdown|submenu|chevron/i, "Cycles must not introduce dropdown behavior");
 console.log("cycles_ui_contract_tests_passed");

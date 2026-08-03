@@ -255,6 +255,96 @@ function titleCase(value: string | null | undefined): string {
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+const EXECUTION_MODE_COPY: Record<string, { label: string; description: string }> = {
+  controlled_variation: {
+    label: "Controlled variation",
+    description: "A close, source-backed rewrite that preserves the source mechanism and payoff while changing only what is necessary.",
+  },
+  franchise_deployment: {
+    label: "Franchise deployment",
+    description: "An intentional deployment of a hook or mechanism the account-level strategy already considers strong.",
+  },
+  mechanism_expansion: {
+    label: "Mechanism expansion",
+    description: "A source-backed use of a known mechanism with a meaningfully different payoff, angle, or structure.",
+  },
+  adjacent_experiment: {
+    label: "Adjacent experiment",
+    description: "A deliberate test of a nearby source-backed variation. This is the clearest true experiment label.",
+  },
+};
+
+const ALLOCATION_COPY: Record<string, { label: string; description: string }> = {
+  winner: {
+    label: "Winner lane",
+    description: "The exact source identity has enough account evidence to be treated as proven or franchise-level.",
+  },
+  development: {
+    label: "Development lane",
+    description: "The exact source identity has encouraging evidence but has not fully earned winner status.",
+  },
+  exploration: {
+    label: "Evidence-building lane",
+    description: "The exact source identity needs more account evidence. This does not mean the broader hook, mechanism, or format is new.",
+  },
+};
+
+const EXACT_SOURCE_STATUS_COPY: Record<string, { label: string; description: string }> = {
+  untested: {
+    label: "No exact-source results yet",
+    description: "No matured Manifest Mental result is linked to this exact Saved Pattern identity.",
+  },
+  probation: {
+    label: "One weak result",
+    description: "The exact source has one failed audition result and one remaining chance before it is benched.",
+  },
+  provisional_pass: {
+    label: "One positive result",
+    description: "The exact source has one passing result and needs another result to graduate.",
+  },
+  tiebreaker: {
+    label: "One pass, one fail",
+    description: "The exact source needs one more result to determine whether it graduates or is benched.",
+  },
+  graduated: {
+    label: "Exact source graduated",
+    description: "The exact source earned at least two passing audition results.",
+  },
+  underperforming: {
+    label: "Exact source underperforming",
+    description: "The exact source accumulated enough weak results to be suppressed or benched.",
+  },
+};
+
+function executionModeCopy(value: string | null | undefined) {
+  return EXECUTION_MODE_COPY[String(value ?? "")] ?? {
+    label: titleCase(value),
+    description: "The persisted generation method used for the scheduled output.",
+  };
+}
+
+function allocationCopy(value: string | null | undefined) {
+  return ALLOCATION_COPY[String(value ?? "")] ?? {
+    label: titleCase(value),
+    description: "The selector lane assigned to this exact source identity.",
+  };
+}
+
+function exactSourceStatusCopy(value: string | null | undefined) {
+  return EXACT_SOURCE_STATUS_COPY[String(value ?? "")] ?? {
+    label: titleCase(value),
+    description: "The audition status of this exact Saved Pattern identity only.",
+  };
+}
+
+function filterLabel(value: string): string {
+  return EXECUTION_MODE_COPY[value]?.label
+    ?? ALLOCATION_COPY[value]?.label
+    ?? EXACT_SOURCE_STATUS_COPY[value]?.label
+    ?? titleCase(value);
+}
+
+
 function slotLabel(value: string | null | undefined): string {
   if (!value) return "Unknown slot";
   const parsed = Date.parse(value);
@@ -285,9 +375,10 @@ function statusClass(value: string | null | undefined): string {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">{children}</span>;
+function Badge({ children, title }: { children: React.ReactNode; title?: string }) {
+  return <span title={title} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">{children}</span>;
 }
+
 
 function StateBadge({ value }: { value: string | null | undefined }) {
   return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(value)}`}>{value || "Unavailable"}</span>;
@@ -312,7 +403,46 @@ function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function GlossaryTerm({ term, meaning }: { term: string; meaning: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <dt className="text-sm font-semibold text-slate-950">{term}</dt>
+      <dd className="mt-1 text-sm leading-6 text-slate-600">{meaning}</dd>
+    </div>
+  );
+}
+
+function CycleGlossary() {
+  return (
+    <details open className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
+      <summary className="cursor-pointer text-sm font-semibold text-sky-950">How to read this page</summary>
+      <p className="mt-3 max-w-4xl text-sm leading-6 text-sky-900">
+        Every slot contains two separate objects: the actual scheduled post and the exact Saved Pattern source used to create it. Labels about the exact source do not automatically describe the broader hook or mechanism.
+      </p>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <GlossaryTerm term="Scheduled output" meaning="The exact post text that was scheduled for the displayed hour." />
+        <GlossaryTerm term="Source used" meaning="The Saved Pattern or source card that supplied the premise, structure, hook, or payoff." />
+        <GlossaryTerm term="Mechanism" meaning="The broader repeatable idea, such as a finger-touch activation, Universe request, money question, or reader-address hook." />
+        <GlossaryTerm term="Exact source identity" meaning="One specific Saved Pattern record. Two similar finger-touch sources can have different exact-source histories." />
+        <GlossaryTerm term="Execution mode" meaning="How the model adapted the source for the scheduled post. Controlled variation is not automatically an experiment." />
+        <GlossaryTerm term="Selection lane" meaning="How much evidence the selector has for the exact source identity: Winner, Development, or Evidence-building." />
+        <GlossaryTerm term="Experimental / exploration" meaning="The exact source is being used to gather evidence. It does not mean the account has never used or proven the broader mechanism." />
+        <GlossaryTerm term="Exact-source status" meaning="The audition record for this exact source only: no results, one pass, one fail, tiebreaker, graduated, or underperforming." />
+        <GlossaryTerm term="Lifetime label" meaning="Long-run exact-source performance: Untested, Prospect, Emerging, Proven, Franchise, or Underperforming." />
+        <GlossaryTerm term="Recent label" meaning="Recent exact-source direction: No recent data, Hot, Healthy, Cooling, Cold, or Recovering." />
+        <GlossaryTerm term="Confidence" meaning="How dependable the exact-source classification is: Low, Developing, Directional, or Reliable." />
+        <GlossaryTerm term="Score" meaning="A selector ranking used within that cycle. It is not a predicted like count or an overall quality grade." />
+        <GlossaryTerm term="72-hour cooldown" meaning="The same exact source cannot be reused too soon. Separate semantic checks can also block a different source that produces a very similar post." />
+        <GlossaryTerm term="Proven mechanism, untested source" meaning="A valid combination: the account may have proven the broader hook while this particular Saved Pattern identity has no linked matured results." />
+        <GlossaryTerm term="Franchise deployment" meaning="The strategy intentionally uses an account-level mechanism it already considers strong. This is different from an exact source receiving the Franchise lifetime label." />
+      </div>
+    </details>
+  );
+}
+
 export default function CyclesPage() {
+
   const [rail, setRail] = useState<Rail>("main");
   const [railState, setRailState] = useState<RailStateResponse | null>(null);
   const [stateLoading, setStateLoading] = useState(true);
@@ -787,7 +917,10 @@ export default function CyclesPage() {
               ) : null}
             </div>
 
+                        <CycleGlossary />
+
             {supportedFilters.length ? (
+
               <div className="mt-5 flex flex-wrap gap-2" aria-label="Source-selection filters">
                 <button
                   type="button"
@@ -808,9 +941,10 @@ export default function CyclesPage() {
                       "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                       filter === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-500",
                     ].join(" ")}
-                  >
-                    {titleCase(value)}
+                                    >
+                    {filterLabel(value)}
                   </button>
+
                 ))}
               </div>
             ) : null}
@@ -848,9 +982,18 @@ export default function CyclesPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm font-semibold text-slate-950">{slotLabel(row.slot_key)}</span>
-                            {row.scheduled_generation_mode ? <Badge>Execution: {titleCase(row.scheduled_generation_mode)}</Badge> : null}
-                            <Badge>Source allocation: {titleCase(row.allocation_tier)}</Badge>
-                            <Badge>Exact source: {titleCase(row.audition_state || row.family_state)}</Badge>
+                                                        {row.scheduled_generation_mode ? (
+                              <Badge title={executionModeCopy(row.scheduled_generation_mode).description}>
+                                Execution mode: {executionModeCopy(row.scheduled_generation_mode).label}
+                              </Badge>
+                            ) : null}
+                            <Badge title={allocationCopy(row.allocation_tier).description}>
+                              Selection lane: {allocationCopy(row.allocation_tier).label}
+                            </Badge>
+                            <Badge title={exactSourceStatusCopy(row.audition_state || row.family_state).description}>
+                              Exact-source status: {exactSourceStatusCopy(row.audition_state || row.family_state).label}
+                            </Badge>
+
                           </div>
                           <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-900">
                             {row.scheduled_post_text || row.source_shorthand || row.source_title || "Scheduled output unavailable"}
@@ -888,7 +1031,10 @@ export default function CyclesPage() {
                                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Scheduled output</p>
                                   <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-950">{detail.scheduled_post_text}</p>
                                   <div className="mt-3 flex flex-wrap gap-2">
-                                    <Badge>Execution: {titleCase(detail.scheduled_generation_mode)}</Badge>
+                                                                        <Badge title={executionModeCopy(detail.scheduled_generation_mode).description}>
+                                      Execution mode: {executionModeCopy(detail.scheduled_generation_mode).label}
+                                    </Badge>
+
                                     <Badge>Status: {titleCase(detail.scheduled_post_status)}</Badge>
                                     {detail.scheduled_post_id ? <Badge>Post #{formatNumber(detail.scheduled_post_id)}</Badge> : null}
                                   </div>
@@ -905,9 +1051,12 @@ export default function CyclesPage() {
                                   <h3 className="text-sm font-semibold text-slate-950">Why it qualified</h3>
                                   <p className="mt-3 text-sm leading-6 text-slate-700">{detail.persisted_reason || "A concise persisted reason is unavailable for this historical receipt."}</p>
                                   <dl className="mt-3">
-                                                                        <KeyValue label="Exact-source history" value={titleCase(detail.audition_state || detail.family_state)} />
-                                    <KeyValue label="History scope" value="This exact Saved Pattern identity only" />
-                                    <KeyValue label="Source allocation" value={titleCase(detail.allocation_tier)} />
+                                                                                                            <KeyValue label="Exact-source status" value={exactSourceStatusCopy(detail.audition_state || detail.family_state).label} />
+                                    <KeyValue label="What that means" value={exactSourceStatusCopy(detail.audition_state || detail.family_state).description} />
+                                    <KeyValue label="History scope" value="This exact Saved Pattern identity only, not the broader hook or mechanism" />
+                                    <KeyValue label="Selection lane" value={allocationCopy(detail.allocation_tier).label} />
+                                    <KeyValue label="Why that lane" value={allocationCopy(detail.allocation_tier).description} />
+
                                     <KeyValue label="Selector" value={detail.engine_version || "Unavailable"} />
                                     <KeyValue label="Policy" value={detail.preselection_policy_version || "Unavailable"} />
                                     <KeyValue label="Policy hash" value={<code className="break-all text-xs">{detail.preselection_policy_hash || "Unavailable"}</code>} />
