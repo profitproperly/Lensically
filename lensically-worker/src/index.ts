@@ -18509,10 +18509,11 @@ async function beginOperatorOperationReceipt(
     }
     return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created: false };
   }
-  const insert = await env.DB.prepare(
+    const inserted = await env.DB.prepare(
     `INSERT OR IGNORE INTO operator_operation_receipts (
       idempotency_key, brand_key, workflow_session_id, operation_type, tool_name, request_fingerprint, status
-    ) VALUES (?, ?, ?, ?, ?, ?, 'started')`,
+    ) VALUES (?, ?, ?, ?, ?, ?, 'started')
+    RETURNING idempotency_key`,
   ).bind(
     key,
         OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args),
@@ -18520,9 +18521,10 @@ async function beginOperatorOperationReceipt(
     toolName,
     toolName,
     fingerprint,
-  ).run();
-  const created = Number(insert.meta?.changes ?? 0) > 0;
+  ).first<{ idempotency_key: string }>();
+  const created = String(inserted?.idempotency_key ?? "") === key;
   return { existing: await readOperatorOperationReceipt(env, key), fingerprint, created };
+
 }
 
 async function completeOperatorOperationReceipt(env: Env, key: string, result: Record<string, unknown>): Promise<void> {
