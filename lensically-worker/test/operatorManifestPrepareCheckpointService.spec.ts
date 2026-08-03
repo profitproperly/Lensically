@@ -29,7 +29,9 @@ function createHarness() {
     refreshContentFocus: vi.fn(async () => ({ status: "repeat" })),
     readActiveLearningBrief: vi.fn(async () => null as JsonRecord | null),
     parseJson: vi.fn((value: string) => JSON.parse(value) as unknown),
-    updateActiveLearningBrief: vi.fn(async () => undefined),
+        updateActiveLearningBrief: vi.fn(async () => undefined),
+    readReadySnapshot: vi.fn(async () => ({ reusable: false, reason: "snapshot_missing" } as JsonRecord)),
+    writeReadySnapshot: vi.fn(async () => ({ id: "manifest-ready:manifest_mental" } as JsonRecord)),
     now: vi.fn(() => "2026-07-27T18:00:00.000Z"),
   };
   const dependencies: OperatorManifestPrepareCheckpointDependencies = {
@@ -54,7 +56,9 @@ function createHarness() {
     refreshContentFocus: mocks.refreshContentFocus,
     readActiveLearningBrief: mocks.readActiveLearningBrief,
     parseJson: mocks.parseJson,
-    updateActiveLearningBrief: mocks.updateActiveLearningBrief,
+        updateActiveLearningBrief: mocks.updateActiveLearningBrief,
+    readReadySnapshot: mocks.readReadySnapshot,
+    writeReadySnapshot: mocks.writeReadySnapshot,
     now: mocks.now,
   };
   return { dependencies, mocks };
@@ -159,25 +163,30 @@ describe("Operator Manifest prepare checkpoint service", () => {
       processed_due_checkpoint_count: 0,
       performance_evaluation: { manifest_layers_deferred: true },
     });
-    mocks.readActiveLearningBrief.mockResolvedValueOnce({
-      id: "brief-fresh",
-      generated_at: "2026-07-27T17:30:00.000Z",
-      brief_json: "{\"manifest_layers_finalized\":true}",
+        mocks.readReadySnapshot.mockResolvedValueOnce({
+      reusable: true,
+      snapshot_id: "manifest-ready:manifest_mental",
+      learning_brief_id: "brief-fresh",
+      age_ms: 1_800_000,
     });
 
     const result = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
     expect(result).toEqual({
       handled: true,
       response: expect.objectContaining({
-        stage_completed: "delta_learning_reused",
+        stage_completed: "delta_ready_snapshot_reused",
         next_stage: "cycle_construction",
+        durable_ready_snapshot_id: "manifest-ready:manifest_mental",
         delta_refresh_required: false,
       }),
     });
     expect(mocks.refreshIntelligenceEngine).not.toHaveBeenCalled();
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
       phase: "cycle_construction",
-      state: expect.objectContaining({ durable_learning_snapshot_id: "brief-fresh" }),
+            state: expect.objectContaining({
+        durable_ready_snapshot_id: "manifest-ready:manifest_mental",
+        durable_learning_snapshot_id: "brief-fresh",
+      }),
     }));
   });
 
@@ -206,10 +215,11 @@ describe("Operator Manifest prepare checkpoint service", () => {
         processed_due_checkpoint_count: 0,
         performance_evaluation: { manifest_layers_deferred: true },
       });
-    mocks.readActiveLearningBrief.mockResolvedValueOnce({
-      id: "brief-fresh",
-      generated_at: "2026-07-27T17:30:00.000Z",
-      brief_json: "{\"manifest_layers_finalized\":true}",
+        mocks.readReadySnapshot.mockResolvedValueOnce({
+      reusable: true,
+      snapshot_id: "manifest-ready:manifest_mental",
+      learning_brief_id: "brief-fresh",
+      age_ms: 1_800_000,
     });
 
     const result = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
@@ -228,7 +238,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
           safety_stop: false,
           phase_path: [
             "live_collection->live_evaluator",
-            "delta_learning_reused->cycle_construction",
+                        "delta_ready_snapshot_reused->cycle_construction",
           ],
         }),
       }),
@@ -288,10 +298,14 @@ describe("Operator Manifest prepare checkpoint service", () => {
     mocks.readActiveLearningBrief.mockResolvedValueOnce({ id: "brief-1", brief_json: "{\"existing\":true}" });
 
     const finalized = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
-    expect(mocks.updateActiveLearningBrief).toHaveBeenCalledWith(expect.objectContaining({
+        expect(mocks.updateActiveLearningBrief).toHaveBeenCalledWith(expect.objectContaining({
       id: "brief-1",
       brandKey: "manifest_mental",
       brief: expect.objectContaining({ manifest_layers_finalized: true }),
+    }));
+    expect(mocks.writeReadySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      learning_brief_id: "brief-1",
+      payload: expect.objectContaining({ manifest_layers_finalized: true }),
     }));
     expect(finalized).toEqual({
       handled: true,
