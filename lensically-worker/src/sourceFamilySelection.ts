@@ -531,22 +531,22 @@ export async function refreshSourceFamilyLabels(
     const rows = (evidenceByFamily.get(familyId) ?? []).sort((left, right) =>
       String(left.posted_at ?? left.captured_at).localeCompare(String(right.posted_at ?? right.captured_at))
     );
-    const lifetimeLikes = rows.map(likesFromRow);
-    const recentRows = rows.filter(isRecent);
-    const recentLikes = recentRows.map(likesFromRow);
+        const lifetimeLikes = rows.map(likesFromRow);
     const lifetimeIndexes = lifetimeLikes.map((likes) => normalizedIndex(likes, accountLifetimeMedian));
-    const recentIndexes = recentLikes.map((likes) => normalizedIndex(likes, accountRecentMedian));
-    const previous = previousByFamily.get(familyId);
-    const lifetime = classifySourceFamilyLifetime({ indexes: lifetimeIndexes });
-    const recent = classifySourceFamilyRecent({
-      recent_indexes: recentIndexes,
-      previous_label: previous?.recent_label as SourceFamilyRecentLabel | null | undefined,
+    const ageDays = rows.map((row) => {
+      const observedMs = parseTimeMs(row.posted_at ?? row.captured_at);
+      return observedMs === null ? 0 : Math.max(0, (nowMs - observedMs) / 86400000);
     });
+    const previous = previousByFamily.get(familyId);
+    const lifetime = classifySourceFamilyLifetime({ indexes: lifetimeIndexes, age_days: ageDays });
     const familyLifetimeMedian = median(lifetimeLikes);
-    const familyRecentMedian = median(recentLikes);
     const state = {
       policy_version: SOURCE_FAMILY_LABEL_POLICY_VERSION,
-            lifetime: {
+      lifecycle_label: lifetime.label,
+      selection_lane: lifetime.selection_lane,
+      unified_rating: lifetime.unified_rating,
+      ranking_score: lifetime.ranking_score,
+      lifetime: {
         label: lifetime.label,
         audition_state: lifetime.audition_state,
         audition_passes: lifetime.audition_passes,
@@ -554,22 +554,18 @@ export async function refreshSourceFamilyLabels(
         audition_opportunities_remaining: lifetime.audition_opportunities_remaining,
         graduated: lifetime.graduated,
         sample_size: lifetimeLikes.length,
-
+        effective_sample_size: lifetime.effective_sample_size,
         median_likes: familyLifetimeMedian,
         account_median_likes: accountLifetimeMedian,
         median_index: lifetime.median_index,
+        unified_rating: lifetime.unified_rating,
+        ranking_score: lifetime.ranking_score,
+        selection_lane: lifetime.selection_lane,
         probability_above_median: lifetime.probability_above_median,
         probability_above_franchise_floor: lifetime.probability_above_franchise_floor,
         probability_below_underperformance_floor: lifetime.probability_below_underperformance_floor,
       },
-      recent_28d: {
-        label: recent.label,
-        sample_size: recentLikes.length,
-        median_likes: familyRecentMedian,
-        account_median_likes: accountRecentMedian,
-        median_index: recent.median_index,
-        latest_two_index: recent.latest_two_index,
-      },
+      recent_classification: "retired",
       confidence_label: lifetime.confidence_label,
       updated_at: nowIso,
     };
