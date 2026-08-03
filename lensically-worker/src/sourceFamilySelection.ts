@@ -30,7 +30,7 @@ export type SourceFamilyAuditionState =
 export function normalizeSourceFamilyLifetimeLabel(value: unknown): SourceFamilyLifetimeLabel {
   const normalized = String(value ?? "untested");
   if (normalized === "disproven") return "underperforming";
-  if (["untested", "prospect", "emerging", "proven", "franchise", "underperforming"].includes(normalized)) {
+    if (["untested", "probation", "tiebreaker", "prospect", "emerging", "proven", "franchise", "underperforming"].includes(normalized)) {
     return normalized as SourceFamilyLifetimeLabel;
   }
   return "untested";
