@@ -1363,44 +1363,38 @@ export async function validateLineupAgainstLockedSourceSelectionPlan(
     const plan = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
   if (!plan.length) throw new Error("locked_source_selection_plan_missing");
   if (plan.length !== input.lineup.length) throw new Error("locked_source_selection_plan_lineup_count_mismatch");
-  const seenSources = new Set<string>();
-  const semanticSlots = new Map<string, string[]>();
+    const seenSourceLanes = new Map<string, UnifiedSelectionLane>();
   for (const row of plan) {
     const receipt = row.receipt && typeof row.receipt === "object" && !Array.isArray(row.receipt)
       ? row.receipt as Record<string, unknown>
       : {};
     const slotKey = String(row.slot_key ?? "");
     const sourceIdentityKey = String(row.source_identity_key ?? "");
-    const lifetimeLabel = String(receipt.lifetime_label ?? "");
-    const semanticKey = String(receipt.semantic_key ?? "");
+    const lifetimeLabel = normalizeSourceFamilyLifetimeLabel(receipt.lifetime_label);
+    const selectionLane = String(receipt.selection_lane ?? selectionLaneForLifecycle(lifetimeLabel)) as UnifiedSelectionLane;
     if (String(receipt.policy_version ?? "") !== SOURCE_SELECTION_ENGINE_VERSION) {
       throw new Error(`locked_source_selection_plan_policy_mismatch:${slotKey}`);
     }
-    if (lifetimeLabel === "underperforming" || lifetimeLabel === "disproven") {
+    if (lifetimeLabel === "underperforming") {
       throw new Error(`locked_source_selection_plan_weak_family:${slotKey}`);
     }
-    if (finiteNumber(receipt.published_uses_72h) > 0) {
-      throw new Error(`locked_source_selection_plan_recent_source:${slotKey}`);
-    }
-    if (finiteNumber(receipt.future_scheduled_uses) > 0) {
-      throw new Error(`locked_source_selection_plan_scheduled_source:${slotKey}`);
-    }
-    if (finiteNumber(receipt.cooldown_relaxation) !== 1 || finiteNumber(receipt.cooldown_hours) !== 72) {
-      throw new Error(`locked_source_selection_plan_relaxed_cooldown:${slotKey}`);
-    }
-    if (!sourceIdentityKey || seenSources.has(sourceIdentityKey)) {
-      throw new Error(`locked_source_selection_plan_duplicate_source:${slotKey}`);
-    }
-    seenSources.add(sourceIdentityKey);
-    if (!semanticKey || !String(receipt.allocation_tier ?? "")) {
+    if (!sourceIdentityKey || !["exploit", "develop", "explore"].includes(selectionLane)) {
       throw new Error(`locked_source_selection_plan_strategy_evidence_missing:${slotKey}`);
     }
-    const priorSlots = semanticSlots.get(semanticKey) ?? [];
-    if (priorSlots.some((priorSlot) => slotDistanceHours(slotKey, priorSlot) < 24)) {
-      throw new Error(`locked_source_selection_plan_semantic_crowding:${slotKey}`);
+    if (finiteNumber(receipt.unified_rating) <= 0 || finiteNumber(receipt.ranking_score) <= 0) {
+      throw new Error(`locked_source_selection_plan_ranking_evidence_missing:${slotKey}`);
     }
-    priorSlots.push(slotKey);
-    semanticSlots.set(semanticKey, priorSlots);
+    if (
+      selectionLane !== "exploit"
+      && (finiteNumber(receipt.future_scheduled_uses) > 0 || finiteNumber(receipt.uses_24h) > 0)
+    ) {
+      throw new Error(`locked_source_selection_plan_unresolved_evidence_pending:${slotKey}`);
+    }
+    const priorLane = seenSourceLanes.get(sourceIdentityKey);
+    if (priorLane && (priorLane !== "exploit" || selectionLane !== "exploit")) {
+      throw new Error(`locked_source_selection_plan_duplicate_unresolved_source:${slotKey}`);
+    }
+    seenSourceLanes.set(sourceIdentityKey, selectionLane);
   }
   const expected = new Map(plan.map((row) => [String(row.slot_key), String(row.source_card_id)]));
   for (const item of input.lineup) {
@@ -1417,8 +1411,19 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
   const repeatedWinners = classifySourceFamilyLifetime({ indexes: [1.8, 1.7, 1.9, 1.6, 2, 1.75] });
   const viralPlusFailures = classifySourceFamilyLifetime({ indexes: [5, 0.4, 0.5, 0.6, 0.55, 0.45] });
   const repeatedLosers = classifySourceFamilyLifetime({ indexes: [0.4, 0.5, 0.55, 0.45, 0.6, 0.5] });
-  const recentAbsent = classifySourceFamilyRecent({ recent_indexes: [] });
-  const recovering = classifySourceFamilyRecent({ recent_indexes: [0.7, 1.1, 1.2], previous_label: "cold" });
+  const recentRetired = classifySourceFamilyRecent({ recent_indexes: [2, 0.4], previous_label: "hot" });
+  const laneTargets16 = buildDynamicLaneTargets({
+    requested_slots: 16,
+    exploit_source_count: 5,
+    develop_source_count: 10,
+    explore_source_count: 10,
+  });
+  const laneTargets33 = buildDynamicLaneTargets({
+    requested_slots: 33,
+    exploit_source_count: 5,
+    develop_source_count: 20,
+    explore_source_count: 20,
+  });
   const newAccountCandidates: SourceSelectionCandidate[] = Array.from({ length: 24 }, (_, index) => ({
     source_identity_key: `new-${index}`,
     source_card_id: `card-${index}`,
@@ -1426,36 +1431,36 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     lifetime_label: "untested",
     recent_label: "no_recent_data",
     lifetime_sample_size: 0,
+    unified_rating: 1,
+    ranking_score: 1,
     lifetime_index: 1,
-    recent_index: null,
     uses_24h: 0,
     uses_7d: 0,
     uses_28d: 0,
-    hours_since_last_use: null,
-    semantic_key: `semantic-${index}`,
   }));
+  const newAccountSlots = Array.from({ length: 24 }, (_, index) => `2026-01-01T${String(index).padStart(2, "0")}:00`);
   const newAccountSelection = selectSourceFamilyLineup({
     candidates: newAccountCandidates,
-    slot_keys: Array.from({ length: 24 }, (_, index) => `2026-01-01T${String(index).padStart(2, "0")}:00`),
+    slot_keys: newAccountSlots,
     seed: "new-account",
   });
-  const monopolyCandidates: SourceSelectionCandidate[] = [
-    {
-      source_identity_key: "winner",
-      source_card_id: "winner-card",
-      source_card_family_id: "winner-family",
-      lifetime_label: "franchise",
-      recent_label: "hot",
-      lifetime_sample_size: 20,
-      lifetime_index: 2,
-      recent_index: 2,
+  const mixedCandidates: SourceSelectionCandidate[] = [
+    ...Array.from({ length: 3 }, (_, index) => ({
+      source_identity_key: `winner-${index}`,
+      source_card_id: `winner-card-${index}`,
+      source_card_family_id: `winner-family-${index}`,
+      lifetime_label: "franchise" as const,
+      recent_label: "no_recent_data" as const,
+      lifetime_sample_size: 8 + index,
+      unified_rating: 1.8 - index * 0.1,
+      ranking_score: 1.7 - index * 0.1,
+      lifetime_index: 1.8 - index * 0.1,
+      global_rank: index + 1,
       uses_24h: 4,
       uses_7d: 10,
-            uses_28d: 20,
+      uses_28d: 20,
       published_uses_72h: 1,
-      hours_since_last_use: 1,
-      semantic_key: "winner",
-    },
+    })),
     ...Array.from({ length: 10 }, (_, index) => ({
       source_identity_key: `untested-${index}`,
       source_card_id: `untested-card-${index}`,
@@ -1463,39 +1468,80 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
       lifetime_label: "untested" as const,
       recent_label: "no_recent_data" as const,
       lifetime_sample_size: 0,
+      unified_rating: 1,
+      ranking_score: 1,
       lifetime_index: 1,
-      recent_index: null,
       uses_24h: 0,
       uses_7d: 0,
       uses_28d: 0,
-      hours_since_last_use: null,
-      semantic_key: `untested-${index}`,
     })),
   ];
-  const monopolySelection = selectSourceFamilyLineup({
-    candidates: monopolyCandidates,
+  const mixedSelection = selectSourceFamilyLineup({
+    candidates: mixedCandidates,
     slot_keys: Array.from({ length: 10 }, (_, index) => `2026-01-02T${String(index).padStart(2, "0")}:00`),
-    seed: "monopoly",
+    seed: "mixed-winner-explore",
   });
+  const pendingSelection = selectSourceFamilyLineup({
+    candidates: [
+      {
+        source_identity_key: "pending-untested",
+        source_card_id: "pending-card",
+        source_card_family_id: "pending-family",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        uses_24h: 1,
+      },
+      {
+        source_identity_key: "fresh-untested",
+        source_card_id: "fresh-card",
+        source_card_family_id: "fresh-family",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        uses_24h: 0,
+      },
+    ],
+    slot_keys: ["2026-01-03T00:00"],
+    seed: "pending-evidence",
+  });
+  const selectedWinnerCounts = mixedSelection.selected.reduce<Record<string, number>>((counts, candidate) => {
+    const identity = String(candidate.source_identity_key ?? "");
+    if (identity.startsWith("winner-")) counts[identity] = Number(counts[identity] ?? 0) + 1;
+    return counts;
+  }, {});
   const assertions = {
-    one_breakout_recognized: oneBreakout.label === "emerging",
-    repeated_winners_franchise: repeatedWinners.label === "franchise",
-    viral_plus_failures_not_franchise: viralPlusFailures.label !== "franchise" && viralPlusFailures.label !== "proven",
-        repeated_losers_underperforming: repeatedLosers.label === "underperforming",
-
-    absent_recent_data_preserved: recentAbsent.label === "no_recent_data",
-    recovery_detected: recovering.label === "recovering",
+    one_breakout_enters_development: oneBreakout.label === "prospect" && oneBreakout.selection_lane === "develop",
+    repeated_winners_franchise: repeatedWinners.label === "franchise" && repeatedWinners.selection_lane === "exploit",
+    viral_plus_failures_not_winner: viralPlusFailures.label === "underperforming",
+    repeated_losers_underperforming: repeatedLosers.label === "underperforming",
+    recent_classification_retired: recentRetired.label === "no_recent_data",
+    dynamic_16_slots: JSON.stringify(laneTargets16) === JSON.stringify({ exploit: 6, develop: 5, explore: 5 }),
+    dynamic_33_slots: JSON.stringify(laneTargets33) === JSON.stringify({ exploit: 11, develop: 11, explore: 11 }),
     new_account_explores_all: new Set(newAccountSelection.selected.map((item) => item.source_identity_key)).size === 24,
-    winner_monopoly_blocked: monopolySelection.selected.filter((item) => item.source_identity_key === "winner").length === 0,
+    winner_reuse_allowed: mixedSelection.selected.filter((item) => String(item.source_identity_key).startsWith("winner-")).length === 5,
+    qualified_winners_covered_before_repeat: Object.keys(selectedWinnerCounts).length === 3,
+    pending_unresolved_source_waits: pendingSelection.selected[0]?.source_identity_key === "fresh-untested",
     deterministic_replay: JSON.stringify(newAccountSelection.receipts) === JSON.stringify(selectSourceFamilyLineup({
       candidates: newAccountCandidates,
-      slot_keys: Array.from({ length: 24 }, (_, index) => `2026-01-01T${String(index).padStart(2, "0")}:00`),
+      slot_keys: newAccountSlots,
       seed: "new-account",
     }).receipts),
   };
   return {
     passed: Object.values(assertions).every(Boolean),
     assertions,
-    examples: { oneBreakout, repeatedWinners, viralPlusFailures, repeatedLosers, recentAbsent, recovering },
+    examples: {
+      oneBreakout,
+      repeatedWinners,
+      viralPlusFailures,
+      repeatedLosers,
+      recentRetired,
+      laneTargets16,
+      laneTargets33,
+      selectedWinnerCounts,
+    },
   };
 }
