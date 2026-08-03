@@ -5,17 +5,19 @@ import {
   sourcePreselectionExclusionForCandidate,
   sourcePreselectionTargetMatchesCandidate,
 } from "./sourcePreselectionPolicy";
+import {
+  buildDynamicLaneTargets,
+  classifyUnifiedSourceFamily,
+  developmentResolutionPriority,
+  selectionLaneForLifecycle,
+  type UnifiedLifecycleLabel,
+  type UnifiedSelectionLane,
+} from "./sourceFamilyRankingV7";
 
-export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v6";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v6";
+export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v7";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v7";
 
-export type SourceFamilyLifetimeLabel =
-  | "untested"
-  | "prospect"
-  | "emerging"
-  | "proven"
-  | "franchise"
-  | "underperforming";
+export type SourceFamilyLifetimeLabel = UnifiedLifecycleLabel;
 
 export type SourceFamilyAuditionState =
   | "untested"
@@ -56,9 +58,13 @@ export type SourceSelectionCandidate = Record<string, unknown> & {
   audition_failures?: number;
   audition_opportunities_remaining?: number;
   graduated?: boolean;
-  recent_label?: SourceFamilyRecentLabel;
+    recent_label?: SourceFamilyRecentLabel;
   confidence_label?: SourceFamilyConfidenceLabel;
   lifetime_sample_size?: number;
+  unified_rating?: number;
+  ranking_score?: number;
+  global_rank?: number | null;
+  selection_lane?: UnifiedSelectionLane;
 
   recent_sample_size?: number;
   lifetime_index?: number;
@@ -93,10 +99,16 @@ export type SourceSelectionReceipt = {
   recent_label: SourceFamilyRecentLabel;
   lifetime_sample_size: number;
 
-  lifetime_index: number;
+    lifetime_index: number;
+  unified_rating: number;
+  ranking_score: number;
+  global_rank: number | null;
+  selection_lane: UnifiedSelectionLane;
   recent_factor: number;
   shrunk_performance: number;
   exploration_bonus: number;
+  cycle_coverage_bonus: number;
+  development_resolution_priority: number;
   uses_24h: number;
   uses_7d: number;
   uses_28d: number;
