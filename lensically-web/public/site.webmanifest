@@ -4,8 +4,10 @@
   "description": "Lensically platform",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+    "theme_color": "#ffffff",
+  "cycles_contract": "cycles-glossary-v1",
   "icons": [
+
     {
       "src": "/lensically-icon-premium-512.png",
       "sizes": "512x512",

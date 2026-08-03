@@ -663,8 +663,10 @@ jobs:
                         runtime_ok=false
             scheduler_ok=false
             dashboard_ok=false
-            cycles_api_ok=false
+                        cycles_api_ok=false
             cycles_page_ok=false
+            cycles_contract_ok=false
+
 
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
               && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "direct_typed_tools" and (.live_tool_count >= 60)' /tmp/lensically-runtime-health.json > /dev/null; then
@@ -682,11 +684,15 @@ jobs:
               && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null and .innovation.latest_run.state == "promoted" and .innovation.latest_run.promotion_destination_version == "v1.0.0"' /tmp/lensically-cycles-state.json > /dev/null; then
               cycles_api_ok=true
             fi
-            if curl --fail-with-body --silent --show-error "https://lensically.com/cycles" > /tmp/lensically-cycles.html \
-              && grep -q "Operational history and source audit" /tmp/lensically-cycles.html \
-              && grep -q "Why these sources" /tmp/lensically-cycles.html; then
+                        if curl --fail-with-body --silent --show-error "https://lensically.com/cycles" > /tmp/lensically-cycles.html \
+              && grep -Fq 'app/(internal)/cycles/page-' /tmp/lensically-cycles.html; then
               cycles_page_ok=true
             fi
+            if curl --fail-with-body --silent --show-error "https://lensically.com/site.webmanifest" > /tmp/lensically-site.webmanifest \
+              && jq -e '.cycles_contract == "cycles-glossary-v1"' /tmp/lensically-site.webmanifest > /dev/null; then
+              cycles_contract_ok=true
+            fi
+
 
             gpt_memory_status="$(curl --silent --output /tmp/gpt-memory-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/gpt-memory/dashboard' || true)"
             agent_status="$(curl --silent --output /tmp/agent-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/agent/accounts' || true)"
@@ -695,9 +701,11 @@ jobs:
             if [ "${runtime_ok}" = "true" ] \
               && [ "${scheduler_ok}" = "true" ] \
                             && [ "${dashboard_ok}" = "true" ] \
-              && [ "${cycles_api_ok}" = "true" ] \
+                            && [ "${cycles_api_ok}" = "true" ] \
               && [ "${cycles_page_ok}" = "true" ] \
+              && [ "${cycles_contract_ok}" = "true" ] \
               && [ "${gpt_memory_status}" = "410" ] \
+
               && [ "${agent_status}" = "410" ] \
               && [ "${intelligence_status}" = "410" ]; then
               verified=true
@@ -710,9 +718,12 @@ jobs:
             cat /tmp/lensically-runtime-health.json || true
             cat /tmp/lensically-scheduler-health.json || true
                         head -c 2000 /tmp/lensically-dashboard.html || true
-            cat /tmp/lensically-cycles-state.json || true
+                        cat /tmp/lensically-cycles-state.json || true
             head -c 4000 /tmp/lensically-cycles.html || true
+            cat /tmp/lensically-site.webmanifest || true
+            echo "runtime_ok=${runtime_ok:-unset} scheduler_ok=${scheduler_ok:-unset} dashboard_ok=${dashboard_ok:-unset} cycles_api_ok=${cycles_api_ok:-unset} cycles_page_ok=${cycles_page_ok:-unset} cycles_contract_ok=${cycles_contract_ok:-unset} gpt_memory_status=${gpt_memory_status:-unset} agent_status=${agent_status:-unset} intelligence_status=${intelligence_status:-unset}"
             cat /tmp/gpt-memory-retired.json || true
+
             cat /tmp/agent-retired.json || true
             cat /tmp/intelligence-retired.json || true
             exit 1
