@@ -1,6 +1,7 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
 import type { SourcePreselectionPolicy, SourcePreselectionSignal } from "./sourcePreselectionPolicy";
 import {
+  compileSourcePreselectionPolicy,
   sourcePreselectionAdjustmentForCandidate,
   sourcePreselectionExclusionForCandidate,
   sourcePreselectionTargetMatchesCandidate,
@@ -1594,6 +1595,52 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     slot_keys: ["2026-01-04T00:00"],
     seed: "development-fairness",
   });
+    const sameMechanismIndependentSelection = selectSourceFamilyLineup({
+    candidates: [
+      {
+        source_identity_key: "finger-source-a",
+        source_card_id: "finger-card-a",
+        source_card_family_id: "finger-family-a",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        semantic_key: "finger_touch",
+        uses_24h: 0,
+      },
+      {
+        source_identity_key: "finger-source-b",
+        source_card_id: "finger-card-b",
+        source_card_family_id: "finger-family-b",
+        lifetime_label: "untested",
+        unified_rating: 1,
+        ranking_score: 1,
+        lifetime_index: 1,
+        semantic_key: "finger_touch",
+        uses_24h: 0,
+      },
+    ],
+    slot_keys: ["2026-01-05T00:00", "2026-01-05T01:00"],
+    seed: "same-mechanism-independent-sources",
+  });
+  const advisoryOnlyPolicy = compileSourcePreselectionPolicy({
+    candidates: [
+      { source_identity_key: "policy-a", source_card_id: "policy-card-a" },
+      { source_identity_key: "policy-b", source_card_id: "policy-card-b" },
+    ],
+    slot_keys: ["2026-01-05T02:00"],
+    strategy_directives: {
+      winner_priority_source_identity_key: "policy-a",
+      source_weights: { "policy-a": 99 },
+    },
+    active_experiments: [{
+      id: "experiment-a",
+      status: "active",
+      required_slots: 1,
+      source_identity_key: "policy-a",
+    }],
+    hard_bans: [{ id: "ban-b", source_identity_key: "policy-b", active: true }],
+  });
   const explorationFairnessSelection = selectSourceFamilyLineup({
     candidates: [
       {
@@ -1639,8 +1686,13 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
         pending_unresolved_source_waits: pendingSelection.selected[0]?.source_identity_key === "fresh-untested",
     development_evidence_debt_prevents_starvation:
       developmentFairnessSelection.selected[0]?.source_identity_key === "develop-needs-evidence",
-    exploration_fewest_opportunities_first:
+        exploration_fewest_opportunities_first:
       explorationFairnessSelection.selected[0]?.source_identity_key === "explore-never-used",
+    similar_sources_remain_independent:
+      new Set(sameMechanismIndependentSelection.selected.map((candidate) => candidate.source_identity_key)).size === 2,
+    strategy_cannot_override_unified_math:
+      advisoryOnlyPolicy.candidate_adjustments.length === 0 && advisoryOnlyPolicy.experiment_reservations.length === 0,
+    explicit_hard_bans_remain_enforced: advisoryOnlyPolicy.hard_exclusions.length === 1,
     deterministic_replay: JSON.stringify(newAccountSelection.receipts) === JSON.stringify(selectSourceFamilyLineup({
       candidates: newAccountCandidates,
       slot_keys: newAccountSlots,
@@ -1659,8 +1711,10 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
       laneTargets16,
             laneTargets33,
       selectedWinnerCounts,
-      developmentFairnessSelection: developmentFairnessSelection.receipts,
+            developmentFairnessSelection: developmentFairnessSelection.receipts,
       explorationFairnessSelection: explorationFairnessSelection.receipts,
+      sameMechanismIndependentSelection: sameMechanismIndependentSelection.receipts,
+      advisoryOnlyPolicy,
     },
   };
 }
