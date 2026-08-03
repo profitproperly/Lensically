@@ -1,6 +1,6 @@
 type JsonRecord = Record<string, unknown>;
 
-export const CYCLE_OBSERVABILITY_CONTRACT_VERSION = "manifest-cycle-observability-v1";
+export const CYCLE_OBSERVABILITY_CONTRACT_VERSION = "manifest-cycle-observability-v2";
 export const CYCLE_RAIL_STATE_CONTRACT_VERSION = "manifest-cycle-rail-state-v1";
 export const CYCLE_HISTORY_DEFAULT_LIMIT = 10;
 export const CYCLE_HISTORY_MAX_LIMIT = 10;
