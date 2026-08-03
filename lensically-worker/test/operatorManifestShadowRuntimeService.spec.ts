@@ -404,7 +404,7 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(resolveManifestShadowSourceCandidates(existing, "manifest_mental")).toBe(existing);
   });
 
-    it("rejects recent parrot repeats and enforces diverse allocation in an isolated 24-slot Innovation cycle", async () => {
+        it("uses unified lifecycle lanes without cooldown suppression in an isolated 24-slot Innovation cycle", async () => {
     const julyRepeatKeys = [
       "life-about-to-get-good",
       "hands-channel-abundance",
@@ -472,33 +472,34 @@ describe("operatorManifestShadowRuntimeService", () => {
     const bundle = record(prepared.body.decision_bundle);
     const locked = rows(bundle.locked_source_lineup);
     const selectedIdentities = locked.map((item) => String(item.source_identity_key));
-    const blockedIdentities = new Set([
-      ...blockedRecent.map((candidate) => String(candidate.source_identity_key)),
-      String(blockedScheduled.source_identity_key),
-      String(blockedWeak.source_identity_key),
-    ]);
-    expect(locked).toHaveLength(24);
+        expect(locked).toHaveLength(24);
     expect(new Set(selectedIdentities).size).toBe(24);
-    expect(selectedIdentities.every((identityKey) => !blockedIdentities.has(identityKey))).toBe(true);
+    expect(selectedIdentities).not.toContain(String(blockedWeak.source_identity_key));
     expect(locked.every((item) => {
       const receipt = record(item.selection_receipt);
-      return Number(receipt.cooldown_hours) === 72
-        && Number(receipt.cooldown_relaxation) === 1
-        && Number(receipt.published_uses_72h) === 0
-        && Number(receipt.future_scheduled_uses) === 0;
+      return String(receipt.policy_version) === "source-selection-engine-v7"
+        && Number(receipt.unified_rating) > 0
+        && Number(receipt.ranking_score) > 0
+        && ["exploit", "develop", "explore"].includes(String(receipt.selection_lane));
     })).toBe(true);
     const selectionSummary = record(bundle.selection_summary);
     expect(selectionSummary).toMatchObject({
-            engine_version: "source-selection-engine-v6",
-
-      recent_exposure_authority: "published_and_scheduled_lineage",
+      engine_version: "source-selection-engine-v7",
+      lifecycle_authority: "unified_confidence_adjusted_rating",
+      recent_classification_retired: true,
+      continuous_recency_weighting: true,
+      arbitrary_cooldown_blocker_active: false,
+      semantic_spacing_blocker_active: false,
+      winner_reuse_allowed: true,
+      unresolved_source_unique_per_cycle: true,
       selected_count: 24,
-      strategy_influence_enforced: true,
+      hard_exclusion_count: 1,
+      strategy_influence_enforced: false,
     });
     const selectedTiers = record(selectionSummary.selected_allocation_tiers);
-    expect(Number(selectedTiers.exploration)).toBeGreaterThanOrEqual(7);
-    expect(Number(selectedTiers.development)).toBeGreaterThanOrEqual(7);
-    expect(Number(selectedTiers.winner)).toBeGreaterThan(0);
+    expect(Number(selectedTiers.exploration)).toBe(8);
+    expect(Number(selectedTiers.development)).toBe(8);
+    expect(Number(selectedTiers.winner)).toBe(8);
     expect(harness.audit.snapshot_db_calls).toBe(0);
     expect(harness.audit.source_provider_reads).toBe(1);
     expect(harness.audit.evidence_provider_reads).toBe(1);
