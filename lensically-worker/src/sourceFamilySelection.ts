@@ -385,8 +385,8 @@ function allocationTierForCandidate(
   candidate: SourceSelectionCandidate,
   policy?: SourcePreselectionPolicy,
 ): SourceAllocationTier {
-  return sourcePreselectionAdjustmentForCandidate(policy, candidate)?.allocation_tier_override
-    ?? allocationTierForLabel(candidate.lifetime_label);
+  void policy;
+  return allocationTierForLabel(candidate.lifetime_label);
 }
 
 function buildAllocationTargets(
@@ -1048,11 +1048,11 @@ export function selectSourceFamilyLineup(input: {
       const semanticFutureScheduledUses = Math.max(0, finiteNumber(candidate.semantic_future_scheduled_uses));
       const exposureBurden = 1;
       const negativeEvidenceMultiplier = 1;
-      const preselectionAdjustment = sourcePreselectionAdjustmentForCandidate(input.preselection_policy, candidate);
-      const preselectionScoreMultiplier = preselectionAdjustment?.score_multiplier ?? 1;
-      const preselectionScoreAddend = preselectionAdjustment?.score_addend ?? 0;
+            const preselectionAdjustment = sourcePreselectionAdjustmentForCandidate(input.preselection_policy, candidate);
+      const preselectionScoreMultiplier = 1;
+      const preselectionScoreAddend = 0;
       const baseScore = rankingScore + cycleCoverageBonus + developmentPriority + explorationBonus;
-      const score = baseScore * preselectionScoreMultiplier + preselectionScoreAddend;
+      const score = baseScore;
 
       const deterministicTiebreak = stableUnit(`${input.seed}|${slotKey}|${identity}`);
       scored.push({

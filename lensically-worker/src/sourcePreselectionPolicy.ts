@@ -1,6 +1,6 @@
 type JsonRecord = Record<string, unknown>;
 
-export const SOURCE_PRESELECTION_POLICY_VERSION = "source-preselection-policy-v1";
+export const SOURCE_PRESELECTION_POLICY_VERSION = "source-preselection-policy-v2";
 
 export type SourcePreselectionAllocationTier = "winner" | "development" | "exploration";
 
@@ -482,15 +482,8 @@ export function compileSourcePreselectionPolicy(
 
   const dedupedExclusions = [...new Map(hardExclusions.map((item) => [item.exclusion_key, item])).values()]
     .sort((left, right) => left.exclusion_key.localeCompare(right.exclusion_key));
-  const sortedReservations = reservations.sort((left, right) => left.reservation_key.localeCompare(right.reservation_key));
-  const sortedAdjustments = [...adjustments.values()]
-    .map((adjustment) => ({
-      ...adjustment,
-      score_multiplier: Number(adjustment.score_multiplier.toFixed(6)),
-      score_addend: Number(adjustment.score_addend.toFixed(6)),
-      signals: adjustment.signals.sort((left, right) => `${left.signal_type}:${left.signal_key}`.localeCompare(`${right.signal_type}:${right.signal_key}`)),
-    }))
-    .sort((left, right) => left.candidate_key.localeCompare(right.candidate_key));
+    const sortedReservations: SourcePreselectionReservation[] = [];
+  const sortedAdjustments: SourcePreselectionAdjustment[] = [];
   const withoutHash = {
     contract_version: SOURCE_PRESELECTION_POLICY_VERSION,
     hard_exclusions: dedupedExclusions,
