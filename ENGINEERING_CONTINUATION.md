@@ -6,24 +6,26 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-main-cycle-20260803-1739
-active_checkpoint: validate_deploy_resume_decision_bundle_finalization
-validated_source_head: 1d43a14c852944144c119813077d9e178e60c68c
-documentation_source_head: 1d43a14c852944144c119813077d9e178e60c68c
-production_sha: 1d43a14c852944144c119813077d9e178e60c68c
-active_interrupt_id: decision-bundle-essential-compaction-overflow-20260803
-active_interrupt_state: repairing
-active_interrupt_precedence: blocks_cycle_resume_until_exact_sha_release
+active_checkpoint: resume_live_persistence_with_authoritative_plan_ids
+validated_source_head: 22c443b8203c492c269e14427493a4098142da86
+documentation_source_head: 22c443b8203c492c269e14427493a4098142da86
+production_sha: 22c443b8203c492c269e14427493a4098142da86
+active_interrupt_id: eadaa187-715f-4ad8-a05c-991e389ce011
+active_interrupt_state: recorded
+active_interrupt_precedence: refresh_live_plan_ids_then_resume_same_cycle
 
 ## ACTIVE Manifest Main Cycle: manifest-main-cycle-20260803-1739
 
 - Owner authorization: run one live Main Manifest Mental cycle end to end.
 - Canonical cycle operation ID: `manifest-main-2026-08-03-1739`.
 - Canonical cycle ID: `3a5ab59d-2fd4-47e3-9752-51afccc5e6b3`.
-- Durable progress: live Threads evidence, all due maturity checkpoints, 814 maturity evaluations, 814 comparable analyses, 837 learning observations, 141 portfolio states, the cycle receipt, and exposure snapshot are persisted. The last completed preparation stage is `manifest_intelligence_portfolio`; the next stage is `manifest_measurement_audit`.
-- Blocking defect: `measurement-audit-database-integrity-api-limit-20260803`, receipt ID `b488317a-61d8-4548-b514-dccf21b96024`. A repeated schema probe for `operator_workflow_requirements` exceeded Cloudflare's single-invocation API-request limit after the cycle had consumed its request budget.
-- Resolved repair: successful D1 integrity checks are cached by D1 binding and canonical expectation; failed checks are evicted and remain retryable. Exact deployed SHA `1d43a14c852944144c119813077d9e178e60c68c`; defect receipt `b488317a-61d8-4548-b514-dccf21b96024` is resolved with typecheck run `30856752301`, Operator run `30856760861`, push validation `30856746177`, and release `30856833976`.
-- Current blocking defect: `decision-bundle-essential-compaction-overflow-20260803`, receipt ID `267b4eb2-60ef-4b78-b5d2-df50e7d72f00`. Measurement audit and exposure revision 2 completed, but the compact decision bundle measured 24,325 bytes, 325 bytes over the 24,000-byte contract, because all locked source identities were duplicated inside the compact bundle despite the canonical paged lineup authority.
-- Current action: validate and release the page-backed compaction fallback, resolve the bundle defect, resume the identical cycle operation ID, consume the compact bundle plus every canonical locked-lineup page, complete strategy and source-backed persistence, then verify zero cycle-horizon missing slots, lineage, scheduler health, and no unresolved delivery incidents.
+- Durable progress: preparation, measurement audit, all 48 canonical lineup pages, and strategy `e6027da2-c3aa-42ba-aaf5-dc9e868c065c` are complete. Fourteen exact hourly posts are persisted and scheduled as IDs `869` through `882`; 34 locked slots remain.
+- Resolved production repairs: D1 integrity checks are runtime-cached; production-sized decision bundles use page-backed lineup authority; fresh operation receipts use atomic `INSERT OR IGNORE ... RETURNING` ownership detection. Current exact production SHA is `22c443b8203c492c269e14427493a4098142da86`, validated by typecheck `30860081178`, Operator tests `30860089567`, push validation `30860074114`, and release `30860247198`.
+- Live lease verification: the first post-repair batch reached candidate persistence immediately instead of returning `operation_already_in_progress`, proving the false two-minute lease was removed.
+- Active P1 interruption: hardening incident `eadaa187-715f-4ad8-a05c-991e389ce011` rejected slots `2026-08-04T09:00` and `2026-08-04T10:00` because stale transcribed plan UUIDs were supplied. No candidate, draft, schedule row, or lineage record was created. Production returned the authoritative plan item IDs `55586330-7da3-459f-806a-39d5cc354076` and `ba277586-2fe5-42f8-b379-431605d221f1`.
+- Permanent prevention: for every persistence wave, read the current cycle's live `next_cycle_plan_items` and use those exact UUIDs. Chat summaries and manually transcribed plan IDs are never authoritative. The existing `manifest_cycle_plan_item_mismatch` gate remains the mutation-prevention control.
+- Current action: persist the two rejected slots with the production-returned UUIDs, close the P1 after verified success, then continue the same cycle in live eight-slot waves until zero missing slots, complete lineage, healthy scheduler state, and no unresolved defects remain.
+
 - Prohibited diversion: do not start another Main, Innovation, shadow, or unrelated engineering job while this active cycle remains incomplete.
 
 ## Completed Unified Source Ranking Pass: unified-source-ranking-v2-20260803
