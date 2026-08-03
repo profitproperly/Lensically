@@ -125,8 +125,14 @@ type SelectionRow = {
   source_identity_key?: string | null;
   source_card_id?: string | null;
   source_card_family_id?: string | null;
-  source_title?: string | null;
+    source_title?: string | null;
   source_shorthand?: string | null;
+  scheduled_post_text?: string | null;
+  scheduled_generation_mode?: string | null;
+  scheduled_strategic_purpose?: string | null;
+  scheduled_post_id?: number | null;
+  scheduled_post_status?: string | null;
+  source_history_scope?: string | null;
   family_state?: string | null;
   audition_state?: string | null;
   allocation_tier?: string | null;
@@ -767,10 +773,10 @@ export default function CyclesPage() {
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Persisted Stage 4 truth</p>
-                <h2 className="mt-2 text-xl font-semibold text-slate-950">Why these sources?</h2>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Cycle slot audit</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-950">Scheduled output and source evidence</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  The page displays the locked source-selection receipts exactly as persisted. It does not rerank sources or manufacture explanations.
+                  Each Main slot separates the generated scheduled post from the locked source that informed it. Exact-source history describes that specific Saved Pattern identity, not the broader hook or mechanism across the account.
                 </p>
               </div>
               {selections?.selected_count !== undefined ? (
@@ -841,11 +847,19 @@ export default function CyclesPage() {
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-950">{slotLabel(row.slot_key)}</span>
-                            <Badge>{titleCase(row.allocation_tier)}</Badge>
-                            <Badge>{titleCase(row.audition_state || row.family_state)}</Badge>
+                                                        <span className="text-sm font-semibold text-slate-950">{slotLabel(row.slot_key)}</span>
+                            {row.scheduled_generation_mode ? <Badge>Execution: {titleCase(row.scheduled_generation_mode)}</Badge> : null}
+                            <Badge>Source allocation: {titleCase(row.allocation_tier)}</Badge>
+                            <Badge>Exact source: {titleCase(row.audition_state || row.family_state)}</Badge>
                           </div>
-                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">{row.source_shorthand || row.source_title || "Source text unavailable"}</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-900">
+                            {row.scheduled_post_text || row.source_shorthand || row.source_title || "Scheduled output unavailable"}
+                          </p>
+                          {row.scheduled_post_text ? (
+                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                              <span className="font-semibold text-slate-600">Source used:</span> {row.source_shorthand || row.source_title || "Source text unavailable"}
+                            </p>
+                          ) : null}
                           {row.persisted_reason ? <p className="mt-2 text-xs text-slate-500">{row.persisted_reason}</p> : null}
                         </div>
                         <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
@@ -868,9 +882,21 @@ export default function CyclesPage() {
                               Detailed receipt unavailable. No replacement explanation was generated.
                             </div>
                           ) : (
-                            <div className="space-y-5">
+                                                        <div className="space-y-5">
+                              {detail.scheduled_post_text ? (
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Scheduled output</p>
+                                  <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-950">{detail.scheduled_post_text}</p>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <Badge>Execution: {titleCase(detail.scheduled_generation_mode)}</Badge>
+                                    <Badge>Status: {titleCase(detail.scheduled_post_status)}</Badge>
+                                    {detail.scheduled_post_id ? <Badge>Post #{formatNumber(detail.scheduled_post_id)}</Badge> : null}
+                                  </div>
+                                </div>
+                              ) : null}
+
                               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Exact source</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Exact source used</p>
                                 <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-900">{detail.source_text || "Unavailable"}</p>
                               </div>
 
@@ -879,8 +905,9 @@ export default function CyclesPage() {
                                   <h3 className="text-sm font-semibold text-slate-950">Why it qualified</h3>
                                   <p className="mt-3 text-sm leading-6 text-slate-700">{detail.persisted_reason || "A concise persisted reason is unavailable for this historical receipt."}</p>
                                   <dl className="mt-3">
-                                    <KeyValue label="Family state" value={titleCase(detail.audition_state || detail.family_state)} />
-                                    <KeyValue label="Allocation tier" value={titleCase(detail.allocation_tier)} />
+                                                                        <KeyValue label="Exact-source history" value={titleCase(detail.audition_state || detail.family_state)} />
+                                    <KeyValue label="History scope" value="This exact Saved Pattern identity only" />
+                                    <KeyValue label="Source allocation" value={titleCase(detail.allocation_tier)} />
                                     <KeyValue label="Selector" value={detail.engine_version || "Unavailable"} />
                                     <KeyValue label="Policy" value={detail.preselection_policy_version || "Unavailable"} />
                                     <KeyValue label="Policy hash" value={<code className="break-all text-xs">{detail.preselection_policy_hash || "Unavailable"}</code>} />

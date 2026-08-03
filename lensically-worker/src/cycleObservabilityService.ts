@@ -835,9 +835,17 @@ function projectSelectionRow(row: JsonRecord): JsonRecord {
     source_identity_key: asText(row.source_identity_key),
     source_card_id: asText(row.source_card_id),
     source_card_family_id: asText(row.source_card_family_id ?? row.family_id),
-    source_title: title,
+        source_title: title,
     source_shorthand: compactText(sourceText ?? title ?? row.source_mechanism, 120),
     source_text_available: Boolean(sourceText),
+    scheduled_post_text: asText(row.scheduled_post_text),
+    scheduled_generation_mode: asText(row.scheduled_generation_mode),
+    scheduled_strategic_purpose: asText(row.scheduled_strategic_purpose),
+    scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined
+      ? null
+      : asNumber(row.scheduled_post_id),
+    scheduled_post_status: asText(row.scheduled_post_status),
+    source_history_scope: "exact_source_identity",
     family_state: auditionState,
     audition_state: auditionState,
     allocation_tier: allocationTier,
@@ -968,13 +976,20 @@ async function readMainSelections(
        p.receipt_json,
        p.status,
        c.title,
-       c.primary_source_json,
+              c.primary_source_json,
        c.source_mechanism,
        c.required_product,
-       c.recommended_direction
+       c.recommended_direction,
+       li.text AS scheduled_post_text,
+       li.generation_mode AS scheduled_generation_mode,
+       li.strategic_purpose AS scheduled_strategic_purpose,
+       li.scheduled_post_id,
+       li.status AS scheduled_post_status
      FROM operator_source_selection_plans p
      LEFT JOIN operator_source_cards c
        ON c.id = p.source_card_id AND c.brand_key = p.brand_key
+     LEFT JOIN operator_autonomous_lineup_items li
+       ON li.brand_key = p.brand_key AND li.cycle_id = p.cycle_id AND li.slot_key = p.slot_key
      WHERE p.brand_key = ? AND p.cycle_id = ?
      ORDER BY p.selection_order ASC
      LIMIT ?`,
@@ -1103,13 +1118,20 @@ async function readMainSelectionDetail(
        p.receipt_json,
        p.status,
        c.title,
-       c.primary_source_json,
+              c.primary_source_json,
        c.source_mechanism,
        c.required_product,
-       c.recommended_direction
+       c.recommended_direction,
+       li.text AS scheduled_post_text,
+       li.generation_mode AS scheduled_generation_mode,
+       li.strategic_purpose AS scheduled_strategic_purpose,
+       li.scheduled_post_id,
+       li.status AS scheduled_post_status
      FROM operator_source_selection_plans p
      LEFT JOIN operator_source_cards c
        ON c.id = p.source_card_id AND c.brand_key = p.brand_key
+     LEFT JOIN operator_autonomous_lineup_items li
+       ON li.brand_key = p.brand_key AND li.cycle_id = p.cycle_id AND li.slot_key = p.slot_key
      WHERE p.brand_key = ? AND p.cycle_id = ? AND p.slot_key = ?
      LIMIT 1`,
   ).bind(brandKey, cycleId, slotKey).first<JsonRecord>();

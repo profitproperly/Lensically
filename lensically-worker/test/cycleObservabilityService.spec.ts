@@ -320,7 +320,12 @@ describe("cycleObservabilityService", () => {
       primary_source_json: JSON.stringify({ source_text: `Exact source text ${index}` }),
       source_mechanism: "Preserve the source mechanism",
       required_product: "Deliver the same audience reward",
-      recommended_direction: "Close adaptation",
+            recommended_direction: "Close adaptation",
+      scheduled_post_text: `Scheduled output ${index}`,
+      scheduled_generation_mode: "controlled_variation",
+      scheduled_strategic_purpose: "Test exact source adaptation",
+      scheduled_post_id: 800 + index,
+      scheduled_post_status: "scheduled",
     }));
     const db = createDb(({ sql, method, bindings }) => {
       if (method === "all" && sql.includes("FROM operator_source_selection_plans")) return selectionRows;
@@ -337,9 +342,17 @@ describe("cycleObservabilityService", () => {
       rail: "main",
       id: "cycle-1",
     });
-    expect((preview.body.rows as unknown[]).length).toBe(CYCLE_SELECTION_PREVIEW_LIMIT);
+        expect((preview.body.rows as unknown[]).length).toBe(CYCLE_SELECTION_PREVIEW_LIMIT);
     expect(preview.body.hidden_count).toBe(2);
     expect(preview.body.excluded_filter_available).toBe(false);
+    expect((preview.body.rows as JsonRecord[])[0]).toMatchObject({
+      scheduled_post_text: "Scheduled output 0",
+      scheduled_generation_mode: "controlled_variation",
+      scheduled_post_id: 800,
+      scheduled_post_status: "scheduled",
+      source_history_scope: "exact_source_identity",
+      source_shorthand: "Exact source text 0",
+    });
 
     const detail = await readCycleObservability({
       db,
@@ -354,6 +367,12 @@ describe("cycleObservabilityService", () => {
       explanation_source: "persisted_stage_4_receipt_only",
       recalculated: false,
       selection: {
+                scheduled_post_text: "Scheduled output 0",
+        scheduled_generation_mode: "controlled_variation",
+        scheduled_strategic_purpose: "Test exact source adaptation",
+        scheduled_post_id: 800,
+        scheduled_post_status: "scheduled",
+        source_history_scope: "exact_source_identity",
         source_text: "Exact source text 0",
         persisted_reason: "Persisted selector reason",
         audition_state: "probation",

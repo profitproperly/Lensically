@@ -23,6 +23,10 @@ assert.match(page, /\/api\/cycles\/selections/, "Cycles must read compact persis
 assert.match(page, /\/api\/cycles\/selection-detail/, "Full selection detail must load on demand");
 assert.match(page, /Show all/, "Cycle details must start compact and expose Show all");
 assert.match(page, /toggleSelectionDetail/, "Selection details must be expansion-driven");
+assert.match(page, /Scheduled output and source evidence/, "Main Cycle must separate scheduled output from source evidence");
+assert.match(page, /Source used:/, "Main Cycle rows must identify the locked source separately");
+assert.match(page, /Exact-source history/, "Exact-source audition state must be scoped honestly");
+assert.doesNotMatch(page, /<KeyValue label="Family state"/, "Exact-source status must not be presented as broad family performance");
 assert.doesNotMatch(page, /\bCompare\b/, "Cycles must not include a Compare surface");
 assert.doesNotMatch(page, /dropdown|submenu|chevron/i, "Cycles must not introduce dropdown behavior");
 console.log("cycles_ui_contract_tests_passed");
