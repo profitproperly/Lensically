@@ -6,11 +6,11 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: manifest-main-cycle-20260803-1739
-active_checkpoint: validate_deploy_resume_measurement_audit
-validated_source_head: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
-documentation_source_head: 3fe9b9d0e9fb8fd4442f0229b2d5ab9fe77f1c15
-production_sha: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
-active_interrupt_id: measurement-audit-database-integrity-api-limit-20260803
+active_checkpoint: validate_deploy_resume_decision_bundle_finalization
+validated_source_head: 1d43a14c852944144c119813077d9e178e60c68c
+documentation_source_head: 1d43a14c852944144c119813077d9e178e60c68c
+production_sha: 1d43a14c852944144c119813077d9e178e60c68c
+active_interrupt_id: decision-bundle-essential-compaction-overflow-20260803
 active_interrupt_state: repairing
 active_interrupt_precedence: blocks_cycle_resume_until_exact_sha_release
 
@@ -21,8 +21,9 @@ active_interrupt_precedence: blocks_cycle_resume_until_exact_sha_release
 - Canonical cycle ID: `3a5ab59d-2fd4-47e3-9752-51afccc5e6b3`.
 - Durable progress: live Threads evidence, all due maturity checkpoints, 814 maturity evaluations, 814 comparable analyses, 837 learning observations, 141 portfolio states, the cycle receipt, and exposure snapshot are persisted. The last completed preparation stage is `manifest_intelligence_portfolio`; the next stage is `manifest_measurement_audit`.
 - Blocking defect: `measurement-audit-database-integrity-api-limit-20260803`, receipt ID `b488317a-61d8-4548-b514-dccf21b96024`. A repeated schema probe for `operator_workflow_requirements` exceeded Cloudflare's single-invocation API-request limit after the cycle had consumed its request budget.
-- Root repair commit: `3fe9b9d0e9fb8fd4442f0229b2d5ab9fe77f1c15`. Successful D1 integrity checks are now cached by D1 binding and canonical expectation; failed checks are evicted and remain retryable. Focused regression coverage proves equivalent checks issue one D1 probe and failures are not cached.
-- Current action: validate the exact repair head, release it, resolve the cycle defect with deployment and regression evidence, refresh the Lensically MCP deployment, resume the same operation ID from the durable checkpoint, complete strategy and source-backed persistence, then verify zero cycle-horizon missing slots, lineage, scheduler health, and no unresolved delivery incidents.
+- Resolved repair: successful D1 integrity checks are cached by D1 binding and canonical expectation; failed checks are evicted and remain retryable. Exact deployed SHA `1d43a14c852944144c119813077d9e178e60c68c`; defect receipt `b488317a-61d8-4548-b514-dccf21b96024` is resolved with typecheck run `30856752301`, Operator run `30856760861`, push validation `30856746177`, and release `30856833976`.
+- Current blocking defect: `decision-bundle-essential-compaction-overflow-20260803`, receipt ID `267b4eb2-60ef-4b78-b5d2-df50e7d72f00`. Measurement audit and exposure revision 2 completed, but the compact decision bundle measured 24,325 bytes, 325 bytes over the 24,000-byte contract, because all locked source identities were duplicated inside the compact bundle despite the canonical paged lineup authority.
+- Current action: validate and release the page-backed compaction fallback, resolve the bundle defect, resume the identical cycle operation ID, consume the compact bundle plus every canonical locked-lineup page, complete strategy and source-backed persistence, then verify zero cycle-horizon missing slots, lineage, scheduler health, and no unresolved delivery incidents.
 - Prohibited diversion: do not start another Main, Innovation, shadow, or unrelated engineering job while this active cycle remains incomplete.
 
 ## Completed Unified Source Ranking Pass: unified-source-ranking-v2-20260803

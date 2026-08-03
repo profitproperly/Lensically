@@ -97,7 +97,7 @@ describe("operatorManifestDecisionBundleService", () => {
     });
     });
 
-  it("keeps a complete 48-slot locked source plan inside the 24KB bundle contract", async () => {
+    it("falls back to canonical paged lineup authority when a production-sized 48-slot plan exceeds 24KB", async () => {
     const cycleId = crypto.randomUUID();
     const snapshotId = crypto.randomUUID();
     const missingSlots = Array.from({ length: 48 }, (_, index) => ({
@@ -167,9 +167,9 @@ describe("operatorManifestDecisionBundleService", () => {
         cycleId,
         slot.key,
         index + 1,
-        `identity-${index}`,
-        `family-${index}`,
-        `card-${index}`,
+                `identity-${index}-${"i".repeat(320)}`,
+        `family-${index}-${"f".repeat(320)}`,
+        `card-${index}-${"c".repeat(320)}`,
                 JSON.stringify({
           lifetime_label: "proven",
           audition_state: "graduated",
@@ -185,12 +185,21 @@ describe("operatorManifestDecisionBundleService", () => {
 
     const built = await buildManifestDecisionBundle(env.DB, { brandKey, cycleId, snapshotId });
     const bundle = built.bundle as Record<string, any>;
-    expect(Number(built.payload_bytes)).toBeLessThanOrEqual(MANIFEST_DECISION_BUNDLE_MAX_BYTES);
-    expect(bundle.locked_source_plan).toHaveLength(48);
-    expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.slot_key))
-      .toEqual(missingSlots.map((slot) => slot.key));
-        expect(bundle.locked_source_plan.map((item: Record<string, unknown>) => item.source_card_id))
-      .toEqual(Array.from({ length: 48 }, (_, index) => `card-${index}`));
+        expect(Number(built.payload_bytes)).toBeLessThanOrEqual(MANIFEST_DECISION_BUNDLE_MAX_BYTES);
+    expect(bundle.locked_source_plan).toEqual([]);
+    expect(bundle.locked_source_plan_summary).toEqual(expect.objectContaining({
+      count: 48,
+      locked_source_plan_hash: bundle.locked_source_plan_hash,
+      first_slot_key: missingSlots[0].key,
+      last_slot_key: missingSlots[47].key,
+      canonical_read_tool: "get_manifest_locked_lineup_page",
+      page_limit: 12,
+      full_lineup_read_required_before_strategy_commit: true,
+    }));
+    expect(bundle.bundle_compaction).toEqual(expect.objectContaining({
+      level: 6,
+      complete_locked_source_plan_preserved_by_canonical_paged_read: true,
+    }));
         expect(bundle.selection_causal_authority).toEqual(expect.objectContaining({
       preselection_policy_versions: ["source-preselection-policy-v1"],
       preselection_policy_hashes: ["policy-hash-1"],
@@ -206,10 +215,11 @@ describe("operatorManifestDecisionBundleService", () => {
       stage_5_may_substitute_sources: false,
       stage_5_may_change_slots: false,
     }));
-    const replayed = await buildManifestDecisionBundle(env.DB, { brandKey, cycleId, snapshotId });
+        const replayed = await buildManifestDecisionBundle(env.DB, { brandKey, cycleId, snapshotId });
     expect((replayed.bundle as Record<string, any>).locked_source_plan_hash).toBe(bundle.locked_source_plan_hash);
-    expect((replayed.bundle as Record<string, any>).locked_source_plan).toEqual(bundle.locked_source_plan);
+    expect((replayed.bundle as Record<string, any>).locked_source_plan_summary).toEqual(bundle.locked_source_plan_summary);
     expect(built.requires_detail_read).toBe(true);
+
 
         expect(String(built.detail_reason)).toContain("bundle_size_compaction_level_");
   });

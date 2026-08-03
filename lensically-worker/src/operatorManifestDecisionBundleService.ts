@@ -704,9 +704,33 @@ export async function buildManifestDecisionBundle(
     bundleJson = stableJson(bundle);
     payloadBytes = new TextEncoder().encode(bundleJson).byteLength;
   }
-  if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
-    throw new Error(`manifest_decision_bundle_too_large_after_essential_compaction:${payloadBytes}`);
+    if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
+    bundleCompactionLevel = 6;
+    const pageBackedLockedPlan = records(bundle.locked_source_plan);
+    bundle.locked_source_plan = [];
+    bundle.locked_source_plan_summary = {
+      count: pageBackedLockedPlan.length,
+      locked_source_plan_hash: bundle.locked_source_plan_hash,
+      first_slot_key: pageBackedLockedPlan[0]?.slot_key ?? null,
+      last_slot_key: pageBackedLockedPlan[pageBackedLockedPlan.length - 1]?.slot_key ?? null,
+      canonical_read_tool: "get_manifest_locked_lineup_page",
+      page_limit: 12,
+      full_lineup_read_required_before_strategy_commit: true,
+    };
+    bundle.bundle_compaction = {
+      level: 6,
+      reason: "payload_budget_page_backed_locked_plan",
+      complete_locked_source_plan_preserved_in_bundle: false,
+      complete_locked_source_plan_preserved_by_canonical_paged_read: true,
+      detail_pages_required_for_evidence_text: true,
+    };
+    bundleJson = stableJson(bundle);
+    payloadBytes = new TextEncoder().encode(bundleJson).byteLength;
   }
+  if (payloadBytes > MANIFEST_DECISION_BUNDLE_MAX_BYTES) {
+    throw new Error(`manifest_decision_bundle_too_large_after_page_backed_compaction:${payloadBytes}`);
+  }
+
 
 
   const bundleHash = await sha256(bundle);
