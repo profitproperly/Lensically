@@ -1,20 +1,32 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-main-cycle-20260803-1739
+active_checkpoint: validate_deploy_resume_measurement_audit
 validated_source_head: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
-documentation_source_head: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
+documentation_source_head: 3fe9b9d0e9fb8fd4442f0229b2d5ab9fe77f1c15
 production_sha: c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_interrupt_id: measurement-audit-database-integrity-api-limit-20260803
+active_interrupt_state: repairing
+active_interrupt_precedence: blocks_cycle_resume_until_exact_sha_release
+
+## ACTIVE Manifest Main Cycle: manifest-main-cycle-20260803-1739
+
+- Owner authorization: run one live Main Manifest Mental cycle end to end.
+- Canonical cycle operation ID: `manifest-main-2026-08-03-1739`.
+- Canonical cycle ID: `3a5ab59d-2fd4-47e3-9752-51afccc5e6b3`.
+- Durable progress: live Threads evidence, all due maturity checkpoints, 814 maturity evaluations, 814 comparable analyses, 837 learning observations, 141 portfolio states, the cycle receipt, and exposure snapshot are persisted. The last completed preparation stage is `manifest_intelligence_portfolio`; the next stage is `manifest_measurement_audit`.
+- Blocking defect: `measurement-audit-database-integrity-api-limit-20260803`, receipt ID `b488317a-61d8-4548-b514-dccf21b96024`. A repeated schema probe for `operator_workflow_requirements` exceeded Cloudflare's single-invocation API-request limit after the cycle had consumed its request budget.
+- Root repair commit: `3fe9b9d0e9fb8fd4442f0229b2d5ab9fe77f1c15`. Successful D1 integrity checks are now cached by D1 binding and canonical expectation; failed checks are evicted and remain retryable. Focused regression coverage proves equivalent checks issue one D1 probe and failures are not cached.
+- Current action: validate the exact repair head, release it, resolve the cycle defect with deployment and regression evidence, refresh the Lensically MCP deployment, resume the same operation ID from the durable checkpoint, complete strategy and source-backed persistence, then verify zero cycle-horizon missing slots, lineage, scheduler health, and no unresolved delivery incidents.
+- Prohibited diversion: do not start another Main, Innovation, shadow, or unrelated engineering job while this active cycle remains incomplete.
 
 ## Completed Unified Source Ranking Pass: unified-source-ranking-v2-20260803
+
 
 - Status: completed, validated, and deployed. No Main, Innovation, shadow, generation, persistence, scheduling, or content cycle was run.
 - Exact production SHA: `c5f4c60fd7f0c51c25dbe520a51ddd1c4a64c6a0`.
