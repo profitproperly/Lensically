@@ -36,7 +36,9 @@ export interface OperatorManifestPrepareCheckpointDependencies {
   refreshContentFocus(brandKey: string): Promise<unknown>;
   readActiveLearningBrief(brandKey: string): Promise<JsonRecord | null>;
   parseJson(value: string): unknown;
-  updateActiveLearningBrief(input: { id: string; brandKey: string; brief: JsonRecord }): Promise<unknown>;
+    updateActiveLearningBrief(input: { id: string; brandKey: string; brief: JsonRecord }): Promise<unknown>;
+  readReadySnapshot(input: JsonRecord): Promise<JsonRecord>;
+  writeReadySnapshot(input: JsonRecord): Promise<JsonRecord>;
   now(): string;
 }
 
@@ -206,23 +208,15 @@ export async function handleOperatorManifestPrepareCheckpoint(
           },
         );
       }
-            const activeBrief = await dependencies.readActiveLearningBrief(brandKey);
-      const activeBriefPayload = activeBrief?.id
-        ? dependencies.operatorRecord(
-          dependencies.parseJson(String(activeBrief.brief_json ?? "{}")),
-        )
-        : {};
-            const activeBriefId = dependencies.normalizeText(activeBrief?.id, 160, true);
-      const generatedAtMs = Date.parse(String(activeBrief?.generated_at ?? ""));
-      const nowMs = Date.parse(dependencies.now());
-      const learningSnapshotFresh = payload.force_full_rebuild !== true
-        && Boolean(activeBriefId)
-        && activeBriefPayload.manifest_layers_finalized === true
+                  const readySnapshot = payload.force_full_rebuild !== true
         && Number(evaluatedSnapshot.processed_due_checkpoint_count ?? 0) === 0
-        && Number.isFinite(generatedAtMs)
-        && Number.isFinite(nowMs)
-        && Math.max(0, nowMs - generatedAtMs) <= 6 * 60 * 60 * 1000;
-      if (learningSnapshotFresh) {
+        ? await dependencies.readReadySnapshot({
+          brand_key: brandKey,
+          account_id: accountId,
+          threads_user_id: threadsUserId,
+        })
+        : null;
+      if (readySnapshot?.reusable === true) {
         const storedEvaluation = dependencies.operatorRecord(evaluatedSnapshot.performance_evaluation);
         threadsSnapshot = {
           ...evaluatedSnapshot,
@@ -231,6 +225,8 @@ export async function handleOperatorManifestPrepareCheckpoint(
             manifest_layers_deferred: false,
             manifest_layers_finalized: true,
             durable_snapshot_reused: true,
+            ready_snapshot_reused: true,
+            ready_snapshot_id: readySnapshot.snapshot_id ?? null,
           },
         };
         await dependencies.writeCheckpoint({
@@ -240,23 +236,27 @@ export async function handleOperatorManifestPrepareCheckpoint(
           timezone,
           horizon_hours: horizonHours,
           state: {
-                        runtime_now_iso: runtimeNowIso,
+            runtime_now_iso: runtimeNowIso,
             threads_snapshot: dependencies.compactThreadsSnapshot(threadsSnapshot),
-            durable_learning_snapshot_id: activeBriefId,
+            durable_ready_snapshot_id: readySnapshot.snapshot_id ?? null,
+            durable_learning_snapshot_id: readySnapshot.learning_brief_id ?? null,
           },
         });
         return continuation(
           explicitOperationId,
           dependencies.checkpointVersion,
-          "delta_learning_reused",
+          "delta_ready_snapshot_reused",
           "cycle_construction",
-                    "The latest finalized learning snapshot is fresh and no new due maturity checkpoints were processed. Server orchestration will construct the cycle without rebuilding unchanged intelligence layers.",
+          "The backend Ready Snapshot still matches its learning, Saved Pattern, and owner-edit watermarks. Server orchestration will construct the cycle without rebuilding unchanged intelligence layers.",
           {
-            durable_learning_snapshot_id: activeBriefId,
+            durable_ready_snapshot_id: readySnapshot.snapshot_id ?? null,
+            durable_learning_snapshot_id: readySnapshot.learning_brief_id ?? null,
+            ready_snapshot_age_ms: readySnapshot.age_ms ?? null,
             delta_refresh_required: false,
           },
         );
       }
+
 
       threadsSnapshot = evaluatedSnapshot;
       await dependencies.writeCheckpoint({
@@ -489,20 +489,37 @@ export async function handleOperatorManifestPrepareCheckpoint(
         contentFocus,
         "manifest_content_focus",
       );
-      const activeBrief = await dependencies.readActiveLearningBrief(brandKey);
-      if (activeBrief?.id) {
+            const activeBrief = await dependencies.readActiveLearningBrief(brandKey);
+      const activeBriefId = dependencies.normalizeText(activeBrief?.id, 160, true);
+      let readySnapshot: JsonRecord | null = null;
+      if (activeBriefId) {
         const brief = dependencies.operatorRecord(
-          dependencies.parseJson(String(activeBrief.brief_json ?? "{}")),
+          dependencies.parseJson(String(activeBrief?.brief_json ?? "{}")),
         );
+        const finalizedBrief = {
+          ...brief,
+          intelligence_engine: state.intelligence_engine ?? {},
+          measurement_audit: state.measurement_audit ?? {},
+          content_focus: contentFocusSummary,
+          manifest_layers_finalized: true,
+        };
         await dependencies.updateActiveLearningBrief({
-          id: String(activeBrief.id),
+          id: activeBriefId,
           brandKey,
-          brief: {
-            ...brief,
+          brief: finalizedBrief,
+        });
+        readySnapshot = await dependencies.writeReadySnapshot({
+          brand_key: brandKey,
+          account_id: accountId,
+          threads_user_id: threadsUserId,
+          learning_brief_id: activeBriefId,
+          generated_at: dependencies.normalizeText(activeBrief?.generated_at, 100, true)
+            ?? dependencies.now(),
+          payload: {
+            manifest_layers_finalized: true,
             intelligence_engine: state.intelligence_engine ?? {},
             measurement_audit: state.measurement_audit ?? {},
             content_focus: contentFocusSummary,
-            manifest_layers_finalized: true,
           },
         });
       }
@@ -523,8 +540,10 @@ export async function handleOperatorManifestPrepareCheckpoint(
         timezone,
         horizon_hours: horizonHours,
         state: {
-          runtime_now_iso: runtimeNowIso,
+                    runtime_now_iso: runtimeNowIso,
           threads_snapshot: threadsSnapshot,
+          durable_ready_snapshot_id: readySnapshot?.id ?? null,
+          durable_learning_snapshot_id: activeBriefId,
         },
       });
       return continuation(
@@ -532,8 +551,12 @@ export async function handleOperatorManifestPrepareCheckpoint(
         dependencies.checkpointVersion,
         "manifest_content_focus",
         "cycle_construction",
-        "Call prepare_manifest_autonomous_cycle again with the identical inputs. All evaluator layers and the active learning brief are finalized; the next invocation constructs the cycle.",
-        { content_focus: contentFocusSummary },
+                "All evaluator layers, the active learning brief, and the durable Ready Snapshot are finalized. Server orchestration will construct the cycle next.",
+        {
+          content_focus: contentFocusSummary,
+          durable_ready_snapshot_id: readySnapshot?.id ?? null,
+          durable_learning_snapshot_id: activeBriefId,
+        },
       );
     }
 
