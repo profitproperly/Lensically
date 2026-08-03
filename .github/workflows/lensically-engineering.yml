@@ -698,16 +698,8 @@ jobs:
             agent_status="$(curl --silent --output /tmp/agent-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/agent/accounts' || true)"
             intelligence_status="$(curl --silent --output /tmp/intelligence-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/threads/intelligence-dashboard' || true)"
 
-            if [ "${runtime_ok}" = "true" ] \
-              && [ "${scheduler_ok}" = "true" ] \
-                            && [ "${dashboard_ok}" = "true" ] \
-                            && [ "${cycles_api_ok}" = "true" ] \
-              && [ "${cycles_page_ok}" = "true" ] \
-              && [ "${cycles_contract_ok}" = "true" ] \
-              && [ "${gpt_memory_status}" = "410" ] \
+                        if [ "${runtime_ok}" = "true" ] && [ "${scheduler_ok}" = "true" ] && [ "${dashboard_ok}" = "true" ] && [ "${cycles_api_ok}" = "true" ] && [ "${cycles_page_ok}" = "true" ] && [ "${cycles_contract_ok}" = "true" ] && [ "${gpt_memory_status}" = "410" ] && [ "${agent_status}" = "410" ] && [ "${intelligence_status}" = "410" ]; then
 
-              && [ "${agent_status}" = "410" ] \
-              && [ "${intelligence_status}" = "410" ]; then
               verified=true
               break
             fi

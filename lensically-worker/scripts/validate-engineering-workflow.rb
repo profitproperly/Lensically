@@ -1,4 +1,6 @@
 require "yaml"
+require "tempfile"
+
 
 path = ARGV.fetch(0)
 source = File.read(path)
@@ -94,7 +96,16 @@ required_worker_release_steps = [
 missing_worker_release_steps = required_worker_release_steps.reject { |name| worker_release_step_names.include?(name) }
 abort("worker_release_steps_missing:#{missing_worker_release_steps.join(",")}") unless missing_worker_release_steps.empty?
 
+production_verification_run = step_run(jobs, "worker-release", "Verify production runtime, scheduler, retained website, and retired legacy surfaces")
+Tempfile.create(["lensically-production-verification", ".sh"]) do |file|
+  file.write("set -euo pipefail\n")
+  file.write(production_verification_run)
+  file.flush
+  abort("production_verification_shell_syntax_invalid") unless system("bash", "-n", file.path, out: File::NULL, err: File::NULL)
+end
+
 push_gate_run = step_run(jobs, "push-validation", "Typecheck and lifecycle gate")
+
 abort("push_release_fallback_preflight_missing") unless push_gate_run.lines.count { |line| line.strip == "node scripts/release-preflight.mjs" } == 1
 
 push_full_run = step_run(jobs, "push-validation", "Run full push validation")
