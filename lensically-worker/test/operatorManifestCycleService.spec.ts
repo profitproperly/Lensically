@@ -89,8 +89,10 @@ describe("Operator Manifest cycle product service", () => {
             selection_order: 1,
             source_identity_key: "threads:source-1",
             source_card_family_id: "family-1",
-            source_card_id: "card-1",
+                        source_card_id: "card-1",
             source_selection_id: "selection-1",
+            cycle_plan_item_id: "plan-item-1",
+            cycle_strategy_id: "strategy-1",
             source_card_version_number: 1,
             source_type: "saved_pattern",
             internal_source_id: "222",
@@ -130,7 +132,9 @@ describe("Operator Manifest cycle product service", () => {
     expect(response.status).toBe(200);
     const page = response.body.lineup_page as JsonRecord;
     const item = (page.items as JsonRecord[])[0];
-    expect(item).toMatchObject({
+        expect(item).toMatchObject({
+      cycle_plan_item_id: "plan-item-1",
+      cycle_strategy_id: "strategy-1",
       source_card_id: "card-1",
       primary_source: expect.objectContaining({ text: "Original source" }),
       owner_guidance: expect.objectContaining({

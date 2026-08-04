@@ -100,7 +100,7 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "get_manifest_locked_lineup_page",
         title: "Read Main Cycle locked lineup page",
-    description: "Return one bounded page of the exact backend-locked Main Cycle source-to-slot lineup with source evidence, active verbatim owner guidance, the latest relevant owner correction, and source identities. Read from offset 0 until complete once per prepared cycle. A source card is evidence, not a script. Do not replace locked sources and do not fetch individual source cards already represented in these pages.",
+        description: "Return one bounded page of the exact backend-locked Main Cycle source-to-slot lineup with source evidence, active verbatim owner guidance, the latest relevant owner correction, source identities, and the persisted cycle_plan_item_id plus cycle_strategy_id when strategy is locked. Read from offset 0 until complete once per prepared cycle and again after strategy lock when bounded persistence requires exact plan identities. A source card is evidence, not a script. Do not replace locked sources and do not fetch individual source cards already represented in these pages.",
     inputSchema: {
       type: "object",
       properties: {

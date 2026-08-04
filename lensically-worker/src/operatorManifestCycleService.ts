@@ -158,8 +158,10 @@ export async function handleOperatorManifestCycleServiceTool(
              p.source_identity_key,
              p.source_card_family_id,
              p.source_card_id,
-             p.engine_version,
+                          p.engine_version,
              p.receipt_json,
+             i.id AS cycle_plan_item_id,
+             i.strategy_id AS cycle_strategy_id,
              c.title AS source_title,
              c.primary_source_json,
              c.source_mechanism,
@@ -196,7 +198,11 @@ export async function handleOperatorManifestCycleServiceTool(
                ORDER BY datetime(r.created_at) DESC, r.revision_number DESC
                LIMIT 1
              ) AS latest_owner_edit_note_json
-           FROM operator_source_selection_plans p
+                      FROM operator_source_selection_plans p
+           LEFT JOIN operator_manifest_cycle_plan_items i
+             ON i.cycle_id = p.cycle_id
+            AND i.brand_key = p.brand_key
+            AND i.slot_key = p.slot_key
            LEFT JOIN operator_source_cards c
              ON c.id = p.source_card_id AND c.brand_key = p.brand_key
                       LEFT JOIN operator_source_card_families f
@@ -212,8 +218,10 @@ export async function handleOperatorManifestCycleServiceTool(
       const items = (rows.results ?? []).map((row) => {
         const receipt = asRecord(parseJson(row.receipt_json, {}));
         return {
-          slot_key: row.slot_key,
+                    slot_key: row.slot_key,
           selection_order: Number(row.selection_order ?? 0),
+          cycle_plan_item_id: row.cycle_plan_item_id ?? null,
+          cycle_strategy_id: row.cycle_strategy_id ?? null,
           source_identity_key: row.source_identity_key,
           source_card_family_id: row.source_card_family_id,
           source_card_id: row.source_card_id,
