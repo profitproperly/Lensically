@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  SOURCE_SELECTION_ENGINE_VERSION,
+  buildWinnerAllocationPlan,
   classifySourceFamilyLifetime,
   extractOwnerBannedSavedPatternIds,
-  normalizeSourceFamilyLifetimeLabel,
+  runSourceFamilySelectionEdgeCases,
   selectSourceFamilyLineup,
-
   type SourceFamilyLifetimeLabel,
   type SourceSelectionCandidate,
 } from "../src/sourceFamilySelection";
-import { compileSourcePreselectionPolicy } from "../src/sourcePreselectionPolicy";
-
 
 function candidate(
   id: string,
   lifetimeLabel: SourceFamilyLifetimeLabel = "untested",
+  rankingScore = 1,
   overrides: Partial<SourceSelectionCandidate> = {},
 ): SourceSelectionCandidate {
   return {
@@ -22,10 +22,11 @@ function candidate(
     source_card_family_id: `family-${id}`,
     lifetime_label: lifetimeLabel,
     recent_label: "no_recent_data",
-    lifetime_sample_size: lifetimeLabel === "untested" ? 0 : 4,
-    recent_sample_size: lifetimeLabel === "untested" ? 0 : 2,
-    lifetime_index: lifetimeLabel === "franchise" ? 1.8 : lifetimeLabel === "proven" ? 1.4 : 1,
-    recent_index: lifetimeLabel === "untested" ? null : 1,
+    lifetime_sample_size: lifetimeLabel === "untested" ? 0 : 6,
+    unified_rating: rankingScore,
+    ranking_score: rankingScore,
+    lifetime_index: rankingScore,
+    global_rank: null,
     uses_24h: 0,
     uses_7d: 0,
     uses_28d: 0,
@@ -35,6 +36,7 @@ function candidate(
     semantic_future_scheduled_uses: 0,
     semantic_exposure_times: [],
     semantic_key: `semantic-${id}`,
+    historical_opportunity_count: lifetimeLabel === "untested" ? 0 : 6,
     ...overrides,
   };
 }
@@ -46,261 +48,184 @@ function slots(count: number, start = "2026-08-10T00:00"): string[] {
   );
 }
 
-describe("source family owner exclusions", () => {
-  it("extracts only Saved Pattern IDs from durable owner directives", () => {
-    const ids = extractOwnerBannedSavedPatternIds({
-      owner_hard_bans: [
-        "Never generate or schedule I bet having $250,000 removes anxiety wording.",
-        "Never select Saved Patterns 6, 7, 218, 189, 25, 27, 214, 118, 205, or 190.",
-      ],
-    });
+function counts(result: ReturnType<typeof selectSourceFamilyLineup>): Record<string, number> {
+  return result.selected.reduce<Record<string, number>>((accumulator, item) => {
+    const identity = String(item.source_identity_key);
+    accumulator[identity] = Number(accumulator[identity] ?? 0) + 1;
+    return accumulator;
+  }, {});
+}
 
+describe("source-selection engine v8", () => {
+  it("uses the v8 production contract", () => {
+    expect(SOURCE_SELECTION_ENGINE_VERSION).toBe("source-selection-engine-v8");
+  });
+
+  it("preserves exact Saved Pattern owner exclusions", () => {
+    const ids = extractOwnerBannedSavedPatternIds({
+      owner_hard_bans: ["Never select Saved Patterns 6, 7, 118, or 214."],
+      banned_saved_pattern_ids: [25],
+    });
     expect([...ids].sort((left, right) => Number(left) - Number(right))).toEqual([
-      "6", "7", "25", "27", "118", "189", "190", "205", "214", "218",
+      "6", "7", "25", "118", "214",
     ]);
-    expect(ids.has("250000")).toBe(false);
   });
 
-  it("supports structured Saved Pattern exclusion fields", () => {
-    const ids = extractOwnerBannedSavedPatternIds({
-      banned_saved_pattern_ids: [6, "214"],
-      nested: { saved_pattern_id: 118 },
+  it("keeps two below-median matured results underperforming", () => {
+    expect(classifySourceFamilyLifetime({ indexes: [0.8, 0.7] })).toEqual(expect.objectContaining({
+      label: "underperforming",
+      audition_failures: 2,
+    }));
+  });
+});
+
+describe("deterministic proportional Exploit allocation", () => {
+  const auditedWinners = [
+    candidate("universe", "franchise", 5.88661973, { global_rank: 1 }),
+    candidate("income", "proven", 2.43192433, { global_rank: 2 }),
+    candidate("relational", "proven", 1.25568152, { global_rank: 3 }),
+    candidate("finger", "proven", 1.01270251, { global_rank: 4 }),
+  ];
+
+  it("turns the audited 16-slot fixture into 8-4-2-2 instead of 13-1-1-1", () => {
+    const plan = buildWinnerAllocationPlan(auditedWinners, 16);
+    expect(Object.fromEntries(plan.map((target) => [target.source_identity_key, target.final_target_count]))).toEqual({
+      "source-universe": 8,
+      "source-income": 4,
+      "source-relational": 2,
+      "source-finger": 2,
     });
 
-    expect([...ids].sort((left, right) => Number(left) - Number(right))).toEqual(["6", "118", "214"]);
-  });
-});
-
-describe("bounded source family audition", () => {
-  it("keeps a one-flop family on probation for exactly one second audition", () => {
-    expect(classifySourceFamilyLifetime({ indexes: [0.84] })).toEqual(expect.objectContaining({
-      label: "untested",
-      audition_state: "probation",
-      audition_failures: 1,
-      audition_opportunities_remaining: 1,
-      graduated: false,
-    }));
-  });
-
-  it("excludes two flops and graduates two passes", () => {
-    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.6] })).toEqual(expect.objectContaining({
-      label: "underperforming",
-      audition_state: "underperforming",
-      audition_failures: 2,
-    }));
-    expect(classifySourceFamilyLifetime({ indexes: [0.85, 0.9] })).toEqual(expect.objectContaining({
-      audition_state: "graduated",
-      audition_passes: 2,
-      graduated: true,
-    }));
-  });
-
-  it("uses one tiebreaker only when the first two results split", () => {
-        expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85] })).toEqual(expect.objectContaining({
-      label: "prospect",
-      audition_state: "tiebreaker",
-
-      audition_opportunities_remaining: 1,
-    }));
-    expect(classifySourceFamilyLifetime({ indexes: [0.84, 0.85, 0.85] })).toEqual(expect.objectContaining({
-      audition_state: "graduated",
-      audition_passes: 2,
-      graduated: true,
-    }));
-    expect(classifySourceFamilyLifetime({ indexes: [0.85, 0.84, 0.2] })).toEqual(expect.objectContaining({
-      label: "underperforming",
-      audition_state: "underperforming",
-      audition_failures: 2,
-    }));
-  });
-
-  it("cuts a graduated family when its later lifetime median falls below 0.85", () => {
-    expect(classifySourceFamilyLifetime({ indexes: [1, 1, 0.2, 0.2, 0.2] })).toEqual(expect.objectContaining({
-      label: "underperforming",
-      audition_state: "underperforming",
-    }));
-  });
-
-    it("recognizes one passing result immediately, treats 0.85 as a pass, and normalizes legacy history", () => {
-    expect(classifySourceFamilyLifetime({ indexes: [0.85] })).toEqual(expect.objectContaining({
-      label: "prospect",
-      audition_state: "provisional_pass",
-      audition_passes: 1,
-    }));
-    expect(classifySourceFamilyLifetime({ indexes: [4] })).toEqual(expect.objectContaining({
-      label: "emerging",
-      audition_state: "provisional_pass",
-      audition_passes: 1,
-    }));
-
-    expect(normalizeSourceFamilyLifetimeLabel("disproven")).toBe("underperforming");
-  });
-});
-
-describe("hardened source family selection", () => {
-  it("hard-excludes recent published, future scheduled, and underperforming families", () => {
-
-    const blocked = [
-      candidate("recent", "proven", { published_uses_72h: 1 }),
-      candidate("scheduled", "franchise", { future_scheduled_uses: 1 }),
-            candidate("weak", "underperforming"),
-
-    ];
-    const safe = Array.from({ length: 6 }, (_, index) => candidate(`safe-${index}`));
     const result = selectSourceFamilyLineup({
-      candidates: [...blocked, ...safe],
-      slot_keys: slots(4),
-      seed: "hard-exclusions",
+      candidates: auditedWinners,
+      slot_keys: slots(16),
+      seed: "audited-13-1-1-1-regression",
       include_parity_trace: true,
     });
 
-    expect(result.selected).toHaveLength(4);
-    expect(result.selected.every((item) => String(item.source_identity_key).startsWith("source-safe-"))).toBe(true);
-    expect(result.receipts.every((receipt) => receipt.cooldown_hours === 72 && receipt.cooldown_relaxation === 1)).toBe(true);
-    expect(result.parity_trace?.exclusions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ reason: "source_published_within_72h" }),
-      expect.objectContaining({ reason: "source_already_future_scheduled" }),
-            expect.objectContaining({ reason: "lifetime_underperforming" }),
-
-    ]));
-  });
-
-    it("keeps probation and tiebreaker families exploration-only", () => {
-    const audition = [
-      candidate("probation", "untested", { audition_state: "probation", audition_failures: 1 }),
-      candidate("tiebreaker", "untested", { audition_state: "tiebreaker", audition_passes: 1, audition_failures: 1 }),
-    ];
-    const result = selectSourceFamilyLineup({
-      candidates: [...audition, candidate("winner", "franchise"), candidate("dev", "emerging")],
-      slot_keys: slots(4),
-      seed: "audition-exploration",
+    expect(counts(result)).toEqual({
+      "source-universe": 8,
+      "source-income": 4,
+      "source-relational": 2,
+      "source-finger": 2,
     });
-    const auditionReceipts = result.receipts.filter((receipt) => ["probation", "tiebreaker"].includes(receipt.audition_state));
-    expect(auditionReceipts).toHaveLength(2);
-    expect(auditionReceipts.every((receipt) => receipt.allocation_tier === "exploration")).toBe(true);
-  });
-
-  it("enforces compiled hard bans, experiment reservations, and strategy/evidence weights before lock", () => {
-    const candidates = [
-      candidate("banned", "franchise", { text: "Forbidden premise" }),
-      candidate("reserved", "emerging"),
-      candidate("weighted", "emerging"),
-      candidate("safe-a", "franchise"),
-      candidate("safe-b", "prospect"),
-      candidate("safe-c"),
-    ];
-    const slotKeys = slots(4);
-    const policy = compileSourcePreselectionPolicy({
-      candidates,
-      slot_keys: slotKeys,
-      hard_bans: [{ rule_key: "ban-premise", phrase: "Forbidden premise", active: 1 }],
-      active_experiments: [{
-        experiment_key: "reserved-test",
-        status: "active",
-        source_identity_key: "source-reserved",
-        required_slots: 1,
-        reserved_slot_keys: [slotKeys[0]],
-      }],
-      strategy_directives: { source_weights: { "source-weighted": 2 } },
-      strongest_mature_evidence: [{ source_identity_key: "source-weighted" }],
-    });
-    const result = selectSourceFamilyLineup({ candidates, slot_keys: slotKeys, seed: "policy-authority", preselection_policy: policy, include_parity_trace: true });
-
-    expect(result.selected.some((item) => item.source_identity_key === "source-banned")).toBe(false);
-    expect(result.receipts[0]).toEqual(expect.objectContaining({
-      source_identity_key: "source-reserved",
-      experiment_reservation_key: "reserved-test",
-      preselection_policy_hash: policy.policy_hash,
-    }));
     expect(result.summary).toEqual(expect.objectContaining({
-      experiment_reservations_required: 1,
-      experiment_reservations_fulfilled: 1,
-      preselection_policy_hash: policy.policy_hash,
+      winner_allocation_contract: "first_coverage_then_score_weighted_largest_remainder_v1",
+      winner_target_mismatch_count: 0,
+      maximum_exact_family_concentration: 0.5,
     }));
-    expect(result.parity_trace?.exclusions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ source_identity_key: "source-banned", reason: "preselection_hard_ban" }),
-    ]));
+    expect(result.receipts.every((receipt) =>
+      receipt.winner_target_satisfied
+      && receipt.winner_actual_selected_count === receipt.winner_final_target_count
+    )).toBe(true);
   });
 
-  it("enforces protected exploration and controlled winner allocation", () => {
-
-    const winners = Array.from({ length: 3 }, (_, index) => candidate(`winner-${index}`, "franchise"));
-    const development = Array.from({ length: 8 }, (_, index) => candidate(`development-${index}`, "emerging"));
-    const exploration = Array.from({ length: 20 }, (_, index) => candidate(`exploration-${index}`));
+  it("covers highest-ranked winners once when capacity is smaller than the winner pool", () => {
     const result = selectSourceFamilyLineup({
-      candidates: [...winners, ...development, ...exploration],
-      slot_keys: slots(20),
-      seed: "allocation",
-    });
-    const tiers = result.summary.selected_allocation_tiers as Record<string, number>;
-
-    expect(tiers).toEqual({ winner: 3, development: 8, exploration: 9 });
-    expect(new Set(result.selected.map((item) => item.source_identity_key)).size).toBe(20);
-  });
-
-  it("blocks a semantic premise inside the 24-hour audience window", () => {
-    const crowded = candidate("crowded", "franchise", {
-      semantic_key: "future-spouse-coming",
-      semantic_exposure_times: ["2026-08-10T01:00:00.000Z"],
-    });
-    const candidates = [
-      crowded,
-      candidate("winner-safe", "franchise"),
-      candidate("dev-1", "emerging"),
-      candidate("dev-2", "prospect"),
-      candidate("explore-1"),
-      candidate("explore-2"),
-      candidate("explore-3"),
-    ];
-    const result = selectSourceFamilyLineup({
-      candidates,
-      slot_keys: slots(5),
-      seed: "semantic-spacing",
-    });
-
-    expect(result.selected.some((item) => item.source_identity_key === crowded.source_identity_key)).toBe(false);
-  });
-
-  it("permanently blocks the July 30-31 parrot-repeat fixtures", () => {
-    const julyRepeatFixtures = [
-      "life-about-to-get-good",
-      "hands-channel-abundance",
-      "inner-child-higher-self",
-      "intuition-believe-it",
-      "kind-person-opportunity",
-      "celebrate-others-beautiful",
-      "twenty-k-month-day",
-      "one-hundred-k-stay-focused",
-      "future-spouse-coming",
-      "flat-stomach-bank-account",
-    ].map((id) => candidate(`july-repeat-${id}`, "proven", { published_uses_72h: 1 }));
-    const fresh = Array.from({ length: 24 }, (_, index) => candidate(`fresh-${index}`));
-    const result = selectSourceFamilyLineup({
-      candidates: [...julyRepeatFixtures, ...fresh],
-      slot_keys: slots(24),
-      seed: "july-repeat-regression",
-    });
-
-    expect(result.selected).toHaveLength(24);
-    expect(result.selected.some((item) => String(item.source_identity_key).includes("july-repeat"))).toBe(false);
-  });
-
-  it("fails closed instead of relaxing when hardened inventory is insufficient", () => {
-    expect(() => selectSourceFamilyLineup({
-      candidates: [
-        candidate("recent-a", "proven", { published_uses_72h: 1 }),
-        candidate("recent-b", "proven", { published_uses_72h: 1 }),
-        candidate("only-safe"),
-      ],
+      candidates: auditedWinners,
       slot_keys: slots(2),
-      seed: "fail-closed",
-    })).toThrow("insufficient_hardened_source_families:1:2");
+      seed: "winner-pool-larger-than-capacity",
+    });
+    expect(counts(result)).toEqual({
+      "source-universe": 1,
+      "source-income": 1,
+    });
   });
 
-  it("replays deterministically under the hardened policy", () => {
-    const candidates = Array.from({ length: 24 }, (_, index) => candidate(`deterministic-${index}`));
-    const input = { candidates, slot_keys: slots(24), seed: "deterministic-v5" };
-    expect(selectSourceFamilyLineup(input).receipts).toEqual(selectSourceFamilyLineup(input).receipts);
+  it("allows the sole qualified winner to receive every Exploit placement", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: [candidate("sole", "franchise", 2.5)],
+      slot_keys: slots(9),
+      seed: "sole-winner",
+    });
+    expect(counts(result)).toEqual({ "source-sole": 9 });
+    expect(result.summary).toEqual(expect.objectContaining({
+      maximum_exact_family_concentration: 1,
+      winner_target_mismatch_count: 0,
+    }));
+  });
+
+  it("matches deterministic largest-remainder targets for arbitrary slot counts", () => {
+    for (const slotCount of [16, 33, 47]) {
+      const expected = Object.fromEntries(
+        buildWinnerAllocationPlan(auditedWinners, slotCount)
+          .filter((target) => target.final_target_count > 0)
+          .map((target) => [target.source_identity_key, target.final_target_count]),
+      );
+      const input = {
+        candidates: auditedWinners,
+        slot_keys: slots(slotCount),
+        seed: `arbitrary-${slotCount}`,
+      };
+      const first = selectSourceFamilyLineup(input);
+      const second = selectSourceFamilyLineup(input);
+      expect(counts(first)).toEqual(expected);
+      expect(first.receipts).toEqual(second.receipts);
+    }
+  });
+
+  it("does not add wording, opener, Universe, Finger Touch, or mechanism concentration limits", () => {
+    const sameOpening = auditedWinners.map((item, index) => ({
+      ...item,
+      text: "Universe, make the person reading this wealthy.",
+      semantic_key: index % 2 === 0 ? "universe" : "finger_touch",
+    }));
+    const result = selectSourceFamilyLineup({
+      candidates: sameOpening,
+      slot_keys: slots(16),
+      seed: "wording-is-not-allocation-authority",
+    });
+    expect(counts(result)).toEqual({
+      "source-universe": 8,
+      "source-income": 4,
+      "source-relational": 2,
+      "source-finger": 2,
+    });
   });
 });
 
+describe("Develop and Explore protection", () => {
+  it("keeps independently saved similar sources independent", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: [
+        candidate("finger-a", "untested", 1, { semantic_key: "finger_touch" }),
+        candidate("finger-b", "untested", 1, { semantic_key: "finger_touch" }),
+      ],
+      slot_keys: slots(2),
+      seed: "independent-saved-patterns",
+    });
+    expect(new Set(result.selected.map((item) => item.source_identity_key)).size).toBe(2);
+  });
+
+  it("blocks an unresolved source until its prior 24-hour evidence matures", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: [
+        candidate("pending", "untested", 1, { uses_24h: 1 }),
+        candidate("fresh", "untested", 1),
+      ],
+      slot_keys: slots(1),
+      seed: "pending-evidence",
+    });
+    expect(result.selected[0]?.source_identity_key).toBe("source-fresh");
+  });
+
+  it("keeps Underperforming families out of normal distribution", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: [
+        candidate("bench", "underperforming", 4),
+        candidate("fresh", "untested", 1),
+      ],
+      slot_keys: slots(1),
+      seed: "bench-exclusion",
+      include_parity_trace: true,
+    });
+    expect(result.selected[0]?.source_identity_key).toBe("source-fresh");
+    expect(result.parity_trace?.exclusions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source_identity_key: "source-bench", reason: "lifetime_underperforming" }),
+    ]));
+  });
+
+  it("passes the built-in production edge-case contract", () => {
+    expect(runSourceFamilySelectionEdgeCases()).toEqual(expect.objectContaining({ passed: true }));
+  });
+});
