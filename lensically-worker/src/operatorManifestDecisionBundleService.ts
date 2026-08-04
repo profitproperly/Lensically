@@ -1,5 +1,5 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
-import { loadUnavailableHistoricalWinnerEvidence } from "./sourceFamilySelection";
+
 
 
 type JsonRecord = Record<string, unknown>;
@@ -126,7 +126,8 @@ export async function buildManifestDecisionBundle(
   ).bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>();
   if (!snapshot) throw new Error("manifest_evidence_snapshot_not_found");
 
-    const [pageRows, strongestRows, weakestRows, familyRows, planRows, hardBanRows, experimentRows, strategyRows, cycle, unavailableHistoricalWinners] = await Promise.all([
+      const [pageRows, strongestRows, weakestRows, familyRows, planRows, hardBanRows, experimentRows, strategyRows, cycle] = await Promise.all([
+
     db.prepare(
       `SELECT page_index, page_contract_version, item_count, byte_count,
               evidence_types_json, items_json
@@ -192,9 +193,9 @@ export async function buildManifestDecisionBundle(
               exposure_snapshot_id, timezone, horizon_hours, updated_at
        FROM operator_autonomous_growth_cycles
        WHERE id = ? AND brand_key = ? LIMIT 1`,
-        ).bind(input.cycleId, input.brandKey).first<JsonRecord>(),
-    loadUnavailableHistoricalWinnerEvidence(db, input.brandKey, 20),
+            ).bind(input.cycleId, input.brandKey).first<JsonRecord>(),
   ]);
+
   if (!cycle) throw new Error("manifest_cycle_not_found");
 
   const pages = pageRows.results ?? [];
@@ -325,11 +326,7 @@ export async function buildManifestDecisionBundle(
     source_card_family_ids: lowConfidenceSelected.map((family) => family.source_card_family_id),
     required_action: "Treat these slots as bounded exploration, not proven deployment.",
   });
-  if (unavailableHistoricalWinners.length > 0) unresolvedEvidenceGaps.push({
-    gap_key: "historical_winners_without_exact_saved_pattern_provenance",
-    published_post_ids: unavailableHistoricalWinners.map((winner) => winner.published_post_id),
-    required_action: "Treat these results as analytics-only. Do not claim that another source card preserves them exactly and do not transfer their evidence by mechanism similarity.",
-  });
+  
 
   const currentStrategyAuthority = strategyRows.results?.[0] ?? null;
   const bundle: JsonRecord = {
@@ -357,13 +354,13 @@ export async function buildManifestDecisionBundle(
     },
                 locked_source_plan: lockedSourcePlan,
         locked_source_plan_hash: lockedSourcePlanHash,
-    historical_winner_source_availability: {
-      contract: "exact-source-provenance-v1",
-      unavailable_count: unavailableHistoricalWinners.length,
-      analytics_only_winners: unavailableHistoricalWinners,
-      exact_source_allocation_available: false,
+        source_card_origin_authority: {
+      contract: "source-card-origin-independent-selection-v1",
+      valid_locked_source_cards_selectable_regardless_of_origin: true,
+      evidence_owned_by_exact_source_card_family: true,
       evidence_transfer_by_mechanism_allowed: false,
     },
+
     selection_causal_authority: selectionCausalAuthority,
     stage_authority: {
 
@@ -392,8 +389,10 @@ export async function buildManifestDecisionBundle(
       stage_4_locked_source_plan_hash: lockedSourcePlanHash,
       stage_5_generation_and_audit_only: true,
             stage_5_source_or_slot_mutation_forbidden: true,
-      historical_analytics_only_winners_may_not_be_claimed_as_exactly_preserved: true,
+            exact_source_card_family_evidence_ownership_required: true,
+      source_card_origin_does_not_change_selection_eligibility: true,
       historical_winner_evidence_transfer_by_mechanism_forbidden: true,
+
       deterministic_hard_bans_server_owned: true,
 
       deterministic_duplicate_and_slot_checks_server_owned: true,

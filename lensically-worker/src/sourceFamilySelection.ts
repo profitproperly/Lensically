@@ -193,72 +193,15 @@ function isLiveSavedPatternId(liveIds: Set<string> | null, value: unknown): bool
   return liveIds === null || !/^\d+$/.test(id) || liveIds.has(id);
 }
 
-export type UnavailableHistoricalWinnerEvidence = {
-  published_post_id: string;
-  source_identity_key: string;
-  source_card_family_id: string;
-  source_card_id: string;
-  source_type: string;
-  likes_24h: number;
-  account_median_likes_24h: number;
-  availability: "analytics_only";
-  exact_source_allocation_available: false;
-  provenance_status: "unavailable_exact_saved_pattern_provenance";
-};
-
-export async function loadUnavailableHistoricalWinnerEvidence(
-  db: D1Database,
-  brandKey: string,
-  limit = 20,
-): Promise<UnavailableHistoricalWinnerEvidence[]> {
-  await ensureSourceFamilySelectionTables(db);
-  const rows = await db.prepare(
-    `SELECT scores.published_post_id, scores.metrics_json,
-            cards.id AS source_card_id, families.id AS source_card_family_id,
-            families.source_identity_key, selections.source_type
-     FROM operator_post_performance_scores scores
-     JOIN operator_post_fingerprints fingerprints
-       ON fingerprints.brand_key = scores.brand_key
-      AND fingerprints.published_post_id = scores.published_post_id
-     JOIN operator_source_cards cards
-       ON cards.id = fingerprints.source_card_id
-      AND cards.brand_key = scores.brand_key
-     JOIN operator_source_card_families families
-       ON families.id = cards.family_id
-      AND families.brand_key = scores.brand_key
-     LEFT JOIN operator_source_selections selections
-       ON selections.id = cards.source_selection_id
-      AND selections.brand_key = cards.brand_key
-     WHERE scores.brand_key = ?
-       AND scores.checkpoint_hours = 24
-       AND scores.valid_for_learning = 1`,
-  ).bind(brandKey).all<Record<string, unknown>>();
-  const parsed = (rows.results ?? []).map((row) => {
-    const metrics = parseJsonRecord(row.metrics_json);
-    return {
-      row,
-      likes: Math.max(0, finiteNumber(metrics.likes)),
-    };
-  });
-  const accountMedian = median(parsed.map((entry) => entry.likes)) ?? 0;
-  return parsed
-    .filter(({ row, likes }) => String(row.source_type ?? "") !== "saved_pattern" && likes >= accountMedian)
-    .sort((left, right) => right.likes - left.likes
-      || String(left.row.published_post_id ?? "").localeCompare(String(right.row.published_post_id ?? "")))
-    .slice(0, Math.max(0, Math.floor(limit)))
-    .map(({ row, likes }) => ({
-      published_post_id: String(row.published_post_id ?? ""),
-      source_identity_key: String(row.source_identity_key ?? ""),
-      source_card_family_id: String(row.source_card_family_id ?? ""),
-      source_card_id: String(row.source_card_id ?? ""),
-      source_type: String(row.source_type ?? "unknown"),
-      likes_24h: likes,
-      account_median_likes_24h: accountMedian,
-      availability: "analytics_only",
-      exact_source_allocation_available: false,
-      provenance_status: "unavailable_exact_saved_pattern_provenance",
-    }));
+export function isSourceCardOriginEligibleForSelection(
+  sourceType: unknown,
+  savedPatternId: unknown,
+  liveSavedPatternIds: Set<string> | null,
+): boolean {
+  return String(sourceType ?? "").trim() !== "saved_pattern"
+    || isLiveSavedPatternId(liveSavedPatternIds, savedPatternId);
 }
+
 
 export function extractOwnerBannedSavedPatternIds(value: unknown): Set<string> {
   const ids = new Set<string>();
@@ -642,27 +585,35 @@ export async function refreshSourceFamilyLabels(
   nowIso = new Date().toISOString(),
 ): Promise<Record<string, unknown>> {
   await ensureSourceFamilySelectionTables(db);
-    const familyRows = await db.prepare(
-                `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
-                sel.internal_source_id AS saved_pattern_id
-     FROM operator_source_card_families fam
-     JOIN operator_source_cards card
-       ON card.id = fam.current_source_card_id
-      AND card.brand_key = fam.brand_key
-      AND card.is_current = 1
-     JOIN operator_source_selections sel
-       ON sel.id = card.source_selection_id
-      AND sel.brand_key = card.brand_key
-      AND sel.source_type = 'saved_pattern'
-     WHERE fam.brand_key = ?
-       AND fam.status = 'active'
-       AND card.status = 'locked'
-       AND card.source_selection_id IS NOT NULL`,
+        const familyRows = await db.prepare(
+      `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+              COALESCE(sel.source_type, fam.source_type, 'source_card') AS source_origin_type,
+              CASE
+                WHEN COALESCE(sel.source_type, fam.source_type) = 'saved_pattern'
+                THEN COALESCE(sel.internal_source_id, fam.internal_source_id)
+                ELSE NULL
+              END AS saved_pattern_id
+       FROM operator_source_card_families fam
+       JOIN operator_source_cards card
+         ON card.id = fam.current_source_card_id
+        AND card.brand_key = fam.brand_key
+        AND card.is_current = 1
+       LEFT JOIN operator_source_selections sel
+         ON sel.id = card.source_selection_id
+        AND sel.brand_key = card.brand_key
+       WHERE fam.brand_key = ?
+         AND fam.status = 'active'
+         AND card.status = 'locked'`,
     ).bind(brandKey).all<Record<string, unknown>>();
   const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
-    const eligibleFamilyRows = (familyRows.results ?? []).filter((row) =>
-    isLiveSavedPatternId(liveSavedPatternIds, row.saved_pattern_id)
+  const eligibleFamilyRows = (familyRows.results ?? []).filter((row) =>
+    isSourceCardOriginEligibleForSelection(
+      row.source_origin_type,
+      row.saved_pattern_id,
+      liveSavedPatternIds,
+    )
   );
+
 
   const evidenceRows = await db.prepare(
     `SELECT c.family_id AS source_card_family_id, fam.source_identity_key,
@@ -864,23 +815,28 @@ export async function loadLockedSourceCardDecisionCandidates(
   await ensureSourceFamilySelectionTables(db);
   const rows = await db.prepare(
 
-                `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
-            card.id AS source_card_id, card.source_mechanism, card.required_product,
-            card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction,
-            sel.internal_source_id AS saved_pattern_id
-     FROM operator_source_card_families fam
-     JOIN operator_source_cards card
-       ON card.id = fam.current_source_card_id
-      AND card.brand_key = fam.brand_key
-      AND card.is_current = 1
-     JOIN operator_source_selections sel
-       ON sel.id = card.source_selection_id
-      AND sel.brand_key = card.brand_key
-      AND sel.source_type = 'saved_pattern'
-     WHERE fam.brand_key = ?
-       AND fam.status = 'active'
-       AND card.status = 'locked'
-       AND card.source_selection_id IS NOT NULL`,
+                      `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
+              card.id AS source_card_id, card.source_mechanism, card.required_product,
+              card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction,
+              COALESCE(sel.source_type, fam.source_type, 'source_card') AS source_origin_type,
+              COALESCE(sel.internal_source_id, fam.internal_source_id, card.id) AS source_origin_internal_id,
+              CASE
+                WHEN COALESCE(sel.source_type, fam.source_type) = 'saved_pattern'
+                THEN COALESCE(sel.internal_source_id, fam.internal_source_id)
+                ELSE NULL
+              END AS saved_pattern_id
+       FROM operator_source_card_families fam
+       JOIN operator_source_cards card
+         ON card.id = fam.current_source_card_id
+        AND card.brand_key = fam.brand_key
+        AND card.is_current = 1
+       LEFT JOIN operator_source_selections sel
+         ON sel.id = card.source_selection_id
+        AND sel.brand_key = card.brand_key
+       WHERE fam.brand_key = ?
+         AND fam.status = 'active'
+         AND card.status = 'locked'`,
+
 
     ).bind(brandKey).all<Record<string, unknown>>();
     const liveSavedPatternIds = await loadLiveSavedPatternIds(db);
@@ -904,11 +860,17 @@ export async function loadLockedSourceCardDecisionCandidates(
     }
     if (exclusion.source_identity_key) excludedIdentityKeys.add(String(exclusion.source_identity_key));
   }
-  const eligibleRows = (rows.results ?? []).filter((row) =>
-    isLiveSavedPatternId(liveSavedPatternIds, row.saved_pattern_id)
-    && !excludedPatternIds.has(String(row.saved_pattern_id ?? ""))
+    const eligibleRows = (rows.results ?? []).filter((row) =>
+    isSourceCardOriginEligibleForSelection(
+      row.source_origin_type,
+      row.saved_pattern_id,
+      liveSavedPatternIds,
+    )
+    && (String(row.source_origin_type ?? "") !== "saved_pattern"
+      || !excludedPatternIds.has(String(row.saved_pattern_id ?? "")))
     && !excludedIdentityKeys.has(String(row.source_identity_key ?? ""))
   );
+
   const candidates = eligibleRows.map((row) => {
     let metrics: Record<string, unknown> = {};
     let primarySource: Record<string, unknown> = {};
@@ -921,8 +883,14 @@ export async function loadLockedSourceCardDecisionCandidates(
       source_card_id: String(row.source_card_id ?? ""),
             source_type: "source_card",
       internal_source_id: String(row.source_card_id ?? ""),
-      saved_pattern_id: String(row.saved_pattern_id ?? ""),
+            saved_pattern_id: row.saved_pattern_id === null || row.saved_pattern_id === undefined
+        ? null
+        : String(row.saved_pattern_id),
+      source_origin_type: String(row.source_origin_type ?? "source_card"),
+      source_origin_internal_id: String(row.source_origin_internal_id ?? row.source_card_id ?? ""),
+      source_origin_selectable: true,
       source_mechanism: row.source_mechanism ?? null,
+
       required_product: row.required_product ?? null,
       recommended_direction: row.recommended_direction ?? null,
       text: primarySource.post_text ?? primarySource.text ?? null,

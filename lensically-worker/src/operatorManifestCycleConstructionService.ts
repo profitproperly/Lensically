@@ -84,11 +84,11 @@ export interface OperatorManifestCycleConstructionDependencies {
     accountPosition: JsonRecord;
   }): Promise<unknown>;
   readLockedSourceSelectionPlan(brandKey: string, cycleId: string): Promise<JsonRecord[]>;
-    loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
-        candidates: JsonRecord[];
+        loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
+    candidates: JsonRecord[];
     preselection_policy: JsonRecord;
-        unavailable_historical_winners?: JsonRecord[];
   }>;
+
 
   loadSourceExclusions(brandKey: string): Promise<string[]>;
   selectSourceLineup(input: {
@@ -395,7 +395,7 @@ export async function constructOperatorManifestAutonomousCycle(
   };
     let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
     let preselectionPolicy: JsonRecord | null = null;
-  let unavailableHistoricalWinners: JsonRecord[] = [];
+  
   let sourceSelectionPlanStatus = missingSlots.length === 0
 
     ? "not_required"
@@ -410,9 +410,9 @@ export async function constructOperatorManifestAutonomousCycle(
       String(clock.effective_now_iso ?? ""),
       currentMissingSlotKeys,
     );
-        preselectionPolicy = record(sourceDecisionContext.preselection_policy);
-    unavailableHistoricalWinners = asRecords(sourceDecisionContext.unavailable_historical_winners);
+            preselectionPolicy = record(sourceDecisionContext.preselection_policy);
     const selectionCandidates = asRecords(sourceDecisionContext.candidates)
+
       .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")));
 
     if (selectionCandidates.length > 0) {
@@ -485,14 +485,14 @@ export async function constructOperatorManifestAutonomousCycle(
     preselection_policy_version: preselectionPolicy?.contract_version ?? null,
     preselection_policy_hash: preselectionPolicy?.policy_hash ?? null,
         preselection_causal_signal_counts: preselectionPolicy?.causal_signal_counts ?? {},
-    historical_winner_source_availability: {
-      contract: "exact-source-provenance-v1",
-      unavailable_count: unavailableHistoricalWinners.length,
-      unavailable_historical_winners: unavailableHistoricalWinners,
+        source_card_origin_authority: {
+      contract: "source-card-origin-independent-selection-v1",
+      valid_locked_source_cards_selectable_regardless_of_origin: true,
+      evidence_owned_by_exact_source_card_family: true,
       evidence_transfer_by_mechanism_allowed: false,
-      strategy_may_claim_exact_preservation: false,
-      cycle_blocked_only_for_false_lineage_claim: true,
+      automated_model_source_card_creation_enabled: false,
     },
+
     locked_source_selection_plan: compactLockedSourceSelectionPlanForReceipt(lockedSourceSelectionPlan),
 
   }, "manifest_cycle.horizon_plan");
