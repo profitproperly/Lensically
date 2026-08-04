@@ -1594,7 +1594,9 @@ export async function validateLineupAgainstLockedSourceSelectionPlan(
     const plan = await readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
   if (!plan.length) throw new Error("locked_source_selection_plan_missing");
   if (plan.length !== input.lineup.length) throw new Error("locked_source_selection_plan_lineup_count_mismatch");
-    const seenSourceLanes = new Map<string, UnifiedSelectionLane>();
+        const seenSourceLanes = new Map<string, UnifiedSelectionLane>();
+  const lockedWinnerTargets = new Map<string, number>();
+  const lockedWinnerActuals = new Map<string, number>();
   for (const row of plan) {
     const receipt = row.receipt && typeof row.receipt === "object" && !Array.isArray(row.receipt)
       ? row.receipt as Record<string, unknown>
@@ -1625,7 +1627,29 @@ export async function validateLineupAgainstLockedSourceSelectionPlan(
     if (priorLane && (priorLane !== "exploit" || selectionLane !== "exploit")) {
       throw new Error(`locked_source_selection_plan_duplicate_unresolved_source:${slotKey}`);
     }
-    seenSourceLanes.set(sourceIdentityKey, selectionLane);
+        seenSourceLanes.set(sourceIdentityKey, selectionLane);
+    if (selectionLane === "exploit") {
+      const familyId = String(row.source_card_family_id ?? receipt.source_card_family_id ?? "");
+      const target = Math.max(0, Math.floor(finiteNumber(receipt.winner_final_target_count)));
+      if (!familyId || target < 1) {
+        throw new Error(`locked_source_selection_plan_winner_target_missing:${slotKey}`);
+      }
+      const existingTarget = lockedWinnerTargets.get(familyId);
+      if (existingTarget !== undefined && existingTarget !== target) {
+        throw new Error(`locked_source_selection_plan_winner_target_conflict:${familyId}`);
+      }
+      lockedWinnerTargets.set(familyId, target);
+      lockedWinnerActuals.set(familyId, Number(lockedWinnerActuals.get(familyId) ?? 0) + 1);
+      if (finiteNumber(receipt.winner_actual_selected_count) !== target || receipt.winner_target_satisfied !== true) {
+        throw new Error(`locked_source_selection_plan_winner_receipt_unreconciled:${slotKey}`);
+      }
+    }
+  }
+  for (const [familyId, target] of lockedWinnerTargets) {
+    const actual = Number(lockedWinnerActuals.get(familyId) ?? 0);
+    if (actual !== target) {
+      throw new Error(`locked_source_selection_plan_winner_target_mismatch:${familyId}:${actual}:${target}`);
+    }
   }
   const expected = new Map(plan.map((row) => [String(row.slot_key), String(row.source_card_id)]));
   for (const item of input.lineup) {
