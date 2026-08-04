@@ -3,8 +3,10 @@ import {
   SOURCE_SELECTION_ENGINE_VERSION,
   buildWinnerAllocationPlan,
   classifySourceFamilyLifetime,
-  extractOwnerBannedSavedPatternIds,
+    extractOwnerBannedSavedPatternIds,
+  isSourceCardOriginEligibleForSelection,
   runSourceFamilySelectionEdgeCases,
+
   selectSourceFamilyLineup,
   type SourceFamilyLifetimeLabel,
   type SourceSelectionCandidate,
@@ -71,12 +73,21 @@ describe("source-selection engine v8", () => {
     ]);
   });
 
-  it("keeps two below-median matured results underperforming", () => {
+    it("keeps two below-median matured results underperforming", () => {
     expect(classifySourceFamilyLifetime({ indexes: [0.8, 0.7] })).toEqual(expect.objectContaining({
       label: "underperforming",
       audition_failures: 2,
     }));
   });
+
+  it("treats source-card validity as independent from origin", () => {
+    const liveSavedPatterns = new Set(["128"]);
+    expect(isSourceCardOriginEligibleForSelection("saved_pattern", "128", liveSavedPatterns)).toBe(true);
+    expect(isSourceCardOriginEligibleForSelection("saved_pattern", "999", liveSavedPatterns)).toBe(false);
+    expect(isSourceCardOriginEligibleForSelection("operator_hypothesis", null, liveSavedPatterns)).toBe(true);
+    expect(isSourceCardOriginEligibleForSelection("owner_source_card", null, liveSavedPatterns)).toBe(true);
+  });
+
 });
 
 describe("deterministic proportional Exploit allocation", () => {
