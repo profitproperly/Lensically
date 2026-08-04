@@ -1,18 +1,26 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: source-card-origin-and-ui-20260803
+active_checkpoint: admit all valid locked source-card origins to selection, add paginated Source Cards UI above Saved Patterns, add owner source-card creation, validate, deploy, and stop without running or simulating any content cycle
 validated_source_head: e064db48ffba88f8730b00349ac3d308a0182113
 documentation_source_head: e064db48ffba88f8730b00349ac3d308a0182113
 production_sha: e064db48ffba88f8730b00349ac3d308a0182113
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
+
+## ACTIVE: Source Card Origin and UI
+
+- Owner-approved scope: treat every valid current locked source-card family as selectable regardless of Saved Pattern, owner, or previously permitted model origin; preserve exact-family evidence ownership; add a Source Cards sidebar item immediately above Saved Patterns; expose every source card through a paginated account-scoped page; allow the owner to create and lock source cards directly from the UI.
+- Creation authority remains separate from selection eligibility. Existing model-originated cards remain valid and selectable; no automated model source-card creation is enabled by this job.
+- Prohibited actions: no Main, Innovation, shadow, simulation, generation, scheduling, publishing, editing, deleting, or rescheduling posts.
+- Current action: implement backend selection and source-card APIs, implement UI and tests, validate exact head, deploy exact validated SHA, verify production, close the ledger, and stop.
+
 
 ## Completed Manifest Exploit Allocation Repair: manifest-exploit-allocation-repair-20260803
 
