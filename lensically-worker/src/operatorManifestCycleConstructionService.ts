@@ -87,8 +87,8 @@ export interface OperatorManifestCycleConstructionDependencies {
     loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
         candidates: JsonRecord[];
     preselection_policy: JsonRecord;
-    unavailable_historical_winners?: JsonRecord[];
-  };
+        unavailable_historical_winners?: JsonRecord[];
+  }>;
 
   loadSourceExclusions(brandKey: string): Promise<string[]>;
   selectSourceLineup(input: {
