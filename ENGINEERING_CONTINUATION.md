@@ -1,25 +1,37 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: source-card-origin-and-ui-20260803
-active_checkpoint: admit all valid locked source-card origins to selection, add paginated Source Cards UI above Saved Patterns, add owner source-card creation, validate, deploy, and stop without running or simulating any content cycle
-validated_source_head: e064db48ffba88f8730b00349ac3d308a0182113
-documentation_source_head: e064db48ffba88f8730b00349ac3d308a0182113
-production_sha: e064db48ffba88f8730b00349ac3d308a0182113
+active_job_id: null
+active_checkpoint: null
+validated_source_head: a32addd24478f473c56dd37877556bad3adea4ae
+documentation_source_head: a32addd24478f473c56dd37877556bad3adea4ae
+production_sha: a32addd24478f473c56dd37877556bad3adea4ae
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
 
-## ACTIVE: Source Card Origin and UI
+## Completed Source Card Origin and UI: source-card-origin-and-ui-20260803
 
-- Owner-approved scope: treat every valid current locked source-card family as selectable regardless of Saved Pattern, owner, or previously permitted model origin; preserve exact-family evidence ownership; add a Source Cards sidebar item immediately above Saved Patterns; expose every source card through a paginated account-scoped page; allow the owner to create and lock source cards directly from the UI.
-- Creation authority remains separate from selection eligibility. Existing model-originated cards remain valid and selectable; no automated model source-card creation is enabled by this job.
-- Prohibited actions: no Main, Innovation, shadow, simulation, generation, scheduling, publishing, editing, deleting, or rescheduling posts.
-- Current action: implement backend selection and source-card APIs, implement UI and tests, validate exact head, deploy exact validated SHA, verify production, close the ledger, and stop.
+- Root cause: candidate loading incorrectly treated a Saved Pattern origin as the validity requirement for a source card. That excluded legitimate locked source-card families created by the owner or by the model under previously permitted rules, despite complete exact lineage and valid performance evidence.
+- Selection repair: every active family with a current locked source card is now eligible regardless of origin. Saved Pattern deletion checks apply only to Saved Pattern-origin cards. Existing owner-created, model-created, and other valid source-card origins compete under the same exact-family lifecycle and proportional allocation math.
+- Evidence authority: performance remains attached only to the exact source-card family that produced it. No evidence is transferred, merged, or inferred through shared Finger Touch, Universe, wording, opening, or mechanism similarity.
+- Creation authority: selection eligibility is now separate from creation permission. Existing model-originated cards are valid and selectable, while autonomous model creation of new source cards remains disabled.
+- Owner creation: the Source Cards workspace can create and immediately lock an owner-authored source card with its own exact family, source identity, selection lineage, transformation contract, and optional permanent guidance. Creation does not generate, schedule, or publish a post.
+- Source Cards UI: a Source Cards item appears immediately above Saved Patterns. The account-scoped page exposes all versions by default, offers a Current Only view, shows origin and exact lineage, supports permanent guidance, and uses server-backed pagination at 20 cards per page with a backend maximum of 50.
+- APIs: added paginated source-card listing, owner source-card creation, and guidance updates by exact source-card ID.
+- Validation protection: source-origin eligibility is directly regression-tested; the web build requires the Source Cards navigation, pagination, owner creation, API, and lineage contract.
+- Supersession: the earlier analytics-only classification for non-Saved Pattern source cards is retired. Those valid cards are now directly selectable through their own exact families.
+- Validation evidence: exact-head typecheck and lifecycle gate `30868296539`; all eight Operator shards `30868489917`; complete worker and web push validation `30868288298`.
+- Release evidence: exact-SHA Worker and web deployment plus production runtime, scheduler, and retained-site verification `30868557295`.
+- Final production SHA: `a32addd24478f473c56dd37877556bad3adea4ae`.
+- Prohibited-action proof: no Main cycle, Innovation cycle, shadow cycle, simulation, generation, scheduling, publishing, editing, deletion, or rescheduling operation was run.
+- Status: completed. No active Lensically engineering job remains.
+
+
 
 
 ## Completed Manifest Exploit Allocation Repair: manifest-exploit-allocation-repair-20260803
@@ -29,8 +41,8 @@ active_interrupt_precedence: none
 - Audited fixture: the exact 16-slot ranking scores now deterministically resolve to Universe 8, Income Acceleration 4, Relational Worth 2, and Finger Touch 2. The prior 13-1-1-1 result is a mandatory failing regression fixture.
 - Enforcement: winners become ineligible after reaching their locked target; locked-plan validation independently recomputes actual counts and fails closed on missing, conflicting, or unsatisfied winner targets.
 - Receipts: every winner receipt now exposes initial coverage, proportional weight, exact additional share, rounded additional placements, final target count, actual count, target satisfaction, and sequencing deficit. Cycle summaries expose target and actual distributions, mismatch count, and maximum exact-family concentration.
-- Historical lineage repair: mature legacy operator-hypothesis winners remain valid analytics but are explicitly marked analytics-only and unavailable for exact Saved Pattern allocation without verified provenance. Evidence cannot be transferred, merged, or claimed as exact preservation based on Finger Touch, Universe, or any other mechanism similarity.
-- Decision reconciliation: unavailable historical winners are surfaced in prepared-cycle state and the decision bundle with directives forbidding false exact-preservation claims while allowing cycles to proceed when the historical provenance is simply unavailable.
+- Historical lineage note: this implementation initially marked non-Saved Pattern source-card families analytics-only. That origin-based restriction was later identified as flawed and is superseded by `source-card-origin-and-ui-20260803`; every valid current locked source-card family is now selectable while retaining exact-family evidence ownership.
+
 - Validation repair: `test/sourceFamilySelection.spec.ts` was rewritten for v8, added to both complete and required full-validation inventories, and protected by mandatory regression markers for proportional allocation, the audited 13-1-1-1 defect, engine v8, and the absence of wording-based allocation authority.
 - No mechanism grouping, opener audit, Universe cap, Finger Touch cap, wording concentration rule, cooldown, fatigue rule, semantic quota, or source-card evidence sharing was added.
 - Preservation proof: scheduled posts 869-916 were not edited, deleted, replaced, rescheduled, or republished.
