@@ -1257,8 +1257,8 @@ export function selectSourceFamilyLineup(input: {
           winner_final_target_count: winnerTarget?.final_target_count ?? 0,
           winner_actual_selected_count: 0,
           winner_target_satisfied: allocationTier !== "winner",
-          winner_share_deficit: winnerShareDeficit,
-          development_resolution_priority: developmentPriority;
+                    winner_share_deficit: winnerShareDeficit,
+          development_resolution_priority: developmentPriority,
           evidence_debt_bonus: evidenceDebtBonus,
           waiting_priority: waitingPriority,
           historical_opportunity_count: historicalOpportunityCount,
@@ -1346,6 +1346,25 @@ export function selectSourceFamilyLineup(input: {
       throw new Error(`hardened_allocation_target_mismatch:${tier}:${selectedTierCounts[tier]}:${allocationTargets[tier]}`);
     }
   }
+    const winnerActualCounts = receipts.reduce<Record<string, number>>((counts, receipt) => {
+    if (receipt.allocation_tier === "winner") {
+      counts[receipt.source_card_family_id] = Number(counts[receipt.source_card_family_id] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const winnerTargetMismatches = winnerAllocationPlan.filter((target) =>
+    Number(winnerActualCounts[target.source_card_family_id] ?? 0) !== target.final_target_count
+  );
+  if (winnerTargetMismatches.length > 0) {
+    const first = winnerTargetMismatches[0];
+    throw new Error(`winner_allocation_target_mismatch:${first.source_card_family_id}:${winnerActualCounts[first.source_card_family_id] ?? 0}:${first.final_target_count}`);
+  }
+  for (const receipt of receipts) {
+    if (receipt.allocation_tier !== "winner") continue;
+    const actual = Number(winnerActualCounts[receipt.source_card_family_id] ?? 0);
+    receipt.winner_actual_selected_count = actual;
+    receipt.winner_target_satisfied = actual === receipt.winner_final_target_count;
+  }
   const labelCounts = selected.reduce<Record<string, number>>((counts, candidate) => {
     const label = String(candidate.lifetime_label ?? "untested");
     counts[label] = Number(counts[label] ?? 0) + 1;
@@ -1371,7 +1390,27 @@ export function selectSourceFamilyLineup(input: {
       unresolved_source_unique_per_cycle: true,
       unresolved_pending_24h_evidence_blocked: true,
       allocation_targets: allocationTargets,
-      selected_allocation_tiers: selectedTierCounts,
+            selected_allocation_tiers: selectedTierCounts,
+      winner_allocation_contract: "first_coverage_then_score_weighted_largest_remainder_v1",
+      qualified_winner_count: winnerAllocationPlan.length,
+      winner_target_distribution: winnerAllocationPlan.map((target) => ({
+        source_identity_key: target.source_identity_key,
+        source_card_family_id: target.source_card_family_id,
+        ranking_score: Number(target.ranking_score.toFixed(8)),
+        global_rank: target.global_rank,
+        initial_coverage_count: target.initial_coverage_count,
+        proportional_weight: Number(target.proportional_weight.toFixed(8)),
+        exact_additional_share: Number(target.exact_additional_share.toFixed(8)),
+        rounded_additional_placements: target.rounded_additional_placements,
+        final_target_count: target.final_target_count,
+        actual_selected_count: Number(winnerActualCounts[target.source_card_family_id] ?? 0),
+        target_satisfied: Number(winnerActualCounts[target.source_card_family_id] ?? 0) === target.final_target_count,
+      })),
+      winner_actual_distribution: winnerActualCounts,
+      winner_target_mismatch_count: winnerTargetMismatches.length,
+      maximum_exact_family_concentration: allocationTargets.winner > 0
+        ? Math.max(0, ...Object.values(winnerActualCounts)) / allocationTargets.winner
+        : 0,
       selected_lifetime_labels: labelCounts,
       preselection_policy_version: input.preselection_policy?.contract_version ?? null,
       preselection_policy_hash: input.preselection_policy?.policy_hash ?? null,
@@ -1405,7 +1444,10 @@ export function selectSourceFamilyLineup(input: {
             source_identity_key: receipt.source_identity_key,
             source_card_id: receipt.source_card_id,
             source_card_family_id: receipt.source_card_family_id,
-            allocation_tier: receipt.allocation_tier,
+                        allocation_tier: receipt.allocation_tier,
+            winner_final_target_count: receipt.winner_final_target_count,
+            winner_actual_selected_count: receipt.winner_actual_selected_count,
+            winner_target_satisfied: receipt.winner_target_satisfied,
             semantic_key: receipt.semantic_key,
           })),
         }
