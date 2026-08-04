@@ -14,6 +14,24 @@ export type ManifestExperimentDecision = "continue" | "expand" | "revise" | "sto
 
 type JsonRecord = Record<string, unknown>;
 
+export const MANIFEST_D1_WRITE_BATCH_SIZE = 40;
+
+export async function executeManifestD1WriteBatches(
+  db: Pick<D1Database, "batch">,
+  statements: D1PreparedStatement[],
+  batchSize = MANIFEST_D1_WRITE_BATCH_SIZE,
+): Promise<{ statement_count: number; batch_count: number }> {
+  const normalizedBatchSize = Math.max(1, Math.min(100, Math.trunc(batchSize)));
+  let batchCount = 0;
+  for (let offset = 0; offset < statements.length; offset += normalizedBatchSize) {
+    const batch = statements.slice(offset, offset + normalizedBatchSize);
+    if (batch.length === 0) continue;
+    await db.batch(batch);
+    batchCount += 1;
+  }
+  return { statement_count: statements.length, batch_count: batchCount };
+}
+
 export type ManifestSemanticSignature = {
   version: string;
   text_hash: string;
@@ -870,8 +888,9 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     LEFT JOIN threads_posts_archive a ON a.post_id = s.published_post_id
     WHERE s.brand_key = ? AND s.valid_for_learning = 1
         ORDER BY s.checkpoint_hours ASC, substr(a.post_timestamp, 1, 19) ASC, datetime(s.updated_at) ASC`).bind(input.brand_key).all<JsonRecord>();
-  const candidates: ManifestComparableCandidate[] = [];
+    const candidates: ManifestComparableCandidate[] = [];
   const maturityRows: Array<{ row: JsonRecord; maturity: ManifestMaturityEvaluation; fingerprint: JsonRecord; signature: ManifestSemanticSignature; family_key: string; source_identity_key: string; generation_mode: string; placement_key: string }> = [];
+  const maturityWriteStatements: D1PreparedStatement[] = [];
   for (const row of scoreRows.results ?? []) {
     const fingerprint = record(parseJson(row.fingerprint_json, {}));
     const signature = parseJson(row.signature_json, null) as ManifestSemanticSignature | null
@@ -884,16 +903,16 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       scores: record(parseJson(row.scores_json, {})),
       distribution_state: text(row.distribution_state, 80),
     });
-            if (runMaturityEvaluations) {
-    await db.prepare(`INSERT INTO operator_manifest_maturity_evaluations (
-      id, brand_key, published_post_id, checkpoint_hours, evaluation_version, evaluation_json, structural_change_allowed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
-      evaluation_version = excluded.evaluation_version, evaluation_json = excluded.evaluation_json,
-      structural_change_allowed = excluded.structural_change_allowed, updated_at = CURRENT_TIMESTAMP`).bind(
-      crypto.randomUUID(), input.brand_key, String(row.published_post_id), maturity.checkpoint_hours,
-            MANIFEST_MATURITY_EVALUATION_VERSION, stableJson(maturity), maturity.structural_change_allowed ? 1 : 0,
-    ).run();
+                if (runMaturityEvaluations) {
+      maturityWriteStatements.push(db.prepare(`INSERT INTO operator_manifest_maturity_evaluations (
+        id, brand_key, published_post_id, checkpoint_hours, evaluation_version, evaluation_json, structural_change_allowed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
+        evaluation_version = excluded.evaluation_version, evaluation_json = excluded.evaluation_json,
+        structural_change_allowed = excluded.structural_change_allowed, updated_at = CURRENT_TIMESTAMP`).bind(
+        crypto.randomUUID(), input.brand_key, String(row.published_post_id), maturity.checkpoint_hours,
+        MANIFEST_MATURITY_EVALUATION_VERSION, stableJson(maturity), maturity.structural_change_allowed ? 1 : 0,
+      ));
     }
     const familyKey = machine(row.autonomous_family_key ?? row.family_id, "unlinked");
     const placement = text(row.slot_time, 20) || timeBucket(row.post_timestamp);
@@ -917,35 +936,44 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       generation_mode: machine(row.generation_mode, "unknown"),
       placement_key: machine(placement, "unknown"),
     });
-  }
-      if (phase === "maturity_evaluations") {
+    }
+  const maturityWriteReceipt = runMaturityEvaluations
+    ? await executeManifestD1WriteBatches(db, maturityWriteStatements)
+    : { statement_count: 0, batch_count: 0 };
+  if (phase === "maturity_evaluations") {
     return {
       engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
       phase,
       maturity_evaluations: maturityRows.length,
+      maturity_write_batches: maturityWriteReceipt.batch_count,
       continuation_required: false,
     };
   }
+  let comparableWriteReceipt = { statement_count: 0, batch_count: 0 };
   if (runComparableAnalyses) {
-  for (const target of candidates) {
-    const analysis = buildManifestComparableAnalysis(target, candidates);
-    await db.prepare(`INSERT INTO operator_manifest_comparable_analyses (
-      id, brand_key, published_post_id, checkpoint_hours, analysis_version, comparable_post_ids_json, analysis_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
-      analysis_version = excluded.analysis_version, comparable_post_ids_json = excluded.comparable_post_ids_json,
-      analysis_json = excluded.analysis_json, updated_at = CURRENT_TIMESTAMP`).bind(
-      crypto.randomUUID(), input.brand_key, target.published_post_id, target.checkpoint_hours,
-            MANIFEST_COMPARABLE_ANALYSIS_VERSION, stableJson(analysis.comparable_post_ids ?? []), stableJson(analysis),
-    ).run();
+    const comparableWriteStatements: D1PreparedStatement[] = [];
+    for (const target of candidates) {
+      const analysis = buildManifestComparableAnalysis(target, candidates);
+      comparableWriteStatements.push(db.prepare(`INSERT INTO operator_manifest_comparable_analyses (
+        id, brand_key, published_post_id, checkpoint_hours, analysis_version, comparable_post_ids_json, analysis_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(brand_key, published_post_id, checkpoint_hours) DO UPDATE SET
+        analysis_version = excluded.analysis_version, comparable_post_ids_json = excluded.comparable_post_ids_json,
+        analysis_json = excluded.analysis_json, updated_at = CURRENT_TIMESTAMP`).bind(
+        crypto.randomUUID(), input.brand_key, target.published_post_id, target.checkpoint_hours,
+        MANIFEST_COMPARABLE_ANALYSIS_VERSION, stableJson(analysis.comparable_post_ids ?? []), stableJson(analysis),
+      ));
+    }
+    comparableWriteReceipt = await executeManifestD1WriteBatches(db, comparableWriteStatements);
   }
-  }
-    if (phase === "maturity_comparables" || phase === "comparable_analyses") {
+  if (phase === "maturity_comparables" || phase === "comparable_analyses") {
     return {
       engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
       phase,
       maturity_evaluations: phase === "maturity_comparables" ? maturityRows.length : 0,
+      maturity_write_batches: maturityWriteReceipt.batch_count,
       comparable_analyses: candidates.length,
+      comparable_write_batches: comparableWriteReceipt.batch_count,
       continuation_required: false,
     };
   }
