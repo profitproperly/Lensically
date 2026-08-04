@@ -1,26 +1,36 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-exploit-allocation-repair-20260803
-active_checkpoint: implement deterministic proportional Exploit targets, repair historical winner-lineage visibility and mandatory regression coverage, validate, deploy, then stop without running or simulating any cycle
-validated_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
-documentation_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
-production_sha: 368bb74fb7817d2206edc52b0db52b4d864df4dc
+active_job_id: null
+active_checkpoint: null
+validated_source_head: e064db48ffba88f8730b00349ac3d308a0182113
+documentation_source_head: e064db48ffba88f8730b00349ac3d308a0182113
+production_sha: e064db48ffba88f8730b00349ac3d308a0182113
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
 
-## ACTIVE: Manifest Exploit Allocation Repair
+## Completed Manifest Exploit Allocation Repair: manifest-exploit-allocation-repair-20260803
 
-- Owner-approved scope: implement the clean 11-step plan for proportional exact-family Exploit allocation, historical winner-lineage visibility, source-pool/intelligence reconciliation, expanded receipts, mandatory selector regression coverage, engineering validation, exact-SHA deployment, and stop.
-- Prohibited actions: no Main cycle, Innovation cycle, shadow cycle, simulation, generation, scheduling, publishing, editing, deleting, or rescheduling posts.
-- Preserve scheduled posts 869–916 exactly.
-- Remove no cooldowns or wording limits beyond the already approved v7 policy; add no mechanism grouping, opener audit, Universe cap, Finger Touch cap, fatigue rule, or semantic quota.
-- Current action: implement the allocator and validation changes from repository head, validate all required gates, deploy exact validated SHA, verify production, close this ledger, and report.
+- Root cause: v7 gave qualified winners one first-appearance bonus, then scored every remaining Exploit slot through the same static ranking auction. `planned_uses` was recorded but never enforced, `exposure_burden` remained 1, and no exact-family target counts existed. The top Universe source therefore won all twelve remaining Exploit placements after first coverage, producing the audited 13-1-1-1 distribution.
+- Allocation repair: source-selection engine v8 locks exact-family targets before sequencing. When capacity covers the winner pool, each qualified winner receives one placement and remaining capacity is distributed by confidence-adjusted ranking score using deterministic largest-remainder rounding. When capacity is smaller, only the highest-ranked families receive one placement. A sole qualified winner may still receive every Exploit slot.
+- Audited fixture: the exact 16-slot ranking scores now deterministically resolve to Universe 8, Income Acceleration 4, Relational Worth 2, and Finger Touch 2. The prior 13-1-1-1 result is a mandatory failing regression fixture.
+- Enforcement: winners become ineligible after reaching their locked target; locked-plan validation independently recomputes actual counts and fails closed on missing, conflicting, or unsatisfied winner targets.
+- Receipts: every winner receipt now exposes initial coverage, proportional weight, exact additional share, rounded additional placements, final target count, actual count, target satisfaction, and sequencing deficit. Cycle summaries expose target and actual distributions, mismatch count, and maximum exact-family concentration.
+- Historical lineage repair: mature legacy operator-hypothesis winners remain valid analytics but are explicitly marked analytics-only and unavailable for exact Saved Pattern allocation without verified provenance. Evidence cannot be transferred, merged, or claimed as exact preservation based on Finger Touch, Universe, or any other mechanism similarity.
+- Decision reconciliation: unavailable historical winners are surfaced in prepared-cycle state and the decision bundle with directives forbidding false exact-preservation claims while allowing cycles to proceed when the historical provenance is simply unavailable.
+- Validation repair: `test/sourceFamilySelection.spec.ts` was rewritten for v8, added to both complete and required full-validation inventories, and protected by mandatory regression markers for proportional allocation, the audited 13-1-1-1 defect, engine v8, and the absence of wording-based allocation authority.
+- No mechanism grouping, opener audit, Universe cap, Finger Touch cap, wording concentration rule, cooldown, fatigue rule, semantic quota, or source-card evidence sharing was added.
+- Preservation proof: scheduled posts 869-916 were not edited, deleted, replaced, rescheduled, or republished.
+- Prohibited-action proof: no Main cycle, Innovation cycle, shadow cycle, simulation, generation, scheduling, publishing, editing, or deletion operation was run.
+- Validation evidence: exact-head typecheck and lifecycle gate `30866827656`; all eight Operator shards `30866837242`; complete repository push validation `30866815729`.
+- Release evidence: exact-SHA Worker deployment and production runtime/scheduler verification `30866982021`.
+- Final production SHA: `e064db48ffba88f8730b00349ac3d308a0182113`.
+- Status: completed. No active Lensically engineering job remains.
 
 ## Completed Manifest Main Cycle: manifest-main-cycle-20260803-1739
 
