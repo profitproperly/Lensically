@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
@@ -131,8 +131,21 @@ function validatePlan() {
   const missingFiles = completeTestFiles.filter((file) => !existsSync(resolve(workerRoot, file)));
   if (missingFiles.length > 0) fail(`full_validation_missing_files:${missingFiles.join(",")}`);
 
-    const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
+      const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
   if (missingRequired.length > 0) fail(`full_validation_required_files_missing:${missingRequired.join(",")}`);
+
+  const selectorRegressionPath = resolve(workerRoot, "test/sourceFamilySelection.spec.ts");
+  const selectorRegressionText = readFileSync(selectorRegressionPath, "utf8");
+  const selectorRegressionMarkers = [
+    "audited-13-1-1-1-regression",
+    "first_coverage_then_score_weighted_largest_remainder_v1",
+    "wording-is-not-allocation-authority",
+    "source-selection-engine-v8",
+  ];
+  const missingSelectorMarkers = selectorRegressionMarkers.filter((marker) => !selectorRegressionText.includes(marker));
+  if (missingSelectorMarkers.length > 0) {
+    fail(`full_validation_selector_regression_markers_missing:${missingSelectorMarkers.join(",")}`);
+  }
 
   const groupedFiles = completeTestGroups.flat();
     if (completeTestGroups.length !== Math.ceil(completeTestFiles.length / 11)
