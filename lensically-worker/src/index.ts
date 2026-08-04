@@ -2142,6 +2142,13 @@ const GPT_BRAND_ACCOUNT_ALIASES: Record<GptBrandKey, string> = {
   opmg_deadman: "deadman",
 };
 
+function getBrandKeyForAccountId(accountId: string): GptBrandKey | null {
+  const match = (Object.entries(GPT_BRAND_ACCOUNT_ALIASES) as Array<[GptBrandKey, string]>)
+    .find(([, configuredAccountId]) => configuredAccountId === accountId);
+  return match?.[0] ?? null;
+}
+
+
 const TEST_THREADS_USER_IDS: Readonly<Record<string, string>> = {
   "manifest-mental": "35758578720393972",
   vectrix: "vectrix",
@@ -31143,7 +31150,400 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+            if (normalizedPath === "/api/source-cards/list" && request.method === "GET") {
+      const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
+      if (!appUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const accountId = await resolvePatternAccountId(
+        env,
+        url.searchParams.get("threads_user_id"),
+        url.searchParams.get("account_id"),
+      );
+      const brandKey = getBrandKeyForAccountId(accountId);
+      if (!brandKey) {
+        return new Response(JSON.stringify({ error: "source_card_account_not_configured" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const rawLimit = Number(url.searchParams.get("limit") ?? "20");
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(50, Math.floor(rawLimit))
+        : 20;
+      const rawPage = Number(url.searchParams.get("page") ?? "1");
+      const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+      const offset = (page - 1) * limit;
+      const currentOnly = url.searchParams.get("current_only") === "true";
+      const currentClause = currentOnly ? "AND card.is_current = 1" : "";
+      await ensureOwnerEditLearningTables(env);
+      const rows = await env.DB.prepare(
+        `SELECT card.id, card.family_id, card.sequence_label, card.lane_key, card.title,
+                card.status, card.primary_source_json, card.metrics_snapshot_json,
+                card.source_mechanism, card.required_product, card.forbidden_surfaces_json,
+                card.danger_surfaces_json, card.pass_conditions_json, card.fail_conditions_json,
+                card.recommended_direction, card.created_by, card.version_number, card.is_current,
+                card.supersedes_source_card_id, card.version_reason, card.transformation_contract_json,
+                card.locked_at, card.created_at, card.updated_at,
+                family.source_identity_key,
+                COALESCE(selection.source_type, family.source_type, 'source_card') AS source_origin_type,
+                COALESCE(selection.internal_source_id, family.internal_source_id, card.id) AS source_origin_internal_id,
+                selection.canonical_source_url,
+                state.lifetime_label, state.confidence_label, state.lifetime_sample_size,
+                state.lifetime_index, state.probability_above_median,
+                (SELECT guidance_text
+                 FROM operator_source_card_owner_guidance guidance
+                 WHERE guidance.source_card_id = card.id AND guidance.active = 1
+                 ORDER BY guidance.version_number DESC LIMIT 1) AS owner_guidance_text,
+                (SELECT COUNT(*) FROM gpt_generation_runs run WHERE run.source_card_id = card.id) AS generation_run_count
+         FROM operator_source_cards card
+         LEFT JOIN operator_source_card_families family
+           ON family.id = card.family_id AND family.brand_key = card.brand_key
+         LEFT JOIN operator_source_selections selection
+           ON selection.id = card.source_selection_id AND selection.brand_key = card.brand_key
+         LEFT JOIN operator_source_family_evidence_states state
+           ON state.brand_key = card.brand_key AND state.source_card_family_id = card.family_id
+         WHERE card.brand_key = ?
+           ${currentClause}
+         ORDER BY card.is_current DESC, datetime(card.updated_at) DESC, card.version_number DESC, card.id ASC
+         LIMIT ? OFFSET ?`,
+      ).bind(brandKey, limit, offset).all<Record<string, unknown>>();
+      const totalRow = await env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM operator_source_cards card
+         WHERE card.brand_key = ? ${currentClause}`,
+      ).bind(brandKey).first<{ total: number | string }>();
+      const total = Number(totalRow?.total ?? 0);
+      const cards = (rows.results ?? []).map((row) => {
+        const primarySource = safeParseJsonString(String(row.primary_source_json ?? "{}"));
+        const primarySourceRecord = primarySource && typeof primarySource === "object" && !Array.isArray(primarySource)
+          ? primarySource as Record<string, unknown>
+          : {};
+        return {
+          id: String(row.id ?? ""),
+          family_id: row.family_id ?? null,
+          sequence_label: row.sequence_label ?? null,
+          lane_key: row.lane_key ?? null,
+          title: row.title ?? "Source card",
+          status: row.status ?? "unknown",
+          source_text: primarySourceRecord.text ?? primarySourceRecord.post_text ?? "",
+          primary_source: primarySourceRecord,
+          metrics_snapshot: safeParseJsonString(String(row.metrics_snapshot_json ?? "null")),
+          source_mechanism: row.source_mechanism ?? null,
+          required_product: row.required_product ?? null,
+          forbidden_surfaces: safeParseJsonString(String(row.forbidden_surfaces_json ?? "[]")),
+          danger_surfaces: safeParseJsonString(String(row.danger_surfaces_json ?? "[]")),
+          pass_conditions: safeParseJsonString(String(row.pass_conditions_json ?? "[]")),
+          fail_conditions: safeParseJsonString(String(row.fail_conditions_json ?? "[]")),
+          recommended_direction: row.recommended_direction ?? null,
+          created_by: row.created_by ?? null,
+          version_number: Number(row.version_number ?? 1),
+          is_current: Number(row.is_current ?? 0) === 1,
+          supersedes_source_card_id: row.supersedes_source_card_id ?? null,
+          version_reason: row.version_reason ?? null,
+          transformation_contract: safeParseJsonString(String(row.transformation_contract_json ?? "{}")),
+          locked_at: row.locked_at ?? null,
+          created_at: row.created_at ?? null,
+          updated_at: row.updated_at ?? null,
+          source_origin: {
+            type: String(row.source_origin_type ?? "source_card"),
+            internal_source_id: row.source_origin_internal_id ?? null,
+            source_identity_key: row.source_identity_key ?? null,
+            canonical_source_url: row.canonical_source_url ?? primarySourceRecord.canonical_source_url ?? null,
+          },
+          lifecycle: {
+            label: row.lifetime_label ?? "untested",
+            confidence: row.confidence_label ?? "low",
+            sample_size: Number(row.lifetime_sample_size ?? 0),
+            lifetime_index: Number(row.lifetime_index ?? 1),
+            probability_above_median: Number(row.probability_above_median ?? 0.5),
+          },
+          owner_guidance: row.owner_guidance_text
+            ? { text: String(row.owner_guidance_text), active: true }
+            : null,
+          generation_run_count: Number(row.generation_run_count ?? 0),
+        };
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        app_user_id: appUserId,
+        account_id: accountId,
+        brand_key: brandKey,
+        cards,
+        total,
+        page,
+        page_size: limit,
+        total_pages: Math.max(1, Math.ceil(total / limit)),
+        current_only: currentOnly,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedPath === "/api/source-cards/create" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const appUserId = normalizeAppUserId(typeof payload.app_user_id === "string" ? payload.app_user_id : null);
+      const threadsUserId = normalizeOperatorText(payload.threads_user_id, 255, true);
+      if (!appUserId || !threadsUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id and threads_user_id are required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const accountId = await resolvePatternAccountId(
+        env,
+        threadsUserId,
+        typeof payload.account_id === "string" ? payload.account_id : null,
+      );
+      const brandKey = getBrandKeyForAccountId(accountId);
+      if (!brandKey) {
+        return new Response(JSON.stringify({ error: "source_card_account_not_configured" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const title = normalizeOperatorText(payload.title, 500);
+      const sourceText = normalizeOperatorText(payload.source_text, 20000);
+      const sourceMechanism = normalizeOperatorText(payload.source_mechanism, 4000);
+      const requiredProduct = normalizeOperatorText(payload.required_product, 4000);
+      const audienceReward = normalizeOperatorText(payload.audience_reward, 4000);
+      if (!title || !sourceText || !sourceMechanism || !requiredProduct || !audienceReward) {
+        return new Response(JSON.stringify({
+          error: "title_source_text_source_mechanism_required_product_and_audience_reward_are_required",
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const normalizeStringArray = (value: unknown): string[] => Array.isArray(value)
+        ? value.map((item) => normalizeOperatorText(item, 2000, true)).filter((item): item is string => Boolean(item))
+        : [];
+      const mustPreserveFunction = normalizeStringArray(payload.must_preserve_function);
+      const transformationContract = normalizeSourceTransformationContract({
+        must_preserve_exact: normalizeStringArray(payload.must_preserve_exact),
+        must_preserve_function: mustPreserveFunction.length ? mustPreserveFunction : [sourceMechanism],
+        may_reuse: normalizeStringArray(payload.may_reuse),
+        should_transform: normalizeStringArray(payload.should_transform),
+        must_transform: normalizeStringArray(payload.must_transform),
+        forbidden_complete_combinations: normalizeStringArray(payload.forbidden_complete_combinations),
+        audience_reward: audienceReward,
+        time_or_context_requirements: normalizeStringArray(payload.time_or_context_requirements),
+        notes: normalizeOperatorText(payload.transformation_notes, 4000, true),
+      });
+      const forbiddenSurfaces = normalizeStringArray(payload.forbidden_surfaces);
+      const dangerSurfaces = normalizeStringArray(payload.danger_surfaces);
+      const passConditions = normalizeStringArray(payload.pass_conditions);
+      const failConditions = normalizeStringArray(payload.fail_conditions);
+      const nowIso = new Date().toISOString();
+      const sourceCardId = crypto.randomUUID();
+      const familyId = crypto.randomUUID();
+      const selectionId = crypto.randomUUID();
+      const batchId = crypto.randomUUID();
+      const sourceIdentityKey = `owner_source_card:${familyId}`;
+      const sourceUrl = canonicalizeThreadsSourceUrl(normalizeOperatorText(payload.source_url, 4000, true));
+      const metricsSnapshot = {
+        views: 0,
+        likes: 0,
+        replies: 0,
+        reposts: 0,
+        quotes: 0,
+        shares: 0,
+        engagement_total: 0,
+        captured_at: nowIso,
+        evidence_status: "owner_authored_no_market_metrics",
+      };
+      const primarySource = {
+        source_candidate_id: `owner_source_card:${sourceCardId}`,
+        source_identity_key: sourceIdentityKey,
+        source_type: "owner_source_card",
+        source_id: sourceCardId,
+        internal_source_id: sourceCardId,
+        canonical_source_url: sourceUrl,
+        text: sourceText,
+        metrics: metricsSnapshot,
+        evidence_role: "owner_authored_source",
+      };
+      const validation = validateSourceCardLockable({
+        brand_key: brandKey,
+        primary_source: primarySource,
+        source_mechanism: sourceMechanism,
+        required_product: requiredProduct,
+        forbidden_surfaces: forbiddenSurfaces,
+        pass_conditions: passConditions,
+        fail_conditions: failConditions,
+        transformation_contract: transformationContract,
+      });
+      if (!validation.can_lock) {
+        return new Response(JSON.stringify({ error: "owner_source_card_not_lockable", validation }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const sequenceLabel = `owner_source_card_${Date.now()}`;
+      const workflowSessionId = `${brandKey}-owner-source-card-ui`;
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO operator_source_selection_batches (
+             id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+             qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+             production_date, status
+           ) VALUES (?, ?, ?, 'owner_source_card_ui', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
+        ).bind(batchId, brandKey, workflowSessionId, nowIso, normalizeOperatorJson({ created_by: "owner", account_id: accountId }, {})),
+        env.DB.prepare(
+          `INSERT INTO operator_source_selections (
+             id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+             source_type, internal_source_id, threads_post_id, canonical_source_url,
+             post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at,
+             disposition, disposition_reason, disposition_at
+           ) VALUES (?, ?, ?, ?, 1, ?, 'owner_source_card', ?, NULL, ?, ?, NULL, ?, ?, ?, 'linked', 'owner_source_card_created', CURRENT_TIMESTAMP)`,
+        ).bind(
+          selectionId, batchId, brandKey, workflowSessionId, sourceIdentityKey, sourceCardId,
+          sourceUrl, sourceText, normalizeOperatorJson(metricsSnapshot, {}), normalizeOperatorJson(primarySource, {}), nowIso,
+        ),
+        env.DB.prepare(
+          `INSERT INTO operator_source_card_families (
+             id, brand_key, source_identity_key, source_type, internal_source_id,
+             threads_post_id, canonical_source_url, current_source_card_id, status
+           ) VALUES (?, ?, ?, 'owner_source_card', ?, NULL, ?, ?, 'active')`,
+        ).bind(familyId, brandKey, sourceIdentityKey, sourceCardId, sourceUrl, sourceCardId),
+        env.DB.prepare(
+          `INSERT INTO operator_source_cards (
+             id, brand_key, workflow_session_id, sequence_label, lane_key, title, status,
+             primary_source_json, secondary_sources_json, anti_sources_json, metrics_snapshot_json,
+             source_mechanism, required_product, forbidden_surfaces_json, danger_surfaces_json,
+             current_inventory_constraints_json, pass_conditions_json, fail_conditions_json,
+             recommended_direction, context_admission_id, created_by, family_id, source_selection_id,
+             version_number, is_current, supersedes_source_card_id, version_reason,
+             transformation_contract_json, locked_at
+           ) VALUES (?, ?, NULL, ?, ?, ?, 'locked', ?, '[]', '[]', ?, ?, ?, ?, ?, '[]', ?, ?, ?, NULL, 'owner', ?, ?, 1, 1, NULL, 'owner_created_source_card', ?, ?)`,
+        ).bind(
+          sourceCardId,
+          brandKey,
+          sequenceLabel,
+          normalizeOperatorMachineKey(payload.lane_key, "") || null,
+          title,
+          normalizeOperatorJson(primarySource, {}),
+          normalizeOperatorJson(metricsSnapshot, {}),
+          sourceMechanism,
+          requiredProduct,
+          normalizeOperatorJson(forbiddenSurfaces, []),
+          normalizeOperatorJson(dangerSurfaces, []),
+          normalizeOperatorJson(passConditions, []),
+          normalizeOperatorJson(failConditions, []),
+          normalizeOperatorText(payload.recommended_direction, 4000, true),
+          familyId,
+          selectionId,
+          normalizeOperatorJson(transformationContract, {}),
+          nowIso,
+        ),
+        env.DB.prepare(
+          `UPDATE operator_source_selections
+           SET source_card_id = ?, workflow_sequence = 1
+           WHERE id = ? AND brand_key = ?`,
+        ).bind(sourceCardId, selectionId, brandKey),
+      ]);
+      await ensureOwnerEditLearningTables(env);
+      const ownerGuidance = normalizeOperatorText(payload.owner_guidance, 20000, true);
+      if (ownerGuidance) {
+        await saveSourceCardOwnerGuidance(env.DB, {
+          brandKey,
+          accountId,
+          threadsUserId,
+          sourceCardId,
+          guidanceText: ownerGuidance,
+          active: true,
+        });
+      }
+      const sourceCard = await getOperatorSourceCard(env, brandKey, sourceCardId);
+      return new Response(JSON.stringify({
+        success: true,
+        account_id: accountId,
+        brand_key: brandKey,
+        source_card: sourceCard,
+        validation,
+      }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedPath === "/api/source-cards/guidance" && request.method === "POST") {
+      let payload: Record<string, unknown>;
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const appUserId = normalizeAppUserId(typeof payload.app_user_id === "string" ? payload.app_user_id : null);
+      const threadsUserId = normalizeOperatorText(payload.threads_user_id, 255, true);
+      const sourceCardId = normalizeOperatorText(payload.source_card_id, 120);
+      if (!appUserId || !threadsUserId || !sourceCardId) {
+        return new Response(JSON.stringify({ error: "app_user_id, threads_user_id, and source_card_id are required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const accountId = await resolvePatternAccountId(
+        env,
+        threadsUserId,
+        typeof payload.account_id === "string" ? payload.account_id : null,
+      );
+      const brandKey = getBrandKeyForAccountId(accountId);
+      if (!brandKey) {
+        return new Response(JSON.stringify({ error: "source_card_account_not_configured" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const ownedCard = await env.DB.prepare(
+        `SELECT id FROM operator_source_cards WHERE id = ? AND brand_key = ? LIMIT 1`,
+      ).bind(sourceCardId, brandKey).first<{ id: string }>();
+      if (!ownedCard) {
+        return new Response(JSON.stringify({ error: "source_card_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      await ensureOwnerEditLearningTables(env);
+      try {
+        const guidance = await saveSourceCardOwnerGuidance(env.DB, {
+          brandKey,
+          accountId,
+          threadsUserId,
+          sourceCardId,
+          guidanceText: payload.guidance_text,
+          active: payload.active !== false,
+        });
+        return new Response(JSON.stringify({ success: true, guidance }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return new Response(JSON.stringify({ error: message }), {
+          status: message === "guidance_text_required" ? 400 : 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
         if (normalizedPath === "/api/patterns/source-card" && request.method === "GET") {
+
       const appUserId = normalizeAppUserId(url.searchParams.get("app_user_id"));
       const patternId = Math.trunc(Number(url.searchParams.get("saved_pattern_id") ?? 0));
       if (!appUserId || !Number.isInteger(patternId) || patternId <= 0) {
