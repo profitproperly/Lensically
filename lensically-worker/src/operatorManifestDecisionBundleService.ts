@@ -1,4 +1,6 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import { loadUnavailableHistoricalWinnerEvidence } from "./sourceFamilySelection";
+
 
 type JsonRecord = Record<string, unknown>;
 
@@ -124,7 +126,7 @@ export async function buildManifestDecisionBundle(
   ).bind(input.snapshotId, input.cycleId, input.brandKey).first<JsonRecord>();
   if (!snapshot) throw new Error("manifest_evidence_snapshot_not_found");
 
-  const [pageRows, strongestRows, weakestRows, familyRows, planRows, hardBanRows, experimentRows, strategyRows, cycle] = await Promise.all([
+    const [pageRows, strongestRows, weakestRows, familyRows, planRows, hardBanRows, experimentRows, strategyRows, cycle, unavailableHistoricalWinners] = await Promise.all([
     db.prepare(
       `SELECT page_index, page_contract_version, item_count, byte_count,
               evidence_types_json, items_json
@@ -190,7 +192,8 @@ export async function buildManifestDecisionBundle(
               exposure_snapshot_id, timezone, horizon_hours, updated_at
        FROM operator_autonomous_growth_cycles
        WHERE id = ? AND brand_key = ? LIMIT 1`,
-    ).bind(input.cycleId, input.brandKey).first<JsonRecord>(),
+        ).bind(input.cycleId, input.brandKey).first<JsonRecord>(),
+    loadUnavailableHistoricalWinnerEvidence(db, input.brandKey, 20),
   ]);
   if (!cycle) throw new Error("manifest_cycle_not_found");
 
@@ -266,7 +269,14 @@ export async function buildManifestDecisionBundle(
       preselection_score_multiplier: receipt.preselection_score_multiplier ?? 1,
       preselection_score_addend: receipt.preselection_score_addend ?? 0,
       preselection_signals: receipt.preselection_signals ?? [],
-      experiment_reservation_key: receipt.experiment_reservation_key ?? null,
+            experiment_reservation_key: receipt.experiment_reservation_key ?? null,
+      winner_initial_coverage_count: finite(receipt.winner_initial_coverage_count),
+      winner_proportional_weight: finite(receipt.winner_proportional_weight),
+      winner_exact_additional_share: finite(receipt.winner_exact_additional_share),
+      winner_rounded_additional_placements: finite(receipt.winner_rounded_additional_placements),
+      winner_final_target_count: finite(receipt.winner_final_target_count),
+      winner_actual_selected_count: finite(receipt.winner_actual_selected_count),
+      winner_target_satisfied: receipt.winner_target_satisfied === true,
     };
   });
     const lockedSourcePlanHash = await sha256(lockedSourcePlan);
@@ -310,10 +320,15 @@ export async function buildManifestDecisionBundle(
     count: matureCount,
     required_action: "Keep account conclusions narrow and explicitly uncertainty-aware.",
   });
-  if (lowConfidenceSelected.length) unresolvedEvidenceGaps.push({
+    if (lowConfidenceSelected.length) unresolvedEvidenceGaps.push({
     gap_key: "selected_low_confidence_families",
     source_card_family_ids: lowConfidenceSelected.map((family) => family.source_card_family_id),
     required_action: "Treat these slots as bounded exploration, not proven deployment.",
+  });
+  if (unavailableHistoricalWinners.length > 0) unresolvedEvidenceGaps.push({
+    gap_key: "historical_winners_without_exact_saved_pattern_provenance",
+    published_post_ids: unavailableHistoricalWinners.map((winner) => winner.published_post_id),
+    required_action: "Treat these results as analytics-only. Do not claim that another source card preserves them exactly and do not transfer their evidence by mechanism similarity.",
   });
 
   const currentStrategyAuthority = strategyRows.results?.[0] ?? null;
@@ -340,8 +355,15 @@ export async function buildManifestDecisionBundle(
       account_position: parseJson(cycle.account_position_json, {}),
       authoritative_missing_slots: records(parseJson(cycle.missing_slots_json, [])),
     },
-        locked_source_plan: lockedSourcePlan,
+                locked_source_plan: lockedSourcePlan,
         locked_source_plan_hash: lockedSourcePlanHash,
+    historical_winner_source_availability: {
+      contract: "exact-source-provenance-v1",
+      unavailable_count: unavailableHistoricalWinners.length,
+      analytics_only_winners: unavailableHistoricalWinners,
+      exact_source_allocation_available: false,
+      evidence_transfer_by_mechanism_allowed: false,
+    },
     selection_causal_authority: selectionCausalAuthority,
     stage_authority: {
 
@@ -369,7 +391,9 @@ export async function buildManifestDecisionBundle(
             exact_locked_plan_required: true,
       stage_4_locked_source_plan_hash: lockedSourcePlanHash,
       stage_5_generation_and_audit_only: true,
-      stage_5_source_or_slot_mutation_forbidden: true,
+            stage_5_source_or_slot_mutation_forbidden: true,
+      historical_analytics_only_winners_may_not_be_claimed_as_exactly_preserved: true,
+      historical_winner_evidence_transfer_by_mechanism_forbidden: true,
       deterministic_hard_bans_server_owned: true,
 
       deterministic_duplicate_and_slot_checks_server_owned: true,
