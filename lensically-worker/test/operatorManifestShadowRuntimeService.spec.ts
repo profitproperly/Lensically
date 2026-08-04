@@ -477,14 +477,14 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(selectedIdentities).not.toContain(String(blockedWeak.source_identity_key));
     expect(locked.every((item) => {
       const receipt = record(item.selection_receipt);
-      return String(receipt.policy_version) === "source-selection-engine-v7"
+            return String(receipt.policy_version) === "source-selection-engine-v8"
         && Number(receipt.unified_rating) > 0
         && Number(receipt.ranking_score) > 0
         && ["exploit", "develop", "explore"].includes(String(receipt.selection_lane));
     })).toBe(true);
     const selectionSummary = record(bundle.selection_summary);
     expect(selectionSummary).toMatchObject({
-      engine_version: "source-selection-engine-v7",
+            engine_version: "source-selection-engine-v8",
       lifecycle_authority: "unified_confidence_adjusted_rating",
       recent_classification_retired: true,
       continuous_recency_weighting: true,
