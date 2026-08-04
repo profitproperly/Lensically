@@ -85,9 +85,10 @@ export interface OperatorManifestCycleConstructionDependencies {
   }): Promise<unknown>;
   readLockedSourceSelectionPlan(brandKey: string, cycleId: string): Promise<JsonRecord[]>;
     loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
-    candidates: JsonRecord[];
+        candidates: JsonRecord[];
     preselection_policy: JsonRecord;
-  }>;
+    unavailable_historical_winners?: JsonRecord[];
+  };
 
   loadSourceExclusions(brandKey: string): Promise<string[]>;
   selectSourceLineup(input: {
@@ -393,7 +394,8 @@ export async function constructOperatorManifestAutonomousCycle(
       && planSlotKeys.every((slotKey, index) => slotKey === currentMissingSlotKeys[index]);
   };
     let lockedPlanMatchesCurrentHorizon = planMatchesCurrentHorizon(lockedSourceSelectionPlan);
-  let preselectionPolicy: JsonRecord | null = null;
+    let preselectionPolicy: JsonRecord | null = null;
+  let unavailableHistoricalWinners: JsonRecord[] = [];
   let sourceSelectionPlanStatus = missingSlots.length === 0
 
     ? "not_required"
@@ -408,7 +410,8 @@ export async function constructOperatorManifestAutonomousCycle(
       String(clock.effective_now_iso ?? ""),
       currentMissingSlotKeys,
     );
-    preselectionPolicy = record(sourceDecisionContext.preselection_policy);
+        preselectionPolicy = record(sourceDecisionContext.preselection_policy);
+    unavailableHistoricalWinners = asRecords(sourceDecisionContext.unavailable_historical_winners);
     const selectionCandidates = asRecords(sourceDecisionContext.candidates)
       .filter((candidate) => !excludedIdentities.has(String(candidate.source_identity_key ?? "")));
 
@@ -481,7 +484,15 @@ export async function constructOperatorManifestAutonomousCycle(
         source_selection_engine_version: dependencies.sourceSelectionEngineVersion,
     preselection_policy_version: preselectionPolicy?.contract_version ?? null,
     preselection_policy_hash: preselectionPolicy?.policy_hash ?? null,
-    preselection_causal_signal_counts: preselectionPolicy?.causal_signal_counts ?? {},
+        preselection_causal_signal_counts: preselectionPolicy?.causal_signal_counts ?? {},
+    historical_winner_source_availability: {
+      contract: "exact-source-provenance-v1",
+      unavailable_count: unavailableHistoricalWinners.length,
+      unavailable_historical_winners: unavailableHistoricalWinners,
+      evidence_transfer_by_mechanism_allowed: false,
+      strategy_may_claim_exact_preservation: false,
+      cycle_blocked_only_for_false_lineage_claim: true,
+    },
     locked_source_selection_plan: compactLockedSourceSelectionPlanForReceipt(lockedSourceSelectionPlan),
 
   }, "manifest_cycle.horizon_plan");

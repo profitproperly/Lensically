@@ -352,7 +352,8 @@ import {
   SOURCE_SELECTION_ENGINE_VERSION,
     enrichSourceCandidatesForSelection,
   ensureSourceFamilySelectionTables,
-    loadLockedSourceCardSelectionCandidates,
+        loadLockedSourceCardSelectionCandidates,
+  loadUnavailableHistoricalWinnerEvidence,
   normalizeSourceFamilyLifetimeLabel,
 
     persistLockedSourceSelectionPlan,
@@ -11476,7 +11477,8 @@ async function prepareManifestAutonomousCycle(
     ),
                         loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys) => {
       await refreshSourceFamilyLabels(env.DB, brandKey, asOf);
-      const decisionSnapshot = await buildManifestDecisionSnapshot(
+            const [decisionSnapshot, unavailableHistoricalWinners] = await Promise.all([
+        buildManifestDecisionSnapshot(
 
         createManifestShadowReadOnlyDatabase(env.DB),
         {
@@ -11488,12 +11490,15 @@ async function prepareManifestAutonomousCycle(
           coverageRules: {
             mode: "main_autonomous_prepare",
             horizon_hours: horizonHours,
-          },
+                    },
         },
-      );
+      ),
+        loadUnavailableHistoricalWinnerEvidence(env.DB, brandKey, 20),
+      ]);
             return {
         candidates: decisionSnapshot.source_candidates as Record<string, unknown>[],
         preselection_policy: compileManifestDecisionSnapshotPreselectionPolicy(decisionSnapshot, slotKeys),
+        unavailable_historical_winners: unavailableHistoricalWinners as unknown as Record<string, unknown>[],
       };
     },
 

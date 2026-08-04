@@ -193,6 +193,73 @@ function isLiveSavedPatternId(liveIds: Set<string> | null, value: unknown): bool
   return liveIds === null || !/^\d+$/.test(id) || liveIds.has(id);
 }
 
+export type UnavailableHistoricalWinnerEvidence = {
+  published_post_id: string;
+  source_identity_key: string;
+  source_card_family_id: string;
+  source_card_id: string;
+  source_type: string;
+  likes_24h: number;
+  account_median_likes_24h: number;
+  availability: "analytics_only";
+  exact_source_allocation_available: false;
+  provenance_status: "unavailable_exact_saved_pattern_provenance";
+};
+
+export async function loadUnavailableHistoricalWinnerEvidence(
+  db: D1Database,
+  brandKey: string,
+  limit = 20,
+): Promise<UnavailableHistoricalWinnerEvidence[]> {
+  await ensureSourceFamilySelectionTables(db);
+  const rows = await db.prepare(
+    `SELECT scores.published_post_id, scores.metrics_json,
+            cards.id AS source_card_id, families.id AS source_card_family_id,
+            families.source_identity_key, selections.source_type
+     FROM operator_post_performance_scores scores
+     JOIN operator_post_fingerprints fingerprints
+       ON fingerprints.brand_key = scores.brand_key
+      AND fingerprints.published_post_id = scores.published_post_id
+     JOIN operator_source_cards cards
+       ON cards.id = fingerprints.source_card_id
+      AND cards.brand_key = scores.brand_key
+     JOIN operator_source_card_families families
+       ON families.id = cards.family_id
+      AND families.brand_key = scores.brand_key
+     LEFT JOIN operator_source_selections selections
+       ON selections.id = cards.source_selection_id
+      AND selections.brand_key = cards.brand_key
+     WHERE scores.brand_key = ?
+       AND scores.checkpoint_hours = 24
+       AND scores.valid_for_learning = 1`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+  const parsed = (rows.results ?? []).map((row) => {
+    const metrics = parseJsonRecord(row.metrics_json);
+    return {
+      row,
+      likes: Math.max(0, finiteNumber(metrics.likes)),
+    };
+  });
+  const accountMedian = median(parsed.map((entry) => entry.likes)) ?? 0;
+  return parsed
+    .filter(({ row, likes }) => String(row.source_type ?? "") !== "saved_pattern" && likes >= accountMedian)
+    .sort((left, right) => right.likes - left.likes
+      || String(left.row.published_post_id ?? "").localeCompare(String(right.row.published_post_id ?? "")))
+    .slice(0, Math.max(0, Math.floor(limit)))
+    .map(({ row, likes }) => ({
+      published_post_id: String(row.published_post_id ?? ""),
+      source_identity_key: String(row.source_identity_key ?? ""),
+      source_card_family_id: String(row.source_card_family_id ?? ""),
+      source_card_id: String(row.source_card_id ?? ""),
+      source_type: String(row.source_type ?? "unknown"),
+      likes_24h: likes,
+      account_median_likes_24h: accountMedian,
+      availability: "analytics_only",
+      exact_source_allocation_available: false,
+      provenance_status: "unavailable_exact_saved_pattern_provenance",
+    }));
+}
+
 export function extractOwnerBannedSavedPatternIds(value: unknown): Set<string> {
   const ids = new Set<string>();
     const visit = (item: unknown, key = ""): void => {
