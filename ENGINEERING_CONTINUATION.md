@@ -1,18 +1,26 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-03
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: manifest-exploit-allocation-repair-20260803
+active_checkpoint: implement deterministic proportional Exploit targets, repair historical winner-lineage visibility and mandatory regression coverage, validate, deploy, then stop without running or simulating any cycle
 validated_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
 documentation_source_head: 368bb74fb7817d2206edc52b0db52b4d864df4dc
 production_sha: 368bb74fb7817d2206edc52b0db52b4d864df4dc
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
+
+## ACTIVE: Manifest Exploit Allocation Repair
+
+- Owner-approved scope: implement the clean 11-step plan for proportional exact-family Exploit allocation, historical winner-lineage visibility, source-pool/intelligence reconciliation, expanded receipts, mandatory selector regression coverage, engineering validation, exact-SHA deployment, and stop.
+- Prohibited actions: no Main cycle, Innovation cycle, shadow cycle, simulation, generation, scheduling, publishing, editing, deleting, or rescheduling posts.
+- Preserve scheduled posts 869–916 exactly.
+- Remove no cooldowns or wording limits beyond the already approved v7 policy; add no mechanism grouping, opener audit, Universe cap, Finger Touch cap, fatigue rule, or semantic quota.
+- Current action: implement the allocator and validation changes from repository head, validate all required gates, deploy exact validated SHA, verify production, close this ledger, and report.
 
 ## Completed Manifest Main Cycle: manifest-main-cycle-20260803-1739
 
