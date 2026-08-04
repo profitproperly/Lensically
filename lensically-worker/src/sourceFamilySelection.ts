@@ -16,7 +16,7 @@ import {
 } from "./sourceFamilyRankingV7";
 
 export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v7";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v7";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v8";
 
 export type SourceFamilyLifetimeLabel = UnifiedLifecycleLabel;
 
@@ -110,7 +110,15 @@ export type SourceSelectionReceipt = {
   recent_factor: number;
   shrunk_performance: number;
   exploration_bonus: number;
-    cycle_coverage_bonus: number;
+        cycle_coverage_bonus: number;
+  winner_initial_coverage_count: number;
+  winner_proportional_weight: number;
+  winner_exact_additional_share: number;
+  winner_rounded_additional_placements: number;
+  winner_final_target_count: number;
+  winner_actual_selected_count: number;
+  winner_target_satisfied: boolean;
+  winner_share_deficit: number;
   development_resolution_priority: number;
   evidence_debt_bonus: number;
   waiting_priority: number;
@@ -413,6 +421,112 @@ function buildAllocationTargets(
     development: dynamic.develop,
     exploration: dynamic.explore,
   };
+}
+
+export type WinnerAllocationTarget = {
+  source_identity_key: string;
+  source_card_family_id: string;
+  ranking_score: number;
+  global_rank: number | null;
+  initial_coverage_count: number;
+  proportional_weight: number;
+  exact_additional_share: number;
+  rounded_additional_placements: number;
+  final_target_count: number;
+};
+
+export function buildWinnerAllocationPlan(
+  candidates: SourceSelectionCandidate[],
+  winnerSlots: number,
+): WinnerAllocationTarget[] {
+  const requested = Math.max(0, Math.floor(winnerSlots));
+  const byFamily = new Map<string, SourceSelectionCandidate>();
+  for (const candidate of candidates) {
+    if (allocationTierForCandidate(candidate) !== "winner") continue;
+    const familyId = String(candidate.source_card_family_id ?? "");
+    const identity = String(candidate.source_identity_key ?? "");
+    if (!familyId || !identity) continue;
+    const existing = byFamily.get(familyId);
+    if (!existing || finiteNumber(candidate.ranking_score, finiteNumber(candidate.unified_rating, 1))
+      > finiteNumber(existing.ranking_score, finiteNumber(existing.unified_rating, 1))) {
+      byFamily.set(familyId, candidate);
+    }
+  }
+  const ranked = [...byFamily.values()].sort((left, right) =>
+    finiteNumber(right.ranking_score, finiteNumber(right.unified_rating, 1))
+      - finiteNumber(left.ranking_score, finiteNumber(left.unified_rating, 1))
+    || finiteNumber(left.global_rank, Number.MAX_SAFE_INTEGER) - finiteNumber(right.global_rank, Number.MAX_SAFE_INTEGER)
+    || String(left.source_identity_key).localeCompare(String(right.source_identity_key))
+  );
+  if (!ranked.length || requested === 0) return ranked.map((candidate) => ({
+    source_identity_key: String(candidate.source_identity_key),
+    source_card_family_id: String(candidate.source_card_family_id),
+    ranking_score: Math.max(0, finiteNumber(candidate.ranking_score, finiteNumber(candidate.unified_rating, 1))),
+    global_rank: candidate.global_rank === null || candidate.global_rank === undefined ? null : Math.max(1, finiteNumber(candidate.global_rank, 1)),
+    initial_coverage_count: 0,
+    proportional_weight: 0,
+    exact_additional_share: 0,
+    rounded_additional_placements: 0,
+    final_target_count: 0,
+  }));
+
+  if (requested < ranked.length) {
+    return ranked.map((candidate, index) => ({
+      source_identity_key: String(candidate.source_identity_key),
+      source_card_family_id: String(candidate.source_card_family_id),
+      ranking_score: Math.max(0, finiteNumber(candidate.ranking_score, finiteNumber(candidate.unified_rating, 1))),
+      global_rank: candidate.global_rank === null || candidate.global_rank === undefined ? null : Math.max(1, finiteNumber(candidate.global_rank, 1)),
+      initial_coverage_count: index < requested ? 1 : 0,
+      proportional_weight: 0,
+      exact_additional_share: 0,
+      rounded_additional_placements: 0,
+      final_target_count: index < requested ? 1 : 0,
+    }));
+  }
+
+  const additionalCapacity = requested - ranked.length;
+  const rawWeights = ranked.map((candidate) => Math.max(0, finiteNumber(
+    candidate.ranking_score,
+    finiteNumber(candidate.unified_rating, 1),
+  )));
+  const positiveWeightTotal = rawWeights.reduce((sum, weight) => sum + weight, 0);
+  const weights = positiveWeightTotal > 0 ? rawWeights : ranked.map(() => 1);
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  const working = ranked.map((candidate, index) => {
+    const exactAdditionalShare = additionalCapacity * (weights[index] / Math.max(weightTotal, Number.EPSILON));
+    const roundedAdditionalPlacements = Math.floor(exactAdditionalShare);
+    return {
+      candidate,
+      proportionalWeight: weights[index],
+      exactAdditionalShare,
+      roundedAdditionalPlacements,
+      remainder: exactAdditionalShare - roundedAdditionalPlacements,
+    };
+  });
+  let unassigned = additionalCapacity - working.reduce((sum, item) => sum + item.roundedAdditionalPlacements, 0);
+  const remainderOrder = [...working].sort((left, right) =>
+    right.remainder - left.remainder
+    || finiteNumber(right.candidate.ranking_score, finiteNumber(right.candidate.unified_rating, 1))
+      - finiteNumber(left.candidate.ranking_score, finiteNumber(left.candidate.unified_rating, 1))
+    || String(left.candidate.source_identity_key).localeCompare(String(right.candidate.source_identity_key))
+  );
+  for (let index = 0; index < remainderOrder.length && unassigned > 0; index += 1, unassigned -= 1) {
+    remainderOrder[index].roundedAdditionalPlacements += 1;
+  }
+
+  return working.map((item) => ({
+    source_identity_key: String(item.candidate.source_identity_key),
+    source_card_family_id: String(item.candidate.source_card_family_id),
+    ranking_score: Math.max(0, finiteNumber(item.candidate.ranking_score, finiteNumber(item.candidate.unified_rating, 1))),
+    global_rank: item.candidate.global_rank === null || item.candidate.global_rank === undefined
+      ? null
+      : Math.max(1, finiteNumber(item.candidate.global_rank, 1)),
+    initial_coverage_count: 1,
+    proportional_weight: item.proportionalWeight,
+    exact_additional_share: item.exactAdditionalShare,
+    rounded_additional_placements: item.roundedAdditionalPlacements,
+    final_target_count: 1 + item.roundedAdditionalPlacements,
+  }));
 }
 
 function chooseAllocationTier(
@@ -961,7 +1075,9 @@ export function selectSourceFamilyLineup(input: {
   const cooldownHours = 0;
   const semanticSpacingHours = 0;
   const requireUniqueSource = false;
-  const allocationTargets = buildAllocationTargets(active, input.slot_keys.length, input.preselection_policy);
+    const allocationTargets = buildAllocationTargets(active, input.slot_keys.length, input.preselection_policy);
+  const winnerAllocationPlan = buildWinnerAllocationPlan(active, allocationTargets.winner);
+  const winnerAllocationByFamily = new Map(winnerAllocationPlan.map((target) => [target.source_card_family_id, target]));
   const reservations = [...(input.preselection_policy?.experiment_reservations ?? [])];
   const reservationCandidate = new Map(reservations.map((reservation) => [
     reservation.reservation_key,
@@ -1017,9 +1133,14 @@ export function selectSourceFamilyLineup(input: {
     }
 
         const slotEligible = active.filter((candidate) => {
-      const identity = String(candidate.source_identity_key);
+            const identity = String(candidate.source_identity_key);
+      const familyId = String(candidate.source_card_family_id);
       const candidateTier = allocationTierForCandidate(candidate, input.preselection_policy);
-      if (candidateTier !== "winner" && usedSources.has(identity)) return false;
+      if (candidateTier === "winner") {
+        const target = winnerAllocationByFamily.get(familyId);
+        const planned = Math.max(0, plannedCounts.get(familyId) ?? 0);
+        if (!target || planned >= target.final_target_count) return false;
+      } else if (usedSources.has(identity)) return false;
       if (activeReservation) {
         if (!sourcePreselectionTargetMatchesCandidate(activeReservation, candidate)) return false;
       } else if (pendingReservedCandidateKeys.has(identity)) {
@@ -1058,8 +1179,14 @@ export function selectSourceFamilyLineup(input: {
         : Math.max(1, finiteNumber(candidate.global_rank, 1));
       const shrunkPerformance = rankingScore;
       const recentFactor = 1;
-      const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
-      const cycleCoverageBonus = allocationTier === "winner" && plannedUses === 0 ? 100 : 0;
+            const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
+      const winnerTarget = winnerAllocationByFamily.get(familyId) ?? null;
+      const cycleCoverageBonus = allocationTier === "winner" && plannedUses === 0 ? 1000 : 0;
+      const winnerShareDeficit = allocationTier === "winner" && winnerTarget
+        ? winnerTarget.final_target_count
+          * ((selectedTierCounts.winner + 1) / Math.max(1, allocationTargets.winner))
+          - plannedUses
+        : 0;
             const developmentPriority = allocationTier === "development"
         ? developmentResolutionPriority(lifecycleLabel) * 10
         : 0;
@@ -1092,8 +1219,8 @@ export function selectSourceFamilyLineup(input: {
             const preselectionAdjustment = sourcePreselectionAdjustmentForCandidate(input.preselection_policy, candidate);
       const preselectionScoreMultiplier = 1;
       const preselectionScoreAddend = 0;
-            const baseScore = allocationTier === "winner"
-        ? rankingScore + cycleCoverageBonus
+                        const baseScore = allocationTier === "winner"
+        ? rankingScore + cycleCoverageBonus + winnerShareDeficit * 100
         : rankingScore + developmentPriority + evidenceDebtBonus + waitingPriority;
       const score = baseScore;
 
@@ -1122,8 +1249,16 @@ export function selectSourceFamilyLineup(input: {
           recent_factor: recentFactor,
           shrunk_performance: shrunkPerformance,
           exploration_bonus: explorationBonus,
-                    cycle_coverage_bonus: cycleCoverageBonus,
-          development_resolution_priority: developmentPriority,
+                                        cycle_coverage_bonus: cycleCoverageBonus,
+          winner_initial_coverage_count: winnerTarget?.initial_coverage_count ?? 0,
+          winner_proportional_weight: winnerTarget?.proportional_weight ?? 0,
+          winner_exact_additional_share: winnerTarget?.exact_additional_share ?? 0,
+          winner_rounded_additional_placements: winnerTarget?.rounded_additional_placements ?? 0,
+          winner_final_target_count: winnerTarget?.final_target_count ?? 0,
+          winner_actual_selected_count: 0,
+          winner_target_satisfied: allocationTier !== "winner",
+          winner_share_deficit: winnerShareDeficit,
+          development_resolution_priority: developmentPriority;
           evidence_debt_bonus: evidenceDebtBonus,
           waiting_priority: waitingPriority,
           historical_opportunity_count: historicalOpportunityCount,
@@ -1181,7 +1316,10 @@ export function selectSourceFamilyLineup(input: {
       ranking_score: Number(winner.receipt.ranking_score.toFixed(6)),
       shrunk_performance: Number(winner.receipt.shrunk_performance.toFixed(6)),
       exploration_bonus: Number(winner.receipt.exploration_bonus.toFixed(6)),
-            cycle_coverage_bonus: Number(winner.receipt.cycle_coverage_bonus.toFixed(6)),
+                        cycle_coverage_bonus: Number(winner.receipt.cycle_coverage_bonus.toFixed(6)),
+      winner_proportional_weight: Number(winner.receipt.winner_proportional_weight.toFixed(8)),
+      winner_exact_additional_share: Number(winner.receipt.winner_exact_additional_share.toFixed(8)),
+      winner_share_deficit: Number(winner.receipt.winner_share_deficit.toFixed(8)),
       development_resolution_priority: Number(winner.receipt.development_resolution_priority.toFixed(6)),
       evidence_debt_bonus: Number(winner.receipt.evidence_debt_bonus.toFixed(6)),
       waiting_priority: Number(winner.receipt.waiting_priority.toFixed(6)),
