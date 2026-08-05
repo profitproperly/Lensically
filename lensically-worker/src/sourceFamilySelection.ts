@@ -682,12 +682,79 @@ export async function ensureSourceFamilySelectionTables(db: D1Database): Promise
       table: "operator_source_selection_receipts",
       columns: ["id", "brand_key", "scope_type", "scope_id", "slot_key", "selection_order", "source_identity_key", "source_card_family_id", "source_card_id", "engine_version", "receipt_json", "created_at"],
     }),
-    assertDatabaseIntegrity(db, {
+        assertDatabaseIntegrity(db, {
       table: "operator_source_selection_plans",
       columns: ["id", "brand_key", "cycle_id", "slot_key", "selection_order", "source_identity_key", "source_card_family_id", "source_card_id", "engine_version", "receipt_json", "status", "created_at", "updated_at"],
     }),
+    assertDatabaseIntegrity(db, {
+      table: "operator_source_label_allocation_state",
+      columns: ["brand_key", "policy_version", "state_json", "last_cycle_id", "created_at", "updated_at"],
+    }),
   ]);
 }
+
+export async function loadSourceLabelAllocationState(
+  db: D1Database,
+  brandKey: string,
+  cycleId?: string,
+): Promise<SourceLabelAllocationState> {
+  await ensureSourceFamilySelectionTables(db);
+  if (cycleId) {
+    const existingCycle = await db.prepare(
+      `SELECT receipt_json FROM operator_source_selection_plans
+       WHERE brand_key = ? AND cycle_id = ? AND engine_version = ? AND status = 'locked'
+       ORDER BY selection_order ASC LIMIT 1`,
+    ).bind(brandKey, cycleId, SOURCE_SELECTION_ENGINE_VERSION).first<{ receipt_json: string }>();
+    const beforeCycle = parseJsonRecord(parseJsonRecord(existingCycle?.receipt_json).allocation_state_before_cycle);
+    if (beforeCycle.policy_version === SOURCE_LABEL_ALLOCATION_POLICY_VERSION) {
+      return normalizeSourceLabelAllocationState(beforeCycle);
+    }
+  }
+  const row = await db.prepare(
+    `SELECT policy_version, state_json FROM operator_source_label_allocation_state WHERE brand_key = ?`,
+  ).bind(brandKey).first<{ policy_version: string; state_json: string }>();
+  if (String(row?.policy_version ?? "") !== SOURCE_LABEL_ALLOCATION_POLICY_VERSION) {
+    return normalizeSourceLabelAllocationState();
+  }
+  return normalizeSourceLabelAllocationState(parseJsonRecord(row?.state_json));
+}
+
+async function reconcileSourceLabelAllocationState(
+  db: D1Database,
+  input: { brand_key: string; cycle_id: string; receipts: SourceSelectionReceipt[] },
+): Promise<void> {
+  if (!input.receipts.length) return;
+  const before = normalizeSourceLabelAllocationState(input.receipts[0].allocation_state_before_cycle);
+  const after = normalizeSourceLabelAllocationState(input.receipts[input.receipts.length - 1].allocation_state_after_cycle);
+  const existing = await db.prepare(
+    `SELECT policy_version, state_json, last_cycle_id
+     FROM operator_source_label_allocation_state WHERE brand_key = ?`,
+  ).bind(input.brand_key).first<{ policy_version: string; state_json: string; last_cycle_id: string | null }>();
+  const current = String(existing?.policy_version ?? "") === SOURCE_LABEL_ALLOCATION_POLICY_VERSION
+    ? normalizeSourceLabelAllocationState(parseJsonRecord(existing?.state_json))
+    : normalizeSourceLabelAllocationState();
+  const sameState = (left: SourceLabelAllocationState, right: SourceLabelAllocationState): boolean =>
+    JSON.stringify(left) === JSON.stringify(right);
+  if (existing?.last_cycle_id !== input.cycle_id && !sameState(current, before)) {
+    throw new Error("source_label_allocation_state_conflict");
+  }
+  await db.prepare(
+    `INSERT INTO operator_source_label_allocation_state (
+       brand_key, policy_version, state_json, last_cycle_id, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     ON CONFLICT(brand_key) DO UPDATE SET
+       policy_version = excluded.policy_version,
+       state_json = excluded.state_json,
+       last_cycle_id = excluded.last_cycle_id,
+       updated_at = CURRENT_TIMESTAMP`,
+  ).bind(
+    input.brand_key,
+    SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+    JSON.stringify(after),
+    input.cycle_id,
+  ).run();
+}
+
 
 export async function refreshSourceFamilyLabels(
   db: D1Database,
