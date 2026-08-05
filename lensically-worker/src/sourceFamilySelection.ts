@@ -1288,11 +1288,11 @@ export function selectSourceFamilyLineup(input: {
   const eligibleFamilyCount = new Set(active.map((candidate) => String(candidate.source_card_family_id))).size;
   const cooldownHours = 0;
   const semanticSpacingHours = 0;
-  const requireUniqueSource = false;
-    const allocationTargets = buildAllocationTargets(active, input.slot_keys.length, input.preselection_policy);
-  const winnerAllocationPlan = buildWinnerAllocationPlan(active, allocationTargets.winner);
-  const winnerAllocationByFamily = new Map(winnerAllocationPlan.map((target) => [target.source_card_family_id, target]));
+    const requireUniqueSource = false;
+  const allocationStateBeforeCycle = normalizeSourceLabelAllocationState(input.allocation_state);
+  let allocationState = cloneSourceLabelAllocationState(allocationStateBeforeCycle);
   const reservations = [...(input.preselection_policy?.experiment_reservations ?? [])];
+
   const reservationCandidate = new Map(reservations.map((reservation) => [
     reservation.reservation_key,
     active.find((candidate) => sourcePreselectionTargetMatchesCandidate(reservation, candidate)) ?? null,
