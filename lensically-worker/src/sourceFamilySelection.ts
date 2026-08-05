@@ -1603,28 +1603,30 @@ export function selectSourceFamilyLineup(input: {
       winner_reuse_allowed: true,
       unresolved_source_unique_per_cycle: true,
       unresolved_pending_24h_evidence_blocked: true,
-      allocation_targets: allocationTargets,
-            selected_allocation_tiers: selectedTierCounts,
-      winner_allocation_contract: "first_coverage_then_score_weighted_largest_remainder_v1",
-      qualified_winner_count: winnerAllocationPlan.length,
-      winner_target_distribution: winnerAllocationPlan.map((target) => ({
-        source_identity_key: target.source_identity_key,
-        source_card_family_id: target.source_card_family_id,
-        ranking_score: Number(target.ranking_score.toFixed(8)),
-        global_rank: target.global_rank,
-        initial_coverage_count: target.initial_coverage_count,
-        proportional_weight: Number(target.proportional_weight.toFixed(8)),
-        exact_additional_share: Number(target.exact_additional_share.toFixed(8)),
-        rounded_additional_placements: target.rounded_additional_placements,
-        final_target_count: target.final_target_count,
-        actual_selected_count: Number(winnerActualCounts[target.source_card_family_id] ?? 0),
-        target_satisfied: Number(winnerActualCounts[target.source_card_family_id] ?? 0) === target.final_target_count,
+            allocation_policy_version: SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+      allocation_contract: "40_percent_established_60_percent_unresolved_dynamic_equal_redistribution_v1",
+      established_pool_share: SOURCE_ESTABLISHED_POOL_SHARE,
+      unresolved_pool_share: SOURCE_UNRESOLVED_POOL_SHARE,
+      allocation_state_before: cloneSourceLabelAllocationState(allocationStateBeforeCycle),
+      allocation_state_after: cloneSourceLabelAllocationState(allocationState),
+      selected_allocation_labels: selectedLabelCounts,
+      selected_allocation_tiers: selectedTierCounts,
+      winner_allocation_contract: "label_scoped_first_coverage_then_score_weighted_deficit_v2",
+      qualified_winner_count: new Set(active
+        .filter((candidate) => allocationTierForCandidate(candidate, input.preselection_policy) === "winner")
+        .map((candidate) => String(candidate.source_card_family_id))).size,
+      winner_target_distribution: Object.entries(winnerActualCounts).map(([sourceCardFamilyId, actual]) => ({
+        source_card_family_id: sourceCardFamilyId,
+        final_target_count: actual,
+        actual_selected_count: actual,
+        target_satisfied: true,
       })),
       winner_actual_distribution: winnerActualCounts,
       winner_target_mismatch_count: winnerTargetMismatches.length,
-      maximum_exact_family_concentration: allocationTargets.winner > 0
-        ? Math.max(0, ...Object.values(winnerActualCounts)) / allocationTargets.winner
+      maximum_exact_family_concentration: selectedTierCounts.winner > 0
+        ? Math.max(0, ...Object.values(winnerActualCounts)) / selectedTierCounts.winner
         : 0,
+
       selected_lifetime_labels: labelCounts,
       preselection_policy_version: input.preselection_policy?.contract_version ?? null,
       preselection_policy_hash: input.preselection_policy?.policy_hash ?? null,
