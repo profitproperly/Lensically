@@ -1303,10 +1303,14 @@ export function selectSourceFamilyLineup(input: {
     }
   }
   
-  const fulfilledReservations = new Set<string>();
+    const fulfilledReservations = new Set<string>();
   const selectedTierCounts: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
+  const selectedLabelCounts = Object.fromEntries(
+    SOURCE_LABEL_ALLOCATION_ORDER.map((label) => [label, 0]),
+  ) as Record<SourceSelectableLifetimeLabel, number>;
 
   const selected: SourceSelectionCandidate[] = [];
+
   const receipts: SourceSelectionReceipt[] = [];
     const usedSources = new Set<string>();
   const plannedCounts = new Map<string, number>();
