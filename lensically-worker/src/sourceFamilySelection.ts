@@ -1459,11 +1459,14 @@ export function selectSourceFamilyLineup(input: {
           shrunk_performance: shrunkPerformance,
           exploration_bonus: explorationBonus,
                                         cycle_coverage_bonus: cycleCoverageBonus,
-          winner_initial_coverage_count: winnerTarget?.initial_coverage_count ?? 0,
-          winner_proportional_weight: winnerTarget?.proportional_weight ?? 0,
-          winner_exact_additional_share: winnerTarget?.exact_additional_share ?? 0,
-          winner_rounded_additional_placements: winnerTarget?.rounded_additional_placements ?? 0,
-          winner_final_target_count: winnerTarget?.final_target_count ?? 0,
+                    winner_initial_coverage_count: allocationTier === "winner" && plannedUses === 0 ? 1 : 0,
+          winner_proportional_weight: allocationTier === "winner" && winnerLabelWeightTotal > 0
+            ? rankingScore / winnerLabelWeightTotal
+            : 0,
+          winner_exact_additional_share: 0,
+          winner_rounded_additional_placements: 0,
+          winner_final_target_count: 0,
+
           winner_actual_selected_count: 0,
           winner_target_satisfied: allocationTier !== "winner",
                     winner_share_deficit: winnerShareDeficit,
