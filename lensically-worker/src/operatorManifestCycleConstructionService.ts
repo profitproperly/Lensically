@@ -93,13 +93,15 @@ export interface OperatorManifestCycleConstructionDependencies {
 
 
   loadSourceExclusions(brandKey: string): Promise<string[]>;
-  selectSourceLineup(input: {
-        candidates: JsonRecord[];
+    selectSourceLineup(input: {
+    candidates: JsonRecord[];
     slot_keys: string[];
     seed: string;
     preselection_policy?: JsonRecord;
+    allocation_state?: JsonRecord;
 
   }): { receipts: unknown[] };
+
   persistLockedSourceSelectionPlan(input: JsonRecord): Promise<JsonRecord[]>;
   buildRollingEvidence(input: JsonRecord): Promise<JsonRecord>;
   attachEvidenceSnapshot(cycleId: string, brandKey: string, evidenceSnapshotId: unknown): Promise<unknown>;
