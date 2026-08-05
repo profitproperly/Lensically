@@ -1361,12 +1361,18 @@ export function selectSourceFamilyLineup(input: {
     const allocationStep = advanceSourceLabelAllocation(allocationState, availableLabels, forcedLabel);
     const allocationLabel = allocationStep.selected_label;
     const allocationTier = allocationTierForLabel(allocationLabel);
-    const available = slotEligible.filter((candidate) =>
+        const available = slotEligible.filter((candidate) =>
       normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) === allocationLabel
     );
-
+    const winnerLabelWeightTotal = allocationTier === "winner"
+      ? available.reduce((sum, candidate) => sum + Math.max(0, finiteNumber(
+          candidate.ranking_score,
+          finiteNumber(candidate.unified_rating, 1),
+        )), 0)
+      : 0;
 
     const scored: Array<{ candidate: SourceSelectionCandidate; receipt: SourceSelectionReceipt }> = [];
+
     for (const candidate of available) {
       const identity = String(candidate.source_identity_key);
       const familyId = String(candidate.source_card_family_id);
