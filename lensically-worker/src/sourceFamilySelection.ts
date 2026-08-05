@@ -1345,20 +1345,22 @@ export function selectSourceFamilyLineup(input: {
       }
       return true;
     });
-    if (!slotEligible.length) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
-        const availableTiers = new Set(slotEligible.map((candidate) => allocationTierForCandidate(candidate, input.preselection_policy)));
-    const allocationTier = activeReservation
-      ? allocationTierForCandidate(slotEligible[0], input.preselection_policy)
-      : chooseAllocationTier(
-          allocationTargets,
-          selectedTierCounts,
-          availableTiers,
-          slotIndex,
-          input.slot_keys.length,
-        );
+        if (!slotEligible.length) throw new Error(`hardened_source_selection_exhausted:${slotIndex}`);
+    const availableLabels = [...new Set(slotEligible.map((candidate) =>
+      normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label)
+    ))].filter((label): label is SourceSelectableLifetimeLabel =>
+      SOURCE_LABEL_ALLOCATION_ORDER.includes(label as SourceSelectableLifetimeLabel)
+    );
+    const forcedLabel = activeReservation
+      ? normalizeSourceFamilyLifetimeLabel(slotEligible[0].lifetime_label) as SourceSelectableLifetimeLabel
+      : null;
+    const allocationStep = advanceSourceLabelAllocation(allocationState, availableLabels, forcedLabel);
+    const allocationLabel = allocationStep.selected_label;
+    const allocationTier = allocationTierForLabel(allocationLabel);
+    const available = slotEligible.filter((candidate) =>
+      normalizeSourceFamilyLifetimeLabel(candidate.lifetime_label) === allocationLabel
+    );
 
-    if (!allocationTier) throw new Error(`hardened_allocation_target_unavailable:${slotIndex}`);
-        const available = slotEligible.filter((candidate) => allocationTierForCandidate(candidate, input.preselection_policy) === allocationTier);
 
     const scored: Array<{ candidate: SourceSelectionCandidate; receipt: SourceSelectionReceipt }> = [];
     for (const candidate of available) {
