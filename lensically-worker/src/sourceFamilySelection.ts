@@ -1549,10 +1549,13 @@ export function selectSourceFamilyLineup(input: {
     };
     selected.push({ ...winner.candidate, selection_receipt: receipt, assigned_slot_key: slotKey });
     receipts.push(receipt);
-    usedSources.add(receipt.source_identity_key);
-        plannedCounts.set(receipt.source_card_family_id, receipt.planned_uses + 1);
+        usedSources.add(receipt.source_identity_key);
+    plannedCounts.set(receipt.source_card_family_id, receipt.planned_uses + 1);
     selectedTierCounts[receipt.allocation_tier] += 1;
+    selectedLabelCounts[receipt.allocation_label] += 1;
+    allocationState = cloneSourceLabelAllocationState(allocationStep.state_after);
     if (receipt.experiment_reservation_key) fulfilledReservations.add(receipt.experiment_reservation_key);
+
     relaxationCounts.strict += 1;
 
   }
