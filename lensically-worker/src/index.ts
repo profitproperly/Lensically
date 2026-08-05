@@ -352,8 +352,10 @@ import {
   SOURCE_SELECTION_ENGINE_VERSION,
     enrichSourceCandidatesForSelection,
   ensureSourceFamilySelectionTables,
-                loadLockedSourceCardSelectionCandidates,
+                                loadLockedSourceCardSelectionCandidates,
+  loadSourceLabelAllocationState,
   normalizeSourceFamilyLifetimeLabel,
+
 
 
     persistLockedSourceSelectionPlan,
