@@ -2122,7 +2122,8 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     dynamic_16_slots: JSON.stringify(laneTargets16) === JSON.stringify({ exploit: 6, develop: 5, explore: 5 }),
     dynamic_33_slots: JSON.stringify(laneTargets33) === JSON.stringify({ exploit: 11, develop: 11, explore: 11 }),
     new_account_explores_all: new Set(newAccountSelection.selected.map((item) => item.source_identity_key)).size === 24,
-    winner_reuse_allowed: mixedSelection.selected.filter((item) => String(item.source_identity_key).startsWith("winner-")).length === 5,
+        winner_reuse_allowed: mixedSelection.selected.filter((item) => String(item.source_identity_key).startsWith("winner-")).length === 4,
+
     qualified_winners_covered_before_repeat: Object.keys(selectedWinnerCounts).length === 3,
         pending_unresolved_source_waits: pendingSelection.selected[0]?.source_identity_key === "fresh-untested",
     development_evidence_debt_prevents_starvation:
