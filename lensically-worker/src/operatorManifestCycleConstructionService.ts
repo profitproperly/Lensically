@@ -84,10 +84,12 @@ export interface OperatorManifestCycleConstructionDependencies {
     accountPosition: JsonRecord;
   }): Promise<unknown>;
   readLockedSourceSelectionPlan(brandKey: string, cycleId: string): Promise<JsonRecord[]>;
-        loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[]): Promise<{
+          loadLockedSourceDecisionContext(brandKey: string, asOf: string, slotKeys: string[], cycleId: string): Promise<{
     candidates: JsonRecord[];
     preselection_policy: JsonRecord;
+    allocation_state: JsonRecord;
   }>;
+
 
 
   loadSourceExclusions(brandKey: string): Promise<string[]>;
