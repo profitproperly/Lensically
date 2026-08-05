@@ -1302,20 +1302,7 @@ export function selectSourceFamilyLineup(input: {
       throw new Error(`preselection_experiment_reservation_ineligible:${reservation.reservation_key}`);
     }
   }
-  const reservedTierMinimums: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
-  for (const reservation of reservations) {
-    const candidate = reservationCandidate.get(reservation.reservation_key);
-    if (candidate) reservedTierMinimums[allocationTierForCandidate(candidate, input.preselection_policy)] += 1;
-  }
-  for (const tier of ["winner", "development", "exploration"] as SourceAllocationTier[]) {
-    while (allocationTargets[tier] < reservedTierMinimums[tier]) {
-      const donor = (["exploration", "development", "winner"] as SourceAllocationTier[])
-        .find((candidateTier) => candidateTier !== tier && allocationTargets[candidateTier] > reservedTierMinimums[candidateTier]);
-      if (!donor) throw new Error(`preselection_reservation_allocation_unavailable:${tier}`);
-      allocationTargets[donor] -= 1;
-      allocationTargets[tier] += 1;
-    }
-  }
+  
   const fulfilledReservations = new Set<string>();
   const selectedTierCounts: Record<SourceAllocationTier, number> = { winner: 0, development: 0, exploration: 0 };
 
