@@ -1651,9 +1651,13 @@ export function selectSourceFamilyLineup(input: {
 
           })).sort((left, right) => String(left.source_identity_key).localeCompare(String(right.source_identity_key))),
           exclusions,
-                    preselection_policy: input.preselection_policy ?? null,
-          allocation_targets: allocationTargets,
+                              preselection_policy: input.preselection_policy ?? null,
+          allocation_policy_version: SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+          allocation_state_before: cloneSourceLabelAllocationState(allocationStateBeforeCycle),
+          allocation_state_after: cloneSourceLabelAllocationState(allocationState),
+          selected_allocation_labels: selectedLabelCounts,
           slot_rankings: slotRankings,
+
 
           selected_source_to_slot: receipts.map((receipt) => ({
             slot_key: receipt.slot_key,
