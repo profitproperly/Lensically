@@ -1238,11 +1238,13 @@ export async function enrichSourceCandidatesForSelection(
 export function selectSourceFamilyLineup(input: {
   candidates: SourceSelectionCandidate[];
   slot_keys: string[];
-    seed: string;
+  seed: string;
   preselection_policy?: SourcePreselectionPolicy;
   include_parity_trace?: boolean;
+  allocation_state?: SourceLabelAllocationState | Record<string, unknown>;
 
 }): {
+
   selected: SourceSelectionCandidate[];
   receipts: SourceSelectionReceipt[];
   summary: Record<string, unknown>;
