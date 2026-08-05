@@ -449,7 +449,81 @@ function allocationTierForCandidate(
   return allocationTierForLabel(candidate.lifetime_label);
 }
 
+function emptySourceLabelAllocationBalances(): Record<SourceSelectableLifetimeLabel, number> {
+  return Object.fromEntries(SOURCE_LABEL_ALLOCATION_ORDER.map((label) => [label, 0]))
+    as Record<SourceSelectableLifetimeLabel, number>;
+}
+
+export function normalizeSourceLabelAllocationState(value?: unknown): SourceLabelAllocationState {
+  const record = parseJsonRecord(value);
+  const rawBalances = parseJsonRecord(record.balances);
+  const balances = emptySourceLabelAllocationBalances();
+  for (const label of SOURCE_LABEL_ALLOCATION_ORDER) {
+    balances[label] = Number(finiteNumber(rawBalances[label]).toFixed(12));
+  }
+  return {
+    policy_version: SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+    balances,
+    selections_total: Math.max(0, Math.floor(finiteNumber(record.selections_total))),
+  };
+}
+
+function cloneSourceLabelAllocationState(state: SourceLabelAllocationState): SourceLabelAllocationState {
+  return normalizeSourceLabelAllocationState(state);
+}
+
+export function buildSourceLabelEffectiveShares(
+  availableLabels: Iterable<SourceSelectableLifetimeLabel>,
+): Partial<Record<SourceSelectableLifetimeLabel, number>> {
+  const available = new Set(availableLabels);
+  const established = SOURCE_ESTABLISHED_LABELS.filter((label) => available.has(label));
+  const unresolved = SOURCE_UNRESOLVED_LABELS.filter((label) => available.has(label));
+  const shares: Partial<Record<SourceSelectableLifetimeLabel, number>> = {};
+  if (!established.length && !unresolved.length) return shares;
+  const establishedPool = unresolved.length ? SOURCE_ESTABLISHED_POOL_SHARE : 1;
+  const unresolvedPool = established.length ? SOURCE_UNRESOLVED_POOL_SHARE : 1;
+  for (const label of established) shares[label] = establishedPool / established.length;
+  for (const label of unresolved) shares[label] = unresolvedPool / unresolved.length;
+  return shares;
+}
+
+function advanceSourceLabelAllocation(
+  state: SourceLabelAllocationState,
+  availableLabels: SourceSelectableLifetimeLabel[],
+  forcedLabel?: SourceSelectableLifetimeLabel | null,
+): {
+  selected_label: SourceSelectableLifetimeLabel;
+  shares: Partial<Record<SourceSelectableLifetimeLabel, number>>;
+  balances_before: Record<SourceSelectableLifetimeLabel, number>;
+  state_after: SourceLabelAllocationState;
+} {
+  const shares = buildSourceLabelEffectiveShares(availableLabels);
+  const balancesBefore = { ...state.balances };
+  const credited = { ...state.balances };
+  for (const label of availableLabels) credited[label] += finiteNumber(shares[label]);
+  const selectedLabel = forcedLabel ?? [...availableLabels].sort((left, right) =>
+    credited[right] - credited[left]
+    || SOURCE_LABEL_ALLOCATION_ORDER.indexOf(left) - SOURCE_LABEL_ALLOCATION_ORDER.indexOf(right)
+  )[0];
+  if (!selectedLabel || !availableLabels.includes(selectedLabel)) {
+    throw new Error("source_label_allocation_unavailable");
+  }
+  credited[selectedLabel] -= 1;
+  for (const label of SOURCE_LABEL_ALLOCATION_ORDER) credited[label] = Number(credited[label].toFixed(12));
+  return {
+    selected_label: selectedLabel,
+    shares,
+    balances_before: balancesBefore,
+    state_after: {
+      policy_version: SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+      balances: credited,
+      selections_total: state.selections_total + 1,
+    },
+  };
+}
+
 function buildAllocationTargets(
+
   candidates: SourceSelectionCandidate[],
   requestedSlots: number,
   policy?: SourcePreselectionPolicy,
