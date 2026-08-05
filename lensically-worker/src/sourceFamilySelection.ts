@@ -450,8 +450,10 @@ function allocationTierForCandidate(
 }
 
 function emptySourceLabelAllocationBalances(): Record<SourceSelectableLifetimeLabel, number> {
-  return Object.fromEntries(SOURCE_LABEL_ALLOCATION_ORDER.map((label) => [label, 0]))
-    as Record<SourceSelectableLifetimeLabel, number>;
+    return Object.fromEntries(
+    SOURCE_LABEL_ALLOCATION_ORDER.map((label) => [label, 0]),
+  ) as Record<SourceSelectableLifetimeLabel, number>;
+
 }
 
 export function normalizeSourceLabelAllocationState(value?: unknown): SourceLabelAllocationState {
