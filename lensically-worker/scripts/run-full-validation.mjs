@@ -136,12 +136,17 @@ function validatePlan() {
 
   const selectorRegressionPath = resolve(workerRoot, "test/sourceFamilySelection.spec.ts");
   const selectorRegressionText = readFileSync(selectorRegressionPath, "utf8");
-  const selectorRegressionMarkers = [
-    "audited-13-1-1-1-regression",
-    "first_coverage_then_score_weighted_largest_remainder_v1",
-    "wording-is-not-allocation-authority",
-    "source-selection-engine-v8",
+    const selectorRegressionMarkers = [
+    "source-selection-engine-v9",
+    "source-label-allocation-40-60-v1",
+    "40-60-baseline",
+    "missing-tiebreaker",
+    "no-unresolved",
+    "one-shot-48",
+    "current-live-inventory-capacity",
+    "label_scoped_first_coverage_then_score_weighted_deficit_v2",
   ];
+
   const missingSelectorMarkers = selectorRegressionMarkers.filter((marker) => !selectorRegressionText.includes(marker));
   if (missingSelectorMarkers.length > 0) {
     fail(`full_validation_selector_regression_markers_missing:${missingSelectorMarkers.join(",")}`);
