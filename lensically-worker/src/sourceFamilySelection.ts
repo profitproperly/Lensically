@@ -1492,10 +1492,21 @@ export function selectSourceFamilyLineup(input: {
           preselection_policy_hash: input.preselection_policy?.policy_hash,
           preselection_score_multiplier: preselectionScoreMultiplier,
           preselection_score_addend: preselectionScoreAddend,
-          preselection_signals: preselectionAdjustment?.signals ?? [],
+                    preselection_signals: preselectionAdjustment?.signals ?? [],
           experiment_reservation_key: activeReservation?.reservation_key ?? null,
+          allocation_policy_version: SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
+          allocation_label: allocationLabel,
+          allocation_available_labels: [...availableLabels],
+          allocation_effective_shares: { ...allocationStep.shares },
+          allocation_balances_before: { ...allocationStep.balances_before },
+          allocation_balances_after: { ...allocationStep.state_after.balances },
+          allocation_selections_total_before: allocationState.selections_total,
+          allocation_selections_total_after: allocationStep.state_after.selections_total,
+          allocation_state_before_cycle: cloneSourceLabelAllocationState(allocationStateBeforeCycle),
+          allocation_state_after_cycle: cloneSourceLabelAllocationState(allocationStep.state_after),
 
         },
+
       });
     }
     scored.sort((left, right) =>
