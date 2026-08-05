@@ -427,10 +427,13 @@ export async function constructOperatorManifestAutonomousCycle(
         candidates: selectionCandidates,
                 slot_keys: currentMissingSlotKeys,
                 seed: `${brandKey}:${cycleId}:${operationId}`,
-        preselection_policy: preselectionPolicy,
-        allocation_state: record(sourceDecisionContext.allocation_state),
+                preselection_policy: preselectionPolicy,
+        ...(sourceDecisionContext.allocation_state
+          ? { allocation_state: record(sourceDecisionContext.allocation_state) }
+          : {}),
 
       });
+
 
       lockedSourceSelectionPlan = await dependencies.persistLockedSourceSelectionPlan({
         brand_key: brandKey,
