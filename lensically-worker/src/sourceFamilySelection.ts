@@ -16,7 +16,32 @@ import {
 } from "./sourceFamilyRankingV7";
 
 export const SOURCE_FAMILY_LABEL_POLICY_VERSION = "source-family-label-policy-v7";
-export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v8";
+export const SOURCE_SELECTION_ENGINE_VERSION = "source-selection-engine-v9";
+export const SOURCE_LABEL_ALLOCATION_POLICY_VERSION = "source-label-allocation-40-60-v1";
+
+export const SOURCE_LABEL_ALLOCATION_ORDER = [
+  "probation",
+  "tiebreaker",
+  "untested",
+  "franchise",
+  "proven",
+  "prospect",
+  "emerging",
+] as const;
+
+export type SourceSelectableLifetimeLabel = typeof SOURCE_LABEL_ALLOCATION_ORDER[number];
+
+export type SourceLabelAllocationState = {
+  policy_version: typeof SOURCE_LABEL_ALLOCATION_POLICY_VERSION;
+  balances: Record<SourceSelectableLifetimeLabel, number>;
+  selections_total: number;
+};
+
+const SOURCE_ESTABLISHED_LABELS = ["franchise", "proven", "prospect", "emerging"] as const;
+const SOURCE_UNRESOLVED_LABELS = ["untested", "probation", "tiebreaker"] as const;
+const SOURCE_ESTABLISHED_POOL_SHARE = 0.4;
+const SOURCE_UNRESOLVED_POOL_SHARE = 0.6;
+
 
 export type SourceFamilyLifetimeLabel = UnifiedLifecycleLabel;
 
