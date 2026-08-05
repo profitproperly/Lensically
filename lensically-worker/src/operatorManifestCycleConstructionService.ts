@@ -425,10 +425,12 @@ export async function constructOperatorManifestAutonomousCycle(
       const backendSelection = dependencies.selectSourceLineup({
         candidates: selectionCandidates,
                 slot_keys: currentMissingSlotKeys,
-        seed: `${brandKey}:${cycleId}:${operationId}`,
+                seed: `${brandKey}:${cycleId}:${operationId}`,
         preselection_policy: preselectionPolicy,
+        allocation_state: record(sourceDecisionContext.allocation_state),
 
       });
+
       lockedSourceSelectionPlan = await dependencies.persistLockedSourceSelectionPlan({
         brand_key: brandKey,
         cycle_id: cycleId,
