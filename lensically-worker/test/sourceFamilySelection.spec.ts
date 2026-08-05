@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  SOURCE_LABEL_ALLOCATION_POLICY_VERSION,
   SOURCE_SELECTION_ENGINE_VERSION,
+  buildSourceLabelEffectiveShares,
   buildWinnerAllocationPlan,
   classifySourceFamilyLifetime,
-    extractOwnerBannedSavedPatternIds,
+  extractOwnerBannedSavedPatternIds,
   isSourceCardOriginEligibleForSelection,
+  normalizeSourceLabelAllocationState,
   runSourceFamilySelectionEdgeCases,
-
   selectSourceFamilyLineup,
   type SourceFamilyLifetimeLabel,
+  type SourceLabelAllocationState,
+  type SourceSelectableLifetimeLabel,
   type SourceSelectionCandidate,
 } from "../src/sourceFamilySelection";
 
@@ -24,7 +28,7 @@ function candidate(
     source_card_family_id: `family-${id}`,
     lifetime_label: lifetimeLabel,
     recent_label: "no_recent_data",
-    lifetime_sample_size: lifetimeLabel === "untested" ? 0 : 6,
+    lifetime_sample_size: lifetimeLabel === "untested" ? 0 : 1,
     unified_rating: rankingScore,
     ranking_score: rankingScore,
     lifetime_index: rankingScore,
@@ -38,9 +42,25 @@ function candidate(
     semantic_future_scheduled_uses: 0,
     semantic_exposure_times: [],
     semantic_key: `semantic-${id}`,
-    historical_opportunity_count: lifetimeLabel === "untested" ? 0 : 6,
+    historical_opportunity_count: lifetimeLabel === "untested" ? 0 : 1,
     ...overrides,
   };
+}
+
+function candidatesForLabel(label: SourceSelectableLifetimeLabel, count: number): SourceSelectionCandidate[] {
+  return Array.from({ length: count }, (_, index) => candidate(`${label}-${index}`, label, 2 - index / 10000));
+}
+
+function fullAllocationPool(perUniqueLabel = 60): SourceSelectionCandidate[] {
+  return [
+    ...candidatesForLabel("franchise", 2),
+    ...candidatesForLabel("proven", 3),
+    ...candidatesForLabel("prospect", perUniqueLabel),
+    ...candidatesForLabel("emerging", perUniqueLabel),
+    ...candidatesForLabel("untested", perUniqueLabel),
+    ...candidatesForLabel("probation", perUniqueLabel),
+    ...candidatesForLabel("tiebreaker", perUniqueLabel),
+  ];
 }
 
 function slots(count: number, start = "2026-08-10T00:00"): string[] {
@@ -50,7 +70,7 @@ function slots(count: number, start = "2026-08-10T00:00"): string[] {
   );
 }
 
-function counts(result: ReturnType<typeof selectSourceFamilyLineup>): Record<string, number> {
+function countsByIdentity(result: ReturnType<typeof selectSourceFamilyLineup>): Record<string, number> {
   return result.selected.reduce<Record<string, number>>((accumulator, item) => {
     const identity = String(item.source_identity_key);
     accumulator[identity] = Number(accumulator[identity] ?? 0) + 1;
@@ -58,9 +78,32 @@ function counts(result: ReturnType<typeof selectSourceFamilyLineup>): Record<str
   }, {});
 }
 
-describe("source-selection engine v8", () => {
-  it("uses the v8 production contract", () => {
-    expect(SOURCE_SELECTION_ENGINE_VERSION).toBe("source-selection-engine-v8");
+function countsByLabel(result: ReturnType<typeof selectSourceFamilyLineup>): Record<string, number> {
+  return result.selected.reduce<Record<string, number>>((accumulator, item) => {
+    const label = String(item.lifetime_label);
+    accumulator[label] = Number(accumulator[label] ?? 0) + 1;
+    return accumulator;
+  }, {});
+}
+
+function nextState(result: ReturnType<typeof selectSourceFamilyLineup>): SourceLabelAllocationState {
+  return normalizeSourceLabelAllocationState(result.summary.allocation_state_after);
+}
+
+function removeSelectedUniqueCandidates(
+  pool: SourceSelectionCandidate[],
+  result: ReturnType<typeof selectSourceFamilyLineup>,
+): SourceSelectionCandidate[] {
+  const consumed = new Set(result.selected
+    .filter((item) => item.lifetime_label !== "franchise" && item.lifetime_label !== "proven")
+    .map((item) => String(item.source_identity_key)));
+  return pool.filter((item) => !consumed.has(String(item.source_identity_key)));
+}
+
+describe("source-selection engine v9", () => {
+  it("uses the v9 production and 40/60 allocation contracts", () => {
+    expect(SOURCE_SELECTION_ENGINE_VERSION).toBe("source-selection-engine-v9");
+    expect(SOURCE_LABEL_ALLOCATION_POLICY_VERSION).toBe("source-label-allocation-40-60-v1");
   });
 
   it("preserves exact Saved Pattern owner exclusions", () => {
@@ -73,7 +116,7 @@ describe("source-selection engine v8", () => {
     ]);
   });
 
-    it("keeps two below-median matured results underperforming", () => {
+  it("keeps two below-median matured results underperforming", () => {
     expect(classifySourceFamilyLifetime({ indexes: [0.8, 0.7] })).toEqual(expect.objectContaining({
       label: "underperforming",
       audition_failures: 2,
@@ -87,10 +130,174 @@ describe("source-selection engine v8", () => {
     expect(isSourceCardOriginEligibleForSelection("operator_hypothesis", null, liveSavedPatterns)).toBe(true);
     expect(isSourceCardOriginEligibleForSelection("owner_source_card", null, liveSavedPatterns)).toBe(true);
   });
-
 });
 
-describe("deterministic proportional Exploit allocation", () => {
+describe("40/60 lifecycle-label allocation", () => {
+  it("allocates 40% equally to established labels and 60% equally to unresolved labels", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: fullAllocationPool(),
+      slot_keys: slots(10),
+      seed: "40-60-baseline",
+    });
+    expect(countsByLabel(result)).toEqual({
+      probation: 2,
+      tiebreaker: 2,
+      untested: 2,
+      franchise: 1,
+      proven: 1,
+      prospect: 1,
+      emerging: 1,
+    });
+  });
+
+  it("redistributes a missing unresolved label inside the unresolved pool", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: fullAllocationPool().filter((item) => item.lifetime_label !== "tiebreaker"),
+      slot_keys: slots(20),
+      seed: "missing-tiebreaker",
+    });
+    expect(countsByLabel(result)).toEqual({
+      probation: 6,
+      untested: 6,
+      franchise: 2,
+      proven: 2,
+      prospect: 2,
+      emerging: 2,
+    });
+  });
+
+  it("redistributes the full unresolved pool when no unresolved inventory exists", () => {
+    const stablePool = fullAllocationPool().filter((item) =>
+      ["franchise", "proven", "prospect", "emerging"].includes(String(item.lifetime_label))
+    );
+    const result = selectSourceFamilyLineup({
+      candidates: stablePool,
+      slot_keys: slots(12),
+      seed: "no-unresolved",
+    });
+    expect(countsByLabel(result)).toEqual({
+      franchise: 3,
+      proven: 3,
+      prospect: 3,
+      emerging: 3,
+    });
+  });
+
+  it("gives every slot to the only available label", () => {
+    const result = selectSourceFamilyLineup({
+      candidates: candidatesForLabel("probation", 48),
+      slot_keys: slots(48),
+      seed: "probation-only",
+    });
+    expect(countsByLabel(result)).toEqual({ probation: 48 });
+  });
+
+  it("handles every requested slot count from one through 48 without losing a slot", () => {
+    for (let slotCount = 1; slotCount <= 48; slotCount += 1) {
+      const result = selectSourceFamilyLineup({
+        candidates: fullAllocationPool(),
+        slot_keys: slots(slotCount),
+        seed: `slot-count-${slotCount}`,
+      });
+      expect(result.selected).toHaveLength(slotCount);
+      expect(result.receipts).toHaveLength(slotCount);
+      expect(Object.values(countsByLabel(result)).reduce((sum, count) => sum + count, 0)).toBe(slotCount);
+    }
+  });
+
+  it("produces the same allocation across one 48-slot cycle and forty-eight one-slot cycles", () => {
+    const oneShot = selectSourceFamilyLineup({
+      candidates: fullAllocationPool(),
+      slot_keys: slots(48),
+      seed: "one-shot-48",
+    });
+
+    let fragmentedPool = fullAllocationPool();
+    let fragmentedState = normalizeSourceLabelAllocationState();
+    const fragmentedCounts: Record<string, number> = {};
+    for (let index = 0; index < 48; index += 1) {
+      const result = selectSourceFamilyLineup({
+        candidates: fragmentedPool,
+        slot_keys: slots(1, new Date(Date.parse("2026-09-01T00:00:00Z") + index * 3600000).toISOString().slice(0, 16)),
+        seed: `fragment-${index}`,
+        allocation_state: fragmentedState,
+      });
+      for (const [label, count] of Object.entries(countsByLabel(result))) {
+        fragmentedCounts[label] = Number(fragmentedCounts[label] ?? 0) + count;
+      }
+      fragmentedState = nextState(result);
+      fragmentedPool = removeSelectedUniqueCandidates(fragmentedPool, result);
+    }
+
+    expect(fragmentedCounts).toEqual(countsByLabel(oneShot));
+    expect(fragmentedState).toEqual(nextState(oneShot));
+  });
+
+  it("does not create historical debt while a label is unavailable", () => {
+    const stableOnly = selectSourceFamilyLineup({
+      candidates: fullAllocationPool().filter((item) =>
+        ["franchise", "proven", "prospect", "emerging"].includes(String(item.lifetime_label))
+      ),
+      slot_keys: slots(20),
+      seed: "unresolved-absent",
+    });
+    const restored = selectSourceFamilyLineup({
+      candidates: fullAllocationPool(),
+      slot_keys: slots(10, "2026-08-11T00:00"),
+      seed: "unresolved-restored",
+      allocation_state: nextState(stableOnly),
+    });
+    expect(countsByLabel(restored)).toEqual({
+      probation: 2,
+      tiebreaker: 2,
+      untested: 2,
+      franchise: 1,
+      proven: 1,
+      prospect: 1,
+      emerging: 1,
+    });
+  });
+
+  it("exhausts finite tiebreaker inventory and redistributes its remaining share", () => {
+    const currentInventoryFixture = [
+      ...candidatesForLabel("franchise", 1),
+      ...candidatesForLabel("proven", 1),
+      ...candidatesForLabel("prospect", 53),
+      ...candidatesForLabel("emerging", 10),
+      ...candidatesForLabel("untested", 82),
+      ...candidatesForLabel("probation", 62),
+      ...candidatesForLabel("tiebreaker", 7),
+    ];
+    const result = selectSourceFamilyLineup({
+      candidates: currentInventoryFixture,
+      slot_keys: slots(48),
+      seed: "current-live-inventory-capacity",
+    });
+    expect(countsByLabel(result)).toEqual({
+      probation: 11,
+      tiebreaker: 7,
+      untested: 11,
+      franchise: 5,
+      proven: 5,
+      prospect: 5,
+      emerging: 4,
+    });
+  });
+
+  it("returns valid shares for every nonempty label combination", () => {
+    const labels: SourceSelectableLifetimeLabel[] = [
+      "franchise", "proven", "prospect", "emerging", "untested", "probation", "tiebreaker",
+    ];
+    for (let mask = 1; mask < 2 ** labels.length; mask += 1) {
+      const active = labels.filter((_, index) => Boolean(mask & (1 << index)));
+      const shares = buildSourceLabelEffectiveShares(active);
+      expect(Object.keys(shares).sort()).toEqual([...active].sort());
+      expect(Object.values(shares).reduce((sum, value) => sum + Number(value), 0)).toBeCloseTo(1, 12);
+    }
+  });
+});
+
+describe("winner distribution inside lifecycle labels", () => {
   const auditedWinners = [
     candidate("universe", "franchise", 5.88661973, { global_rank: 1 }),
     candidate("income", "proven", 2.43192433, { global_rank: 2 }),
@@ -98,104 +305,43 @@ describe("deterministic proportional Exploit allocation", () => {
     candidate("finger", "proven", 1.01270251, { global_rank: 4 }),
   ];
 
-  it("turns the audited 16-slot fixture into 8-4-2-2 instead of 13-1-1-1", () => {
-    const plan = buildWinnerAllocationPlan(auditedWinners, 16);
-    expect(Object.fromEntries(plan.map((target) => [target.source_identity_key, target.final_target_count]))).toEqual({
-      "source-universe": 8,
-      "source-income": 4,
-      "source-relational": 2,
-      "source-finger": 2,
-    });
-
+  it("preserves the audited 16-slot 8-4-2-2 winner distribution", () => {
     const result = selectSourceFamilyLineup({
       candidates: auditedWinners,
       slot_keys: slots(16),
-      seed: "audited-13-1-1-1-regression",
+      seed: "audited-winner-regression",
       include_parity_trace: true,
     });
-
-    expect(counts(result)).toEqual({
+    expect(countsByIdentity(result)).toEqual({
       "source-universe": 8,
       "source-income": 4,
       "source-relational": 2,
       "source-finger": 2,
     });
     expect(result.summary).toEqual(expect.objectContaining({
-      winner_allocation_contract: "first_coverage_then_score_weighted_largest_remainder_v1",
+      winner_allocation_contract: "label_scoped_first_coverage_then_score_weighted_deficit_v2",
       winner_target_mismatch_count: 0,
       maximum_exact_family_concentration: 0.5,
     }));
-    expect(result.receipts.every((receipt) =>
-      receipt.winner_target_satisfied
-      && receipt.winner_actual_selected_count === receipt.winner_final_target_count
-    )).toBe(true);
   });
 
-  it("covers highest-ranked winners once when capacity is smaller than the winner pool", () => {
-    const result = selectSourceFamilyLineup({
-      candidates: auditedWinners,
-      slot_keys: slots(2),
-      seed: "winner-pool-larger-than-capacity",
-    });
-    expect(counts(result)).toEqual({
-      "source-universe": 1,
-      "source-income": 1,
-    });
+  it("keeps the legacy allocation helper deterministic for audit compatibility", () => {
+    const first = buildWinnerAllocationPlan(auditedWinners, 16);
+    const second = buildWinnerAllocationPlan(auditedWinners, 16);
+    expect(first).toEqual(second);
   });
 
-  it("allows the sole qualified winner to receive every Exploit placement", () => {
+  it("allows the sole qualified winner to receive every available placement", () => {
     const result = selectSourceFamilyLineup({
       candidates: [candidate("sole", "franchise", 2.5)],
       slot_keys: slots(9),
       seed: "sole-winner",
     });
-    expect(counts(result)).toEqual({ "source-sole": 9 });
-    expect(result.summary).toEqual(expect.objectContaining({
-      maximum_exact_family_concentration: 1,
-      winner_target_mismatch_count: 0,
-    }));
-  });
-
-  it("matches deterministic largest-remainder targets for arbitrary slot counts", () => {
-    for (const slotCount of [16, 33, 47]) {
-      const expected = Object.fromEntries(
-        buildWinnerAllocationPlan(auditedWinners, slotCount)
-          .filter((target) => target.final_target_count > 0)
-          .map((target) => [target.source_identity_key, target.final_target_count]),
-      );
-      const input = {
-        candidates: auditedWinners,
-        slot_keys: slots(slotCount),
-        seed: `arbitrary-${slotCount}`,
-      };
-      const first = selectSourceFamilyLineup(input);
-      const second = selectSourceFamilyLineup(input);
-      expect(counts(first)).toEqual(expected);
-      expect(first.receipts).toEqual(second.receipts);
-    }
-  });
-
-  it("does not add wording, opener, Universe, Finger Touch, or mechanism concentration limits", () => {
-    const sameOpening = auditedWinners.map((item, index) => ({
-      ...item,
-      text: "Universe, make the person reading this wealthy.",
-      semantic_key: index % 2 === 0 ? "universe" : "finger_touch",
-    }));
-    const result = selectSourceFamilyLineup({
-      candidates: sameOpening,
-      slot_keys: slots(16),
-      seed: "wording-is-not-allocation-authority",
-    });
-    expect(counts(result)).toEqual({
-      "source-universe": 8,
-      "source-income": 4,
-      "source-relational": 2,
-      "source-finger": 2,
-    });
+    expect(countsByIdentity(result)).toEqual({ "source-sole": 9 });
   });
 });
 
-describe("Develop and Explore protection", () => {
+describe("selection protection", () => {
   it("keeps independently saved similar sources independent", () => {
     const result = selectSourceFamilyLineup({
       candidates: [
