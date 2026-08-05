@@ -1537,7 +1537,8 @@ if (!source.includes('from "./operatorManifestCycleService"')
     || !source.includes("buildCycleReceiptRead: (receipt, section, offset, limit)")
     || !source.includes("readIntelligenceFoundation: (brandKey)")
     || !source.includes("readPerformanceLearning: (brandKey, includePosts)")
-    || !source.includes("readIntelligenceAudit: ({ brandKey, section, offset, limit })")
+        || !source.includes("readIntelligenceAudit: ({ brandKey, section, lifetimeLabel, offset, limit })")
+    || !source.includes("lifecycle_label: lifetimeLabel")
     || !source.includes("readContentFocus: (brandKey)")) {
   lifecycleErrors.push("operator_manifest_cycle_service_import_or_binding_missing");
 }
