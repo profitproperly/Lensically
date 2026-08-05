@@ -1333,15 +1333,11 @@ export function selectSourceFamilyLineup(input: {
       }
     }
 
-        const slotEligible = active.filter((candidate) => {
-            const identity = String(candidate.source_identity_key);
-      const familyId = String(candidate.source_card_family_id);
+                const slotEligible = active.filter((candidate) => {
+      const identity = String(candidate.source_identity_key);
       const candidateTier = allocationTierForCandidate(candidate, input.preselection_policy);
-      if (candidateTier === "winner") {
-        const target = winnerAllocationByFamily.get(familyId);
-        const planned = Math.max(0, plannedCounts.get(familyId) ?? 0);
-        if (!target || planned >= target.final_target_count) return false;
-      } else if (usedSources.has(identity)) return false;
+      if (candidateTier !== "winner" && usedSources.has(identity)) return false;
+
       if (activeReservation) {
         if (!sourcePreselectionTargetMatchesCandidate(activeReservation, candidate)) return false;
       } else if (pendingReservedCandidateKeys.has(identity)) {
