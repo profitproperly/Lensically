@@ -169,9 +169,20 @@ export type SourceSelectionReceipt = {
   preselection_policy_hash?: string;
   preselection_score_multiplier?: number;
   preselection_score_addend?: number;
-  preselection_signals?: SourcePreselectionSignal[];
+    preselection_signals?: SourcePreselectionSignal[];
   experiment_reservation_key?: string | null;
+  allocation_policy_version: typeof SOURCE_LABEL_ALLOCATION_POLICY_VERSION;
+  allocation_label: SourceSelectableLifetimeLabel;
+  allocation_available_labels: SourceSelectableLifetimeLabel[];
+  allocation_effective_shares: Partial<Record<SourceSelectableLifetimeLabel, number>>;
+  allocation_balances_before: Record<SourceSelectableLifetimeLabel, number>;
+  allocation_balances_after: Record<SourceSelectableLifetimeLabel, number>;
+  allocation_selections_total_before: number;
+  allocation_selections_total_after: number;
+  allocation_state_before_cycle: SourceLabelAllocationState;
+  allocation_state_after_cycle: SourceLabelAllocationState;
 };
+
 
 function finiteNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
