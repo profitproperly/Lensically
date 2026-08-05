@@ -11484,9 +11484,11 @@ async function prepareManifestAutonomousCycle(
       brandKey,
       cycleId,
     ),
-                                                loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys) => {
+                                                                                                loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys, cycleId) => {
       await refreshSourceFamilyLabels(env.DB, brandKey, asOf);
-      const decisionSnapshot = await buildManifestDecisionSnapshot(
+      const [decisionSnapshot, allocationState] = await Promise.all([
+        buildManifestDecisionSnapshot(
+
         createManifestShadowReadOnlyDatabase(env.DB),
         {
           brandKey,
