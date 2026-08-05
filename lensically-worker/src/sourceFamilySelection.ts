@@ -1388,14 +1388,14 @@ export function selectSourceFamilyLineup(input: {
         : Math.max(1, finiteNumber(candidate.global_rank, 1));
       const shrunkPerformance = rankingScore;
       const recentFactor = 1;
-            const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
-      const winnerTarget = winnerAllocationByFamily.get(familyId) ?? null;
+                  const plannedUses = Math.max(0, plannedCounts.get(familyId) ?? 0);
       const cycleCoverageBonus = allocationTier === "winner" && plannedUses === 0 ? 1000 : 0;
-      const winnerShareDeficit = allocationTier === "winner" && winnerTarget
-        ? winnerTarget.final_target_count
-          * ((selectedTierCounts.winner + 1) / Math.max(1, allocationTargets.winner))
+      const winnerShareDeficit = allocationTier === "winner"
+        ? ((selectedLabelCounts[allocationLabel] + 1)
+          * (winnerLabelWeightTotal > 0 ? rankingScore / winnerLabelWeightTotal : 1 / Math.max(1, available.length)))
           - plannedUses
         : 0;
+
             const developmentPriority = allocationTier === "development"
         ? developmentResolutionPriority(lifecycleLabel) * 10
         : 0;
