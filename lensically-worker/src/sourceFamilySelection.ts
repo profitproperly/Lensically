@@ -1774,13 +1774,19 @@ export async function persistLockedSourceSelectionPlan(
     SOURCE_SELECTION_ENGINE_VERSION, JSON.stringify(receipt),
   ));
   for (let index = 0; index < statements.length; index += 50) await db.batch(statements.slice(index, index + 50));
-  await persistSourceSelectionReceipts(db, {
+    await persistSourceSelectionReceipts(db, {
     brand_key: input.brand_key,
     scope_type: "cycle",
     scope_id: input.cycle_id,
     receipts: input.receipts,
   });
+  await reconcileSourceLabelAllocationState(db, {
+    brand_key: input.brand_key,
+    cycle_id: input.cycle_id,
+    receipts: input.receipts,
+  });
   return readLockedSourceSelectionPlan(db, input.brand_key, input.cycle_id);
+
 }
 
 export async function readLockedSourceSelectionPlan(
