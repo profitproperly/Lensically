@@ -52,11 +52,15 @@ describe("Operator MCP account analytics registry", () => {
       "run_comparisons",
       "saved_patterns",
       "follower_checkpoint",
-      "strategy_transitions",
+            "strategy_transitions",
       "portfolio",
+      "lifecycle_inventory",
       "experiments",
       "capability_gaps",
     ]);
+        expect(properties.lifecycle_label).toMatchObject({
+      enum: ["untested", "probation", "tiebreaker", "prospect", "emerging", "proven", "franchise", "underperforming"],
+    });
     expect(properties.limit).toMatchObject({ minimum: 1, maximum: 50, default: 20 });
     expect(audit.description).toContain("never changes content or schedule state");
   });

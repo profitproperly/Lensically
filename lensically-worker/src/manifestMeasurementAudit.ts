@@ -10,6 +10,9 @@ import {
   type ManifestSemanticSignature,
 } from "./manifestIntelligenceEngine";
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import { loadLockedSourceCardDecisionCandidates } from "./sourceFamilySelection";
+
+
 
 
 export const MANIFEST_MEASUREMENT_AUDIT_VERSION = "manifest-measurement-audit-v1";
@@ -28,8 +31,9 @@ export type ManifestAuditSection =
   | "run_comparisons"
   | "saved_patterns"
   | "follower_checkpoint"
-  | "strategy_transitions"
+    | "strategy_transitions"
   | "portfolio"
+  | "lifecycle_inventory"
   | "experiments"
   | "capability_gaps";
 
@@ -1275,7 +1279,8 @@ function auditPagination(total: number, offset: number, limit: number): JsonReco
 
 export async function buildManifestMeasurementAuditRead(db: D1Database, input: {
   brand_key: string;
-  section?: ManifestAuditSection | null;
+    section?: ManifestAuditSection | null;
+  lifecycle_label?: string | null;
   offset?: number;
   limit?: number;
 }): Promise<JsonRecord> {
@@ -1333,7 +1338,104 @@ export async function buildManifestMeasurementAuditRead(db: D1Database, input: {
       records: (rows.results ?? []).map((row) => ({ ...row, evidence: compactEvidence(row.evidence_json, 10) })),
     };
   }
+    if (section === "lifecycle_inventory") {
+    const requestedLabel = machine(input.lifecycle_label, "");
+    const candidates = await loadLockedSourceCardDecisionCandidates(db, input.brand_key, new Date().toISOString());
+    const labelOrder: Record<string, number> = {
+      franchise: 1,
+      proven: 2,
+      emerging: 3,
+      prospect: 4,
+      probation: 5,
+      tiebreaker: 6,
+      untested: 7,
+      underperforming: 8,
+    };
+    const inventory = candidates.map((candidate) => {
+      const lifetimeLabel = machine(candidate.lifetime_label, "untested");
+      const selectionLane = machine(
+        candidate.selection_lane,
+        ["franchise", "proven"].includes(lifetimeLabel)
+          ? "exploit"
+          : ["emerging", "prospect", "probation", "tiebreaker"].includes(lifetimeLabel)
+            ? "develop"
+            : "explore",
+      );
+      const uses24h = Math.max(0, number(candidate.uses_24h));
+      const futureScheduledUses = Math.max(0, number(candidate.future_scheduled_uses));
+      const baseExclusionReason = lifetimeLabel === "underperforming"
+        ? "lifetime_underperforming"
+        : selectionLane !== "exploit" && (uses24h > 0 || futureScheduledUses > 0)
+          ? "unresolved_source_pending_24h_evidence"
+          : null;
+      return {
+        source_identity_key: candidate.source_identity_key ?? null,
+        source_card_family_id: candidate.source_card_family_id ?? null,
+        source_card_id: candidate.source_card_id ?? null,
+        source_origin_type: candidate.source_origin_type ?? null,
+        source_origin_internal_id: candidate.source_origin_internal_id ?? null,
+        saved_pattern_id: candidate.saved_pattern_id ?? null,
+        lifetime_label: lifetimeLabel,
+        audition_state: candidate.audition_state ?? null,
+        audition_passes: Math.max(0, number(candidate.audition_passes)),
+        audition_failures: Math.max(0, number(candidate.audition_failures)),
+        audition_opportunities_remaining: Math.max(0, number(candidate.audition_opportunities_remaining)),
+        graduated: candidate.graduated === true,
+        confidence_label: candidate.confidence_label ?? null,
+        lifetime_sample_size: Math.max(0, number(candidate.lifetime_sample_size)),
+        unified_rating: number(candidate.unified_rating),
+        ranking_score: number(candidate.ranking_score),
+        global_rank: candidate.global_rank === null || candidate.global_rank === undefined
+          ? null
+          : Math.max(1, number(candidate.global_rank, 1)),
+        selection_lane: selectionLane,
+        base_selector_eligible: baseExclusionReason === null,
+        base_exclusion_reason: baseExclusionReason,
+        cooldown_hours: 0,
+        uses_24h: uses24h,
+        uses_7d: Math.max(0, number(candidate.uses_7d)),
+        uses_28d: Math.max(0, number(candidate.uses_28d)),
+        lifetime_published_uses: Math.max(0, number(candidate.lifetime_published_uses)),
+        historical_opportunity_count: Math.max(0, number(candidate.historical_opportunity_count)),
+        future_scheduled_uses: futureScheduledUses,
+        latest_published_at: candidate.latest_published_at ?? null,
+        next_scheduled_at: candidate.next_scheduled_at ?? null,
+        hours_since_last_use: candidate.hours_since_last_use ?? null,
+        source_mechanism: text(candidate.source_mechanism, 1000) || null,
+        required_product: text(candidate.required_product, 1000) || null,
+      };
+    }).sort((left, right) =>
+      number(labelOrder[left.lifetime_label], 99) - number(labelOrder[right.lifetime_label], 99)
+      || number(right.ranking_score) - number(left.ranking_score)
+      || String(left.source_identity_key ?? "").localeCompare(String(right.source_identity_key ?? ""))
+    );
+    const labelCounts = inventory.reduce<Record<string, number>>((counts, item) => {
+      counts[item.lifetime_label] = number(counts[item.lifetime_label]) + 1;
+      return counts;
+    }, {});
+    const filtered = requestedLabel
+      ? inventory.filter((item) => item.lifetime_label === requestedLabel)
+      : inventory;
+    return {
+      summary,
+      section,
+      filters: { lifetime_label: requestedLabel || null },
+      inventory_summary: {
+        candidate_count: inventory.length,
+        filtered_count: filtered.length,
+        label_counts: labelCounts,
+        base_selector_eligible_count: inventory.filter((item) => item.base_selector_eligible).length,
+        base_selector_excluded_count: inventory.filter((item) => !item.base_selector_eligible).length,
+        source_contract: "same_locked_source_candidate_pool_used_by_source_selection_engine",
+        cycle_specific_preselection_applied: false,
+        score_contract: "ranking_score is stable family evidence; final slot score is computed during a specific cycle selection.",
+      },
+      pagination: auditPagination(filtered.length, offset, limit),
+      records: filtered.slice(offset, offset + limit),
+    };
+  }
   if (section === "portfolio") {
+
     const totalRow = await db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_portfolio_states WHERE brand_key = ?`).bind(input.brand_key).first<JsonRecord>();
     const rows = await db.prepare(`SELECT family_key, role, recommended_role, previous_role,
         confidence_score, confidence_label, allocation_weight, actual_decay, reason, evidence_json, updated_at

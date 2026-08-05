@@ -67,7 +67,8 @@ export interface OperatorManifestCycleServiceDependencies {
   readPerformanceLearning(brandKey: string, includePosts: boolean): Promise<unknown>;
   readIntelligenceAudit(input: {
     brandKey: string;
-    section: string;
+        section: string;
+    lifetimeLabel?: string | null;
     offset: number;
     limit: number;
   }): Promise<unknown>;
@@ -359,7 +360,8 @@ export async function handleOperatorManifestCycleServiceTool(
       brand_key: brandKey,
       intelligence_audit: await dependencies.readIntelligenceAudit({
         brandKey,
-        section: requestedSection,
+                section: requestedSection,
+        lifetimeLabel: dependencies.normalizeMachineKey(payload.lifecycle_label, "") || null,
         offset: Number(payload.offset ?? 0),
         limit: Number(payload.limit ?? 20),
       }),

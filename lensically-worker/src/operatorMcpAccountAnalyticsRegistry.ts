@@ -47,15 +47,20 @@ export const OPERATOR_MCP_ACCOUNT_ANALYTICS_TOOLS: OperatorMcpToolDefinition[] =
   {
     name: "get_manifest_intelligence_audit",
     title: "Get Manifest intelligence audit",
-    description: "Read the bounded Manifest learning brief, benchmark history, run comparisons, Saved Pattern intelligence, account-level follower checkpoint, strategy transitions, portfolio state, experiments, or remaining evidence gaps. This tool never changes content or schedule state.",
+        description: "Read the bounded Manifest learning brief, benchmark history, run comparisons, Saved Pattern intelligence, account-level follower checkpoint, strategy transitions, portfolio state, full selector lifecycle-label inventory, experiments, or remaining evidence gaps. This tool never changes content or schedule state.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         audit_section: {
           type: "string",
-          enum: ["summary", "learning_brief", "benchmarks", "run_comparisons", "saved_patterns", "follower_checkpoint", "strategy_transitions", "portfolio", "experiments", "capability_gaps"],
+                    enum: ["summary", "learning_brief", "benchmarks", "run_comparisons", "saved_patterns", "follower_checkpoint", "strategy_transitions", "portfolio", "lifecycle_inventory", "experiments", "capability_gaps"],
           default: "summary",
+                },
+        lifecycle_label: {
+          type: "string",
+          enum: ["untested", "probation", "tiebreaker", "prospect", "emerging", "proven", "franchise", "underperforming"],
+          description: "Optional exact lifecycle-label filter for lifecycle_inventory reads.",
         },
         offset: { type: "integer", minimum: 0, default: 0 },
         limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },

@@ -12499,9 +12499,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         brandKey as GptBrandKey,
         includePosts,
       ),
-      readIntelligenceAudit: ({ brandKey, section, offset, limit }) => buildManifestMeasurementAuditRead(env.DB, {
+            readIntelligenceAudit: ({ brandKey, section, lifetimeLabel, offset, limit }) => buildManifestMeasurementAuditRead(env.DB, {
         brand_key: brandKey as GptBrandKey,
         section: section as ManifestAuditSection,
+        lifecycle_label: lifetimeLabel,
         offset,
         limit,
       }),
@@ -20559,7 +20560,7 @@ async function handleOperatorMcpEngineeringTool(
     }
 
     if (["read_file", "search_file", "upsert_file", "patch_file", "delete_file"].includes(operation)) {
-      const path = sanitizeRepoPath(args.path);
+            const path = sanitizeRepoPath(args.path ?? (operation === "search_file" ? args.prefix : undefined));
       if (!path) return { ok: false, error: "valid_repository_file_path_required", repository: target.full_name, branch };
       const existing = await loadFile(path);
 

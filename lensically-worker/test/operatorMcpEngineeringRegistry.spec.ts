@@ -51,7 +51,9 @@ describe("Operator MCP engineering registry", () => {
             "get_workflow_run",
           ],
         },
-        repository: { pattern: "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$" },
+                repository: { pattern: "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$" },
+        path: { description: expect.stringContaining("Exact repository-relative file path") },
+        prefix: { description: expect.stringContaining("search_file") },
         limit: { maximum: 500 },
       },
     });

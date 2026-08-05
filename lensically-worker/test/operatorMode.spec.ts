@@ -1367,7 +1367,28 @@ describe("operator mode backend spine", () => {
       pagination: { returned: 1 },
       records: [{ reuse_state: "proven", confidence: { label: "reliable_adaptation_evidence" } }],
     });
-    expect(new TextEncoder().encode(JSON.stringify(patterns.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+        expect(new TextEncoder().encode(JSON.stringify(patterns.structuredContent)).byteLength).toBeLessThanOrEqual(24000);
+
+    const lifecycle = await mcpToolRaw<{
+      intelligence_audit: {
+        section: string;
+        filters: { lifetime_label: string | null };
+        inventory_summary: { candidate_count: number; label_counts: Record<string, number> };
+        records: Array<{ lifetime_label: string; base_selector_eligible: boolean; audition_opportunities_remaining: number }>;
+      };
+    }>("get_manifest_intelligence_audit", {
+      brand_key: "manifest_mental",
+      audit_section: "lifecycle_inventory",
+      lifecycle_label: "probation",
+      offset: 0,
+      limit: 50,
+      proceed_confirmed: true,
+    });
+    expect(lifecycle.isError, JSON.stringify(lifecycle.structuredContent)).not.toBe(true);
+    expect(lifecycle.structuredContent.intelligence_audit.section).toBe("lifecycle_inventory");
+    expect(lifecycle.structuredContent.intelligence_audit.filters).toEqual({ lifetime_label: "probation" });
+    expect(lifecycle.structuredContent.intelligence_audit.inventory_summary.candidate_count).toBeGreaterThanOrEqual(0);
+    expect(lifecycle.structuredContent.intelligence_audit.records.every((record) => record.lifetime_label === "probation")).toBe(true);
 
             await env.DB.prepare(`CREATE TABLE IF NOT EXISTS external_patterns (
       id INTEGER PRIMARY KEY,
