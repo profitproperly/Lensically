@@ -1737,7 +1737,15 @@ export async function persistLockedSourceSelectionPlan(
     if (existing.length) {
     const existingSignature = existing.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
     const requestedSignature = input.receipts.map((row) => `${row.slot_key}:${row.source_card_id}`).join("|");
-    if (existingSignature === requestedSignature) return existing;
+        if (existingSignature === requestedSignature) {
+      await reconcileSourceLabelAllocationState(db, {
+        brand_key: input.brand_key,
+        cycle_id: input.cycle_id,
+        receipts: input.receipts,
+      });
+      return existing;
+    }
+
     const committedStrategy = await db.prepare(
       `SELECT COUNT(*) AS total FROM operator_manifest_cycle_strategies
        WHERE brand_key = ? AND cycle_id = ?`,
