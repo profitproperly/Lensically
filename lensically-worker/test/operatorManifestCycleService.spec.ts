@@ -284,16 +284,30 @@ describe("Operator Manifest cycle product service", () => {
       brandKey: "manifest_mental",
       payload: { audit_section: " Portfolio ", offset: "7", limit: "9" },
     }, dependencies);
-    expect(mocks.readIntelligenceAudit).toHaveBeenCalledWith({
+        expect(mocks.readIntelligenceAudit).toHaveBeenCalledWith({
       brandKey: "manifest_mental",
       section: "portfolio",
+      lifetimeLabel: null,
       offset: 7,
       limit: 9,
     });
-    expect(audit.body).toEqual({
+        expect(audit.body).toEqual({
       success: true,
       brand_key: "manifest_mental",
       intelligence_audit: { section: "portfolio", items: [] },
+    });
+
+    await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_intelligence_audit",
+      brandKey: "manifest_mental",
+      payload: { audit_section: " lifecycle inventory ", lifecycle_label: " Probation ", offset: 0, limit: 50 },
+    }, dependencies);
+    expect(mocks.readIntelligenceAudit).toHaveBeenLastCalledWith({
+      brandKey: "manifest_mental",
+      section: "lifecycle_inventory",
+      lifetimeLabel: "probation",
+      offset: 0,
+      limit: 50,
     });
 
     const contentFocus = await handleOperatorManifestCycleServiceTool({
