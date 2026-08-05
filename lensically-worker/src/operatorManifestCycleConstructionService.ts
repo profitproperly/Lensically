@@ -409,11 +409,13 @@ export async function constructOperatorManifestAutonomousCycle(
         ? "pending_horizon_reconciliation"
         : "pending";
   if (missingSlots.length > 0 && !lockedPlanMatchesCurrentHorizon) {
-        const sourceDecisionContext = await dependencies.loadLockedSourceDecisionContext(
+            const sourceDecisionContext = await dependencies.loadLockedSourceDecisionContext(
       brandKey,
       String(clock.effective_now_iso ?? ""),
       currentMissingSlotKeys,
+      cycleId,
     );
+
             preselectionPolicy = record(sourceDecisionContext.preselection_policy);
     const selectionCandidates = asRecords(sourceDecisionContext.candidates)
 
