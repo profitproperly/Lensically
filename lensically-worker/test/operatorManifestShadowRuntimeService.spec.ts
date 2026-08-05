@@ -472,19 +472,22 @@ describe("operatorManifestShadowRuntimeService", () => {
     const bundle = record(prepared.body.decision_bundle);
     const locked = rows(bundle.locked_source_lineup);
     const selectedIdentities = locked.map((item) => String(item.source_identity_key));
-        expect(locked).toHaveLength(24);
-    expect(new Set(selectedIdentities).size).toBe(24);
+            expect(locked).toHaveLength(24);
+    expect(new Set(selectedIdentities).size).toBe(22);
     expect(selectedIdentities).not.toContain(String(blockedWeak.source_identity_key));
     expect(locked.every((item) => {
       const receipt = record(item.selection_receipt);
-            return String(receipt.policy_version) === "source-selection-engine-v8"
+      return String(receipt.policy_version) === "source-selection-engine-v9"
+        && String(receipt.allocation_policy_version) === "source-label-allocation-40-60-v1"
         && Number(receipt.unified_rating) > 0
         && Number(receipt.ranking_score) > 0
         && ["exploit", "develop", "explore"].includes(String(receipt.selection_lane));
     })).toBe(true);
     const selectionSummary = record(bundle.selection_summary);
     expect(selectionSummary).toMatchObject({
-            engine_version: "source-selection-engine-v8",
+      engine_version: "source-selection-engine-v9",
+      allocation_policy_version: "source-label-allocation-40-60-v1",
+      allocation_contract: "40_percent_established_60_percent_unresolved_dynamic_equal_redistribution_v1",
       lifecycle_authority: "unified_confidence_adjusted_rating",
       recent_classification_retired: true,
       continuous_recency_weighting: true,
@@ -496,10 +499,16 @@ describe("operatorManifestShadowRuntimeService", () => {
       hard_exclusion_count: 1,
       strategy_influence_enforced: false,
     });
+    const selectedLabels = record(selectionSummary.selected_allocation_labels);
+    expect(Number(selectedLabels.untested)).toBe(15);
+    expect(Number(selectedLabels.franchise)).toBe(3);
+    expect(Number(selectedLabels.proven)).toBe(3);
+    expect(Number(selectedLabels.emerging)).toBe(3);
     const selectedTiers = record(selectionSummary.selected_allocation_tiers);
-    expect(Number(selectedTiers.exploration)).toBe(8);
-    expect(Number(selectedTiers.development)).toBe(8);
-    expect(Number(selectedTiers.winner)).toBe(8);
+    expect(Number(selectedTiers.exploration)).toBe(15);
+    expect(Number(selectedTiers.development)).toBe(3);
+    expect(Number(selectedTiers.winner)).toBe(6);
+
     expect(harness.audit.snapshot_db_calls).toBe(0);
     expect(harness.audit.source_provider_reads).toBe(1);
     expect(harness.audit.evidence_provider_reads).toBe(1);
