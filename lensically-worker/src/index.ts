@@ -11484,29 +11484,32 @@ async function prepareManifestAutonomousCycle(
       brandKey,
       cycleId,
     ),
-                                                                                                loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys, cycleId) => {
+                                                                                                    loadLockedSourceDecisionContext: async (brandKey, asOf, slotKeys, cycleId) => {
       await refreshSourceFamilyLabels(env.DB, brandKey, asOf);
       const [decisionSnapshot, allocationState] = await Promise.all([
         buildManifestDecisionSnapshot(
-
-        createManifestShadowReadOnlyDatabase(env.DB),
-        {
-          brandKey,
-          accountId: brand.account_id,
-          threadsUserId: brand.profile.threads_user_id,
-          capturedAt: asOf,
-          timezone,
-          coverageRules: {
-            mode: "main_autonomous_prepare",
-            horizon_hours: horizonHours,
+          createManifestShadowReadOnlyDatabase(env.DB),
+          {
+            brandKey,
+            accountId: brand.account_id,
+            threadsUserId: brand.profile.threads_user_id,
+            capturedAt: asOf,
+            timezone,
+            coverageRules: {
+              mode: "main_autonomous_prepare",
+              horizon_hours: horizonHours,
+            },
           },
-        },
-      );
+        ),
+        loadSourceLabelAllocationState(env.DB, brandKey, cycleId),
+      ]);
       return {
         candidates: decisionSnapshot.source_candidates as Record<string, unknown>[],
         preselection_policy: compileManifestDecisionSnapshotPreselectionPolicy(decisionSnapshot, slotKeys),
+        allocation_state: allocationState,
       };
     },
+
 
 
     loadSourceExclusions: async (brandKey) => {
