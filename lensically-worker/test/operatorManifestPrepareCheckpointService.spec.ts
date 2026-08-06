@@ -190,7 +190,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
     }));
   });
 
-  it("advances routine durable phases server-side until cycle construction", async () => {
+    it("returns before chaining transport-sensitive preparation phases", async () => {
     const { dependencies, mocks } = createHarness();
     let checkpoint: JsonRecord | null = null;
     mocks.readCheckpoint.mockImplementation(async () => checkpoint);
@@ -215,31 +215,107 @@ describe("Operator Manifest prepare checkpoint service", () => {
         processed_due_checkpoint_count: 0,
         performance_evaluation: { manifest_layers_deferred: true },
       });
-        mocks.readReadySnapshot.mockResolvedValueOnce({
+    mocks.readReadySnapshot.mockResolvedValueOnce({
       reusable: true,
       snapshot_id: "manifest-ready:manifest_mental",
       learning_brief_id: "brief-fresh",
       age_ms: 1_800_000,
     });
 
-    const result = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
+    const collection = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
       maxAdvances: 8,
       maxElapsedMs: 20_000,
       nowMs: () => 1_000,
     });
-    expect(result).toEqual({
+    expect(collection).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        stage_completed: "live_collection",
+        next_stage: "live_evaluator",
+        server_safety_continuation: true,
+        server_orchestration: expect.objectContaining({
+          version: "manifest-preparation-orchestrator-v2",
+          advances: 1,
+          continuation_count: 1,
+          safety_stop: true,
+          stop_reason: "transport_sensitive_boundary",
+          phase_path: ["live_collection->live_evaluator"],
+          phase_durations_ms: [0],
+        }),
+      }),
+    });
+
+    const evaluator = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
+      maxAdvances: 8,
+      maxElapsedMs: 20_000,
+      nowMs: () => 1_000,
+    });
+    expect(evaluator).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        stage_completed: "delta_ready_snapshot_reused",
+        next_stage: "cycle_construction",
+        server_safety_continuation: true,
+        server_orchestration: expect.objectContaining({
+          advances: 1,
+          continuation_count: 1,
+          stop_reason: "transport_sensitive_boundary",
+        }),
+      }),
+    });
+
+    const construction = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
+      maxAdvances: 8,
+      maxElapsedMs: 20_000,
+      nowMs: () => 1_000,
+    });
+    expect(construction).toEqual({
       handled: false,
       context: expect.objectContaining({
         explicitOperationId: "prepare-op-1",
         threadsSnapshot: expect.objectContaining({ refreshed: true, complete: true }),
         server_orchestration: expect.objectContaining({
-          advances: 3,
-          continuation_count: 2,
+          advances: 1,
+          continuation_count: 0,
           safety_stop: false,
-          phase_path: [
-            "live_collection->live_evaluator",
-                        "delta_ready_snapshot_reused->cycle_construction",
-          ],
+          stop_reason: "completed",
+        }),
+      }),
+    });
+  });
+
+  it("does not start another durable phase after the orchestration budget is consumed", async () => {
+    const { dependencies, mocks } = createHarness();
+    let clock = 0;
+    mocks.readCheckpoint.mockResolvedValueOnce({
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      phase: "manifest_intelligence",
+      state: { threads_snapshot: { complete: true } },
+    });
+    mocks.refreshIntelligenceEngine.mockImplementationOnce(async () => {
+      clock = 13_000;
+      return { refreshed: true };
+    });
+
+    const result = await orchestrateOperatorManifestPrepareCheckpoint(input, dependencies, {
+      maxAdvances: 8,
+      maxElapsedMs: 12_000,
+      nowMs: () => clock,
+    });
+
+    expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        stage_completed: "manifest_intelligence_semantic",
+        next_stage: "manifest_intelligence_maturity",
+        server_safety_continuation: true,
+        server_orchestration: expect.objectContaining({
+          advances: 1,
+          elapsed_ms: 13_000,
+          phase_durations_ms: [13_000],
+          stop_reason: "elapsed_budget",
         }),
       }),
     });
