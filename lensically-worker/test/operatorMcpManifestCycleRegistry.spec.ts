@@ -98,6 +98,9 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
     expect(strategy.description).toContain("complete paged backend-locked lineup");
     expect(strategy.description).toContain("without changing any source-to-slot assignment");
         expect(strategy.description).toContain("bounded evidence-page detail read");
+        expect(strategy.description).toContain("account_conclusion must include published_post_ids");
+    expect(strategy.description).toContain("Every strongest_executions and weakest_executions item");
+    expect(strategy.description).toContain("content_focus must include array fields emphasize");
     expect(strategy.description).toContain("Never include follower totals");
     expect(strategy.description).toContain("follower_context");
     expect(strategy.description).toContain("server rejects it here");
@@ -107,11 +110,20 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
         expect(strategy.inputSchema.properties).toMatchObject({
       decision_bundle_id: { type: "string" },
       decision_bundle_hash: { type: "string" },
-      account_conclusion: {
+            account_conclusion: {
         type: "object",
-        description: expect.stringContaining("Do not include follower totals"),
+        description: expect.stringContaining("Include published_post_ids"),
+        required: ["published_post_ids"],
+      },
+      content_focus: {
+        type: "object",
+        required: ["emphasize", "preserve", "reduce", "avoid_clustering", "test", "unresolved_questions"],
       },
     });
+    const strongest = (strategy.inputSchema.properties as Record<string, any>).strongest_executions;
+    const weakest = (strategy.inputSchema.properties as Record<string, any>).weakest_executions;
+    expect(strongest.items.required).toEqual(["published_post_ids", "reason"]);
+    expect(weakest.items.required).toEqual(["published_post_ids", "reason"]);
     const lineup = (strategy.inputSchema.properties as Record<string, any>).lineup;
     expect(lineup.minItems).toBe(1);
     expect(lineup.items.required).toContain("source_card_id");
