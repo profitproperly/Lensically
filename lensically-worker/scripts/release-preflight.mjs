@@ -1659,6 +1659,10 @@ if (!operatorManifestPrepareCheckpointService.includes("export async function ha
 }
 if (!operatorManifestPreparationOrchestratorService.includes("export async function orchestrateOperatorManifestPrepareCheckpoint")
     || !operatorManifestPreparationOrchestratorService.includes("handleOperatorManifestPrepareCheckpoint(input, dependencies)")
+    || !operatorManifestPreparationOrchestratorService.includes('version: "manifest-preparation-orchestrator-v2"')
+    || !operatorManifestPreparationOrchestratorService.includes("TRANSPORT_SENSITIVE_PREPARATION_PHASES")
+    || !operatorManifestPreparationOrchestratorService.includes("phase_durations_ms")
+    || !operatorManifestPreparationOrchestratorService.includes("stop_reason")
     || !operatorManifestPreparationOrchestratorService.includes("server_safety_continuation: true")
     || !operatorManifestPreparationOrchestratorService.includes("maxElapsedMs")) {
   lifecycleErrors.push("operator_manifest_preparation_orchestrator_service_module_incomplete");
@@ -1667,7 +1671,8 @@ if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission
     || !operatorManifestPrepareCheckpointServiceTests.includes("checkpoints bounded live collection before evaluator recomputation")
     || !operatorManifestPrepareCheckpointServiceTests.includes("persists bounded learning continuation offsets")
     || !operatorManifestPrepareCheckpointServiceTests.includes("reuses a fresh finalized learning snapshot when no due maturity checkpoint changed")
-    || !operatorManifestPrepareCheckpointServiceTests.includes("advances routine durable phases server-side until cycle construction")
+        || !operatorManifestPrepareCheckpointServiceTests.includes("returns before chaining transport-sensitive preparation phases")
+    || !operatorManifestPrepareCheckpointServiceTests.includes("does not start another durable phase after the orchestration budget is consumed")
     || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");
 }
