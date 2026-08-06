@@ -648,7 +648,7 @@ export async function upsertManifestLearningObservation(db: D1Database, input: {
   return { transitioned, from_state: previousLabel, to_state: input.confidence_label };
 }
 
-export async function upsertManifestSemanticSignature(db: D1Database, input: {
+export type ManifestSemanticSignatureUpsertInput = {
   brand_key: string;
   content_type: "published" | "scheduled" | "candidate";
   content_id: string;
@@ -656,12 +656,15 @@ export async function upsertManifestSemanticSignature(db: D1Database, input: {
   metadata?: JsonRecord | null;
   scheduled_post_id?: number | null;
   published_post_id?: string | null;
-    observed_at?: string | null;
-  skip_table_ensure?: boolean;
-}): Promise<ManifestSemanticSignature> {
-  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
+  observed_at?: string | null;
+};
+
+function prepareManifestSemanticSignatureUpsert(
+  db: Pick<D1Database, "prepare">,
+  input: ManifestSemanticSignatureUpsertInput,
+): { signature: ManifestSemanticSignature; statement: D1PreparedStatement } {
   const signature = buildManifestSemanticSignature({ text: input.text, metadata: input.metadata });
-  await db.prepare(`INSERT INTO operator_manifest_semantic_signatures (
+  const statement = db.prepare(`INSERT INTO operator_manifest_semantic_signatures (
     id, brand_key, content_type, content_id, scheduled_post_id, published_post_id, observed_at,
     text_hash, signature_version, signature_json
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -673,8 +676,34 @@ export async function upsertManifestSemanticSignature(db: D1Database, input: {
     crypto.randomUUID(), input.brand_key, input.content_type, input.content_id,
     input.scheduled_post_id ?? null, input.published_post_id ?? null, input.observed_at ?? null,
     signature.text_hash, MANIFEST_SEMANTIC_SIGNATURE_VERSION, stableJson(signature),
-  ).run();
-  return signature;
+  );
+  return { signature, statement };
+}
+
+export async function persistManifestSemanticSignatureBatch(
+  db: Pick<D1Database, "prepare" | "batch">,
+  inputs: ManifestSemanticSignatureUpsertInput[],
+  batchSize = MANIFEST_D1_WRITE_BATCH_SIZE,
+): Promise<{ signatures: ManifestSemanticSignature[]; statement_count: number; batch_count: number }> {
+  const prepared = inputs.map((input) => prepareManifestSemanticSignatureUpsert(db, input));
+  const receipt = await executeManifestD1WriteBatches(
+    db,
+    prepared.map((item) => item.statement),
+    batchSize,
+  );
+  return {
+    signatures: prepared.map((item) => item.signature),
+    ...receipt,
+  };
+}
+
+export async function upsertManifestSemanticSignature(db: D1Database, input: ManifestSemanticSignatureUpsertInput & {
+  skip_table_ensure?: boolean;
+}): Promise<ManifestSemanticSignature> {
+  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
+  const prepared = prepareManifestSemanticSignatureUpsert(db, input);
+  await prepared.statement.run();
+  return prepared.signature;
 }
 
 export async function analyzeManifestCandidateRepetition(db: D1Database, input: {
@@ -798,10 +827,12 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
   const runComparableAnalyses = phase === "full" || phase === "maturity_comparables" || phase === "comparable_analyses";
   const runLearning = phase === "full" || phase === "learning_observations";
   const runPortfolio = phase === "full" || phase === "portfolio_experiments";
-  let publishedRows: JsonRecord[] = [];
+    let publishedRows: JsonRecord[] = [];
   let scheduledCount = 0;
+  let semanticWriteReceipt = { statement_count: 0, batch_count: 0 };
   if (runSemantic) {
-  const published = await db.prepare(`SELECT a.post_id, a.post_text, a.post_timestamp,
+    const semanticInputs: ManifestSemanticSignatureUpsertInput[] = [];
+    const published = await db.prepare(`SELECT a.post_id, a.post_text, a.post_timestamp,
       s.id AS scheduled_post_id, t.hook_style, t.pillar, t.format, t.metadata_json,
       f.fingerprint_json, c.family_id, fam.source_identity_key,
       l.generation_mode, l.slot_time
@@ -818,25 +849,24 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       input.brand_key, input.brand_key, input.brand_key, input.brand_key, input.threads_user_id,
     ).all<JsonRecord>();
     publishedRows = published.results ?? [];
-  for (const row of publishedRows) {
-    await upsertManifestSemanticSignature(db, {
-      brand_key: input.brand_key,
-      content_type: "published",
-      content_id: String(row.post_id),
-      text: text(row.post_text, 20000),
-      metadata: {
-        hook_style: row.hook_style,
-        topic: row.pillar,
-        format: row.format,
-        ...record(parseJson(row.metadata_json, {})),
-      },
-      scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : number(row.scheduled_post_id),
-            published_post_id: String(row.post_id),
-      observed_at: text(row.post_timestamp, 100) || null,
-      skip_table_ensure: true,
-    });
-  }
-  const scheduled = await db.prepare(`SELECT s.id, s.post_text, s.scheduled_time, t.hook_style, t.pillar,
+    for (const row of publishedRows) {
+      semanticInputs.push({
+        brand_key: input.brand_key,
+        content_type: "published",
+        content_id: String(row.post_id),
+        text: text(row.post_text, 20000),
+        metadata: {
+          hook_style: row.hook_style,
+          topic: row.pillar,
+          format: row.format,
+          ...record(parseJson(row.metadata_json, {})),
+        },
+        scheduled_post_id: row.scheduled_post_id === null || row.scheduled_post_id === undefined ? null : number(row.scheduled_post_id),
+        published_post_id: String(row.post_id),
+        observed_at: text(row.post_timestamp, 100) || null,
+      });
+    }
+    const scheduled = await db.prepare(`SELECT s.id, s.post_text, s.scheduled_time, t.hook_style, t.pillar,
       t.format, t.metadata_json, l.family_key, l.generation_mode
     FROM scheduled_posts s
     LEFT JOIN gpt_post_strategy_tags t ON t.scheduled_post_id = s.id
@@ -844,25 +874,29 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     WHERE s.threads_user_id = ? AND s.status IN ('approved', 'posting') AND datetime(s.scheduled_time) >= datetime('now')
     ORDER BY datetime(s.scheduled_time) ASC LIMIT 168`).bind(input.brand_key, input.threads_user_id).all<JsonRecord>();
     scheduledCount = scheduled.results?.length ?? 0;
-  for (const row of scheduled.results ?? []) {
-    await upsertManifestSemanticSignature(db, {
-      brand_key: input.brand_key,
-      content_type: "scheduled",
-      content_id: String(row.id),
-      text: text(row.post_text, 20000),
-      metadata: {
-        hook_style: row.hook_style,
-        topic: row.pillar,
-        format: row.format,
-        family_key: row.family_key,
-        generation_mode: row.generation_mode,
-        ...record(parseJson(row.metadata_json, {})),
-      },
-            scheduled_post_id: number(row.id),
-      observed_at: text(row.scheduled_time, 100) || null,
-      skip_table_ensure: true,
-    });
-  }
+    for (const row of scheduled.results ?? []) {
+      semanticInputs.push({
+        brand_key: input.brand_key,
+        content_type: "scheduled",
+        content_id: String(row.id),
+        text: text(row.post_text, 20000),
+        metadata: {
+          hook_style: row.hook_style,
+          topic: row.pillar,
+          format: row.format,
+          family_key: row.family_key,
+          generation_mode: row.generation_mode,
+          ...record(parseJson(row.metadata_json, {})),
+        },
+        scheduled_post_id: number(row.id),
+        observed_at: text(row.scheduled_time, 100) || null,
+      });
+    }
+    const semanticBatch = await persistManifestSemanticSignatureBatch(db, semanticInputs);
+    semanticWriteReceipt = {
+      statement_count: semanticBatch.statement_count,
+      batch_count: semanticBatch.batch_count,
+    };
   }
   if (phase === "semantic_signatures") {
     return {
@@ -870,6 +904,8 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       phase,
       published_signatures: publishedRows.length,
       scheduled_signatures: scheduledCount,
+      semantic_write_statements: semanticWriteReceipt.statement_count,
+      semantic_write_batches: semanticWriteReceipt.batch_count,
       continuation_required: false,
     };
   }
