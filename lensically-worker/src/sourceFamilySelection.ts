@@ -238,6 +238,158 @@ export function isSourceCardOriginEligibleForSelection(
     || isLiveSavedPatternId(liveSavedPatternIds, savedPatternId);
 }
 
+export const SOURCE_CARD_LINEAGE_BACKFILL_VERSION = "source-card-lineage-backfill-v1";
+
+export type LockedSourceCardLineageRepairReceipt = {
+  version: typeof SOURCE_CARD_LINEAGE_BACKFILL_VERSION;
+  repaired_count: number;
+  repaired_source_card_ids: string[];
+};
+
+export async function repairLockedSourceCardSelectionLineage(
+  db: D1Database,
+  brandKey: string,
+): Promise<LockedSourceCardLineageRepairReceipt> {
+  const rows = await db.prepare(
+    `SELECT
+       card.id AS source_card_id,
+       card.created_at AS source_card_created_at,
+       card.primary_source_json,
+       card.metrics_snapshot_json,
+       card.source_mechanism,
+       card.required_product,
+       fam.source_identity_key,
+       COALESCE(fam.source_type, 'source_card') AS source_type,
+       COALESCE(fam.internal_source_id, card.id) AS internal_source_id,
+       fam.threads_post_id,
+       fam.canonical_source_url
+     FROM operator_source_card_families fam
+     JOIN operator_source_cards card
+       ON card.id = fam.current_source_card_id
+      AND card.brand_key = fam.brand_key
+      AND card.is_current = 1
+     WHERE fam.brand_key = ?
+       AND fam.status = 'active'
+       AND card.status = 'locked'
+       AND (card.source_selection_id IS NULL OR trim(card.source_selection_id) = '')`,
+  ).bind(brandKey).all<Record<string, unknown>>();
+
+  const repairedSourceCardIds: string[] = [];
+  const statements: D1PreparedStatement[] = [];
+  for (const row of rows.results ?? []) {
+    const sourceCardId = String(row.source_card_id ?? "").trim();
+    const sourceIdentityKey = String(row.source_identity_key ?? "").trim();
+    if (!sourceCardId || !sourceIdentityKey) continue;
+    const batchId = `source-card-lineage-batch:${sourceCardId}`;
+    const selectionId = `source-card-lineage-selection:${sourceCardId}`;
+    const workflowSessionId = `source-card-lineage:${sourceCardId}`;
+    const primarySource = parseJsonRecord(row.primary_source_json);
+    const metricsSnapshot = parseJsonRecord(row.metrics_snapshot_json);
+    const selectedAt = String(row.source_card_created_at ?? "").trim() || new Date().toISOString();
+    const postText = String(
+      primarySource.post_text
+      ?? primarySource.text
+      ?? primarySource.strategic_purpose
+      ?? row.required_product
+      ?? row.source_mechanism
+      ?? "",
+    ).trim();
+    const originalPostedAt = String(
+      primarySource.posted_at ?? primarySource.original_posted_at ?? "",
+    ).trim() || null;
+    const sourceSnapshot = {
+      ...primarySource,
+      source_card_id: sourceCardId,
+      source_identity_key: sourceIdentityKey,
+      lineage_backfill: {
+        version: SOURCE_CARD_LINEAGE_BACKFILL_VERSION,
+        reason: "legacy_locked_source_card_missing_source_selection",
+      },
+    };
+    statements.push(
+      db.prepare(
+        `INSERT OR IGNORE INTO operator_source_selection_batches (
+          id, brand_key, workflow_session_id, selection_method, eligibility_min_likes,
+          qualified_pool_count, requested_count, selected_count, selected_at, metadata_json,
+          production_date, status
+        ) VALUES (?, ?, ?, 'legacy_locked_source_card_lineage_backfill', 0, 1, 1, 1, ?, ?, NULL, 'completed')`,
+      ).bind(
+        batchId,
+        brandKey,
+        workflowSessionId,
+        selectedAt,
+        JSON.stringify({
+          version: SOURCE_CARD_LINEAGE_BACKFILL_VERSION,
+          source_card_id: sourceCardId,
+          source_identity_key: sourceIdentityKey,
+        }),
+      ),
+      db.prepare(
+        `INSERT OR IGNORE INTO operator_source_selections (
+          id, batch_id, brand_key, workflow_session_id, draw_order, source_identity_key,
+          source_type, internal_source_id, threads_post_id, canonical_source_url,
+          post_text, original_posted_at, metrics_snapshot_json, source_snapshot_json, selected_at
+        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        selectionId,
+        batchId,
+        brandKey,
+        workflowSessionId,
+        sourceIdentityKey,
+        String(row.source_type ?? "source_card"),
+        String(row.internal_source_id ?? sourceCardId),
+        row.threads_post_id ?? null,
+        row.canonical_source_url ?? null,
+        postText,
+        originalPostedAt,
+        JSON.stringify(metricsSnapshot),
+        JSON.stringify(sourceSnapshot),
+        selectedAt,
+      ),
+      db.prepare(
+        `UPDATE operator_source_selections
+         SET source_card_id = ?,
+             disposition = 'linked',
+             disposition_reason = 'legacy_locked_source_card_lineage_backfill',
+             disposition_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND brand_key = ?`,
+      ).bind(sourceCardId, selectionId, brandKey),
+      db.prepare(
+        `UPDATE operator_source_cards
+         SET source_selection_id = ?
+         WHERE id = ? AND brand_key = ?
+           AND (source_selection_id IS NULL OR trim(source_selection_id) = '')`,
+      ).bind(selectionId, sourceCardId, brandKey),
+    );
+    repairedSourceCardIds.push(sourceCardId);
+  }
+  for (let index = 0; index < statements.length; index += 50) {
+    await db.batch(statements.slice(index, index + 50));
+  }
+
+  const unresolved = await db.prepare(
+    `SELECT COUNT(*) AS total
+     FROM operator_source_card_families fam
+     JOIN operator_source_cards card
+       ON card.id = fam.current_source_card_id
+      AND card.brand_key = fam.brand_key
+      AND card.is_current = 1
+     WHERE fam.brand_key = ?
+       AND fam.status = 'active'
+       AND card.status = 'locked'
+       AND (card.source_selection_id IS NULL OR trim(card.source_selection_id) = '')`,
+  ).bind(brandKey).first<{ total: number }>();
+  if (Number(unresolved?.total ?? 0) > 0) {
+    throw new Error("locked_source_card_lineage_backfill_incomplete");
+  }
+  return {
+    version: SOURCE_CARD_LINEAGE_BACKFILL_VERSION,
+    repaired_count: repairedSourceCardIds.length,
+    repaired_source_card_ids: repairedSourceCardIds,
+  };
+}
+
+
 
 export function extractOwnerBannedSavedPatternIds(value: unknown): Set<string> {
   const ids = new Set<string>();
@@ -992,10 +1144,12 @@ export async function loadLockedSourceCardDecisionCandidates(
   nowIso = new Date().toISOString(),
 ): Promise<SourceSelectionCandidate[]> {
   await ensureSourceFamilySelectionTables(db);
+  await repairLockedSourceCardSelectionLineage(db, brandKey);
   const rows = await db.prepare(
 
                       `SELECT fam.id AS source_card_family_id, fam.source_identity_key,
-              card.id AS source_card_id, card.source_mechanism, card.required_product,
+              card.id AS source_card_id, card.source_selection_id, card.source_mechanism, card.required_product,
+
               card.metrics_snapshot_json, card.primary_source_json, card.recommended_direction,
               COALESCE(sel.source_type, fam.source_type, 'source_card') AS source_origin_type,
               COALESCE(sel.internal_source_id, fam.internal_source_id, card.id) AS source_origin_internal_id,
@@ -1059,8 +1213,10 @@ export async function loadLockedSourceCardDecisionCandidates(
       source_candidate_id: `source_card:${String(row.source_card_id ?? "")}`,
       source_identity_key: String(row.source_identity_key ?? ""),
       source_card_family_id: String(row.source_card_family_id ?? ""),
-      source_card_id: String(row.source_card_id ?? ""),
+            source_card_id: String(row.source_card_id ?? ""),
+      source_selection_id: String(row.source_selection_id ?? "") || null,
             source_type: "source_card",
+
       internal_source_id: String(row.source_card_id ?? ""),
             saved_pattern_id: row.saved_pattern_id === null || row.saved_pattern_id === undefined
         ? null

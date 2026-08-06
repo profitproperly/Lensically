@@ -1,4 +1,6 @@
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
+import { repairLockedSourceCardSelectionLineage } from "./sourceFamilySelection";
+
 
 export const MANIFEST_INTELLIGENCE_FOUNDATION_VERSION = "manifest-intelligence-foundation-v3";
 export const MANIFEST_CYCLE_RECEIPT_VERSION = "manifest-cycle-receipt-v3";
@@ -1292,10 +1294,12 @@ export async function commitManifestCycleStrategy(db: D1Database, input: {
   const requiredKeys = new Set(missingSlots.map((slot) => text(slot.key, 40)).filter(Boolean));
   const receivedKeys = new Set<string>();
   const allowedModes = new Set(["franchise_deployment", "controlled_variation", "mechanism_expansion", "adjacent_experiment"]);
-  const sourceCardIds = Array.from(new Set(input.lineup
+    const sourceCardIds = Array.from(new Set(input.lineup
     .map((item) => text(item.source_card_id, 160))
     .filter(Boolean)));
+  await repairLockedSourceCardSelectionLineage(db, input.brandKey);
   const sourceCardRows = sourceCardIds.length
+
     ? await db.prepare(`SELECT id, status, source_selection_id FROM operator_source_cards
         WHERE brand_key = ? AND id IN (SELECT value FROM json_each(?))`)
       .bind(input.brandKey, stableManifestJson(sourceCardIds)).all<JsonRecord>()

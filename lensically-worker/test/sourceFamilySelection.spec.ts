@@ -7,8 +7,10 @@ import {
   classifySourceFamilyLifetime,
   extractOwnerBannedSavedPatternIds,
   isSourceCardOriginEligibleForSelection,
-  normalizeSourceLabelAllocationState,
+    normalizeSourceLabelAllocationState,
+  repairLockedSourceCardSelectionLineage,
   runSourceFamilySelectionEdgeCases,
+
   selectSourceFamilyLineup,
   type SourceFamilyLifetimeLabel,
   type SourceLabelAllocationState,
@@ -123,14 +125,69 @@ describe("source-selection engine v9", () => {
     }));
   });
 
-  it("treats source-card validity as independent from origin", () => {
+    it("treats source-card validity as independent from origin", () => {
     const liveSavedPatterns = new Set(["128"]);
     expect(isSourceCardOriginEligibleForSelection("saved_pattern", "128", liveSavedPatterns)).toBe(true);
     expect(isSourceCardOriginEligibleForSelection("saved_pattern", "999", liveSavedPatterns)).toBe(false);
     expect(isSourceCardOriginEligibleForSelection("operator_hypothesis", null, liveSavedPatterns)).toBe(true);
     expect(isSourceCardOriginEligibleForSelection("owner_source_card", null, liveSavedPatterns)).toBe(true);
   });
+
+  it("backfills durable selection lineage for a legacy locked source card", async () => {
+    const batched: Array<{ sql: string; bindings: unknown[] }> = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...bindings: unknown[]) => ({
+          sql,
+          bindings,
+          all: async () => sql.includes("SELECT\n       card.id AS source_card_id")
+            ? {
+                results: [{
+                  source_card_id: "card-legacy",
+                  source_card_created_at: "2026-07-01T00:00:00.000Z",
+                  primary_source_json: JSON.stringify({
+                    source_type: "operator_hypothesis",
+                    strategic_purpose: "A direct-reader blessing.",
+                  }),
+                  metrics_snapshot_json: "{}",
+                  source_mechanism: "Direct-reader blessing",
+                  required_product: "A source-backed blessing",
+                  source_identity_key: "operator_hypothesis:legacy",
+                  source_type: "operator_hypothesis",
+                  internal_source_id: "legacy",
+                  threads_post_id: null,
+                  canonical_source_url: null,
+                }],
+              }
+            : { results: [] },
+          first: async () => ({ total: 0 }),
+          run: async () => ({}),
+        }),
+      }),
+      batch: async (statements: Array<{ sql: string; bindings: unknown[] }>) => {
+        batched.push(...statements);
+        return [];
+      },
+    } as unknown as D1Database;
+
+    const receipt = await repairLockedSourceCardSelectionLineage(db, "manifest_mental");
+
+    expect(receipt).toEqual({
+      version: "source-card-lineage-backfill-v1",
+      repaired_count: 1,
+      repaired_source_card_ids: ["card-legacy"],
+    });
+    expect(batched.some((statement) =>
+      statement.sql.includes("INSERT OR IGNORE INTO operator_source_selections")
+      && statement.bindings[0] === "source-card-lineage-selection:card-legacy"
+    )).toBe(true);
+    expect(batched.some((statement) =>
+      statement.sql.includes("UPDATE operator_source_cards")
+      && statement.bindings[0] === "source-card-lineage-selection:card-legacy"
+    )).toBe(true);
+  });
 });
+
 
 describe("40/60 lifecycle-label allocation", () => {
   it("allocates 40% equally to established labels and 60% equally to unresolved labels", () => {
