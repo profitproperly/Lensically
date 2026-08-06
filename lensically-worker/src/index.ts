@@ -17439,7 +17439,7 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
     "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
       "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
     "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
-  "workflow_dispatch_temporarily_unavailable",
+    "workflow_dispatch_temporarily_unavailable", "repository_file_search_requires_exact_file",
 ]);
 export function isExpectedHardeningControlResult(
   toolName: string,
@@ -20580,11 +20580,15 @@ async function handleOperatorMcpEngineeringTool(
         return { ok: true, repository: target.full_name, branch, path, sha: existing.sha, size: existing.size, start_line: startLine, returned_lines: selected.length, total_lines: lines.length, content: selected.join("\n"), truncated: startLine - 1 + maxLines < lines.length };
       }
 
-      if (operation === "search_file") {
+            if (operation === "search_file") {
         const query = normalizeOperatorText(args.query, 500);
         const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
         if (!query) return { ok: false, error: "repository_file_search_query_required", repository: target.full_name, branch, path };
-        if (!existing.ok || existing.content === null) return { ok: false, error: "github_repository_file_read_failed", status: existing.status, repository: target.full_name, branch, path };
+        if (!existing.ok || existing.content === null) {
+          return existing.status === 200
+            ? { ok: false, error: "repository_file_search_requires_exact_file", status: existing.status, repository: target.full_name, branch, path }
+            : { ok: false, error: "github_repository_file_read_failed", status: existing.status, repository: target.full_name, branch, path };
+        }
         const search = searchKnownRepositoryFileContent(existing.content, query, limit);
         return { ok: true, repository: target.full_name, branch, path, query, ...search, returned_count: search.matches.length, verified_complete_for_known_file: true };
       }

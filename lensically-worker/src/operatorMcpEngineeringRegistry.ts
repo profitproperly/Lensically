@@ -375,7 +375,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
         repository: { type: "string", minLength: 1, maxLength: 220, pattern: "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$" },
         branch: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._/-]+$" },
                 path: { ...REPO_PATH_SCHEMA, description: "Exact repository-relative file path for read, search, upsert, patch, or delete operations." },
-        prefix: { type: "string", maxLength: 500, description: "Directory prefix for list_files. For search_file, an exact file path is also accepted when path is omitted." },
+                prefix: { type: "string", maxLength: 500, description: "Directory prefix for list_files only. For search_file, omit prefix and pass the exact repository file path in path; directory-wide search is not supported." },
         query: { type: "string", maxLength: 500 },
         content: { type: "string", maxLength: 100000 },
         find: { type: "string", maxLength: 100000 },

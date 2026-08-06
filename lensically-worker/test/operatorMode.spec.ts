@@ -5044,11 +5044,16 @@ active_checkpoint: none
       "unexpected_result",
       { ok: false, status: 409, failure: { phase: "head_changed" } },
     )).toBe(true);
-    expect(isExpectedHardeningControlResult(
+        expect(isExpectedHardeningControlResult(
       "applyRepoPatchSet",
       "unexpected_result",
       { ok: false, status: 500, failure: { phase: "commit_failed" } },
     )).toBe(false);
+    expect(isExpectedHardeningControlResult(
+      "operateGitHubRepositories",
+      "repository_file_search_requires_exact_file",
+      { ok: false, status: 200 },
+    )).toBe(true);
   });
 
   it.skip("retired: bloated internal registry contract", async () => {
