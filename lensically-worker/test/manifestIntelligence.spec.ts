@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { validateManifestFollowerAttributionBoundary } from "../src/manifestIntelligence";
+import {
+  buildManifestEvidencePages,
+  MANIFEST_EVIDENCE_FRAGMENT_CONTRACT_VERSION,
+  validateManifestFollowerAttributionBoundary,
+} from "../src/manifestIntelligence";
+
 import { executeManifestD1WriteBatches } from "../src/manifestIntelligenceEngine";
 
 describe("Manifest follower attribution boundary", () => {
@@ -15,6 +20,38 @@ describe("Manifest follower attribution boundary", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.join(" ")).toContain("follower_attribution_forbidden");
+  });
+});
+
+describe("Manifest evidence paging", () => {
+  it("losslessly fragments one oversized evidence item within the byte ceiling", () => {
+    const oversizedOwnerNote = "🧠".repeat(7000);
+    const pages = buildManifestEvidencePages({
+      summary: {},
+      posts: [{
+        published_post_id: "post-1",
+        lineage: { owner_note: oversizedOwnerNote },
+      }],
+      benchmarks: {},
+      recentExposure: {},
+      futureSchedule: [],
+      hardBans: [],
+      experiments: [],
+      maxItems: 12,
+      maxBytes: 4000,
+    });
+    expect(pages.every((page) => Number(page.byte_count) <= 4000)).toBe(true);
+    const items = pages.flatMap((page) => Array.isArray(page.items)
+      ? page.items as Record<string, unknown>[]
+      : []);
+    const fragments = items
+      .filter((item) => item.evidence_type === "published_post"
+        && item.fragment_contract_version === MANIFEST_EVIDENCE_FRAGMENT_CONTRACT_VERSION
+        && JSON.stringify(item.fragment_path) === JSON.stringify(["lineage", "owner_note"]))
+      .sort((left, right) => Number(left.fragment_index) - Number(right.fragment_index));
+    expect(fragments.length).toBeGreaterThan(1);
+    expect(fragments.every((item) => Number(item.fragment_count) === fragments.length)).toBe(true);
+    expect(fragments.map((item) => String(item.data ?? "")).join("")).toBe(oversizedOwnerNote);
   });
 });
 

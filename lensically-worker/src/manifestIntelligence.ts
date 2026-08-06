@@ -7,6 +7,7 @@ export const MANIFEST_CYCLE_STRATEGY_CONTRACT = "manifest-cycle-strategy-v1";
 export const MANIFEST_EXPOSURE_LEDGER_VERSION = "manifest-exposure-ledger-v3";
 export const MANIFEST_EVIDENCE_SNAPSHOT_VERSION = "manifest-evidence-snapshot-v2";
 export const MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION = "manifest-evidence-page-v1";
+export const MANIFEST_EVIDENCE_FRAGMENT_CONTRACT_VERSION = "manifest-evidence-fragment-v1";
 export const MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION = "manifest-candidate-gate-receipt-v1";
 export const MANIFEST_POST_HYPOTHESIS_VERSION = "manifest-post-hypothesis-v3";
 export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v3";
@@ -702,6 +703,84 @@ function manifestEvidenceCollectionItems(evidenceType: string, value: unknown): 
   return [{ evidence_type: evidenceType, data: value }];
 }
 
+function manifestEvidenceSingleItemBytes(item: JsonRecord): number {
+  return manifestEvidenceJsonBytes({
+    page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION,
+    items: [item],
+  });
+}
+
+function splitManifestEvidenceStringItem(
+  base: JsonRecord,
+  value: string,
+  maxBytes: number,
+): JsonRecord[] {
+  const codePoints = Array.from(value);
+  const chunks: string[] = [];
+  let cursor = 0;
+  while (cursor < codePoints.length) {
+    let low = 1;
+    let high = codePoints.length - cursor;
+    let accepted = 0;
+    while (low <= high) {
+      const midpoint = Math.floor((low + high) / 2);
+      const candidate = {
+        ...base,
+        fragment_index: 999999,
+        fragment_count: 999999,
+        data: codePoints.slice(cursor, cursor + midpoint).join(""),
+      };
+      if (manifestEvidenceSingleItemBytes(candidate) <= maxBytes) {
+        accepted = midpoint;
+        low = midpoint + 1;
+      } else {
+        high = midpoint - 1;
+      }
+    }
+    if (accepted < 1) throw new Error("manifest_evidence_fragment_metadata_exceeds_page_budget");
+    chunks.push(codePoints.slice(cursor, cursor + accepted).join(""));
+    cursor += accepted;
+  }
+  return chunks.map((data, fragmentIndex) => ({
+    ...base,
+    fragment_index: fragmentIndex,
+    fragment_count: chunks.length,
+    data,
+  }));
+}
+
+function splitManifestEvidenceItem(
+  item: JsonRecord,
+  maxBytes: number,
+  fragmentPath: Array<string | number> = [],
+): JsonRecord[] {
+  if (manifestEvidenceSingleItemBytes(item) <= maxBytes) return [item];
+  const { data, fragment_path: _fragmentPath, ...identity } = item;
+  const base: JsonRecord = {
+    ...identity,
+    fragment_contract_version: MANIFEST_EVIDENCE_FRAGMENT_CONTRACT_VERSION,
+    fragment_path: fragmentPath,
+  };
+  if (Array.isArray(data)) {
+    return data.flatMap((child, index) => splitManifestEvidenceItem(
+      { ...base, data: child },
+      maxBytes,
+      [...fragmentPath, index],
+    ));
+  }
+  if (data && typeof data === "object") {
+    return Object.entries(data as JsonRecord).flatMap(([key, child]) => splitManifestEvidenceItem(
+      { ...base, data: child },
+      maxBytes,
+      [...fragmentPath, key],
+    ));
+  }
+  if (typeof data === "string") {
+    return splitManifestEvidenceStringItem(base, data, maxBytes);
+  }
+  throw new Error("manifest_evidence_fragment_metadata_exceeds_page_budget");
+}
+
 export function buildManifestEvidencePages(input: {
   summary: JsonRecord;
   posts: JsonRecord[];
@@ -716,7 +795,7 @@ export function buildManifestEvidencePages(input: {
 }): JsonRecord[] {
   const maxItems = Math.max(1, Math.min(25, Math.trunc(input.maxItems ?? MANIFEST_EVIDENCE_PAGE_SIZE)));
   const maxBytes = Math.max(4000, Math.min(18000, Math.trunc(input.maxBytes ?? MANIFEST_EVIDENCE_PAGE_MAX_BYTES)));
-  const items: JsonRecord[] = [
+  const rawItems: JsonRecord[] = [
     { evidence_type: "snapshot_summary", data: input.summary },
     { evidence_type: "likes_first_benchmarks", data: input.benchmarks },
     { evidence_type: "previous_likes_first_benchmarks", data: input.previousBenchmarks ?? {} },
@@ -726,6 +805,7 @@ export function buildManifestEvidencePages(input: {
     ...manifestEvidenceCollectionItems("experiment", input.experiments),
     ...input.posts.map((post, index) => ({ evidence_type: "published_post", item_index: index, data: post })),
   ];
+  const items = rawItems.flatMap((item) => splitManifestEvidenceItem(item, maxBytes));
   const pages: JsonRecord[] = [];
   let current: JsonRecord[] = [];
   const flush = (): void => {
@@ -742,8 +822,9 @@ export function buildManifestEvidencePages(input: {
     current = [];
   };
   for (const item of items) {
-    const singleBytes = manifestEvidenceJsonBytes({ page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, items: [item] });
-    if (singleBytes > maxBytes) throw new Error("manifest_evidence_item_exceeds_page_budget");
+    if (manifestEvidenceSingleItemBytes(item) > maxBytes) {
+      throw new Error("manifest_evidence_fragment_exceeds_page_budget");
+    }
     const candidate = [...current, item];
     const candidateBytes = manifestEvidenceJsonBytes({ page_contract_version: MANIFEST_EVIDENCE_PAGE_CONTRACT_VERSION, items: candidate });
     if (current.length && (candidate.length > maxItems || candidateBytes > maxBytes)) flush();
