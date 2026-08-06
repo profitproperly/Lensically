@@ -14,12 +14,31 @@ describe("Manifest follower attribution boundary", () => {
     })).toEqual({ ok: true });
   });
 
+    it("allows explicit uncertainty and prohibition statements about attribution", () => {
+    expect(validateManifestFollowerAttributionBoundary({
+      account_conclusion: {
+        uncertainty: "The evidence does not justify post-level follower attribution.",
+      },
+      directives: {
+        prohibit: ["Post-level follower attribution"],
+      },
+    })).toEqual({ ok: true });
+  });
+
   it("continues to reject positive scoped follower attribution claims", () => {
-    const result = validateManifestFollowerAttributionBoundary({
+    const directResult = validateManifestFollowerAttributionBoundary({
       conclusion: "This post generated 25 followers.",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.join(" ")).toContain("follower_attribution_forbidden");
+    expect(directResult.ok).toBe(false);
+    if (!directResult.ok) expect(directResult.errors.join(" ")).toContain("follower_attribution_forbidden");
+
+    const policyPathResult = validateManifestFollowerAttributionBoundary({
+      directives: {
+        prohibit: ["This post generated 25 followers."],
+      },
+    });
+    expect(policyPathResult.ok).toBe(false);
+    if (!policyPathResult.ok) expect(policyPathResult.errors.join(" ")).toContain("follower_attribution_forbidden");
   });
 });
 
