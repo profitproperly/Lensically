@@ -1653,14 +1653,16 @@ if (!operatorManifestPrepareCheckpointService.includes("export async function ha
     || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshIntelligenceEngine")
     || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshMeasurementAudit")
     || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshContentFocus")
-    || !operatorManifestPrepareCheckpointService.includes('phase: "learning_observations"')
+        || !operatorManifestPrepareCheckpointService.includes('phase: "learning_observations"')
+    || !operatorManifestPrepareCheckpointService.includes('learning_limit: 60')
     || !operatorManifestPrepareCheckpointService.includes('phase: "cycle_construction"')) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_module_incomplete");
 }
 if (!operatorManifestPreparationOrchestratorService.includes("export async function orchestrateOperatorManifestPrepareCheckpoint")
     || !operatorManifestPreparationOrchestratorService.includes("handleOperatorManifestPrepareCheckpoint(input, dependencies)")
-    || !operatorManifestPreparationOrchestratorService.includes('version: "manifest-preparation-orchestrator-v2"')
-    || !operatorManifestPreparationOrchestratorService.includes("TRANSPORT_SENSITIVE_PREPARATION_PHASES")
+        || !operatorManifestPreparationOrchestratorService.includes('version: "manifest-preparation-orchestrator-v3"')
+    || !operatorManifestPreparationOrchestratorService.includes('const maxAdvances = 1')
+    || !operatorManifestPreparationOrchestratorService.includes('"durable_phase_boundary"')
     || !operatorManifestPreparationOrchestratorService.includes("phase_durations_ms")
     || !operatorManifestPreparationOrchestratorService.includes("stop_reason")
     || !operatorManifestPreparationOrchestratorService.includes("server_safety_continuation: true")
@@ -1671,7 +1673,7 @@ if (!operatorManifestPrepareCheckpointServiceTests.includes("preserves admission
     || !operatorManifestPrepareCheckpointServiceTests.includes("checkpoints bounded live collection before evaluator recomputation")
     || !operatorManifestPrepareCheckpointServiceTests.includes("persists bounded learning continuation offsets")
     || !operatorManifestPrepareCheckpointServiceTests.includes("reuses a fresh finalized learning snapshot when no due maturity checkpoint changed")
-        || !operatorManifestPrepareCheckpointServiceTests.includes("returns before chaining transport-sensitive preparation phases")
+            || !operatorManifestPrepareCheckpointServiceTests.includes("returns after every durable preparation phase without chaining")
     || !operatorManifestPrepareCheckpointServiceTests.includes("does not start another durable phase after the orchestration budget is consumed")
     || !operatorManifestPrepareCheckpointServiceTests.includes("finalizes Content Focus and returns cycle-construction context")) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_tests_incomplete");

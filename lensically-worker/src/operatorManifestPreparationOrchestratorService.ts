@@ -7,14 +7,14 @@ import {
 type JsonRecord = Record<string, unknown>;
 
 export type OperatorManifestPreparationOrchestration = {
-  version: "manifest-preparation-orchestrator-v2";
+  version: "manifest-preparation-orchestrator-v3";
   advances: number;
   elapsed_ms: number;
   phase_path: string[];
   phase_durations_ms: number[];
   safety_stop: boolean;
   continuation_count: number;
-  stop_reason: "completed" | "non_routine_response" | "transport_sensitive_boundary" | "elapsed_budget" | "advance_limit";
+  stop_reason: "completed" | "non_routine_response" | "durable_phase_boundary" | "elapsed_budget";
 };
 
 export type OperatorManifestPreparationOrchestratorResult =
@@ -43,11 +43,7 @@ function record(value: unknown): JsonRecord {
     : {};
 }
 
-const TRANSPORT_SENSITIVE_PREPARATION_PHASES = new Set([
-  "live_collection",
-  "live_evaluator",
-  "delta_ready_snapshot_reused",
-]);
+
 
 function orchestrationReceipt(input: {
   advances: number;
@@ -60,7 +56,7 @@ function orchestrationReceipt(input: {
   stopReason: OperatorManifestPreparationOrchestration["stop_reason"];
 }): OperatorManifestPreparationOrchestration {
   return {
-    version: "manifest-preparation-orchestrator-v2",
+        version: "manifest-preparation-orchestrator-v3",
     advances: input.advances,
     elapsed_ms: Math.max(0, input.nowMs() - input.startedAtMs),
     phase_path: input.phasePath,
@@ -86,7 +82,7 @@ export async function orchestrateOperatorManifestPrepareCheckpoint(
   dependencies: OperatorManifestPrepareCheckpointDependencies,
   options: OperatorManifestPreparationOrchestratorOptions = {},
 ): Promise<OperatorManifestPreparationOrchestratorResult> {
-    const maxAdvances = Math.min(16, Math.max(1, Math.trunc(options.maxAdvances ?? 8)));
+      const maxAdvances = 1;
   const maxElapsedMs = Math.min(15_000, Math.max(1_000, Math.trunc(options.maxElapsedMs ?? 12_000)));
   const nowMs = options.nowMs ?? (() => Date.now());
   const startedAtMs = nowMs();
@@ -151,35 +147,28 @@ export async function orchestrateOperatorManifestPrepareCheckpoint(
 
     continuationCount += 1;
     const elapsedMs = nowMs() - startedAtMs;
-    const stopReason = TRANSPORT_SENSITIVE_PREPARATION_PHASES.has(completed)
-      || TRANSPORT_SENSITIVE_PREPARATION_PHASES.has(nextStage)
-      ? "transport_sensitive_boundary"
-      : elapsedMs >= maxElapsedMs
-        ? "elapsed_budget"
-        : advances >= maxAdvances
-          ? "advance_limit"
-          : null;
-    if (stopReason) {
-      return {
-        handled: true,
-        response: {
-          ...response,
-          continuation_required: true,
-          server_safety_continuation: true,
-          next_action: "Call prepare_manifest_autonomous_cycle once more with the identical operation_id, timezone, and horizon_hours. The completed phase is durably checkpointed and the response returned before another transport-sensitive or over-budget phase could begin.",
-          server_orchestration: orchestrationReceipt({
-            advances,
-            startedAtMs,
-            nowMs,
-            phasePath,
-            phaseDurationsMs,
-            safetyStop: true,
-            continuationCount,
-            stopReason,
-          }),
-        },
-      };
-    }
+        const stopReason: OperatorManifestPreparationOrchestration["stop_reason"] = elapsedMs >= maxElapsedMs
+      ? "elapsed_budget"
+      : "durable_phase_boundary";
+    return {
+      handled: true,
+      response: {
+        ...response,
+        continuation_required: true,
+        server_safety_continuation: true,
+        next_action: "Call prepare_manifest_autonomous_cycle once more with the identical operation_id, timezone, and horizon_hours. Exactly one durable phase completed and checkpointed; the server returned before starting any additional phase.",
+        server_orchestration: orchestrationReceipt({
+          advances,
+          startedAtMs,
+          nowMs,
+          phasePath,
+          phaseDurationsMs,
+          safetyStop: true,
+          continuationCount,
+          stopReason,
+        }),
+      },
+    };
   }
 
   throw new Error("manifest_preparation_orchestrator_unreachable");

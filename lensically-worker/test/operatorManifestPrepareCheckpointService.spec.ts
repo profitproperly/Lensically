@@ -131,7 +131,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
     expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
       phase: "learning_observations",
       learning_offset: 180,
-      learning_limit: 180,
+            learning_limit: 60,
     });
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
       phase: "manifest_intelligence_learning",
@@ -190,7 +190,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
     }));
   });
 
-    it("returns before chaining transport-sensitive preparation phases", async () => {
+      it("returns after every durable preparation phase without chaining", async () => {
     const { dependencies, mocks } = createHarness();
     let checkpoint: JsonRecord | null = null;
     mocks.readCheckpoint.mockImplementation(async () => checkpoint);
@@ -234,11 +234,11 @@ describe("Operator Manifest prepare checkpoint service", () => {
         next_stage: "live_evaluator",
         server_safety_continuation: true,
         server_orchestration: expect.objectContaining({
-          version: "manifest-preparation-orchestrator-v2",
+                    version: "manifest-preparation-orchestrator-v3",
           advances: 1,
           continuation_count: 1,
           safety_stop: true,
-          stop_reason: "transport_sensitive_boundary",
+          stop_reason: "durable_phase_boundary",
           phase_path: ["live_collection->live_evaluator"],
           phase_durations_ms: [0],
         }),
@@ -253,13 +253,13 @@ describe("Operator Manifest prepare checkpoint service", () => {
     expect(evaluator).toEqual({
       handled: true,
       response: expect.objectContaining({
-        stage_completed: "delta_ready_snapshot_reused",
+                stage_completed: "delta_ready_snapshot_reused",
         next_stage: "cycle_construction",
         server_safety_continuation: true,
         server_orchestration: expect.objectContaining({
           advances: 1,
           continuation_count: 1,
-          stop_reason: "transport_sensitive_boundary",
+          stop_reason: "durable_phase_boundary",
         }),
       }),
     });
