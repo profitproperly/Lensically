@@ -97,13 +97,20 @@ describe("Operator MCP Manifest cycle-strategy registry", () => {
         expect(strategy.description).toContain("compact versioned decision bundle");
     expect(strategy.description).toContain("complete paged backend-locked lineup");
     expect(strategy.description).toContain("without changing any source-to-slot assignment");
-    expect(strategy.description).toContain("bounded evidence-page detail read");
+        expect(strategy.description).toContain("bounded evidence-page detail read");
+    expect(strategy.description).toContain("Never include follower totals");
+    expect(strategy.description).toContain("follower_context");
+    expect(strategy.description).toContain("server rejects it here");
     expect(strategy.description).toContain("Replaying an identical strategy is safe");
     expect(strategy.inputSchema.required).toContain("decision_bundle_id");
     expect(strategy.inputSchema.required).toContain("decision_bundle_hash");
-    expect(strategy.inputSchema.properties).toMatchObject({
+        expect(strategy.inputSchema.properties).toMatchObject({
       decision_bundle_id: { type: "string" },
       decision_bundle_hash: { type: "string" },
+      account_conclusion: {
+        type: "object",
+        description: expect.stringContaining("Do not include follower totals"),
+      },
     });
     const lineup = (strategy.inputSchema.properties as Record<string, any>).lineup;
     expect(lineup.minItems).toBe(1);

@@ -117,7 +117,7 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "commit_manifest_cycle_strategy",
     title: "Lock Manifest cycle strategy",
-                description: "Using the compact versioned decision bundle returned by the Main Cycle prepare tool and the complete paged backend-locked lineup returned by get_manifest_locked_lineup_page, persist exactly one account-wide strategy without changing any source-to-slot assignment. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts, substitute sources, or form source-independent hypotheses. A bounded evidence-page detail read is allowed only when the bundle flags genuine ambiguity. Replaying an identical strategy is safe; a conflicting second strategy is blocked.",
+                                description: "Using the compact versioned decision bundle returned by the Main Cycle prepare tool and the complete paged backend-locked lineup returned by get_manifest_locked_lineup_page, persist exactly one account-wide strategy without changing any source-to-slot assignment. The model must rank mature posts primarily by 24-hour likes, cite actual post IDs, separate uncertainty from conclusions, and may not create original posts, substitute sources, or form source-independent hypotheses. Never include follower totals, follower velocity, follower projections, follower_context, or any other follower-shaped field anywhere in account_conclusion, content_focus, benchmarks, executions, directives, experiments, risks, or lineup; follower trajectory is account-level context outside the content-strategy payload and the server rejects it here. A bounded evidence-page detail read is allowed only when the bundle flags genuine ambiguity. Replaying an identical strategy is safe; a conflicting second strategy is blocked.",
     inputSchema: {
       type: "object",
       properties: {
@@ -126,7 +126,7 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
                 snapshot_id: { type: "string" },
         decision_bundle_id: { type: "string" },
         decision_bundle_hash: { type: "string" },
-        account_conclusion: { type: "object", additionalProperties: true },
+                account_conclusion: { type: "object", description: "Content-performance conclusions only. Do not include follower totals, velocity, projections, follower_context, or any follower-shaped key.", additionalProperties: true },
         content_focus: { type: "object", additionalProperties: true },
         benchmarks: { type: "object", additionalProperties: true },
         strongest_executions: { type: "array", items: { type: "object", additionalProperties: true } },
