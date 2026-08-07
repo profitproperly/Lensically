@@ -10,9 +10,9 @@ active_checkpoint: implement embedded Stripe Checkout on the public sales page, 
 validated_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
 production_sha: 6f70dab641e2d2ee486099da84188c64c21bbc95
-active_interrupt_id: embedded-checkout-tool-contract-20260807
-active_interrupt_state: open
-active_interrupt_precedence: P1
+active_interrupt_id: null
+active_interrupt_state: closed
+active_interrupt_precedence: none
 
 ## Active Commercial Inline Checkout: commercial-inline-checkout-20260807
 
@@ -21,7 +21,14 @@ active_interrupt_precedence: P1
 - P1 root cause: the native `operateStripe.create_checkout_session` contract only supports hosted Checkout and hard-requires `success_url` and `cancel_url`, so it cannot express the embedded-session contract needed by the public page.
 - Secondary resolved incident: an assumed `lensically-worker/wrangler.toml` path returned 404; bounded repository enumeration is now required before config-path reads.
 - P1 recurrence observed during this job: a guessed commercial-delivery migration filename also returned 404. Root cause is operator path guessing despite the new rule. Prevention is strengthened: no repository file read/search may use an unverified path during this job; enumerate the relevant prefix first, then read only an exact returned path.
-- Current action: implement a canonical commercial embedded-session endpoint with the existing fixed $997 price, update fulfillment validation to accept only canonical Payment Link sessions or server-issued embedded sessions, mount Stripe Embedded Checkout on the sales page, preserve the existing download/license flow, add focused regressions, validate, deploy, and live-verify.
+- Backend implementation completed at `fefd19118cc41975b854e90048414f03ed2c4ec8`: added server-owned `ui_mode=embedded` Checkout Session creation, canonical fixed-price metadata, embedded-session fulfillment verification, and native Stripe operator support for embedded sessions.
+- Validation passed for the backend implementation: typecheck `31213331325`, all eight Operator shards `31213344684`, and full push validation `31213318504`.
+- Backend release completed successfully in Worker deployment run `31213839177`; exact release identity and production runtime verification passed.
+- Sales-page implementation completed at `86b476fa48d117f079f0b70c22d0f463f0a9d84d`: all purchase CTAs now stay on-page and target an inline Payment Details section; Stripe Embedded Checkout mounts there when configured, with the canonical hosted Payment Link retained only as a fail-safe fallback.
+- Sales-page full push validation `31213632344` passed and Cloudflare Pages deployment `31213936648` completed successfully from `86b476fa48d117f079f0b70c22d0f463f0a9d84d`.
+- Resolved P1: the native `operateStripe.create_checkout_session` contract now supports embedded Checkout with `ui_mode=embedded` and `return_url`, so the earlier hosted-only contract defect is closed.
+- Remaining external dependency: production does not currently expose a Stripe publishable key to the Worker. Embedded Checkout requires the account's public `pk_live_...` key for Stripe.js. `LENSICALLY_STRIPE_PUBLISHABLE_KEY` is intentionally fail-closed until that public key is configured; no secret key may be exposed or substituted.
+- Current action: obtain the Lensically Stripe live publishable key, configure `LENSICALLY_STRIPE_PUBLISHABLE_KEY`, deploy the exact resulting Worker head, then live-verify that the on-page Stripe payment form renders and completed payments still enter the existing license/download flow.
 - Security constraints: never expose the Stripe secret key; do not accept client-supplied price, amount, product, release, or fulfillment authority; keep price, line item, currency, metadata, and return target server-owned.
 
 ## Completed Manifest Winner Language Preservation: manifest-winner-language-preservation-20260806
