@@ -10,9 +10,9 @@ active_checkpoint: implement embedded Stripe Checkout on the public sales page, 
 validated_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
 production_sha: 6f70dab641e2d2ee486099da84188c64c21bbc95
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_interrupt_id: commercial-root-domain-routing-20260807
+active_interrupt_state: open
+active_interrupt_precedence: P1
 
 ## Active Commercial Inline Checkout: commercial-inline-checkout-20260807
 
@@ -27,8 +27,11 @@ active_interrupt_precedence: none
 - Sales-page implementation completed at `86b476fa48d117f079f0b70c22d0f463f0a9d84d`: all purchase CTAs now stay on-page and target an inline Payment Details section; Stripe Embedded Checkout mounts there when configured, with the canonical hosted Payment Link retained only as a fail-safe fallback.
 - Sales-page full push validation `31213632344` passed and Cloudflare Pages deployment `31213936648` completed successfully from `86b476fa48d117f079f0b70c22d0f463f0a9d84d`.
 - Resolved P1: the native `operateStripe.create_checkout_session` contract now supports embedded Checkout with `ui_mode=embedded` and `return_url`, so the earlier hosted-only contract defect is closed.
-- Remaining external dependency: production does not currently expose a Stripe publishable key to the Worker. Embedded Checkout requires the account's public `pk_live_...` key for Stripe.js. `LENSICALLY_STRIPE_PUBLISHABLE_KEY` is intentionally fail-closed until that public key is configured; no secret key may be exposed or substituted.
-- Current action: obtain the Lensically Stripe live publishable key, configure `LENSICALLY_STRIPE_PUBLISHABLE_KEY`, deploy the exact resulting Worker head, then live-verify that the on-page Stripe payment form renders and completed payments still enter the existing license/download flow.
+- Stripe publishable-key dependency resolved: the owner supplied the live public key, `LENSICALLY_STRIPE_PUBLISHABLE_KEY` was configured in `wrangler.jsonc`, validation passed in runs `31214225704` and `31214205493`, and exact Worker release `31214440085` deployed SHA `59e9e0723ac97e66f00d279b2a4611a7c4c3a7d3` successfully.
+- Live verification exposed a separate P1 routing defect: the deployed Pages project contains the new embedded-checkout sales page, but `https://lensically.com/operator/` is still served by the existing OpenNext `lensically-web` Worker. Public evidence shows the apex returns the Lensically Next.js app (`307 /dashboard`), while `lensically-operator.pages.dev/operator/` contains the new checkout surface.
+- Root cause: the commercial Pages project was never attached to the production apex, and the apex is already legitimately occupied by the main Lensically web application. Attempting to attach the whole apex to Pages is the wrong topology because it would displace `/dashboard`, `/cycles`, and the internal web product. Cloudflare Pages reports `verification-error=CNAME record not set`; the existing apex cannot become the Pages origin without breaking the main app.
+- Durable repair direction: preserve the main web application on the apex and add an explicit `lensically-web` route handler for `/operator` and `/operator/*` that proxies the canonical commercial Pages origin. This gives the sales funnel one production URL without changing apex DNS or disrupting the app. Commercial deployment is not considered live until the production-domain smoke validates both the proxied page and embedded Checkout endpoint.
+- Current action: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`.
 - Security constraints: never expose the Stripe secret key; do not accept client-supplied price, amount, product, release, or fulfillment authority; keep price, line item, currency, metadata, and return target server-owned.
 
 ## Completed Manifest Winner Language Preservation: manifest-winner-language-preservation-20260806
