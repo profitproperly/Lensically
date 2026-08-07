@@ -226,7 +226,6 @@ async function createCommercialEmbeddedCheckoutSession(
   const params = new URLSearchParams();
   params.set("mode", "payment");
   params.set("ui_mode", "elements");
-  params.set("redirect_on_completion", "always");
   params.set("line_items[0][price]", COMMERCIAL_PRODUCT_PRICE_ID);
   params.set("line_items[0][quantity]", "1");
   params.set("return_url", `${env.ROOT_SITE_URL?.trim() || "https://lensically.com"}/download/?session_id={CHECKOUT_SESSION_ID}`);
