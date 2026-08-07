@@ -96,8 +96,7 @@
     footer { padding:0 0 38px; color:#777; font-size:11px; }
     .footer-links { display:flex; flex-wrap:wrap; gap:10px 14px; margin-bottom:10px; }
     .footer-links a { color:#555; }
-    .mobile-buy { position:fixed; z-index:20; left:12px; right:12px; bottom:max(12px,env(safe-area-inset-bottom)); min-height:54px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:#111; color:#fff; text-decoration:none; font-size:14px; font-weight:850; box-shadow:0 12px 30px rgba(0,0,0,.18); }
-    @media (min-width:760px) { body { padding-bottom:0; } .top { padding-top:34px; } .mobile-buy { display:none; } }
+    @media (min-width:760px) { body { padding-bottom:0; } .top { padding-top:34px; } }
     @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .screen { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
   </style>
 </head>
@@ -202,7 +201,6 @@
     </main>
     <footer><nav class="footer-links" aria-label="Legal"><a href="/license/">Commercial license</a><a href="/refund-policy/">Refund policy</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/data-deletion/">Data deletion</a></nav><div>Support: <a href="mailto:support@lensically.com">support@lensically.com</a></div><div>© 2026 Lensically. All rights reserved.</div></footer>
   </div>
-    <a class="mobile-buy" href="#checkout">Get Lensically Operator · $997</a>
   <script src="https://js.stripe.com/clover/stripe.js"></script>
   <script>
     (() => {
