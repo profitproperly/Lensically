@@ -1,18 +1,27 @@
 # Lensically Continuation Ledger
 
-status: completed
-updated_at: 2026-08-06
+status: active
+updated_at: 2026-08-07
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: null
-active_checkpoint: null
+active_job_id: commercial-inline-checkout-20260807
+active_checkpoint: implement embedded Stripe Checkout on the public sales page, preserve fulfillment security, validate, deploy, and live-verify
 validated_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
-documentation_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
+documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
 production_sha: 6f70dab641e2d2ee486099da84188c64c21bbc95
-active_interrupt_id: null
-active_interrupt_state: closed
-active_interrupt_precedence: none
+active_interrupt_id: embedded-checkout-tool-contract-20260807
+active_interrupt_state: open
+active_interrupt_precedence: P1
+
+## Active Commercial Inline Checkout: commercial-inline-checkout-20260807
+
+- Owner direction: keep the simplified mobile-first white sales page, but place the payment experience directly on the product page instead of sending buyers to a separate hosted checkout link.
+- Verified Stripe capability: Stripe supports embedded Checkout Sessions with `ui_mode=embedded`, a server-created `client_secret`, and a `return_url`; the payment form remains Stripe-hosted inside the page.
+- P1 root cause: the native `operateStripe.create_checkout_session` contract only supports hosted Checkout and hard-requires `success_url` and `cancel_url`, so it cannot express the embedded-session contract needed by the public page.
+- Secondary resolved incident: an assumed `lensically-worker/wrangler.toml` path returned 404; bounded repository enumeration is now required before config-path reads.
+- Current action: implement a canonical commercial embedded-session endpoint with the existing fixed $997 price, update fulfillment validation to accept only canonical Payment Link sessions or server-issued embedded sessions, mount Stripe Embedded Checkout on the sales page, preserve the existing download/license flow, add focused regressions, validate, deploy, and live-verify.
+- Security constraints: never expose the Stripe secret key; do not accept client-supplied price, amount, product, release, or fulfillment authority; keep price, line item, currency, metadata, and return target server-owned.
 
 ## Completed Manifest Winner Language Preservation: manifest-winner-language-preservation-20260806
 
