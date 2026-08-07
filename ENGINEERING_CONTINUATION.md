@@ -1,18 +1,33 @@
 # Lensically Continuation Ledger
 
 status: completed
-updated_at: 2026-08-03
+updated_at: 2026-08-06
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: null
 active_checkpoint: null
-validated_source_head: a32addd24478f473c56dd37877556bad3adea4ae
-documentation_source_head: a32addd24478f473c56dd37877556bad3adea4ae
-production_sha: a32addd24478f473c56dd37877556bad3adea4ae
+validated_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
+documentation_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
+production_sha: 6f70dab641e2d2ee486099da84188c64c21bbc95
 active_interrupt_id: null
 active_interrupt_state: closed
 active_interrupt_precedence: none
+
+## Completed Manifest Winner Language Preservation: manifest-winner-language-preservation-20260806
+
+- Root cause: Manifest generation deliberately discarded every source card's transformation contract before gate evaluation, and the Main Cycle lineup stripped source mechanism, required product, recommended direction, and transformation evidence from the model payload. Winning cards therefore carried historical evidence but no enforceable protection against softened hooks, vague payoffs, reduced certainty, lost timing, or weaker visual intensity.
+- Universal winner rule: any Manifest source card with at least 1,000 likes in its canonical source evidence or strongest linked 24-hour published execution receives `manifest-winner-preservation-v1`, regardless of whether it originated from a Saved Pattern, owner source card, model source card, operator hypothesis, or recovered historical lineage.
+- Legacy repair: previously locked winning cards are enriched dynamically at read time. Existing explicit safe wording is retained; cards without sufficient protection receive bounded exact anchors and required functions derived from the strongest verified execution.
+- Performance package: winner contracts preserve the recognizable opening hook, certainty level, concrete payoff or amount, timing/deadline, and capitalization intensity when those elements exist in the winning execution. Variation remains allowed only around non-load-bearing details.
+- Generation exposure: ordinary generation and `get_manifest_locked_lineup_page` now receive the effective transformation contract and winner-preservation evidence instead of a stripped historical-only card.
+- Gate enforcement: winning Manifest cards execute the source transformation gate. Watered-down variants fail when they omit protected exact surfaces or required functions. Non-winning cards retain source-specific creative freedom. Exact full-source copies remain independently blocked by the dedicated source-surface copy gate.
+- Regression protection: added source-card enrichment, safe legacy anchor, below-threshold, gender-safety, Main Cycle lineup, winner-gate failure/pass, close-adaptation, and exact-copy regressions.
+- Validation evidence: typecheck `31138588144`; all eight Operator shards `31138656275`; complete push validation `31138647169`.
+- Release evidence: exact-SHA Worker deployment and production runtime verification `31138852324`.
+- Live proof: source card `363e2b51-1ec2-4864-a471-35fbd8a71fcf` now protects `IF YOUR FINGER TOUCHED THIS TODAY` and `EXPECT GOOD MONEY NEWS` from its 6,584-like 24-hour winner. The published watered-down descendant fails the live transformation gate with both surfaces missing; a close adaptation preserving the package passes all gates.
+- Final production SHA: `6f70dab641e2d2ee486099da84188c64c21bbc95`.
+- Status: completed. No active Lensically engineering job remains.
 
 ## Completed Source Card Origin and UI: source-card-origin-and-ui-20260803
 
