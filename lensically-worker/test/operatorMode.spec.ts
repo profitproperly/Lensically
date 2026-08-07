@@ -2758,7 +2758,7 @@ describe("operator mode backend spine", () => {
       draft_analysis: analysis,
     });
         expect(copied.showable).toBe(false);
-    expect(copied.blocking_failures.some((failure) => failure.gate_key === "source_transformation_contract_gate")).toBe(true);
+        expect(copied.blocking_failures.some((failure) => failure.gate_key === "source_surface_copy_gate")).toBe(true);
     }, 30000);
 
   it("ignores rejected drafts in exact duplicate inventory but still blocks approved drafts", async () => {
