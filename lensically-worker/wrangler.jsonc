@@ -61,7 +61,9 @@
 		"WORKER_ORIGIN": "https://api.lensically.com",
 		"WEB_APP_URL": "https://app.lensically.com",
 		"HERMES_MODEL": "gpt-5.5",
-		"LENSICALLY_MCP_OAUTH_CLIENT_ID": "lensically-operator-mode"
+				"LENSICALLY_MCP_OAUTH_CLIENT_ID": "lensically-operator-mode",
+		"LENSICALLY_STRIPE_PUBLISHABLE_KEY": "pk_live_51TwB2B4dwsz5Id6rWsgypYC28d9TDJTCGOgsb5OKrBgLwdy6lQwpzvSsnvaIVhr3DZwkHGtEeqOTRmwxZXdVVPyH00GUHUOftT"
+
 	}
 	// Public compliance references: https://lensically.com/privacy and https://lensically.com/data-deletion
 	/**
