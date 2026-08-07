@@ -4,6 +4,7 @@ import {
   COMMERCIAL_PAYMENT_LINK_ID,
   COMMERCIAL_PRODUCT_AMOUNT,
   COMMERCIAL_PRODUCT_CURRENCY,
+  COMMERCIAL_PRODUCT_NAME,
   COMMERCIAL_PRODUCT_PRICE_ID,
   handleCommercialDeliveryRequest,
   validateCommercialCheckoutSessionPayload,
@@ -32,7 +33,12 @@ function paidSession(overrides: Record<string, unknown> = {}) {
       data: [
         {
           quantity: 1,
-          price: { id: COMMERCIAL_PRODUCT_PRICE_ID },
+          price: {
+            id: COMMERCIAL_PRODUCT_PRICE_ID,
+            unit_amount: COMMERCIAL_PRODUCT_AMOUNT,
+            currency: COMMERCIAL_PRODUCT_CURRENCY,
+            product: { name: COMMERCIAL_PRODUCT_NAME },
+          },
         },
       ],
     },
@@ -59,6 +65,19 @@ describe("commercial delivery checkout verification", () => {
     expect(validateCommercialCheckoutSessionPayload(paidSession({
       payment_link: null,
       ui_mode: "embedded_page",
+      line_items: {
+        data: [
+          {
+            quantity: 1,
+            price: {
+              id: "price_embedded_inline",
+              unit_amount: COMMERCIAL_PRODUCT_AMOUNT,
+              currency: COMMERCIAL_PRODUCT_CURRENCY,
+              product: { name: COMMERCIAL_PRODUCT_NAME },
+            },
+          },
+        ],
+      },
       metadata: {
         product_key: "lensically_operator_threads",
         release: "v1.0.0",
@@ -117,6 +136,10 @@ describe("commercial delivery checkout verification", () => {
     const params = new URLSearchParams(body);
     expect(params.get("ui_mode")).toBe("embedded_page");
     expect(params.get("redirect_on_completion")).toBe("always");
+    expect(params.get("line_items[0][price]")).toBeNull();
+    expect(params.get("line_items[0][price_data][currency]")).toBe(COMMERCIAL_PRODUCT_CURRENCY);
+    expect(params.get("line_items[0][price_data][unit_amount]")).toBe(String(COMMERCIAL_PRODUCT_AMOUNT));
+    expect(params.get("line_items[0][price_data][product_data][name]")).toBe(COMMERCIAL_PRODUCT_NAME);
     expect(params.get("return_url")).toBe("https://lensically.com/download/?session_id={CHECKOUT_SESSION_ID}");
   });
 });

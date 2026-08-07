@@ -2,11 +2,12 @@ const STRIPE_API_ORIGIN = "https://api.stripe.com/v1";
 const GITHUB_API_ORIGIN = "https://api.github.com";
 
 export const COMMERCIAL_PRODUCT_KEY = "lensically_operator_threads";
+export const COMMERCIAL_PRODUCT_NAME = "Lensically Operator for Threads";
 export const COMMERCIAL_PRODUCT_RELEASE = "v1.0.0";
 export const COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx";
 export const COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0";
 export const COMMERCIAL_EMBEDDED_CHECKOUT_MARKER = "embedded_checkout_v1";
-export const COMMERCIAL_PRODUCT_AMOUNT = 99_700;
+export const COMMERCIAL_PRODUCT_AMOUNT = 97_700;
 export const COMMERCIAL_PRODUCT_CURRENCY = "usd";
 export const COMMERCIAL_RELEASE_REPOSITORY = "Lensically-Operator-Threads";
 export const COMMERCIAL_RELEASE_ASSET = "Lensically-Operator-Threads-v1.0.0.zip";
@@ -160,7 +161,17 @@ export function validateCommercialCheckoutSessionPayload(payload: unknown): Comm
     if (!line) return false;
     const priceId = expandableId(line.price);
     const quantity = integerValue(line.quantity);
-    return priceId === COMMERCIAL_PRODUCT_PRICE_ID && quantity === 1;
+    const price = asRecord(line.price);
+    const product = asRecord(price?.product);
+    const embeddedInlinePriceMatches =
+      isCanonicalEmbeddedCheckout
+      && integerValue(price?.unit_amount) === COMMERCIAL_PRODUCT_AMOUNT
+      && stringValue(price?.currency, 3)?.toLowerCase() === COMMERCIAL_PRODUCT_CURRENCY
+      && (
+        stringValue(product?.name, 160) === COMMERCIAL_PRODUCT_NAME
+        || stringValue(product?.name, 160) === null
+      );
+    return quantity === 1 && (priceId === COMMERCIAL_PRODUCT_PRICE_ID || embeddedInlinePriceMatches);
   });
   if (!matchingLine) return { ok: false, error: "checkout_line_item_mismatch" };
 
@@ -227,7 +238,9 @@ async function createCommercialEmbeddedCheckoutSession(
   params.set("mode", "payment");
   params.set("ui_mode", "embedded_page");
   params.set("redirect_on_completion", "always");
-  params.set("line_items[0][price]", COMMERCIAL_PRODUCT_PRICE_ID);
+  params.set("line_items[0][price_data][currency]", COMMERCIAL_PRODUCT_CURRENCY);
+  params.set("line_items[0][price_data][unit_amount]", String(COMMERCIAL_PRODUCT_AMOUNT));
+  params.set("line_items[0][price_data][product_data][name]", COMMERCIAL_PRODUCT_NAME);
   params.set("line_items[0][quantity]", "1");
   params.set("return_url", `${env.ROOT_SITE_URL?.trim() || "https://lensically.com"}/download/?session_id={CHECKOUT_SESSION_ID}`);
   params.set("metadata[product_key]", COMMERCIAL_PRODUCT_KEY);
@@ -379,7 +392,7 @@ async function issueCommercialDownload(
   downloadUrl.searchParams.set("token", token);
   return jsonResponse({
     ok: true,
-    product: "Lensically Operator for Threads",
+    product: COMMERCIAL_PRODUCT_NAME,
     release: COMMERCIAL_PRODUCT_RELEASE,
     license_key: licenseKey,
     customer_email: validation.customerEmail,
