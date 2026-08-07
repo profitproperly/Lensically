@@ -9,34 +9,66 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    environment: production
     timeout-minutes: 5
     steps:
+      - name: Inspect Cloudflare Pages topology
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          if (!token || !account) throw new Error('cloudflare_credentials_missing');
+          const url = `https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/lensically-operator`;
+          const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          const payload = await response.json();
+          if (!response.ok || !payload?.success) throw new Error(`pages_project_lookup_failed_${response.status}`);
+          const project = payload.result || {};
+          const latest = project.latest_deployment || {};
+          const trigger = latest.deployment_trigger?.metadata || {};
+          console.log(`pages-project=${project.name || 'unknown'}`);
+          console.log(`pages-production-branch=${project.production_branch || 'unknown'}`);
+          console.log(`pages-domains=${Array.isArray(project.domains) ? project.domains.join(',') : 'none'}`);
+          console.log(`pages-latest-url=${latest.url || 'unknown'}`);
+          console.log(`pages-latest-branch=${trigger.branch || 'unknown'}`);
+          console.log(`pages-latest-commit=${trigger.commit_hash || 'unknown'}`);
+          NODE
+
       - name: Verify live sales page and embedded Checkout session
         shell: bash
         run: |
           set -euo pipefail
 
-                              page="$(curl --fail --silent --show-error https://lensically.com/operator/)"
-          if grep -Fq 'id="embedded-checkout"' <<<"$page"; then
-            echo 'sales-page-embedded-container=ok'
-          else
-            echo 'sales-page-embedded-container=missing'
-            exit 21
-          fi
-          if grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"; then
-            echo 'sales-page-stripe-js=ok'
-          else
-            echo 'sales-page-stripe-js=missing'
-            exit 22
-          fi
-          if grep -Fq 'api.lensically.com/api/commercial/embedded-checkout-session' <<<"$page"; then
-            echo 'sales-page-endpoint-reference=ok'
-          else
-            echo 'sales-page-endpoint-reference=missing'
-            exit 23
-          fi
+          check_page() {
+            label="$1"
+            url="$2"
+            page="$(curl --fail --silent --show-error "$url")"
+            if grep -Fq 'id="embedded-checkout"' <<<"$page"; then
+              echo "$label-embedded-container=ok"
+            else
+              echo "$label-embedded-container=missing"
+              return 21
+            fi
+            if grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"; then
+              echo "$label-stripe-js=ok"
+            else
+              echo "$label-stripe-js=missing"
+              return 22
+            fi
+            if grep -Fq 'api.lensically.com/api/commercial/embedded-checkout-session' <<<"$page"; then
+              echo "$label-endpoint-reference=ok"
+            else
+              echo "$label-endpoint-reference=missing"
+              return 23
+            fi
+          }
 
-
+          check_page pages-dev https://lensically-operator.pages.dev/operator/
+          check_page custom-domain https://lensically.com/operator/
 
           headers="$(mktemp)"
           body="$(mktemp)"
@@ -49,32 +81,29 @@ jobs:
             --header 'Accept: application/json' \
             https://api.lensically.com/api/commercial/embedded-checkout-session)"
 
-                    echo "embedded-endpoint-http=$status"
+          echo "embedded-endpoint-http=$status"
           test "$status" = "200"
           if grep -iq '^access-control-allow-origin: https://lensically.com' "$headers"; then
             echo 'embedded-endpoint-cors=ok'
           else
             echo 'embedded-endpoint-cors=missing'
-            exit 1
+            exit 31
           fi
 
           node - "$body" <<'NODE'
-
           const fs = require('fs');
           const payload = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-          const valid = payload.ok === true
-            && typeof payload.publishable_key === 'string'
-            && payload.publishable_key.startsWith('pk_live_')
-            && typeof payload.client_secret === 'string'
-            && payload.client_secret.includes('_secret_')
-            && typeof payload.session_id === 'string'
-            && payload.session_id.startsWith('cs_live_');
-                    console.log(`payload-ok=${payload.ok === true}`);
-          console.log(`publishable-key-live=${typeof payload.publishable_key === 'string' && payload.publishable_key.startsWith('pk_live_')}`);
-          console.log(`client-secret-present=${typeof payload.client_secret === 'string' && payload.client_secret.includes('_secret_')}`);
-          console.log(`live-session-present=${typeof payload.session_id === 'string' && payload.session_id.startsWith('cs_live_')}`);
+          const checks = {
+            ok: payload.ok === true,
+            publishable: typeof payload.publishable_key === 'string' && payload.publishable_key.startsWith('pk_live_'),
+            clientSecret: typeof payload.client_secret === 'string' && payload.client_secret.includes('_secret_'),
+            liveSession: typeof payload.session_id === 'string' && payload.session_id.startsWith('cs_live_'),
+          };
+          console.log(`payload-ok=${checks.ok}`);
+          console.log(`publishable-key-live=${checks.publishable}`);
+          console.log(`client-secret-present=${checks.clientSecret}`);
+          console.log(`live-session-present=${checks.liveSession}`);
           console.log(`error-code=${typeof payload.error === 'string' ? payload.error : 'none'}`);
-          if (!valid) process.exit(1);
+          if (!Object.values(checks).every(Boolean)) process.exit(41);
           console.log('Live embedded Checkout smoke passed without exposing checkout credentials.');
-
           NODE
