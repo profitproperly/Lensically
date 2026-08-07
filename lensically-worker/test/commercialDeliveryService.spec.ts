@@ -58,7 +58,7 @@ describe("commercial delivery checkout verification", () => {
     it("accepts a server-issued embedded checkout session for the same canonical offer", () => {
     expect(validateCommercialCheckoutSessionPayload(paidSession({
       payment_link: null,
-      ui_mode: "elements",
+      ui_mode: "embedded_page",
       metadata: {
         product_key: "lensically_operator_threads",
         release: "v1.0.0",
@@ -84,7 +84,7 @@ describe("commercial delivery checkout verification", () => {
       .toEqual({ ok: false, error: "checkout_source_mismatch" });
     expect(validateCommercialCheckoutSessionPayload(paidSession({
       payment_link: null,
-      ui_mode: "elements",
+      ui_mode: "embedded_page",
       metadata: { checkout_surface: COMMERCIAL_EMBEDDED_CHECKOUT_MARKER },
     }))).toEqual({ ok: false, error: "checkout_source_mismatch" });
     expect(validateCommercialCheckoutSessionPayload(paidSession({
@@ -115,7 +115,8 @@ describe("commercial delivery checkout verification", () => {
     expect(response.status).toBe(200);
     const body = String(fetchMock.mock.calls[0]?.[1]?.body);
     const params = new URLSearchParams(body);
-    expect(params.get("ui_mode")).toBe("elements");
+    expect(params.get("ui_mode")).toBe("embedded_page");
+    expect(params.get("redirect_on_completion")).toBe("always");
     expect(params.get("return_url")).toBe("https://lensically.com/download/?session_id={CHECKOUT_SESSION_ID}");
   });
 });

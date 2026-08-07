@@ -86,13 +86,13 @@ jobs:
             label="$1"
             url="$2"
             page="$(curl --fail --silent --show-error "$url")"
-            if grep -Fq 'id="payment-element"' <<<"$page"; then
-              echo "$label-payment-element=ok"
+            if grep -Fq 'id="embedded-checkout"' <<<"$page"; then
+              echo "$label-embedded-container=ok"
             else
-              echo "$label-payment-element=missing"
+              echo "$label-embedded-container=missing"
               return 21
             fi
-            if grep -Fq 'https://js.stripe.com/v3/' <<<"$page"; then
+            if grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"; then
               echo "$label-stripe-js=ok"
             else
               echo "$label-stripe-js=missing"
