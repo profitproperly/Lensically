@@ -23,7 +23,7 @@
     .top { padding:26px 0 18px; }
     .brand { display:inline-flex; align-items:center; gap:9px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:-.02em; }
     .brand-mark { width:32px; height:32px; display:block; object-fit:contain; }
-    .cover { min-height:302px; overflow:hidden; border:1px solid #dcdcdc; border-radius:14px; background:#f7f7f7; padding:30px; display:grid; grid-template-columns:.88fr 1.12fr; gap:22px; align-items:center; }
+    .cover { min-height:302px; overflow:hidden; border:1px solid #dcdcdc; border-radius:14px; background:#f7f7f7; padding:20px; display:block; }
     .cover-copy small { display:block; margin-bottom:14px; color:#777; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .cover-copy strong { display:block; max-width:250px; font-size:36px; line-height:.95; letter-spacing:-.06em; }
     .cover-copy p { margin:16px 0 0; max-width:250px; color:#555; font-size:13px; line-height:1.45; }
@@ -132,7 +132,7 @@
     .sticky-buy-button svg { width:17px; height:17px; }
     @media (min-width:760px) { .top { padding-top:34px; } }
     @media (max-width:560px) { body { padding-bottom:120px; } .sticky-buy { bottom:12px; width:calc(100% - 24px); } .sticky-buy-inner { grid-template-columns:1fr; gap:10px; } .sticky-buy-button { width:100%; min-height:50px; } }
-    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .mock-shell { grid-template-columns:74px 1fr; } .mock-sidebar { padding:13px 7px; } .mock-main { padding:14px 9px 11px; } .mock-post:nth-of-type(n+5) { display:none; } .intro { padding-top:23px; } h1 { font-size:29px; } }
+    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:14px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .mock-shell { grid-template-columns:74px 1fr; } .mock-sidebar { padding:13px 7px; } .mock-main { padding:14px 9px 11px; } .mock-post:nth-of-type(n+5) { display:none; } .intro { padding-top:23px; } h1 { font-size:29px; } }
   </style>
 </head>
 <body>
@@ -140,7 +140,6 @@
     <div class="top"><a class="brand" href="/" aria-label="Lensically Operator home"><img class="brand-mark" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt="Lensically logo"><span>Lensically</span></a></div>
     <main>
       <section class="cover" aria-label="Lensically Operator product preview">
-        <div class="cover-copy"><small>AI-operated Threads system</small><strong>Run the operation, not just the posts.</strong><p>Research. Create. Quality check. Schedule. Measure. Learn. Repeat.</p></div>
         <div class="hero-app-preview" aria-label="Lensically scheduled posts dashboard preview with a fictional Nova Studio account">
           <div class="mock-top">
             <div class="mock-brand"><img src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt=""><span>Lensically</span></div>
