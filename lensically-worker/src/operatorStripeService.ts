@@ -188,9 +188,11 @@ export const OPERATOR_STRIPE_TOOLS: OperatorMcpToolDefinition[] = [
         customer_name: { type: "string" },
         customer_id: { type: "string" },
         quantity: { type: "integer", minimum: 1, maximum: 999999, default: 1 },
-        mode: { type: "string", enum: ["payment", "subscription"], default: "payment" },
+                mode: { type: "string", enum: ["payment", "subscription"], default: "payment" },
+        ui_mode: { type: "string", enum: ["hosted", "embedded"], default: "hosted" },
         success_url: { type: "string" },
         cancel_url: { type: "string" },
+        return_url: { type: "string" },
         after_completion_redirect_url: { type: "string" },
         allow_promotion_codes: { type: "boolean" },
         payment_intent_id: { type: "string" },
@@ -288,20 +290,32 @@ export async function handleOperatorStripeTool(
     return stripeRequest(env, "/customers", { method: "POST", params, idempotencyKey: operationId });
   }
 
-  if (operation === "create_checkout_session") {
+    if (operation === "create_checkout_session") {
     const priceId = normalizeText(args.price_id, 255);
-    const successUrl = normalizeText(args.success_url, 2000);
-    const cancelUrl = normalizeText(args.cancel_url, 2000);
     const mode = normalizeText(args.mode, 20) ?? "payment";
+    const uiMode = normalizeText(args.ui_mode, 20) ?? "hosted";
     const quantity = normalizeInteger(args.quantity ?? 1, 1, 999999) ?? 1;
-    if (!priceId || !successUrl || !cancelUrl || !["payment", "subscription"].includes(mode)) {
-      return { ok: false, error: "price_id_success_url_cancel_url_and_mode_required" };
+    if (!priceId || !["payment", "subscription"].includes(mode) || !["hosted", "embedded"].includes(uiMode)) {
+      return { ok: false, error: "price_id_mode_and_ui_mode_required" };
     }
     params.set("mode", mode);
     params.set("line_items[0][price]", priceId);
     params.set("line_items[0][quantity]", String(quantity));
-    params.set("success_url", successUrl);
-    params.set("cancel_url", cancelUrl);
+    if (uiMode === "embedded") {
+      const returnUrl = normalizeText(args.return_url, 2000);
+      if (!returnUrl) return { ok: false, error: "return_url_required_for_embedded_checkout" };
+      params.set("ui_mode", "embedded");
+      params.set("return_url", returnUrl);
+      params.set("redirect_on_completion", "always");
+    } else {
+      const successUrl = normalizeText(args.success_url, 2000);
+      const cancelUrl = normalizeText(args.cancel_url, 2000);
+      if (!successUrl || !cancelUrl) {
+        return { ok: false, error: "success_url_and_cancel_url_required_for_hosted_checkout" };
+      }
+      params.set("success_url", successUrl);
+      params.set("cancel_url", cancelUrl);
+    }
     const customerId = normalizeText(args.customer_id, 255);
     const email = normalizeText(args.email, 320);
     if (customerId) params.set("customer", customerId);

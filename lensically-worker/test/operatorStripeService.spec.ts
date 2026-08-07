@@ -78,6 +78,36 @@ describe("native Stripe operator service", () => {
     expect(String(init?.body)).toContain("metadata%5Brelease%5D=1.0.0");
   });
 
+    it("creates embedded Checkout Sessions without hosted success or cancel URLs", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "cs_test_embedded",
+      client_secret: "cs_test_embedded_secret_test",
+      ui_mode: "embedded",
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const result = await handleOperatorStripeTool(
+      { LENSICALLY_STRIPE_KEY: "sk_test_example" },
+      "operateStripe",
+      {
+        operation: "create_checkout_session",
+        operation_id: "embedded-checkout-test-20260807",
+        price_id: "price_test",
+        quantity: 1,
+        mode: "payment",
+        ui_mode: "embedded",
+        return_url: "https://example.com/return?session_id={CHECKOUT_SESSION_ID}",
+      },
+    );
+
+    expect(result).toMatchObject({ ok: true, stripe: { id: "cs_test_embedded" } });
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = String(init?.body);
+    expect(body).toContain("ui_mode=embedded");
+    expect(body).toContain("return_url=https%3A%2F%2Fexample.com%2Freturn%3Fsession_id%3D%7BCHECKOUT_SESSION_ID%7D");
+    expect(body).not.toContain("success_url=");
+    expect(body).not.toContain("cancel_url=");
+  });
+
   it("blocks refunds without the owner's exact approval before contacting Stripe", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const result = await handleOperatorStripeTool(

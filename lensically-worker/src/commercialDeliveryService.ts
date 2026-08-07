@@ -5,6 +5,7 @@ export const COMMERCIAL_PRODUCT_KEY = "lensically_operator_threads";
 export const COMMERCIAL_PRODUCT_RELEASE = "v1.0.0";
 export const COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx";
 export const COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0";
+export const COMMERCIAL_EMBEDDED_CHECKOUT_MARKER = "embedded_checkout_v1";
 export const COMMERCIAL_PRODUCT_AMOUNT = 99_700;
 export const COMMERCIAL_PRODUCT_CURRENCY = "usd";
 export const COMMERCIAL_RELEASE_REPOSITORY = "Lensically-Operator-Threads";
@@ -17,6 +18,7 @@ const MAX_DOWNLOADS_PER_PURCHASE = 5;
 export interface CommercialDeliveryEnv {
   DB: D1Database;
   LENSICALLY_STRIPE_KEY?: string;
+  LENSICALLY_STRIPE_PUBLISHABLE_KEY?: string;
   GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
 }
@@ -32,7 +34,8 @@ type CommercialCheckoutValidation =
       customerName: string | null;
       amountTotal: number;
       currency: string;
-      checkoutCreatedAt: number | null;
+            checkoutCreatedAt: number | null;
+      checkoutSourceId: string;
     }
   | { ok: false; error: string };
 
@@ -118,10 +121,25 @@ export function validateCommercialCheckoutSessionPayload(payload: unknown): Comm
     return { ok: false, error: "checkout_amount_mismatch" };
   }
 
-  const paymentLinkId = expandableId(session.payment_link);
-  if (!paymentLinkId || !timingSafeTextEqual(paymentLinkId, COMMERCIAL_PAYMENT_LINK_ID)) {
-    return { ok: false, error: "checkout_payment_link_mismatch" };
+    const paymentLinkId = expandableId(session.payment_link);
+  const metadata = asRecord(session.metadata);
+  const isCanonicalPaymentLink = Boolean(
+    paymentLinkId && timingSafeTextEqual(paymentLinkId, COMMERCIAL_PAYMENT_LINK_ID),
+  );
+  const isCanonicalEmbeddedCheckout =
+    stringValue(session.ui_mode, 40) === "embedded"
+    && stringValue(metadata?.checkout_surface, 80) === COMMERCIAL_EMBEDDED_CHECKOUT_MARKER
+    && stringValue(metadata?.product_key, 120) === COMMERCIAL_PRODUCT_KEY
+    && stringValue(metadata?.release, 80) === COMMERCIAL_PRODUCT_RELEASE;
+  const checkoutSourceId = isCanonicalPaymentLink
+    ? COMMERCIAL_PAYMENT_LINK_ID
+    : isCanonicalEmbeddedCheckout
+      ? COMMERCIAL_EMBEDDED_CHECKOUT_MARKER
+      : null;
+  if (!checkoutSourceId) {
+    return { ok: false, error: "checkout_source_mismatch" };
   }
+
 
   const lineItems = asRecord(session.line_items);
   const lineItemData = Array.isArray(lineItems?.data) ? lineItems.data : [];
@@ -142,8 +160,9 @@ export function validateCommercialCheckoutSessionPayload(payload: unknown): Comm
     customerEmail: stringValue(customerDetails?.email, 320),
     customerName: stringValue(customerDetails?.name, 250),
     amountTotal,
-    currency,
+        currency,
     checkoutCreatedAt: integerValue(session.created),
+    checkoutSourceId,
   };
 }
 
@@ -170,6 +189,64 @@ async function deterministicLicenseKey(sessionId: string): Promise<string> {
 }
 
 
+
+
+
+async function createCommercialEmbeddedCheckoutSession(
+  request: Request,
+  env: CommercialDeliveryEnv,
+): Promise<Response> {
+  const stripeKey = env.LENSICALLY_STRIPE_KEY?.trim() ?? "";
+  if (!stripeKey || (!stripeKey.startsWith("sk_") && !stripeKey.startsWith("rk_"))) {
+    return jsonResponse({ ok: false, error: "checkout_creation_unavailable" }, 503);
+  }
+
+  const publishableKey = env.LENSICALLY_STRIPE_PUBLISHABLE_KEY?.trim() ?? "";
+  if (!/^pk_(?:live|test)_[A-Za-z0-9]+$/.test(publishableKey)) {
+    return jsonResponse({ ok: false, error: "checkout_publishable_key_unavailable" }, 503);
+  }
+  const secretMode = /^(?:sk|rk)_live_/.test(stripeKey) ? "live" : "test";
+  const publishableMode = publishableKey.startsWith("pk_live_") ? "live" : "test";
+  if (secretMode !== publishableMode) {
+    return jsonResponse({ ok: false, error: "checkout_key_mode_mismatch" }, 503);
+  }
+
+  const params = new URLSearchParams();
+  params.set("mode", "payment");
+  params.set("ui_mode", "embedded");
+  params.set("redirect_on_completion", "always");
+  params.set("line_items[0][price]", COMMERCIAL_PRODUCT_PRICE_ID);
+  params.set("line_items[0][quantity]", "1");
+  params.set("return_url", `${new URL(request.url).origin}/operator/download/?session_id={CHECKOUT_SESSION_ID}`);
+  params.set("metadata[product_key]", COMMERCIAL_PRODUCT_KEY);
+  params.set("metadata[release]", COMMERCIAL_PRODUCT_RELEASE);
+  params.set("metadata[checkout_surface]", COMMERCIAL_EMBEDDED_CHECKOUT_MARKER);
+
+  const response = await fetch(`${STRIPE_API_ORIGIN}/checkout/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    return jsonResponse({ ok: false, error: "checkout_session_creation_failed" }, 502);
+  }
+  const session = asRecord(payload);
+  const sessionId = stringValue(session?.id, 255);
+  const clientSecret = stringValue(session?.client_secret, 2000);
+  if (!sessionId || !clientSecret) {
+    return jsonResponse({ ok: false, error: "checkout_session_creation_failed" }, 502);
+  }
+  return jsonResponse({
+    ok: true,
+    publishable_key: publishableKey,
+    client_secret: clientSecret,
+    session_id: sessionId,
+  });
+}
 
 async function fetchStripeCheckoutSession(
   env: CommercialDeliveryEnv,
@@ -256,9 +333,9 @@ async function issueCommercialDownload(
     validation.paymentIntentId,
     validation.customerEmail,
     validation.customerName,
-    COMMERCIAL_PRODUCT_KEY,
+        COMMERCIAL_PRODUCT_KEY,
     COMMERCIAL_PRODUCT_RELEASE,
-    COMMERCIAL_PAYMENT_LINK_ID,
+    validation.checkoutSourceId,
     COMMERCIAL_PRODUCT_PRICE_ID,
     validation.amountTotal,
     validation.currency,
@@ -393,6 +470,12 @@ export async function handleCommercialDeliveryRequest(
   env: CommercialDeliveryEnv,
   normalizedPath: string,
 ): Promise<Response> {
+  if (normalizedPath === "/api/commercial/embedded-checkout-session") {
+    return request.method === "POST"
+      ? createCommercialEmbeddedCheckoutSession(request, env)
+      : jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+  }
+
   if (request.method !== "GET") {
     return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
   }

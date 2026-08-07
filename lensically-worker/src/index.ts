@@ -30972,7 +30972,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     }
 
         if (
-      normalizedPath === "/api/commercial/checkout-session"
+            normalizedPath === "/api/commercial/checkout-session"
+      || normalizedPath === "/api/commercial/embedded-checkout-session"
       || normalizedPath === "/api/commercial/download"
     ) {
       return handleCommercialDeliveryRequest(request, env, normalizedPath);

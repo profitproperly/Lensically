@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    COMMERCIAL_EMBEDDED_CHECKOUT_MARKER,
   COMMERCIAL_PAYMENT_LINK_ID,
   COMMERCIAL_PRODUCT_AMOUNT,
   COMMERCIAL_PRODUCT_CURRENCY,
@@ -14,7 +15,8 @@ function paidSession(overrides: Record<string, unknown> = {}) {
     payment_status: "paid",
     amount_total: COMMERCIAL_PRODUCT_AMOUNT,
     currency: COMMERCIAL_PRODUCT_CURRENCY,
-    payment_link: COMMERCIAL_PAYMENT_LINK_ID,
+        payment_link: COMMERCIAL_PAYMENT_LINK_ID,
+    ui_mode: "hosted",
     payment_intent: "pi_commercial123",
     created: 1785698514,
     customer_details: {
@@ -42,8 +44,24 @@ describe("commercial delivery checkout verification", () => {
       customerEmail: "buyer@example.com",
       customerName: "Buyer Name",
       amountTotal: COMMERCIAL_PRODUCT_AMOUNT,
-      currency: COMMERCIAL_PRODUCT_CURRENCY,
+            currency: COMMERCIAL_PRODUCT_CURRENCY,
       checkoutCreatedAt: 1785698514,
+      checkoutSourceId: COMMERCIAL_PAYMENT_LINK_ID,
+    });
+  });
+
+    it("accepts a server-issued embedded checkout session for the same canonical offer", () => {
+    expect(validateCommercialCheckoutSessionPayload(paidSession({
+      payment_link: null,
+      ui_mode: "embedded",
+      metadata: {
+        product_key: "lensically_operator_threads",
+        release: "v1.0.0",
+        checkout_surface: COMMERCIAL_EMBEDDED_CHECKOUT_MARKER,
+      },
+    }))).toMatchObject({
+      ok: true,
+      checkoutSourceId: COMMERCIAL_EMBEDDED_CHECKOUT_MARKER,
     });
   });
 
@@ -57,8 +75,13 @@ describe("commercial delivery checkout verification", () => {
   it("rejects wrong amounts, links, prices, or quantities", () => {
     expect(validateCommercialCheckoutSessionPayload(paidSession({ amount_total: 100 })))
       .toEqual({ ok: false, error: "checkout_amount_mismatch" });
-    expect(validateCommercialCheckoutSessionPayload(paidSession({ payment_link: "plink_other" })))
-      .toEqual({ ok: false, error: "checkout_payment_link_mismatch" });
+        expect(validateCommercialCheckoutSessionPayload(paidSession({ payment_link: "plink_other" })))
+      .toEqual({ ok: false, error: "checkout_source_mismatch" });
+    expect(validateCommercialCheckoutSessionPayload(paidSession({
+      payment_link: null,
+      ui_mode: "embedded",
+      metadata: { checkout_surface: COMMERCIAL_EMBEDDED_CHECKOUT_MARKER },
+    }))).toEqual({ ok: false, error: "checkout_source_mismatch" });
     expect(validateCommercialCheckoutSessionPayload(paidSession({
       line_items: { data: [{ quantity: 1, price: { id: "price_other" } }] },
     }))).toEqual({ ok: false, error: "checkout_line_item_mismatch" });
