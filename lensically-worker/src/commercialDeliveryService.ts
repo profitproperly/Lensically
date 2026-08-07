@@ -139,7 +139,7 @@ export function validateCommercialCheckoutSessionPayload(payload: unknown): Comm
   );
   const sessionUiMode = stringValue(session.ui_mode, 40);
   const isCanonicalEmbeddedCheckout =
-    (sessionUiMode === "embedded" || sessionUiMode === "embedded_page")
+    (sessionUiMode === "embedded" || sessionUiMode === "embedded_page" || sessionUiMode === "elements")
     && stringValue(metadata?.checkout_surface, 80) === COMMERCIAL_EMBEDDED_CHECKOUT_MARKER
     && stringValue(metadata?.product_key, 120) === COMMERCIAL_PRODUCT_KEY
     && stringValue(metadata?.release, 80) === COMMERCIAL_PRODUCT_RELEASE;
@@ -225,7 +225,7 @@ async function createCommercialEmbeddedCheckoutSession(
 
   const params = new URLSearchParams();
   params.set("mode", "payment");
-  params.set("ui_mode", "embedded_page");
+  params.set("ui_mode", "elements");
   params.set("redirect_on_completion", "always");
   params.set("line_items[0][price]", COMMERCIAL_PRODUCT_PRICE_ID);
   params.set("line_items[0][quantity]", "1");
