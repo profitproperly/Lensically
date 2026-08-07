@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIRECTORY = resolve(fileURLToPath(new URL(".", import.meta.url)));
@@ -57,8 +57,8 @@ function countRegex(source, pattern) {
 
 function resolveRepositoryPath(relativePath) {
   const path = resolve(WORKER_ROOT, requireNonemptyString(relativePath, "release_acceptance_source_path_missing"));
-  const repositoryRelative = path.slice(REPOSITORY_ROOT.length + 1);
-  if (!path.startsWith(`${REPOSITORY_ROOT}/`) && path !== REPOSITORY_ROOT) {
+  const repositoryRelative = relative(REPOSITORY_ROOT, path);
+  if (repositoryRelative.startsWith("..") || resolve(repositoryRelative) === repositoryRelative) {
     fail("release_acceptance_source_outside_repository", relativePath);
   }
   if (!existsSync(path)) fail("release_acceptance_source_missing", repositoryRelative || relativePath);

@@ -1,12 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     COMMERCIAL_EMBEDDED_CHECKOUT_MARKER,
   COMMERCIAL_PAYMENT_LINK_ID,
   COMMERCIAL_PRODUCT_AMOUNT,
   COMMERCIAL_PRODUCT_CURRENCY,
   COMMERCIAL_PRODUCT_PRICE_ID,
+  handleCommercialDeliveryRequest,
   validateCommercialCheckoutSessionPayload,
 } from "../src/commercialDeliveryService";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function paidSession(overrides: Record<string, unknown> = {}) {
   return {
@@ -88,5 +93,29 @@ describe("commercial delivery checkout verification", () => {
     expect(validateCommercialCheckoutSessionPayload(paidSession({
       line_items: { data: [{ quantity: 2, price: { id: COMMERCIAL_PRODUCT_PRICE_ID } }] },
     }))).toEqual({ ok: false, error: "checkout_line_item_mismatch" });
+  });
+
+  it("creates embedded checkout sessions that return to the root sales download route", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "cs_live_embedded123",
+      client_secret: "cs_live_embedded123_secret_abc",
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await handleCommercialDeliveryRequest(
+      new Request("https://api.lensically.com/api/commercial/embedded-checkout-session", { method: "POST" }),
+      {
+        DB: {} as D1Database,
+        LENSICALLY_STRIPE_KEY: "sk_live_testsecret",
+        LENSICALLY_STRIPE_PUBLISHABLE_KEY: "pk_live_testpublishable",
+        ROOT_SITE_URL: "https://lensically.com",
+      },
+      "/api/commercial/embedded-checkout-session",
+    );
+
+    expect(response.status).toBe(200);
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body);
+    const params = new URLSearchParams(body);
+    expect(params.get("ui_mode")).toBe("embedded");
+    expect(params.get("return_url")).toBe("https://lensically.com/download/?session_id={CHECKOUT_SESSION_ID}");
   });
 });

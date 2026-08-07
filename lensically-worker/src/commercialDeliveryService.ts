@@ -21,6 +21,7 @@ export interface CommercialDeliveryEnv {
   LENSICALLY_STRIPE_PUBLISHABLE_KEY?: string;
   GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
+  ROOT_SITE_URL?: string;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -217,7 +218,7 @@ async function createCommercialEmbeddedCheckoutSession(
   params.set("redirect_on_completion", "always");
   params.set("line_items[0][price]", COMMERCIAL_PRODUCT_PRICE_ID);
   params.set("line_items[0][quantity]", "1");
-  params.set("return_url", `${new URL(request.url).origin}/operator/download/?session_id={CHECKOUT_SESSION_ID}`);
+  params.set("return_url", `${env.ROOT_SITE_URL?.trim() || "https://lensically.com"}/download/?session_id={CHECKOUT_SESSION_ID}`);
   params.set("metadata[product_key]", COMMERCIAL_PRODUCT_KEY);
   params.set("metadata[release]", COMMERCIAL_PRODUCT_RELEASE);
   params.set("metadata[checkout_surface]", COMMERCIAL_EMBEDDED_CHECKOUT_MARKER);

@@ -9,6 +9,7 @@
 - Active Innovation state is not copied into Main persistence. The paired UI state is derived read-only from the released Main Champion and physically isolated `SHADOW_DB` run/benchmark receipts. Main stores only released Champion identity and immutable promotion history.
 - Read-only `/api/cycles/*` surfaces provide current paired state, server-paginated Main/Innovation history, bounded summaries, six-row source-selection previews, and exact persisted Stage 4 detail on demand. Missing historical fields are labeled unavailable rather than inferred.
 - Public compliance routes are `/privacy`, `/terms`, and `/data-deletion`.
+- Production public sales routes are served from `lensically-worker/public/` at `https://lensically.com/`, including root checkout, `/download/`, `/license/`, `/refund-policy/`, `/privacy`, `/terms`, and `/data-deletion`. The private operational Next.js app is canonical at `https://app.lensically.com/`.
 - Backend persistence is the source of truth for accounts, workflow state, schedules, presets, strategy memory, source lineage, performance snapshots, and continuity. Browser storage is convenience-only.
 
 ## Operator MCP
@@ -141,10 +142,11 @@
 ## Deployment Targets
 
 - GitHub remote: `origin`
-- Frontend Cloudflare target: `lensically-web`
+- Private operational frontend Cloudflare target: `lensically-web`
 - Backend Cloudflare target: `lensically-worker`
 - Production API: `api.lensically.com`
-- Production web: `lensically.com`
+- Production public sales web: `lensically.com`
+- Production private app web: `app.lensically.com`
 
 ## Maintenance Rule
 

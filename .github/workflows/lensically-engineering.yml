@@ -675,7 +675,7 @@ jobs:
               && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
               scheduler_ok=true
             fi
-                        if curl --fail-with-body --silent --show-error "https://lensically.com/dashboard" > /tmp/lensically-dashboard.html \
+                        if curl --fail-with-body --silent --show-error "https://app.lensically.com/dashboard" > /tmp/lensically-dashboard.html \
               && grep -q "Operator Dashboard" /tmp/lensically-dashboard.html; then
               dashboard_ok=true
             fi
@@ -683,11 +683,11 @@ jobs:
               && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null and .innovation.latest_run.state == "promoted" and .innovation.latest_run.promotion_destination_version == "v1.0.0"' /tmp/lensically-cycles-state.json > /dev/null; then
               cycles_api_ok=true
             fi
-                        if curl --fail-with-body --silent --show-error "https://lensically.com/cycles" > /tmp/lensically-cycles.html \
+                        if curl --fail-with-body --silent --show-error "https://app.lensically.com/cycles" > /tmp/lensically-cycles.html \
               && grep -Fq 'app/(internal)/cycles/page-' /tmp/lensically-cycles.html; then
               cycles_page_ok=true
             fi
-            if curl --fail-with-body --silent --show-error "https://lensically.com/site.webmanifest" > /tmp/lensically-site.webmanifest \
+            if curl --fail-with-body --silent --show-error "https://app.lensically.com/site.webmanifest" > /tmp/lensically-site.webmanifest \
               && jq -e '.cycles_contract == "unified-source-ranking-v2"' /tmp/lensically-site.webmanifest > /dev/null; then
               cycles_contract_ok=true
             fi

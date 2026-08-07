@@ -52,9 +52,15 @@ jobs:
           const zones = await read(`${api}/zones?name=lensically.com`);
           const zone = Array.isArray(zones) ? zones[0] : null;
           if (zone?.id) {
-            const dns = await read(`${api}/zones/${zone.id}/dns_records?name=lensically.com`);
-            for (const record of Array.isArray(dns) ? dns : []) {
-              console.log(`root-dns=${record.type}:${record.name}:${record.content}:proxied=${record.proxied}`);
+            try {
+              const dns = await read(`${api}/zones/${zone.id}/dns_records?per_page=100`);
+              for (const record of Array.isArray(dns) ? dns : []) {
+                if (['lensically.com', 'app.lensically.com', 'api.lensically.com'].includes(record.name)) {
+                  console.log(`dns=${record.type}:${record.name}:${record.content}:proxied=${record.proxied}`);
+                }
+              }
+            } catch {
+              console.log('dns-read=unavailable');
             }
             try {
               const routes = await read(`${api}/zones/${zone.id}/workers/routes`);
@@ -100,10 +106,16 @@ jobs:
             fi
           }
 
-          check_page pages-dev https://lensically-operator.pages.dev/operator/
-          custom_domain_ok=0
-          if check_page custom-domain https://lensically.com/operator/; then
-            custom_domain_ok=1
+          check_page root-sales https://lensically.com/
+
+          app_status="$(curl --silent --show-error --output /tmp/app-root.html --write-out '%{http_code}' --location https://app.lensically.com/)"
+          echo "app-root-http=$app_status"
+          test "$app_status" = "200"
+          if grep -Eq 'Lensically|dashboard|__next' /tmp/app-root.html; then
+            echo 'app-operational-root=ok'
+          else
+            echo 'app-operational-root=missing'
+            exit 24
           fi
 
           headers="$(mktemp)"
@@ -143,9 +155,4 @@ jobs:
           if (!Object.values(checks).every(Boolean)) process.exit(41);
           console.log('Live embedded Checkout endpoint passed without exposing checkout credentials.');
           NODE
-
-          if [ "$custom_domain_ok" != "1" ]; then
-            echo 'custom-domain-cutover=required'
-            exit 51
-          fi
           echo 'live-commercial-checkout=ok'

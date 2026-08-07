@@ -68,7 +68,7 @@ if (process.argv.includes("--live")) {
     { name: "worker_health", url: "https://api.lensically.com/health", expected: 200 },
     { name: "operator_health", url: "https://api.lensically.com/api/operator/health", expected: 200 },
     { name: "scheduler_health", url: "https://api.lensically.com/api/operator/scheduler-health", expected: 200 },
-    { name: "dashboard", url: "https://lensically.com/dashboard", expected: 200 },
+    { name: "dashboard", url: "https://app.lensically.com/dashboard", expected: 200 },
     { name: "retired_gpt_memory", url: "https://api.lensically.com/api/gpt-memory/dashboard", expected: 410 },
     { name: "retired_agent", url: "https://api.lensically.com/api/agent/accounts", expected: 410 },
     { name: "retired_intelligence_ui", url: "https://api.lensically.com/api/threads/intelligence-dashboard", expected: 410 },

@@ -9,18 +9,19 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
 const commercialDeliveryService = read("src/commercialDeliveryService.ts");
-const commercialSalesPage = read("public/operator/index.html");
-const commercialDownloadPage = read("public/operator/download/index.html");
+const commercialSalesPage = read("public/index.html");
+const commercialDownloadPage = read("public/download/index.html");
 const commercialPrivacyPage = read("public/privacy.html");
 const commercialTermsPage = read("public/terms.html");
 const commercialDeletionPage = read("public/data-deletion/index.html");
-const commercialRefundPage = read("public/operator/refund-policy/index.html");
+const commercialRefundPage = read("public/refund-policy/index.html");
 const commercialPreflightFailures = [
   [commercialDeliveryService.includes('COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0"'), "commercial_payment_link_identity_missing"],
   [commercialDeliveryService.includes('COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx"'), "commercial_price_identity_missing"],
   [commercialSalesPage.includes("https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01"), "commercial_checkout_link_missing"],
-  [commercialDownloadPage.includes("window.location.hostname !== 'api.lensically.com'"), "commercial_root_to_api_handoff_missing"],
-  [commercialDownloadPage.includes("https://api.lensically.com/operator/download/"), "commercial_api_download_origin_missing"],
+  [commercialSalesPage.includes('<link rel="canonical" href="https://lensically.com/">'), "commercial_root_canonical_missing"],
+  [commercialSalesPage.includes('id="embedded-checkout"'), "commercial_root_embedded_checkout_missing"],
+  [commercialDownloadPage.includes("https://api.lensically.com/api/commercial/checkout-session"), "commercial_download_api_origin_missing"],
   [commercialDownloadPage.includes("/api/commercial/checkout-session?session_id="), "commercial_checkout_verification_call_missing"],
   [commercialPrivacyPage.includes("support@lensically.com"), "commercial_privacy_support_channel_missing"],
   [commercialTermsPage.includes("support@lensically.com"), "commercial_terms_support_channel_missing"],
