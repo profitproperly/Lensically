@@ -1,0 +1,78 @@
+name: Lensically Cloudflare Pages Domain
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    steps:
+      - name: Attach lensically.com to commercial Pages project
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          if (!token || !account) throw new Error('cloudflare_credentials_missing');
+
+          const project = 'lensically-operator';
+          const domain = 'lensically.com';
+          const base = `https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/domains`;
+          const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          };
+
+          const parse = async (response) => {
+            const payload = await response.json().catch(() => null);
+            return { response, payload };
+          };
+
+          let lookup = await parse(await fetch(`${base}/${domain}`, { headers }));
+          if (lookup.response.status === 404) {
+            const created = await parse(await fetch(base, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ name: domain }),
+            }));
+            if (!created.response.ok || !created.payload?.success) {
+              const code = created.payload?.errors?.[0]?.code ?? 'unknown';
+              const message = created.payload?.errors?.[0]?.message ?? `HTTP ${created.response.status}`;
+              throw new Error(`pages_domain_create_failed_${code}:${message}`);
+            }
+            console.log('pages-domain-created=true');
+          } else if (!lookup.response.ok || !lookup.payload?.success) {
+            throw new Error(`pages_domain_lookup_failed_${lookup.response.status}`);
+          } else {
+            console.log('pages-domain-created=false');
+          }
+
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            lookup = await parse(await fetch(`${base}/${domain}`, { headers }));
+            if (!lookup.response.ok || !lookup.payload?.success) {
+              throw new Error(`pages_domain_poll_failed_${lookup.response.status}`);
+            }
+            const result = lookup.payload.result || {};
+            const status = result.status || 'unknown';
+            const validation = result.validation_data?.status || 'unknown';
+            const verification = result.verification_data?.status || 'unknown';
+            console.log(`pages-domain-status=${status};validation=${validation};verification=${verification};attempt=${attempt}`);
+            if (status === 'active') process.exit(0);
+            if (['blocked', 'error', 'deactivated'].includes(status)) {
+              const validationError = result.validation_data?.error_message || 'none';
+              const verificationError = result.verification_data?.error_message || 'none';
+              throw new Error(`pages_domain_terminal_${status}:validation=${validationError}:verification=${verificationError}`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+          throw new Error('pages_domain_activation_timeout');
+          NODE
