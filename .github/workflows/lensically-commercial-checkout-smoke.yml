@@ -12,7 +12,7 @@ jobs:
     environment: production
     timeout-minutes: 5
     steps:
-      - name: Inspect Cloudflare Pages topology
+      - name: Inspect Cloudflare production topology
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -23,19 +23,52 @@ jobs:
           const token = process.env.CLOUDFLARE_API_TOKEN;
           const account = process.env.CLOUDFLARE_ACCOUNT_ID;
           if (!token || !account) throw new Error('cloudflare_credentials_missing');
-          const url = `https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/lensically-operator`;
-          const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-          const payload = await response.json();
-          if (!response.ok || !payload?.success) throw new Error(`pages_project_lookup_failed_${response.status}`);
-          const project = payload.result || {};
-          const latest = project.latest_deployment || {};
-          const trigger = latest.deployment_trigger?.metadata || {};
-          console.log(`pages-project=${project.name || 'unknown'}`);
-          console.log(`pages-production-branch=${project.production_branch || 'unknown'}`);
-          console.log(`pages-domains=${Array.isArray(project.domains) ? project.domains.join(',') : 'none'}`);
-          console.log(`pages-latest-url=${latest.url || 'unknown'}`);
-          console.log(`pages-latest-branch=${trigger.branch || 'unknown'}`);
-          console.log(`pages-latest-commit=${trigger.commit_hash || 'unknown'}`);
+          const headers = { Authorization: `Bearer ${token}` };
+          const api = 'https://api.cloudflare.com/client/v4';
+          const read = async (url) => {
+            const response = await fetch(url, { headers });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) throw new Error(`cloudflare_read_failed_${response.status}`);
+            return payload.result;
+          };
+
+          const project = await read(`${api}/accounts/${account}/pages/projects/lensically-operator`);
+          const latest = project?.latest_deployment || {};
+          const trigger = latest?.deployment_trigger?.metadata || {};
+          console.log(`pages-project=${project?.name || 'unknown'}`);
+          console.log(`pages-production-branch=${project?.production_branch || 'unknown'}`);
+          console.log(`pages-domains=${Array.isArray(project?.domains) ? project.domains.join(',') : 'none'}`);
+          console.log(`pages-latest-url=${latest?.url || 'unknown'}`);
+          console.log(`pages-latest-branch=${trigger?.branch || 'unknown'}`);
+
+          const projects = await read(`${api}/accounts/${account}/pages/projects`);
+          for (const entry of Array.isArray(projects) ? projects : []) {
+            const domains = Array.isArray(entry?.domains) ? entry.domains : [];
+            if (domains.some((domain) => String(domain).includes('lensically'))) {
+              console.log(`pages-map=${entry.name}:${domains.join('|')}`);
+            }
+          }
+
+          const zones = await read(`${api}/zones?name=lensically.com`);
+          const zone = Array.isArray(zones) ? zones[0] : null;
+          if (zone?.id) {
+            const dns = await read(`${api}/zones/${zone.id}/dns_records?name=lensically.com`);
+            for (const record of Array.isArray(dns) ? dns : []) {
+              console.log(`root-dns=${record.type}:${record.name}:${record.content}:proxied=${record.proxied}`);
+            }
+            try {
+              const routes = await read(`${api}/zones/${zone.id}/workers/routes`);
+              for (const route of Array.isArray(routes) ? routes : []) {
+                if (String(route?.pattern || '').includes('lensically.com')) {
+                  console.log(`worker-route=${route.pattern}:${route.script || 'none'}`);
+                }
+              }
+            } catch {
+              console.log('worker-route-read=unavailable');
+            }
+          } else {
+            console.log('lensically-zone=missing');
+          }
           NODE
 
       - name: Verify live sales page and embedded Checkout session
@@ -68,7 +101,10 @@ jobs:
           }
 
           check_page pages-dev https://lensically-operator.pages.dev/operator/
-          check_page custom-domain https://lensically.com/operator/
+          custom_domain_ok=0
+          if check_page custom-domain https://lensically.com/operator/; then
+            custom_domain_ok=1
+          fi
 
           headers="$(mktemp)"
           body="$(mktemp)"
@@ -105,5 +141,11 @@ jobs:
           console.log(`live-session-present=${checks.liveSession}`);
           console.log(`error-code=${typeof payload.error === 'string' ? payload.error : 'none'}`);
           if (!Object.values(checks).every(Boolean)) process.exit(41);
-          console.log('Live embedded Checkout smoke passed without exposing checkout credentials.');
+          console.log('Live embedded Checkout endpoint passed without exposing checkout credentials.');
           NODE
+
+          if [ "$custom_domain_ok" != "1" ]; then
+            echo 'custom-domain-cutover=required'
+            exit 51
+          fi
+          echo 'live-commercial-checkout=ok'
