@@ -22,7 +22,7 @@
     .page { width:min(var(--column),calc(100% - 36px)); margin:0 auto; }
     .top { padding:26px 0 18px; }
     .brand { display:inline-flex; align-items:center; gap:9px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:-.02em; }
-    .brand-mark { width:28px; height:28px; border:1.5px solid var(--ink); border-radius:8px; display:grid; place-items:center; font-size:14px; font-weight:900; }
+    .brand-mark { width:32px; height:32px; display:block; object-fit:contain; }
     .cover { min-height:302px; overflow:hidden; border:1px solid #dcdcdc; border-radius:14px; background:#f7f7f7; padding:30px; display:grid; grid-template-columns:.88fr 1.12fr; gap:22px; align-items:center; }
     .cover-copy small { display:block; margin-bottom:14px; color:#777; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .cover-copy strong { display:block; max-width:250px; font-size:36px; line-height:.95; letter-spacing:-.06em; }
@@ -41,7 +41,7 @@
     h1 { margin-bottom:4px; font-size:31px; line-height:1.08; letter-spacing:-.045em; }
     .subtitle { margin:0; color:#30343a; font-size:16px; line-height:1.45; }
     .seller { margin-top:14px; display:flex; align-items:center; gap:9px; font-size:14px; }
-    .seller-dot { width:26px; height:26px; display:grid; place-items:center; border-radius:50%; background:#111; color:#fff; font-size:12px; font-weight:900; }
+    .seller-logo { width:28px; height:28px; display:block; object-fit:contain; }
     .price-row { margin-top:17px; display:flex; align-items:baseline; gap:10px; }
     .price { font-size:34px; line-height:1; font-weight:850; letter-spacing:-.04em; }
     .price-note { color:#777; font-size:13px; }
@@ -95,7 +95,7 @@
 </head>
 <body>
   <div class="page">
-    <div class="top"><a class="brand" href="/operator/" aria-label="Lensically Operator home"><span class="brand-mark">L</span><span>Lensically</span></a></div>
+    <div class="top"><a class="brand" href="/operator/" aria-label="Lensically Operator home"><img class="brand-mark" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-black-no-border.png" alt="Lensically logo"><span>Lensically</span></a></div>
     <main>
       <section class="cover" aria-label="Lensically Operator product preview">
         <div class="cover-copy"><small>AI-operated Threads system</small><strong>Run the operation, not just the posts.</strong><p>Research. Create. Quality check. Schedule. Measure. Learn. Repeat.</p></div>
@@ -107,7 +107,7 @@
       <section class="intro">
         <h1>Lensically Operator for Threads</h1>
         <p class="subtitle">The AI-operated system that researches, creates, schedules, measures, and improves your Threads content.</p>
-        <div class="seller"><span class="seller-dot">L</span><span>Lensically</span></div>
+        <div class="seller"><img class="seller-logo" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-black-no-border.png" alt=""><span>Lensically</span></div>
         <div class="price-row"><span class="price">$997</span><span class="price-note">one-time purchase</span></div>
         <a class="cta" href="https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01">Get Lensically Operator</a>
         <p class="micro">Secure Stripe checkout. Private versioned download after verified payment.</p>
