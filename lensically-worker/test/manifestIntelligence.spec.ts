@@ -6,6 +6,7 @@ import {
 } from "../src/manifestIntelligence";
 
 import { executeManifestD1WriteBatches } from "../src/manifestIntelligenceEngine";
+import { persistManifestSavedPatternIntelligenceBatch } from "../src/manifestMeasurementAudit";
 
 describe("Manifest follower attribution boundary", () => {
   it("allows explicit no-attribution policy statements that use a no-follower noun phrase", () => {
@@ -91,7 +92,7 @@ describe("Manifest D1 write batching", () => {
     expect(observedBatchSizes).toEqual([40, 40, 15]);
   });
 
-  it("does not call D1 for an empty write set", async () => {
+    it("does not call D1 for an empty write set", async () => {
     let calls = 0;
     const db = {
       batch: async () => {
@@ -105,6 +106,22 @@ describe("Manifest D1 write batching", () => {
       batch_count: 0,
     });
     expect(calls).toBe(0);
+  });
+
+  it("persists Saved Pattern intelligence through bounded batches", async () => {
+    const observedBatchSizes: number[] = [];
+    const db = {
+      batch: async (statements: D1PreparedStatement[]) => {
+        observedBatchSizes.push(statements.length);
+        return [];
+      },
+    } as unknown as Pick<D1Database, "batch">;
+    const statements = Array.from({ length: 159 }, (_, index) => ({ index } as unknown as D1PreparedStatement));
+
+    const receipt = await persistManifestSavedPatternIntelligenceBatch(db, statements, 40);
+
+    expect(receipt).toEqual({ statement_count: 159, batch_count: 4 });
+    expect(observedBatchSizes).toEqual([40, 40, 40, 39]);
   });
 });
 

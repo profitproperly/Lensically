@@ -3612,8 +3612,13 @@ const manifestAutonomousGrowthChecks = [
     && manifestIntelligence.includes('response_bytes_estimated: true')
     && manifestIntelligence.includes('Math.min(MANIFEST_EVIDENCE_RESPONSE_MAX_BYTES, storedPageBytes + 2048)')],
   ["likes_first", manifestIntelligence.includes('primary_metric: "24_hour_likes"')],
-  ["single_cycle_strategy_writer", !source.includes("ensureManifestStrategyVersion")
+    ["single_cycle_strategy_writer", !source.includes("ensureManifestStrategyVersion")
     && !manifestMeasurementAudit.includes("ensureManifestStrategyVersion")],
+  ["measurement_audit_transport_safe", manifestMeasurementAudit.includes("persistManifestSavedPatternIntelligenceBatch")
+    && manifestMeasurementAudit.includes("write_statement_count")
+    && manifestMeasurementAudit.includes("write_batch_count")
+    && manifestMeasurementAudit.includes("component_durations_ms")
+    && tests.includes("persists Saved Pattern intelligence through bounded batches")],
     ["one_cycle_strategy", manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies")
     && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")
     && manifestIntelligence.includes('table: "operator_manifest_cycle_strategies"')

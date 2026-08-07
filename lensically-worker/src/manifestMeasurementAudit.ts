@@ -4,9 +4,10 @@ import {
   getLatestManifestStrategyVersion,
 } from "./manifestIntelligence";
 import {
-  buildManifestSemanticSignature,
+    buildManifestSemanticSignature,
   compareManifestSemanticSignatures,
   ensureManifestIntelligenceEngineTables,
+  executeManifestD1WriteBatches,
   type ManifestSemanticSignature,
 } from "./manifestIntelligenceEngine";
 import { assertDatabaseIntegrity } from "./databaseIntegrity";
@@ -851,6 +852,14 @@ export function buildManifestSavedPatternIntelligence(input: {
   };
 }
 
+export async function persistManifestSavedPatternIntelligenceBatch(
+  db: Pick<D1Database, "batch">,
+  statements: D1PreparedStatement[],
+  batchSize = 40,
+): Promise<{ statement_count: number; batch_count: number }> {
+  return executeManifestD1WriteBatches(db, statements, batchSize);
+}
+
 export async function refreshManifestSavedPatternIntelligence(db: D1Database, input: {
   brand_key: string;
   account_id: string;
@@ -930,10 +939,11 @@ export async function refreshManifestSavedPatternIntelligence(db: D1Database, in
     matches.sort((a, b) => number(b.semantic_score) - number(a.semantic_score));
     similarityByIdentity.set(left.source_identity_key, matches.slice(0, 10));
   }
-  let readyCount = 0;
+    let readyCount = 0;
   let provenCount = 0;
   let coolingCount = 0;
   let excludedCount = 0;
+  const writeStatements: D1PreparedStatement[] = [];
   for (const pattern of patternRows) {
     const intelligence = buildManifestSavedPatternIntelligence({
       pattern,
@@ -949,7 +959,7 @@ export async function refreshManifestSavedPatternIntelligence(db: D1Database, in
     if (reuseState === "proven") provenCount += 1;
     if (reuseState === "cooling") coolingCount += 1;
     if (reuseState === "excluded") excludedCount += 1;
-    await db.prepare(`INSERT INTO operator_manifest_saved_pattern_intelligence (
+        writeStatements.push(db.prepare(`INSERT INTO operator_manifest_saved_pattern_intelligence (
         id, brand_key, pattern_identity_key, external_pattern_id, source_identity_key,
         verified_metrics_json, semantic_json, mechanism_json, adaptation_options_json,
         similarity_json, usage_json, results_json, confidence_json, reuse_state,
@@ -970,14 +980,17 @@ export async function refreshManifestSavedPatternIntelligence(db: D1Database, in
         stableJson(intelligence.adaptation_options), stableJson(intelligence.similarity),
         stableJson(intelligence.prior_uses), stableJson(intelligence.results), stableJson(intelligence.confidence),
         reuseState, machine(intelligence.exclusion_state), safeIso(pattern.updated_at), MANIFEST_SAVED_PATTERN_INTELLIGENCE_VERSION,
-      ).run();
+      ));
   }
+  const writeReceipt = await persistManifestSavedPatternIntelligenceBatch(db, writeStatements);
   return {
     qualified_pattern_count: patternRows.length,
     ready_count: readyCount,
     proven_count: provenCount,
     cooling_count: coolingCount,
     excluded_count: excludedCount,
+    write_statement_count: writeReceipt.statement_count,
+    write_batch_count: writeReceipt.batch_count,
   };
 }
 
@@ -1156,18 +1169,28 @@ export async function refreshManifestMeasurementAudit(db: D1Database, input: {
   saved_patterns_app_user_id: string;
   cycle_id?: string | null;
 }): Promise<JsonRecord> {
-  await ensureManifestMeasurementAuditTables(db);
+    await ensureManifestMeasurementAuditTables(db);
+  const startedAt = Date.now();
+  const componentDurations: Record<string, number> = {};
+  let componentStartedAt = Date.now();
   const savedPatterns = await refreshManifestSavedPatternIntelligence(db, {
     brand_key: input.brand_key,
     account_id: input.account_id,
     app_user_id: input.saved_patterns_app_user_id,
   });
+  componentDurations.saved_patterns = Date.now() - componentStartedAt;
+  componentStartedAt = Date.now();
   const followerCheckpoint = await refreshManifestFollowerCheckpoint(db, {
     brand_key: input.brand_key,
     threads_user_id: input.threads_user_id,
   });
+  componentDurations.follower_checkpoint = Date.now() - componentStartedAt;
+  componentStartedAt = Date.now();
   const learningBrief = await refreshManifestLearningBrief(db, input.brand_key);
+  componentDurations.learning_brief = Date.now() - componentStartedAt;
+  componentStartedAt = Date.now();
   const benchmarks = await refreshManifestBenchmarks(db, input.brand_key, input.cycle_id ?? null);
+  componentDurations.benchmarks = Date.now() - componentStartedAt;
   return {
     version: MANIFEST_MEASUREMENT_AUDIT_VERSION,
     learning_brief: {
@@ -1183,12 +1206,14 @@ export async function refreshManifestMeasurementAudit(db: D1Database, input: {
     },
     run_comparison: benchmarks.comparison,
     saved_patterns: savedPatterns,
-    follower_checkpoint: {
+        follower_checkpoint: {
       snapshot_date: followerCheckpoint.snapshot_date,
       followers_count: followerCheckpoint.followers_count,
       distance_to_goal: followerCheckpoint.distance_to_goal,
       account_level_only: true,
     },
+    component_durations_ms: componentDurations,
+    elapsed_ms: Date.now() - startedAt,
   };
 }
 
