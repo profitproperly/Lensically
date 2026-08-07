@@ -14,7 +14,7 @@
   <title>Lensically Operator for Threads</title>
   <link rel="canonical" href="https://lensically.com/">
   <style>
-    :root { color-scheme: light; --ink:#111; --line:#e7e7e7; --paper:#fff; --column:660px; --stripe-summary-crop:-92px; --checkout-policy-version:1; --sticky-trigger-version:1; --sticky-style-version:1; }
+    :root { color-scheme: light; --ink:#111; --line:#e7e7e7; --paper:#fff; --column:660px; --stripe-summary-crop:-92px; --checkout-policy-version:1; --sticky-trigger-version:1; --sticky-style-version:1; --sticky-hide-version:1; }
     * { box-sizing:border-box; }
     html { scroll-behavior:smooth; }
     body { margin:0; min-width:320px; background:var(--paper); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; padding-bottom:110px; }
@@ -302,11 +302,12 @@
 
       const updateStickyBuy = () => {
         if (!stickyBuy || !shell) return;
-        const checkoutTop = shell.getBoundingClientRect().top;
+        const checkoutSection = document.getElementById('checkout');
+        const checkoutRect = checkoutSection ? checkoutSection.getBoundingClientRect() : shell.getBoundingClientRect();
         const firstCtaBottom = firstCta ? firstCta.getBoundingClientRect().bottom : 0;
         const firstButtonOutOfFrame = firstCtaBottom <= 0;
-        const beforeCheckout = checkoutTop > window.innerHeight * 0.92;
-        const shouldShow = firstButtonOutOfFrame && beforeCheckout;
+        const checkoutInView = checkoutRect.top < window.innerHeight && checkoutRect.bottom > 0;
+        const shouldShow = firstButtonOutOfFrame && !checkoutInView;
         stickyBuy.classList.toggle('is-visible', shouldShow);
         stickyBuy.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
       };
