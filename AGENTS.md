@@ -11,9 +11,16 @@
 
 ## Startup
 
+- If the session starts in `C:\Auto-Threads`, treat it only as the parent workspace and immediately switch to the real Lensically git repository at `C:\Auto-Threads\lensically` before git status, git pull, file reads, continuation reads, validation, or edits.
 - Read `AGENTS.md`, `OPERATING_MEMORY.md`, and `CURRENT_STATE.md` before Lensically work.
+- Because most Lensically work happens in ChatGPT/web/cloud, local source is often behind. At every new session, after reading startup files, run `git status --short --branch`, then update local `main` from GitHub `main` before relying on local source or editing. Preserve unrelated local changes; if the tree is dirty, inspect status and use a safe non-destructive update path.
 - Before any Lensically continuation decision, call `getEngineeringContinuation`. Root `ENGINEERING_CONTINUATION.md` is the sole canonical ledger for every active, queued, and captured job, with explicit precedence and exactly one current action. Chat history, D1 work-state tables, action-closure receipts, Growth Mission records, and other documents are non-authoritative evidence only.
-- GitHub `main` is authoritative. Pull current source before local Codex work and preserve unrelated changes.
+- GitHub `main` is authoritative. Pull or otherwise fast-forward current source before local Codex work while preserving unrelated changes.
+- Do not leave Lensically dirty at handoff. Before final, either commit and push intentional changes, add generated/local artifacts to `.gitignore`, or remove truly disposable generated files. Never leave uncommitted tracked changes or untracked artifacts without an explicit blocker.
+- Lensically uses the Profit Properly GitHub and Cloudflare estate. Do not use Brian's global default Cloudflare profile for Lensically Cloudflare diagnostics. The project Cloudflare account is recorded in `.wrangler/cache/wrangler-account.json` and must match `42ea358a42af1def2087ba93a2391b3d`.
+- Profit Properly Cloudflare access requires the project token/profile reference `fancy-math-e8d1`. Treat this as the required credential pointer for Lensically Cloudflare Worker Builds, deployments, D1, and account-scoped API checks; never print or store the underlying secret token value.
+- Local Codex should use Windows user environment variables for Profit Properly Cloudflare access before Recovery: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID=42ea358a42af1def2087ba93a2391b3d`. Verified on 2026-08-01: `npx wrangler whoami` reports the Profit Properly account and `npx wrangler deployments list --config wrangler.jsonc` reads `lensically-worker`.
+- If local Wrangler auth is stale, missing, or under-permissioned, use the Lensically Recovery MCP Cloudflare tools for read-only Worker state, deployments, bindings, domains, telemetry, and authorized recovery operations. Verified working tool: `lensically_recovery.getCloudflareWorkerState` reads `lensically-worker` in the Profit Properly account.
 - Read the target integration point before editing. Do not restore removed systems because old commits or stale documentation mention them.
 - A deployed MCP schema change that leaves the current chat holding an older closed schema is an expected client-refresh handoff, not a Lensically product blocker, engineering incident, or reason to design a compatibility workaround. Do not keep reading, invoke Recovery, weaken the new schema, add a bridge, or continue engineering around the stale chat. Report the completed work, exact deployed SHA and version, validation and live state, state that the current chat must refresh before further Main calls, stop the turn, and end with the exact standalone line: `refresh the lensically operator mode mcp now`.
 
@@ -62,6 +69,7 @@
 ## Repository and Git
 
 - Check the current repository head before mutations.
+- Use Profit Properly credentials for `profitproperly/Lensically`. Do not fall back to global personal GitHub or Cloudflare identity unless the owner explicitly asks for that account.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
 - Known exact files should be read once through the main bounded file-read route and searched locally. Free-text or unknown-location repository discovery uses Recovery; do not send it through the main public gateway.
 - Exact text replacements must match once. A stale head or ambiguous anchor requires refreshed source and corrected input, not a new route.

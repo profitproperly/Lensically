@@ -25865,6 +25865,8 @@ function sanitizeImportedPatternText(
       next = next.replace(/^@?[a-z0-9._]{2,40}\s+\d+\s*(?:s|m|h|d|w|mo|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\s+/i, "");
       next = next.replace(/^\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mos?|mo|years?|yrs?|y)\b\s*/i, "");
+      next = next.replace(/^\/?\d{1,2}\/\d{2,4}\s*more\s*/i, "");
+      next = next.replace(/^\/?\d{1,2}\/\d{1,2}\/\d{2,4}\s*more\s*/i, "");
       next = next.replace(/^\/\s*\d+\s+/i, "");
       return next.trim();
     })
@@ -26097,6 +26099,61 @@ async function deleteExternalPatterns(
     .run();
 
   return Number(result.meta.changes ?? 0);
+}
+
+async function updateExternalPatternText(
+  env: Env,
+  appUserId: string,
+  accountId: string,
+  id: number,
+  rawPostText: string,
+): Promise<ExternalPatternRow | null> {
+  await ensureExternalPatternsTable(env);
+
+  const patternId = Number(id);
+  if (!Number.isInteger(patternId) || patternId <= 0) {
+    throw new Error("pattern_id_is_required");
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT id, app_user_id, platform, source_url, post_id, author_handle, author_display_name,
+            account_id, post_text, likes, replies, reposts, shares, views, posted_at, capture_confidence,
+            raw_payload, saved_at, updated_at
+     FROM external_patterns
+     WHERE id = ?
+       AND app_user_id = ?
+       AND account_id = ?
+     LIMIT 1`,
+  ).bind(patternId, appUserId, accountId).first<ExternalPatternRow>();
+
+  if (!existing) {
+    return null;
+  }
+
+  const sanitizedText = sanitizeImportedPatternText(
+    normalizePatternString(rawPostText, { maxLength: 20000 }),
+    derivePatternAuthorHandleFromSourceUrl(existing.source_url) ?? existing.author_handle,
+    existing.author_display_name,
+  );
+  if (!sanitizedText) {
+    throw new Error("post_text_is_required");
+  }
+
+  const nowIso = new Date().toISOString();
+  await env.DB.prepare(
+    `UPDATE external_patterns
+     SET post_text = ?,
+         updated_at = ?
+     WHERE id = ?
+       AND app_user_id = ?
+       AND account_id = ?`,
+  ).bind(sanitizedText, nowIso, patternId, appUserId, accountId).run();
+
+  return {
+    ...existing,
+    post_text: sanitizedText,
+    updated_at: nowIso,
+  };
 }
 
 async function resolvePatternAccountId(
@@ -31733,6 +31790,73 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    if (normalizedPath === "/api/patterns/update" && request.method === "POST") {
+      let payload: {
+        app_user_id?: unknown;
+        account_id?: unknown;
+        threads_user_id?: unknown;
+        id?: unknown;
+        post_text?: unknown;
+      };
+      try {
+        payload = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const appUserId = normalizeAppUserId(
+        typeof payload.app_user_id === "string" ? payload.app_user_id : null,
+      );
+      if (!appUserId) {
+        return new Response(JSON.stringify({ error: "app_user_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const accountId = await resolvePatternAccountId(
+          env,
+          typeof payload.threads_user_id === "string" ? payload.threads_user_id : null,
+          typeof payload.account_id === "string" ? payload.account_id : null,
+        );
+        const pattern = await updateExternalPatternText(
+          env,
+          appUserId,
+          accountId,
+          Number(payload.id),
+          typeof payload.post_text === "string" ? payload.post_text : "",
+        );
+
+        if (!pattern) {
+          return new Response(JSON.stringify({ error: "pattern_not_found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          app_user_id: appUserId,
+          account_id: accountId,
+          pattern,
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        const status = message === "post_text_is_required" || message === "pattern_id_is_required" ? 400 : 500;
+        return new Response(JSON.stringify({ error: message }), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (normalizedPath === "/api/batch-schedule/presets" && request.method === "GET") {

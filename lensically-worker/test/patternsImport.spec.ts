@@ -11,7 +11,7 @@ async function fetchFromWorker(path: string, init?: RequestInit): Promise<Respon
 }
 
 async function resetTables(): Promise<void> {
-  await env.DB.prepare("DROP TABLE IF EXISTS external_patterns").run();
+  await env.DB.prepare("DELETE FROM external_patterns").run();
 }
 
 describe("patterns import routes", () => {
@@ -373,6 +373,92 @@ describe("patterns import routes", () => {
         post_text: "Juicy Steak with Creamy Garlic Sauce Ingredients\n1/2 cup heavy cream\n1/4 cup parmesan",
       }),
     });
+  });
+
+  it("cleans attached numeric date and More metadata from imported saved pattern text", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://app.lensically.com",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        platform: "threads",
+        source_url: "https://www.threads.com/@bedsideto/post/DbNT9bhIJ87",
+        post_text: "/25/26MoreHealing is expensive. Avoiding people is free.",
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+    await expect(importResponse.json()).resolves.toMatchObject({
+      success: true,
+      pattern: expect.objectContaining({
+        post_text: "Healing is expensive. Avoiding people is free.",
+      }),
+    });
+  });
+
+  it("updates saved pattern text without changing the selected account scope", async () => {
+    const importResponse = await fetchFromWorker("/api/patterns/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "chrome-extension://exampleextensionid",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        account_id: "manifest-mental",
+        platform: "threads",
+        source_url: "https://www.threads.com/@example/post/edit-me",
+        post_text: "Bad captured text",
+      }),
+    });
+    const imported = (await importResponse.json()) as {
+      pattern?: { id?: number };
+    };
+    const patternId = Number(imported.pattern?.id ?? 0);
+    expect(patternId).toBeGreaterThan(0);
+
+    const updateResponse = await fetchFromWorker("/api/patterns/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "chrome-extension://exampleextensionid",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        account_id: "manifest-mental",
+        id: patternId,
+        post_text: "Corrected saved pattern text",
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      success: true,
+      account_id: "manifest-mental",
+      pattern: expect.objectContaining({
+        id: patternId,
+        post_text: "Corrected saved pattern text",
+      }),
+    });
+
+    const wrongAccountResponse = await fetchFromWorker("/api/patterns/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "chrome-extension://exampleextensionid",
+      },
+      body: JSON.stringify({
+        app_user_id: "lensically_test",
+        account_id: "vectrix",
+        id: patternId,
+        post_text: "Wrong account update",
+      }),
+    });
+
+    expect(wrongAccountResponse.status).toBe(404);
   });
 
   it("prefers the Threads source URL author over the logged-in importer handle", async () => {

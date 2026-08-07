@@ -89,6 +89,8 @@ const SAVED_PATTERNS_URL = buildWorkerUrl("/api/patterns/list");
 const DELETE_PATTERNS_URL = buildWorkerUrl("/api/patterns/delete");
 const SOURCE_CARD_URL = buildWorkerUrl("/api/patterns/source-card");
 const SOURCE_CARD_GUIDANCE_URL = buildWorkerUrl("/api/patterns/source-card/guidance");
+const UPDATE_PATTERN_URL = buildWorkerUrl("/api/patterns/update");
+const REVIEW_PATTERN_URL = buildWorkerUrl("/api/gpt-memory/saved-patterns/review");
 const APP_USER_ID = "lensically";
 const DEFAULT_LIMIT = 200;
 
@@ -130,8 +132,12 @@ export default function SavedPatternsPage() {
   const [patterns, setPatterns] = useState<SavedPatternRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [order, setOrder] = useState<"newest" | "likes">("newest");
-    const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [savingEditId, setSavingEditId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [total, setTotal] = useState(0);
@@ -161,7 +167,7 @@ export default function SavedPatternsPage() {
       }
 
       const nextPatterns = Array.isArray(data?.patterns) ? data.patterns : [];
-            setPatterns(nextPatterns);
+      setPatterns(nextPatterns);
       setSelectedIds((current) => current.filter((id) => nextPatterns.some((pattern) => pattern.id === id)));
       setTotal(typeof data?.total === "number" ? data.total : nextPatterns.length);
       setOwnerLearningSummary(data?.owner_learning_summary ?? null);
@@ -230,7 +236,60 @@ export default function SavedPatternsPage() {
     }
   }
 
-    async function toggleSourceCard(patternId: number) {
+  async function reviewPattern(
+    pattern: SavedPatternRow,
+    verdict: "approved" | "rejected" | "cooldown" | "watch",
+  ) {
+    const note = window.prompt("Optional note for the GPT to remember about this pattern:", "");
+    if (note === null) {
+      return;
+    }
+
+    setReviewingId(pattern.id);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(REVIEW_PATTERN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          app_user_id: APP_USER_ID,
+          threads_user_id: threadsUserId,
+          saved_pattern_ids: [pattern.id],
+          verdict,
+          note,
+          title: `Saved pattern review: ${verdict}`,
+          metadata: {
+            author_handle: pattern.author_handle ?? null,
+            source_url: pattern.source_url,
+            captured_likes: pattern.likes,
+            captured_replies: pattern.replies,
+            captured_reposts: pattern.reposts,
+            captured_shares: pattern.shares,
+            captured_views: pattern.views ?? null,
+          },
+          cooldown_days: verdict === "cooldown" ? 14 : 0,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save pattern review.");
+      }
+
+      setMessage(`Saved ${verdict} review for pattern ${pattern.id}.`);
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Could not save pattern review.");
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
+  async function toggleSourceCard(patternId: number) {
     if (expandedPatternId === patternId) {
       setExpandedPatternId(null);
       return;
@@ -275,6 +334,111 @@ export default function SavedPatternsPage() {
     }
   }
 
+  function beginEdit(pattern: SavedPatternRow) {
+    setEditingId(pattern.id);
+    setEditText(pattern.post_text);
+    setError("");
+    setMessage("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+  }
+
+  async function savePatternEdit(pattern: SavedPatternRow) {
+    const nextText = editText.trim();
+    if (!nextText) {
+      setError("Saved pattern text cannot be blank.");
+      return;
+    }
+
+    setSavingEditId(pattern.id);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(UPDATE_PATTERN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          app_user_id: APP_USER_ID,
+          threads_user_id: threadsUserId,
+          id: pattern.id,
+          post_text: nextText,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string; pattern?: SavedPatternRow } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not update saved pattern.");
+      }
+
+      const updatedPattern = data?.pattern;
+      setPatterns((current) => current.map((row) => (
+        row.id === pattern.id && updatedPattern ? { ...row, ...updatedPattern } : row
+      )));
+      setEditingId(null);
+      setEditText("");
+      setMessage(`Updated saved pattern ${pattern.id}.`);
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : "Could not update saved pattern.");
+    } finally {
+      setSavingEditId(null);
+    }
+  }
+
+  async function reviewSelectedPatterns(verdict: "approved" | "rejected" | "cooldown" | "watch") {
+    if (!selectedIds.length) {
+      return;
+    }
+
+    const note = window.prompt("Optional note for the GPT to remember about these selected patterns:", "");
+    if (note === null) {
+      return;
+    }
+
+    setReviewingId(-1);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(REVIEW_PATTERN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          app_user_id: APP_USER_ID,
+          threads_user_id: threadsUserId,
+          saved_pattern_ids: selectedIds,
+          verdict,
+          note,
+          title: `Selected saved patterns review: ${verdict}`,
+          metadata: {
+            selected_count: selectedIds.length,
+          },
+          cooldown_days: verdict === "cooldown" ? 14 : 0,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not save selected pattern review.");
+      }
+
+      setMessage(`Saved ${verdict} review for ${formatMetric(selectedIds.length)} selected patterns.`);
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Could not save selected pattern review.");
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
   async function saveSourceCardGuidance(patternId: number, active: boolean) {
     setSavingGuidanceId(patternId);
     setError("");
@@ -311,7 +475,6 @@ export default function SavedPatternsPage() {
       setSavingGuidanceId(null);
     }
   }
-
 
   function toggleSelection(id: number) {
     setSelectedIds((current) => (
@@ -377,7 +540,33 @@ export default function SavedPatternsPage() {
         </div>
       </div>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-slate-700">
+            {selectedIds.length ? `${formatMetric(selectedIds.length)} selected for GPT pattern memory` : "Select patterns to review them in bulk"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["approved", "Mark Useful"],
+              ["watch", "Watch"],
+              ["cooldown", "Cooldown"],
+              ["rejected", "Reject"],
+            ].map(([verdict, label]) => (
+              <button
+                key={verdict}
+                type="button"
+                onClick={() => void reviewSelectedPatterns(verdict as "approved" | "rejected" | "cooldown" | "watch")}
+                disabled={loading || deleting || reviewingId === -1 || selectedIds.length === 0}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reviewingId === -1 ? "Saving..." : label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-1">
           <h2 className="text-sm font-semibold text-slate-900">Owner learning</h2>
           <p className="text-xs text-slate-500">
@@ -451,6 +640,8 @@ export default function SavedPatternsPage() {
           <div className="space-y-3">
             {patterns.map((pattern) => {
               const isSelected = selectedIds.includes(pattern.id);
+              const isEditing = editingId === pattern.id;
+              const isSavingEdit = savingEditId === pattern.id;
 
               return (
                 <article
@@ -480,20 +671,91 @@ export default function SavedPatternsPage() {
                               <span className="text-xs text-slate-500">@{pattern.author_handle}</span>
                             ) : null}
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{pattern.post_text}</p>
+                          {isEditing ? (
+                            <div className="mt-2 space-y-2">
+                              <textarea
+                                value={editText}
+                                onChange={(event) => setEditText(event.target.value)}
+                                rows={4}
+                                className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void savePatternEdit(pattern)}
+                                  disabled={isSavingEdit}
+                                  className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {isSavingEdit ? "Saving..." : "Save Text"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEdit}
+                                  disabled={isSavingEdit}
+                                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{pattern.post_text}</p>
+                          )}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => void deletePatterns([pattern.id])}
-                          disabled={deleting}
-                          className="shrink-0 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => beginEdit(pattern)}
+                            disabled={deleting || isSavingEdit}
+                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Edit Text
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deletePatterns([pattern.id])}
+                            disabled={deleting || isSavingEdit}
+                            className="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
 
-                                            <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "approved")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Mark Useful
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "watch")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Watch
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "cooldown")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-amber-200 bg-white px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Cooldown
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void reviewPattern(pattern, "rejected")}
+                          disabled={reviewingId === pattern.id}
+                          className="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Reject Pattern
+                        </button>
                         <button
                           type="button"
                           onClick={() => void toggleSourceCard(pattern.id)}

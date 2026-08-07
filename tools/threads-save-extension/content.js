@@ -387,6 +387,8 @@
       if (/^(like|reply|repost|share)\s*\d[\d.,kmb]*$/i.test(line)) continue;
       if (/^\d+\s*(s|m|h|d|w|mo|y)$/i.test(line)) continue;
 
+      line = line.replace(/^\/?\d{1,2}\/\d{2,4}\s*more\s*/i, "");
+      line = line.replace(/^\/?\d{1,2}\/\d{1,2}\/\d{2,4}\s*more\s*/i, "");
       line = line.replace(
         /\s*like\s*\d[\d.,kmb]*\s*reply\s*\d[\d.,kmb]*\s*repost\s*\d[\d.,kmb]*\s*share\s*\d[\d.,kmb]*\s*$/i,
         ""
