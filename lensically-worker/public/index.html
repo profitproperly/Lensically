@@ -48,8 +48,7 @@
     .cta { display:flex; width:100%; min-height:54px; margin-top:18px; align-items:center; justify-content:center; border-radius:9px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; letter-spacing:-.01em; }
         .micro { margin:9px 0 0; color:#777; text-align:center; font-size:11px; line-height:1.45; }
     .checkout-section { scroll-margin-top:18px; margin:30px 0 8px; padding:22px 0 28px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-    .checkout-section h2 { margin:0 0 4px; font-size:23px; line-height:1.15; letter-spacing:-.035em; }
-    .checkout-subtitle { margin:0 0 18px; color:#666; font-size:13px; }
+    .checkout-section h2 { margin:0 0 18px; text-align:center; font-size:23px; line-height:1.15; letter-spacing:-.035em; }
     .checkout-shell { width:100%; max-width:none; min-height:220px; }
     #embedded-checkout { width:100%; max-width:none; }
     #embedded-checkout > * { width:100% !important; max-width:none !important; margin-left:0 !important; margin-right:0 !important; }
@@ -58,7 +57,7 @@
     .checkout-loading { padding:22px 0; color:#777; font-size:13px; text-align:center; }
     .checkout-error { display:none; margin-top:14px; padding:14px; border:1px solid #e0e0e0; border-radius:9px; background:#fafafa; color:#555; font-size:13px; line-height:1.5; }
     .checkout-fallback { display:none; width:100%; min-height:52px; margin-top:12px; align-items:center; justify-content:center; border:1px solid #111; border-radius:9px; background:#fff; color:#111; text-decoration:none; font-size:14px; font-weight:800; }
-    .checkout-note { margin:13px 0 0; color:#777; font-size:11px; line-height:1.5; }
+    .checkout-note { margin:13px 0 0; color:#777; text-align:center; font-size:11px; line-height:1.5; }
     .copy { padding-top:32px; }
     .copy p { margin-bottom:20px; }
     .copy strong { font-weight:800; }
@@ -97,8 +96,8 @@
     .final-offer h2 { margin-bottom:8px; font-size:26px; line-height:1.12; letter-spacing:-.04em; }
     .final-offer p { margin-bottom:0; color:#444; }
     .legal-box { margin-top:18px; padding:14px; border:1px solid #e3e3e3; border-radius:9px; color:#666; font-size:12px; line-height:1.5; }
-    footer { padding:0 0 38px; color:#777; font-size:11px; }
-    .footer-links { display:flex; flex-wrap:wrap; gap:10px 14px; margin-bottom:10px; }
+    footer { padding:0 0 38px; color:#777; text-align:center; font-size:11px; }
+    .footer-links { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 14px; margin-bottom:10px; }
     .footer-links a { color:#555; }
     @media (min-width:760px) { body { padding-bottom:0; } .top { padding-top:34px; } }
     @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .screen { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
@@ -195,8 +194,7 @@
         <div class="legal-box">Digital product. Once your purchase is complete, Lensically issues access to the download. There are no refunds on digital products except where required by law. Purchase is also governed by the <a href="/refund-policy/">Refund Policy</a>, <a href="/license/">Commercial License</a>, and <a href="/terms.html">Terms</a>.</div>
       </section>
       <section class="checkout-section" id="checkout" aria-labelledby="checkout-title">
-        <h2 id="checkout-title">Payment details</h2>
-        <p class="checkout-subtitle">Complete your $997 one-time purchase securely with Stripe.</p>
+        <h2 id="checkout-title">Payment Details</h2>
         <div class="checkout-shell" id="checkout-shell">
           <div id="embedded-checkout"><div class="checkout-loading" id="checkout-loading">Loading secure payment form...</div></div>
         </div>
