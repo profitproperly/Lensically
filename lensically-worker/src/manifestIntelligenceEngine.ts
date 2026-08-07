@@ -695,6 +695,68 @@ export async function upsertManifestLearningObservation(db: D1Database, input: M
   return receipt.results[0];
 }
 
+export type ManifestPortfolioStateUpsertInput = {
+  brand_key: string;
+  family_key: string;
+  current_role: ManifestPortfolioRole;
+  role: ManifestPortfolioRole;
+  recommended_role: ManifestPortfolioRole;
+  confidence_score: number;
+  confidence_label: ManifestConfidenceLabel;
+  allocation_weight: number;
+  actual_decay: boolean;
+  reason: string;
+  evidence: JsonRecord;
+};
+
+export async function persistManifestPortfolioStateBatch(
+  db: Pick<D1Database, "prepare" | "batch">,
+  inputs: ManifestPortfolioStateUpsertInput[],
+  batchSize = MANIFEST_D1_WRITE_BATCH_SIZE,
+): Promise<{
+  portfolio_count: number;
+  transition_count: number;
+  statement_count: number;
+  batch_count: number;
+}> {
+  const statements: D1PreparedStatement[] = [];
+  let transitionCount = 0;
+  for (const input of inputs) {
+    const evidenceJson = stableJson(input.evidence);
+    statements.push(db.prepare(`INSERT INTO operator_manifest_portfolio_states (
+      id, brand_key, family_key, role, recommended_role, previous_role, confidence_score,
+      confidence_label, allocation_weight, actual_decay, reason, evidence_json, portfolio_version
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(brand_key, family_key) DO UPDATE SET
+      previous_role = operator_manifest_portfolio_states.role, role = excluded.role,
+      recommended_role = excluded.recommended_role, confidence_score = excluded.confidence_score,
+      confidence_label = excluded.confidence_label, allocation_weight = excluded.allocation_weight,
+      actual_decay = excluded.actual_decay, reason = excluded.reason,
+      evidence_json = excluded.evidence_json, portfolio_version = excluded.portfolio_version,
+      updated_at = CURRENT_TIMESTAMP`).bind(
+      crypto.randomUUID(), input.brand_key, input.family_key, input.role, input.recommended_role,
+      input.current_role, input.confidence_score, input.confidence_label,
+      input.allocation_weight, input.actual_decay ? 1 : 0, input.reason,
+      evidenceJson, MANIFEST_ADAPTIVE_PORTFOLIO_VERSION,
+    ));
+    if (input.role === input.current_role) continue;
+    const transitionKey = fnv1a(`${input.brand_key}|family|${input.family_key}|${input.current_role}|${input.role}|${evidenceJson}`);
+    statements.push(db.prepare(`INSERT OR IGNORE INTO operator_manifest_state_transitions (
+      id, transition_key, brand_key, entity_type, entity_id, from_state, to_state, reason, evidence_json, transitioned_at
+    ) VALUES (?, ?, ?, 'family', ?, ?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(), transitionKey, input.brand_key, input.family_key, input.current_role, input.role,
+      input.reason, evidenceJson, new Date().toISOString(),
+    ));
+    transitionCount += 1;
+  }
+  const receipt = await executeManifestD1WriteBatches(db, statements, batchSize);
+  return {
+    portfolio_count: inputs.length,
+    transition_count: transitionCount,
+    ...receipt,
+  };
+}
+
 export type ManifestSemanticSignatureUpsertInput = {
   brand_key: string;
   content_type: "published" | "scheduled" | "candidate";
@@ -1150,12 +1212,18 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       continuation_required: learningEnd < groupValues.length,
     };
   }
-  let experimentsEvaluated = 0;
+    let experimentsEvaluated = 0;
+  let portfolioWriteReceipt = { portfolio_count: 0, transition_count: 0, statement_count: 0, batch_count: 0 };
   if (runPortfolio) {
+  const currentPortfolioRows = await db.prepare(`SELECT family_key, role, confidence_label
+    FROM operator_manifest_portfolio_states WHERE brand_key = ?`).bind(input.brand_key).all<JsonRecord>();
+  const currentPortfolioRoles = new Map((currentPortfolioRows.results ?? []).map((row) => [
+    machine(row.family_key, "unknown"),
+    machine(row.role, "prospect") as ManifestPortfolioRole,
+  ]));
+  const portfolioInputs: ManifestPortfolioStateUpsertInput[] = [];
   for (const [familyKey, evidence] of familyObservations) {
-    const current = await db.prepare(`SELECT role, confidence_label FROM operator_manifest_portfolio_states
-      WHERE brand_key = ? AND family_key = ? LIMIT 1`).bind(input.brand_key, familyKey).first<JsonRecord>();
-    const currentRole = machine(current?.role, "prospect") as ManifestPortfolioRole;
+    const currentRole = currentPortfolioRoles.get(familyKey) ?? "prospect";
     const confidence = record(evidence.confidence);
     const familyRows = authoritativeRows.filter((item) => item.family_key === familyKey);
     const latestHalf = familyRows.slice(Math.max(0, familyRows.length - Math.ceil(familyRows.length / 2)));
@@ -1170,32 +1238,21 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       weak_count: number(evidence.weak_count),
       confidence_label: machine(confidence.label, "insufficient") as ManifestConfidenceLabel,
     });
-    await db.prepare(`INSERT INTO operator_manifest_portfolio_states (
-      id, brand_key, family_key, role, recommended_role, previous_role, confidence_score,
-      confidence_label, allocation_weight, actual_decay, reason, evidence_json, portfolio_version
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(brand_key, family_key) DO UPDATE SET
-      previous_role = operator_manifest_portfolio_states.role, role = excluded.role,
-      recommended_role = excluded.recommended_role, confidence_score = excluded.confidence_score,
-      confidence_label = excluded.confidence_label, allocation_weight = excluded.allocation_weight,
-      actual_decay = excluded.actual_decay, reason = excluded.reason,
-      evidence_json = excluded.evidence_json, portfolio_version = excluded.portfolio_version,
-      updated_at = CURRENT_TIMESTAMP`).bind(
-      crypto.randomUUID(), input.brand_key, familyKey, portfolio.role, portfolio.recommended_role,
-      currentRole, number(confidence.score), machine(confidence.label, "insufficient"),
-      portfolio.allocation_weight, portfolio.actual_decay ? 1 : 0, portfolio.reason,
-      stableJson(evidence), MANIFEST_ADAPTIVE_PORTFOLIO_VERSION,
-    ).run();
-    if (portfolio.role !== currentRole) {
-      const transitionKey = fnv1a(`${input.brand_key}|family|${familyKey}|${currentRole}|${portfolio.role}|${stableJson(evidence)}`);
-      await db.prepare(`INSERT OR IGNORE INTO operator_manifest_state_transitions (
-        id, transition_key, brand_key, entity_type, entity_id, from_state, to_state, reason, evidence_json, transitioned_at
-      ) VALUES (?, ?, ?, 'family', ?, ?, ?, ?, ?, ?)`).bind(
-        crypto.randomUUID(), transitionKey, input.brand_key, familyKey, currentRole, portfolio.role,
-        portfolio.reason, stableJson(evidence), new Date().toISOString(),
-      ).run();
-    }
+        portfolioInputs.push({
+      brand_key: input.brand_key,
+      family_key: familyKey,
+      current_role: currentRole,
+      role: portfolio.role,
+      recommended_role: portfolio.recommended_role,
+      confidence_score: number(confidence.score),
+      confidence_label: machine(confidence.label, "insufficient") as ManifestConfidenceLabel,
+      allocation_weight: portfolio.allocation_weight,
+      actual_decay: portfolio.actual_decay,
+      reason: portfolio.reason,
+      evidence,
+    });
   }
+  portfolioWriteReceipt = await persistManifestPortfolioStateBatch(db, portfolioInputs);
     const experiments = await db.prepare(`SELECT * FROM operator_manifest_experiments
     WHERE brand_key = ? AND status IN ('running', 'planned')`).bind(input.brand_key).all<JsonRecord>();
   for (const experiment of experiments.results ?? []) {
@@ -1236,7 +1293,10 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     maturity_evaluations: maturityRows.length,
     comparable_analyses: candidates.length,
     learning_observations: groups.size,
-    portfolio_states: familyObservations.size,
+        portfolio_states: familyObservations.size,
+    portfolio_write_statements: portfolioWriteReceipt.statement_count,
+    portfolio_write_batches: portfolioWriteReceipt.batch_count,
+    portfolio_transition_count: portfolioWriteReceipt.transition_count,
     experiments_evaluated: experimentsEvaluated,
     authoritative_post_count: authoritativeRows.length,
   };

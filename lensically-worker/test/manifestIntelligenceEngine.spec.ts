@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   executeManifestD1WriteBatches,
-    persistManifestLearningObservationBatch,
+      persistManifestLearningObservationBatch,
+  persistManifestPortfolioStateBatch,
   persistManifestSemanticSignatureBatch,
 } from "../src/manifestIntelligenceEngine";
 
@@ -64,6 +65,42 @@ describe("Manifest D1 write batching", () => {
     expect(receipt.batch_count).toBe(3);
     expect(receipt.signatures).toHaveLength(95);
     expect(observedBatchSizes).toEqual([40, 40, 15]);
+  });
+
+    it("persists portfolio states and transitions through bounded D1 batches", async () => {
+    const observedBatchSizes: number[] = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({ sql, values } as unknown as D1PreparedStatement),
+      }),
+      batch: async (statements: D1PreparedStatement[]) => {
+        observedBatchSizes.push(statements.length);
+        return [];
+      },
+    } as unknown as Pick<D1Database, "prepare" | "batch">;
+    const inputs = [
+      { family_key: "unchanged", current_role: "core" as const, role: "core" as const },
+      { family_key: "promoted", current_role: "prospect" as const, role: "emerging" as const },
+      { family_key: "cooled", current_role: "core" as const, role: "cooling" as const },
+    ].map((item) => ({
+      brand_key: "manifest_mental",
+      recommended_role: item.role,
+      confidence_score: 0.8,
+      confidence_label: "directional" as const,
+      allocation_weight: 1,
+      actual_decay: false,
+      reason: "test",
+      evidence: { sample_size: 5 },
+      ...item,
+    }));
+
+    const receipt = await persistManifestPortfolioStateBatch(db, inputs, 40);
+
+    expect(receipt.portfolio_count).toBe(3);
+    expect(receipt.transition_count).toBe(2);
+    expect(receipt.statement_count).toBe(5);
+    expect(receipt.batch_count).toBe(1);
+    expect(observedBatchSizes).toEqual([5]);
   });
 
   it("persists learning observations and transitions through bounded D1 batches", async () => {
