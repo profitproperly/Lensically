@@ -27,15 +27,7 @@
     .cover-copy small { display:block; margin-bottom:14px; color:#777; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .cover-copy strong { display:block; max-width:250px; font-size:36px; line-height:.95; letter-spacing:-.06em; }
     .cover-copy p { margin:16px 0 0; max-width:250px; color:#555; font-size:13px; line-height:1.45; }
-    .screen { border:1px solid #d7d7d7; border-radius:12px; background:#fff; box-shadow:0 18px 44px rgba(0,0,0,.08); overflow:hidden; }
-    .screen-head { height:34px; padding:0 12px; border-bottom:1px solid #ececec; display:flex; align-items:center; justify-content:space-between; font-size:9px; font-weight:800; color:#777; }
-    .screen-body { padding:14px; }
-    .screen-label { color:#8a8a8a; font-size:9px; text-transform:uppercase; letter-spacing:.08em; }
-    .screen-title { margin-top:4px; font-size:16px; font-weight:800; letter-spacing:-.03em; }
-    .flow { display:grid; gap:7px; margin-top:14px; }
-    .flow-row { display:grid; grid-template-columns:52px 1fr auto; gap:8px; align-items:center; padding:8px 9px; border:1px solid #eee; border-radius:8px; font-size:9px; }
-    .flow-row b { font-size:9px; }
-    .flow-row span:last-child { color:#777; }
+    .hero-app-preview { width:100%; display:block; border:1px solid #d7d7d7; border-radius:12px; background:#fff; box-shadow:0 18px 44px rgba(0,0,0,.08); }
     .intro { padding:28px 0 4px; }
     h1,h2,h3,p { margin-top:0; }
     h1 { margin-bottom:4px; font-size:31px; line-height:1.08; letter-spacing:-.045em; }
@@ -113,7 +105,7 @@
     .sticky-buy-button svg { width:17px; height:17px; }
     @media (min-width:760px) { .top { padding-top:34px; } }
     @media (max-width:560px) { body { padding-bottom:120px; } .sticky-buy { bottom:12px; width:calc(100% - 24px); } .sticky-buy-inner { grid-template-columns:1fr; gap:10px; } .sticky-buy-button { width:100%; min-height:50px; } }
-    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .screen { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
+    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
   </style>
 </head>
 <body>
@@ -122,10 +114,7 @@
     <main>
       <section class="cover" aria-label="Lensically Operator product preview">
         <div class="cover-copy"><small>AI-operated Threads system</small><strong>Run the operation, not just the posts.</strong><p>Research. Create. Quality check. Schedule. Measure. Learn. Repeat.</p></div>
-        <div class="screen" aria-hidden="true">
-          <div class="screen-head"><span>LENSICALLY OPERATOR</span><span>ACTIVE</span></div>
-          <div class="screen-body"><div class="screen-label">Operating cycle</div><div class="screen-title">Content operation</div><div class="flow"><div class="flow-row"><b>01</b><span>Source intelligence</span><span>Ready</span></div><div class="flow-row"><b>02</b><span>Generation + gates</span><span>Ready</span></div><div class="flow-row"><b>03</b><span>Protected scheduling</span><span>Ready</span></div><div class="flow-row"><b>04</b><span>Measurement + learning</span><span>Ready</span></div></div></div>
-        </div>
+        <img class="hero-app-preview" src="/lensically-app-hero-mock.png" alt="Lensically scheduled posts dashboard preview with a fictional Nova Studio account">
       </section>
       <section class="intro">
         <h1>Lensically Operator for Threads</h1>
