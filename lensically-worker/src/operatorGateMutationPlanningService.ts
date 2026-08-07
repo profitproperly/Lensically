@@ -543,21 +543,23 @@ export async function runOperatorGateEngine<TStage extends string>(
       }
       continue;
     }
-            if (gateKey === "source_surface_copy_gate") {
+                if (gateKey === "source_surface_copy_gate") {
+      if (manifestOwnerGuided && exactSourceCopy) {
+        results.push(buildOperatorGateResult(
+          gate,
+          "fail",
+          "The candidate exactly reproduces the complete source post.",
+          { source_text: primarySourceText },
+          "Preserve the performance-bearing language package without reproducing the complete source post verbatim.",
+        ));
+        continue;
+      }
       if (manifestOwnerGuided && !manifestWinnerPreservationRequired) {
-        results.push(exactSourceCopy
-          ? buildOperatorGateResult(
-            gate,
-            "fail",
-            "The candidate exactly reproduces the complete source post.",
-            { source_text: primarySourceText },
-            "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
-          )
-          : buildOperatorGateResult(
-            gate,
-            "pass",
-            "The active Manifest decision remains governed by source evidence and source-specific owner guidance.",
-          ));
+        results.push(buildOperatorGateResult(
+          gate,
+          "pass",
+          "The active Manifest decision remains governed by source evidence and source-specific owner guidance.",
+        ));
         continue;
       }
       const forbidden = Array.isArray(sourceCard?.forbidden_surfaces) ? sourceCard.forbidden_surfaces : [];
