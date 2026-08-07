@@ -10,6 +10,18 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: workspaceRoot,
   },
+  async rewrites() {
+    return [
+      {
+        source: "/operator",
+        destination: "https://lensically-operator.pages.dev/operator/",
+      },
+      {
+        source: "/operator/:path*",
+        destination: "https://lensically-operator.pages.dev/operator/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
