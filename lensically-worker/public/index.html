@@ -17,7 +17,7 @@
     :root { color-scheme: light; --ink:#111; --line:#e7e7e7; --paper:#fff; --column:660px; --stripe-summary-crop:-92px; --checkout-policy-version:1; }
     * { box-sizing:border-box; }
     html { scroll-behavior:smooth; }
-    body { margin:0; min-width:320px; background:var(--paper); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; padding-bottom:88px; }
+    body { margin:0; min-width:320px; background:var(--paper); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; padding-bottom:110px; }
     a { color:inherit; }
     .page { width:min(var(--column),calc(100% - 36px)); margin:0 auto; }
     .top { padding:26px 0 18px; }
@@ -106,7 +106,17 @@
     footer { padding:0 0 38px; color:#777; text-align:center; font-size:11px; }
     .footer-links { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 14px; margin-bottom:10px; }
     .footer-links a { color:#555; }
-    @media (min-width:760px) { body { padding-bottom:0; } .top { padding-top:34px; } }
+    .sticky-buy { position:fixed; left:50%; bottom:18px; z-index:30; width:min(684px,calc(100% - 32px)); transform:translate(-50%,130%); opacity:0; pointer-events:none; transition:transform .22s ease, opacity .22s ease; }
+    .sticky-buy.is-visible { transform:translate(-50%,0); opacity:1; pointer-events:auto; }
+    .sticky-buy-inner { min-height:74px; padding:14px; display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; border:1px solid #e2e2e2; border-radius:8px; background:#f4f4f5; box-shadow:0 12px 34px rgba(0,0,0,.14); }
+    .sticky-buy-title { margin:0 0 1px; font-size:15px; font-weight:850; line-height:1.2; letter-spacing:-.02em; }
+    .sticky-buy-price { display:flex; align-items:center; gap:8px; color:#3f2be5; font-size:14px; font-weight:850; }
+    .sticky-buy-price span { color:#777; font-size:12px; font-weight:650; }
+    .sticky-buy-badge { display:inline-flex; padding:2px 6px; border-radius:3px; background:#f00; color:#fff; font-size:10px; font-weight:900; text-decoration:none; }
+    .sticky-buy-button { min-width:146px; min-height:56px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:7px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; }
+    .sticky-buy-button svg { width:17px; height:17px; }
+    @media (min-width:760px) { .top { padding-top:34px; } }
+    @media (max-width:560px) { body { padding-bottom:120px; } .sticky-buy { bottom:12px; width:calc(100% - 24px); } .sticky-buy-inner { grid-template-columns:1fr; gap:10px; } .sticky-buy-button { width:100%; min-height:50px; } }
     @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:20px; grid-template-columns:1fr; gap:18px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .screen { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
   </style>
 </head>
@@ -220,6 +230,18 @@
     </main>
     <footer><nav class="footer-links" aria-label="Legal"><a href="/license/">Commercial license</a><a href="/refund-policy/">Refund policy</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/data-deletion/">Data deletion</a></nav><div>Support: <a href="mailto:support@lensically.com">support@lensically.com</a></div><div>© 2026 Lensically. All rights reserved.</div></footer>
   </div>
+  <div class="sticky-buy" id="sticky-buy" aria-hidden="true">
+    <div class="sticky-buy-inner">
+      <div>
+        <p class="sticky-buy-title">Lensically Operator for Threads</p>
+        <div class="sticky-buy-price">$977 <span>one-time</span><b class="sticky-buy-badge">DEAL</b></div>
+      </div>
+      <a class="sticky-buy-button" href="#checkout" aria-label="Go to payment details">
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm1 11v4h-2v-4H7v-2h4V7h2v4h4v2h-4Z"/></svg>
+        Purchase
+      </a>
+    </div>
+  </div>
   <script src="https://js.stripe.com/clover/stripe.js"></script>
   <script>
     (() => {
@@ -228,6 +250,7 @@
       const loading = document.getElementById('checkout-loading');
       const errorBox = document.getElementById('checkout-error');
       let initialized = false;
+      const stickyBuy = document.getElementById('sticky-buy');
 
       const showFallback = () => {
         if (loading) loading.style.display = 'none';
@@ -275,6 +298,19 @@
       document.querySelectorAll('a[href="#checkout"]').forEach((link) => {
         link.addEventListener('click', () => initializeCheckout(), { once: true });
       });
+
+      const updateStickyBuy = () => {
+        if (!stickyBuy || !shell) return;
+        const checkoutTop = shell.getBoundingClientRect().top;
+        const scrolledEnough = window.scrollY > Math.max(520, window.innerHeight * 1.15);
+        const beforeCheckout = checkoutTop > window.innerHeight * 0.92;
+        const shouldShow = scrolledEnough && beforeCheckout;
+        stickyBuy.classList.toggle('is-visible', shouldShow);
+        stickyBuy.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+      };
+      updateStickyBuy();
+      window.addEventListener('scroll', updateStickyBuy, { passive: true });
+      window.addEventListener('resize', updateStickyBuy);
     })();
   </script>
 </body>
