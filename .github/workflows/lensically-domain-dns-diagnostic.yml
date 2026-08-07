@@ -44,5 +44,8 @@ jobs:
           console.log(`validation-method=${result.validation_data?.method || 'unknown'}`);
           console.log(`validation-error=${result.validation_data?.error_message || 'none'}`);
           console.log(`verification-status=${result.verification_data?.status || 'unknown'}`);
-          console.log(`verification-error=${result.verification_data?.error_message || 'none'}`);
+                    console.log(`verification-error=${result.verification_data?.error_message || 'none'}`);
           NODE
+          echo 'diagnostic-complete-intentional-exit'
+          exit 99
+
