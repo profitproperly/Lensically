@@ -16,11 +16,26 @@ jobs:
         run: |
           set -euo pipefail
 
-                    page="$(curl --fail --silent --show-error https://lensically.com/operator/)"
-          grep -Fq 'id="embedded-checkout"' <<<"$page"
-          grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"
-          grep -Fq 'api.lensically.com/api/commercial/embedded-checkout-session' <<<"$page"
-          echo 'sales-page-markup=ok'
+                              page="$(curl --fail --silent --show-error https://lensically.com/operator/)"
+          if grep -Fq 'id="embedded-checkout"' <<<"$page"; then
+            echo 'sales-page-embedded-container=ok'
+          else
+            echo 'sales-page-embedded-container=missing'
+            exit 21
+          fi
+          if grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"; then
+            echo 'sales-page-stripe-js=ok'
+          else
+            echo 'sales-page-stripe-js=missing'
+            exit 22
+          fi
+          if grep -Fq 'api.lensically.com/api/commercial/embedded-checkout-session' <<<"$page"; then
+            echo 'sales-page-endpoint-reference=ok'
+          else
+            echo 'sales-page-endpoint-reference=missing'
+            exit 23
+          fi
+
 
 
           headers="$(mktemp)"
