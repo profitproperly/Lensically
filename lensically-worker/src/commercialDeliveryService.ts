@@ -68,6 +68,16 @@ function jsonResponse(payload: JsonRecord, status = 200): Response {
   });
 }
 
+function sanitizeStripeError(payload: unknown): JsonRecord {
+  const error = asRecord(asRecord(payload)?.error);
+  return {
+    type: stringValue(error?.type, 120),
+    code: stringValue(error?.code, 120),
+    param: stringValue(error?.param, 120),
+    message: stringValue(error?.message, 300),
+  };
+}
+
 function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as JsonRecord
@@ -233,6 +243,10 @@ async function createCommercialEmbeddedCheckoutSession(
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    console.warn("COMMERCIAL_CHECKOUT_SESSION_CREATE_FAILED", {
+      status: response.status,
+      stripe_error: sanitizeStripeError(payload),
+    });
     return jsonResponse({ ok: false, error: "checkout_session_creation_failed" }, 502);
   }
   const session = asRecord(payload);
