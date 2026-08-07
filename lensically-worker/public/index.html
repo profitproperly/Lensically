@@ -54,10 +54,10 @@
     .checkout-product-name { margin:0 0 5px; color:#666; font-size:14px; font-weight:750; line-height:1.25; }
     .checkout-product-price { margin:0; color:#111; font-size:34px; line-height:1; font-weight:500; letter-spacing:-.04em; }
     .checkout-shell { width:100%; max-width:none; min-height:220px; overflow:hidden; }
-    #embedded-checkout { width:100%; max-width:none; }
+    #embedded-checkout { width:100%; max-width:none; transform:translateY(var(--stripe-summary-crop)); }
     #embedded-checkout > * { width:100% !important; max-width:none !important; margin-left:0 !important; margin-right:0 !important; }
     #embedded-checkout div { width:100% !important; max-width:none !important; }
-    #embedded-checkout iframe { width:100% !important; max-width:none !important; margin-top:var(--stripe-summary-crop); }
+    #embedded-checkout iframe { width:100% !important; max-width:none !important; }
     .checkout-loading { padding:22px 0; color:#777; font-size:13px; text-align:center; }
     .checkout-error { display:none; margin-top:14px; padding:14px; border:1px solid #e0e0e0; border-radius:9px; background:#fafafa; color:#555; font-size:13px; line-height:1.5; }
     .checkout-fallback { display:none; width:100%; min-height:52px; margin-top:12px; align-items:center; justify-content:center; border:1px solid #111; border-radius:9px; background:#fff; color:#111; text-decoration:none; font-size:14px; font-weight:800; }
