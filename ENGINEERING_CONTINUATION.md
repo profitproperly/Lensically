@@ -10,7 +10,7 @@ active_checkpoint: implement embedded Stripe Checkout on the public sales page, 
 validated_source_head: 6f70dab641e2d2ee486099da84188c64c21bbc95
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
 production_sha: 6f70dab641e2d2ee486099da84188c64c21bbc95
-active_interrupt_id: commercial-root-domain-routing-20260807
+active_interrupt_id: commercial-next-route-path-validator-20260807
 active_interrupt_state: open
 active_interrupt_precedence: P1
 
@@ -32,6 +32,7 @@ active_interrupt_precedence: P1
 - Root cause: the commercial Pages project was never attached to the production apex, and the apex is already legitimately occupied by the main Lensically web application. Attempting to attach the whole apex to Pages is the wrong topology because it would displace `/dashboard`, `/cycles`, and the internal web product. Cloudflare Pages reports `verification-error=CNAME record not set`; the existing apex cannot become the Pages origin without breaking the main app.
 - Durable repair direction: preserve the main web application on the apex and add an explicit `lensically-web` route handler for `/operator` and `/operator/*` that proxies the canonical commercial Pages origin. This gives the sales funnel one production URL without changing apex DNS or disrupting the app. Commercial deployment is not considered live until the production-domain smoke validates both the proxied page and embedded Checkout endpoint.
 - Current action: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`.
+- P1 implementation interrupt: `operateGitHubRepositories.upsert_file` rejects repository paths containing Next.js optional-catchall square brackets, so the direct `app/operator/[[...commercialPath]]/route.ts` file could not be created through the bounded repository tool. Root cause is the engineering path validator, not Next.js. Prevention: do not retry bracketed repository paths through this tool; use a supported configuration-level proxy/rewrites surface with an ordinary repository path, preserving the same route behavior without bypassing repository safety.
 - Security constraints: never expose the Stripe secret key; do not accept client-supplied price, amount, product, release, or fulfillment authority; keep price, line item, currency, metadata, and return target server-owned.
 
 ## Completed Manifest Winner Language Preservation: manifest-winner-language-preservation-20260806
