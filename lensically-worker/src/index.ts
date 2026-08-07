@@ -194,7 +194,11 @@ import {
   planOperatorSourceCardPersistence,
 } from "./operatorSourceCardPersistencePlanningService";
 import { planOperatorSourceCardLock } from "./operatorSourceCardLockService";
-import { readOperatorSourceCard } from "./operatorSourceCardReadService";
+import {
+  applyManifestWinnerPreservation,
+  normalizeManifestWinnerPreservation,
+  readOperatorSourceCard,
+} from "./operatorSourceCardReadService";
 import { admitOperatorGenerationRun } from "./operatorGenerationRunAdmissionService";
 import { planOperatorGenerationRunPersistence } from "./operatorGenerationRunPersistencePlanningService";
 import { admitOperatorGenerationDraft } from "./operatorGenerationDraftAdmissionService";
@@ -6203,8 +6207,9 @@ function normalizeSourceTransformationContract(value: unknown): Record<string, u
     must_transform: normalizeSourceContractTransformItems(record.must_transform),
     forbidden_complete_combinations: normalizeForbiddenSourceCombinations(record.forbidden_complete_combinations),
     audience_reward: normalizeOperatorText(record.audience_reward, 2000, true),
-    time_or_context_requirements: normalizeSourceContractStringList(record.time_or_context_requirements),
+        time_or_context_requirements: normalizeSourceContractStringList(record.time_or_context_requirements),
     notes: normalizeOperatorText(record.notes, 3000, true),
+    winner_preservation: normalizeManifestWinnerPreservation(record.winner_preservation),
   };
 }
 
@@ -7810,7 +7815,10 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
     return null;
   }
   const ownerLearning = await readSourceCardOwnerLearning(env.DB, sourceCardId);
-  return {
+  const transformationContract = normalizeSourceTransformationContract(
+    safeParseJsonString(String(row.transformation_contract_json ?? "{}")) ?? {},
+  );
+  const sourceCard: Record<string, unknown> = {
     id: row.id,
     brand_key: row.brand_key,
     workflow_session_id: row.workflow_session_id ?? null,
@@ -7829,7 +7837,7 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
     current_inventory_constraints: safeParseJsonString(String(row.current_inventory_constraints_json ?? "[]")) ?? [],
     pass_conditions: safeParseJsonString(String(row.pass_conditions_json ?? "[]")) ?? [],
     fail_conditions: safeParseJsonString(String(row.fail_conditions_json ?? "[]")) ?? [],
-            recommended_direction: row.recommended_direction ?? null,
+    recommended_direction: row.recommended_direction ?? null,
     owner_guidance: ownerLearning.active_guidance ?? null,
     owner_edit_notes: ownerLearning.owner_edit_notes ?? [],
     owner_revision_history: ownerLearning.revision_history ?? [],
@@ -7842,16 +7850,16 @@ async function getOperatorSourceCard(env: Env, brandKey: GptBrandKey, sourceCard
     is_current: Number(row.is_current ?? 1) === 1,
     supersedes_source_card_id: row.supersedes_source_card_id ?? null,
     version_reason: row.version_reason ?? null,
-    transformation_contract: normalizeSourceTransformationContract(
-      safeParseJsonString(String(row.transformation_contract_json ?? "{}")) ?? {},
-    ),
+    transformation_contract: transformationContract,
     locked_at: row.locked_at ?? null,
-
     invalidated_at: row.invalidated_at ?? null,
     invalidation_reason: row.invalidation_reason ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+  return brandKey === "manifest_mental"
+    ? applyManifestWinnerPreservation(sourceCard, transformationContract)
+    : sourceCard;
 }
 
 function buildActiveGenerationSourceCard(
@@ -7859,6 +7867,12 @@ function buildActiveGenerationSourceCard(
   brandKey: GptBrandKey,
 ): Record<string, unknown> {
   if (brandKey !== "manifest_mental") return card;
+  const winnerPreservation = card.winner_preservation
+    && typeof card.winner_preservation === "object"
+    && !Array.isArray(card.winner_preservation)
+    ? card.winner_preservation as Record<string, unknown>
+    : null;
+  const winnerProtectionActive = winnerPreservation?.required === true;
   return {
     id: card.id,
     brand_key: card.brand_key,
@@ -7868,17 +7882,24 @@ function buildActiveGenerationSourceCard(
     primary_source: card.primary_source ?? null,
     secondary_sources: card.secondary_sources ?? [],
     metrics_snapshot: card.metrics_snapshot ?? null,
+    source_mechanism: card.source_mechanism ?? null,
+    required_product: card.required_product ?? null,
+    recommended_direction: card.recommended_direction ?? null,
+    transformation_contract: card.transformation_contract ?? {},
+    winner_preservation: winnerPreservation,
     owner_guidance: card.owner_guidance ?? null,
     owner_edit_notes: card.owner_edit_notes ?? [],
     owner_revision_history: card.owner_revision_history ?? [],
-    generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+    generation_direction: winnerProtectionActive
+      ? "Preserve the winner's performance-bearing language package. Vary only non-load-bearing details without weakening the hook, certainty, specificity, payoff, timing, or visual intensity."
+      : "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
     family_id: card.family_id ?? null,
     source_selection_id: card.source_selection_id ?? null,
     version_number: card.version_number ?? 1,
     is_current: card.is_current === true,
     legacy_source_card_interpretation: {
       preserved_historically: true,
-      active_generation_instruction: false,
+      active_generation_instruction: winnerProtectionActive,
     },
   };
 }
@@ -12470,8 +12491,13 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       brandKey: brand.brand_key,
       payload: servicePayload,
     }, {
-      db: env.DB,
+            db: env.DB,
       normalizeText: normalizeOperatorText,
+      readSourceCard: (brandKey, sourceCardId) => getOperatorSourceCard(
+        env,
+        brandKey as GptBrandKey,
+        sourceCardId,
+      ),
       observe: (observedToolName, observedPayload, result) => observeManifestCycleToolResult(
         env,
         brand,

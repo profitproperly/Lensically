@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyManifestWinnerPreservation,
   readOperatorSourceCard,
   type OperatorSourceCardReadDependencies,
 } from "../src/operatorSourceCardReadService";
@@ -88,5 +89,83 @@ describe("readOperatorSourceCard", () => {
         },
       },
     });
+    });
+});
+
+describe("Manifest winner preservation", () => {
+  it("repairs a legacy winning finger-touch source card with enforceable exact anchors", () => {
+    const result = applyManifestWinnerPreservation({
+      id: "card-touch",
+      primary_source: {},
+      metrics_snapshot: null,
+      forbidden_surfaces: [],
+      danger_surfaces: [],
+      owner_revision_history: [{
+        revised_text: "IF YOUR FINGER TOUCHED THIS TODAY, EXPECT GOOD MONEY NEWS WITHIN 7 DAYS.",
+        published_post_id: "post-winner",
+        performance_24h: { metrics: { likes: 6604 } },
+      }],
+    }, {
+      must_preserve_exact: [],
+      must_preserve_function: [],
+      may_reuse: [],
+      must_transform: [],
+      audience_reward: "Immediate anticipation of positive money news.",
+    });
+
+    expect(result.winner_preservation).toMatchObject({
+      required: true,
+      observed_likes: 6604,
+      winner_post_id: "post-winner",
+      exact_surfaces: [
+        "IF YOUR FINGER TOUCHED THIS TODAY",
+        "EXPECT GOOD MONEY NEWS",
+      ],
+    });
+    expect(result.transformation_contract).toMatchObject({
+      must_preserve_exact: [
+        "IF YOUR FINGER TOUCHED THIS TODAY",
+        "EXPECT GOOD MONEY NEWS",
+      ],
+      winner_preservation: expect.objectContaining({ required: true }),
+    });
+  });
+
+  it("does not activate winner enforcement below the evidence threshold", () => {
+    const result = applyManifestWinnerPreservation({
+      id: "card-prospect",
+      primary_source: { text: "A useful but unproven idea.", metrics: { likes: 300 } },
+      owner_revision_history: [],
+    }, {
+      must_preserve_exact: [],
+      must_preserve_function: ["Preserve the premise."],
+    });
+
+    expect(result.winner_preservation).toBeNull();
+    expect(result.transformation_contract).toMatchObject({
+      must_preserve_exact: [],
+      must_preserve_function: ["Preserve the premise."],
+    });
+  });
+
+  it("keeps explicit safe winner anchors instead of deriving gendered source language", () => {
+    const result = applyManifestWinnerPreservation({
+      id: "card-universe",
+      primary_source: {
+        text: "Universe! Make the woman reading this a multimillionaire!",
+        metrics: { likes: 23100 },
+      },
+      owner_revision_history: [],
+      forbidden_surfaces: ["Gendered audience language"],
+    }, {
+      must_preserve_exact: ["Universe", "the person reading this"],
+      must_preserve_function: ["Deliver a decisive blessing of substantial wealth."],
+    });
+
+    expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([
+      "Universe",
+      "the person reading this",
+    ]);
   });
 });
+

@@ -296,10 +296,15 @@ export async function runOperatorGateEngine<TStage extends string>(
     : null;
   const draftText = dependencies.normalizeText(input.draftText, 20000, true) ?? "";
   const normalizedDraft = dependencies.normalizeComparableText(draftText);
-    const manifestOwnerGuided = input.brandKey === "manifest_mental";
-  const sourceContract = dependencies.normalizeSourceContract(
-    manifestOwnerGuided ? {} : sourceCard?.transformation_contract,
-  );
+      const manifestOwnerGuided = input.brandKey === "manifest_mental";
+  const sourceContract = dependencies.normalizeSourceContract(sourceCard?.transformation_contract);
+  const winnerPreservation = sourceContract.winner_preservation
+    && typeof sourceContract.winner_preservation === "object"
+    && !Array.isArray(sourceContract.winner_preservation)
+    ? sourceContract.winner_preservation as Record<string, unknown>
+    : null;
+  const manifestWinnerPreservationRequired = manifestOwnerGuided
+    && winnerPreservation?.required === true;
   const ownerGuidance = sourceCard?.owner_guidance
     && typeof sourceCard.owner_guidance === "object"
     && !Array.isArray(sourceCard.owner_guidance)
@@ -387,8 +392,8 @@ export async function runOperatorGateEngine<TStage extends string>(
       ));
       continue;
     }
-        if (gateKey === "source_transformation_contract_gate") {
-      if (manifestOwnerGuided) {
+            if (gateKey === "source_transformation_contract_gate") {
+      if (manifestOwnerGuided && !manifestWinnerPreservationRequired) {
         results.push(exactSourceCopy
           ? buildOperatorGateResult(
             gate,
@@ -400,11 +405,12 @@ export async function runOperatorGateEngine<TStage extends string>(
           : buildOperatorGateResult(
             gate,
             "pass",
-            "Manifest generation is governed by the source evidence and source-specific owner guidance, not the legacy transformation contract.",
+                        "Non-winning Manifest generation is governed by the source evidence and source-specific owner guidance.",
             {
               owner_guidance_id: ownerGuidance?.id ?? null,
               owner_note_count: ownerEditNotes.length,
               legacy_transformation_contract_active: false,
+              winner_preservation_active: false,
             },
           ));
         continue;
@@ -509,7 +515,11 @@ export async function runOperatorGateEngine<TStage extends string>(
           gate,
           "fail",
           "Draft does not satisfy the active source transformation contract.",
-          failures,
+                    {
+            ...failures,
+            winner_preservation_active: manifestWinnerPreservationRequired,
+            winner_preservation: winnerPreservation,
+          },
           "Preserve approved exact hooks/functions, declare satisfied semantic requirements, transform designated elements, deliver the audience reward, and avoid the prohibited full source package.",
         ));
       } else if (copiedShouldTransform.length) {
@@ -524,13 +534,17 @@ export async function runOperatorGateEngine<TStage extends string>(
         results.push(buildOperatorGateResult(
           gate,
           "pass",
-          "Draft satisfies the active source transformation contract.",
+                    "Draft satisfies the active source transformation contract.",
+          manifestWinnerPreservationRequired ? {
+            winner_preservation_active: true,
+            winner_preservation: winnerPreservation,
+          } : null,
         ));
       }
       continue;
     }
-        if (gateKey === "source_surface_copy_gate") {
-      if (manifestOwnerGuided) {
+            if (gateKey === "source_surface_copy_gate") {
+      if (manifestOwnerGuided && !manifestWinnerPreservationRequired) {
         results.push(exactSourceCopy
           ? buildOperatorGateResult(
             gate,

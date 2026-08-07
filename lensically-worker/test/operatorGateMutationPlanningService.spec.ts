@@ -406,7 +406,83 @@ describe("operator gate engine", () => {
     }));
   });
 
-    it("uses source-specific owner guidance instead of legacy Manifest mimicry rules", async () => {
+      it("enforces the performance-bearing language package for Manifest winners", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "transform", gate_key: "source_transformation_contract_gate", severity: "block", evaluator: "hybrid" },
+    ]);
+    dependencies.getSourceCard.mockResolvedValue({
+      status: "locked",
+      primary_source: { text: "IF YOUR FINGER TOUCHED THIS TODAY, EXPECT GOOD MONEY NEWS WITHIN 7 DAYS." },
+      transformation_contract: {
+        must_preserve_exact: [
+          "IF YOUR FINGER TOUCHED THIS TODAY",
+          "EXPECT GOOD MONEY NEWS",
+        ],
+        must_preserve_function: ["Preserve the winner's certainty level."],
+        audience_reward: "Immediate anticipation of positive money news.",
+        winner_preservation: {
+          required: true,
+          observed_likes: 6604,
+          exact_surfaces: [
+            "IF YOUR FINGER TOUCHED THIS TODAY",
+            "EXPECT GOOD MONEY NEWS",
+          ],
+        },
+      },
+    });
+
+    const failed = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-winner",
+      threadsUserId: "threads-winner",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-winner",
+      draftText: "Your finger landed here before the financial news did.",
+      draftAnalysis: {
+        preserved_functions: ["Preserve the winner's certainty level."],
+        audience_reward_delivered: true,
+      },
+    }, dependencies);
+
+    expect(failed.showable).toBe(false);
+    expect(failed.blocking_failures).toEqual([
+      expect.objectContaining({
+        gate_key: "source_transformation_contract_gate",
+        result: "fail",
+        evidence: expect.objectContaining({
+          winner_preservation_active: true,
+          missing_exact_surfaces: [
+            "IF YOUR FINGER TOUCHED THIS TODAY",
+            "EXPECT GOOD MONEY NEWS",
+          ],
+        }),
+      }),
+    ]);
+
+    const passed = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-winner",
+      threadsUserId: "threads-winner",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-winner",
+      draftText: "IF YOUR FINGER TOUCHED THIS TODAY, EXPECT GOOD MONEY NEWS before next Friday.",
+      draftAnalysis: {
+        preserved_functions: ["Preserve the winner's certainty level."],
+        audience_reward_delivered: true,
+      },
+    }, dependencies);
+
+    expect(passed.showable).toBe(true);
+    expect(passed.gate_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gate_key: "source_transformation_contract_gate",
+        result: "pass",
+        evidence: expect.objectContaining({ winner_preservation_active: true }),
+      }),
+    ]));
+  });
+
+  it("uses source-specific owner guidance instead of legacy Manifest mimicry rules", async () => {
     const dependencies = createGateEngineDependencies([
       { id: "transform", gate_key: "source_transformation_contract_gate", severity: "block", evaluator: "hybrid" },
       { id: "inventory", gate_key: "current_inventory_repeat_gate", severity: "block", evaluator: "backend" },

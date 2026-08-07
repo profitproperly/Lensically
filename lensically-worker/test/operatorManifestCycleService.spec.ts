@@ -28,7 +28,8 @@ function createHarness() {
   const dbState = createDb();
   const mocks = {
     observe: vi.fn(async (_toolName: string, _payload: JsonRecord, result: JsonRecord) => ({ observed: true, ...result })),
-    readEvidencePage: vi.fn(async () => ({ success: true, page_index: 0 } as JsonRecord)),
+        readEvidencePage: vi.fn(async () => ({ success: true, page_index: 0 } as JsonRecord)),
+    readSourceCard: vi.fn(async () => null as JsonRecord | null),
     validateLockedLineup: vi.fn(async () => [{ id: "plan-1" }] as JsonRecord[]),
     commitStrategy: vi.fn(async () => ({ id: "strategy-1" } as JsonRecord)),
     appendCycleEvent: vi.fn(async () => undefined),
@@ -54,7 +55,8 @@ function createHarness() {
   };
   const dependencies: OperatorManifestCycleServiceDependencies = {
     db: dbState.db,
-    normalizeText,
+        normalizeText,
+    readSourceCard: mocks.readSourceCard,
     observe: mocks.observe,
     readEvidencePage: mocks.readEvidencePage,
     validateLockedLineup: mocks.validateLockedLineup,
@@ -78,8 +80,33 @@ function createHarness() {
 }
 
 describe("Operator Manifest cycle product service", () => {
-  it("returns source evidence and owner notes without activating legacy mimicry fields", async () => {
-    const { dependencies } = createHarness();
+    it("returns enforceable winner language evidence in the locked Main Cycle lineup", async () => {
+    const { dependencies, mocks } = createHarness();
+    mocks.readSourceCard.mockResolvedValue({
+      id: "card-1",
+      primary_source: { text: "Original source", metrics: { likes: 1000 } },
+      source_mechanism: "Preserve everything closely.",
+      required_product: "Repeat the same payoff.",
+      recommended_direction: "Create a close adaptation.",
+      transformation_contract: {
+        must_preserve_exact: ["Original source"],
+        must_preserve_function: ["Preserve the winning hook."],
+        winner_preservation: {
+          required: true,
+          observed_likes: 1000,
+          exact_surfaces: ["Original source"],
+        },
+      },
+      winner_preservation: {
+        required: true,
+        observed_likes: 1000,
+        exact_surfaces: ["Original source"],
+      },
+      owner_guidance: {
+        id: "guidance-1",
+        text: "Use this source as evidence and follow my note.",
+      },
+    });
     const prepare = vi.fn((sql: string) => ({
       bind: vi.fn(() => ({
         first: vi.fn(async () => ({ total: 1 })),
@@ -145,18 +172,26 @@ describe("Operator Manifest cycle product service", () => {
         id: "revision-1",
         owner_note: "The prior version repeated too much.",
       }),
-      generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+            source_mechanism: "Preserve everything closely.",
+      required_product: "Repeat the same payoff.",
+      recommended_direction: "Create a close adaptation.",
+      transformation_contract: expect.objectContaining({
+        must_preserve_exact: ["Original source"],
+        winner_preservation: expect.objectContaining({ required: true }),
+      }),
+      winner_preservation: expect.objectContaining({
+        required: true,
+        observed_likes: 1000,
+      }),
+      generation_direction: "Preserve the winner's performance-bearing language package. Vary only non-load-bearing details without weakening the hook, certainty, specificity, payoff, timing, or visual intensity.",
       legacy_source_card_interpretation: {
         preserved_historically: true,
-        active_generation_instruction: false,
+        active_generation_instruction: true,
       },
     });
-    expect(item).not.toHaveProperty("source_mechanism");
-    expect(item).not.toHaveProperty("required_product");
-    expect(item).not.toHaveProperty("recommended_direction");
-    expect(item).not.toHaveProperty("transformation_contract");
     expect(item).not.toHaveProperty("pass_conditions");
-        expect(item).not.toHaveProperty("fail_conditions");
+    expect(item).not.toHaveProperty("fail_conditions");
+    expect(mocks.readSourceCard).toHaveBeenCalledWith("manifest_mental", "card-1");
     expect(prepare).toHaveBeenCalled();
   });
 

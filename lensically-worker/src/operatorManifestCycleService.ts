@@ -31,8 +31,9 @@ export type OperatorManifestCycleServiceResult = {
 };
 
 export interface OperatorManifestCycleServiceDependencies {
-  db: D1Database;
+    db: D1Database;
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
+  readSourceCard(brandKey: string, sourceCardId: string): Promise<JsonRecord | null>;
   observe(
     toolName: OperatorManifestCycleServiceToolName,
     payload: JsonRecord,
@@ -216,10 +217,23 @@ export async function handleOperatorManifestCycleServiceTool(
         ).bind(brandKey, cycleId, limit, offset).all<JsonRecord>(),
       ]);
       const totalCount = Math.max(0, Math.trunc(Number(countRow?.total ?? 0)));
-      const items = (rows.results ?? []).map((row) => {
+            const items = await Promise.all((rows.results ?? []).map(async (row) => {
         const receipt = asRecord(parseJson(row.receipt_json, {}));
+        const sourceCardId = String(row.source_card_id ?? "").trim();
+        const sourceCard = sourceCardId
+          ? await dependencies.readSourceCard(brandKey, sourceCardId)
+          : null;
+        const transformationContract = asRecord(
+          sourceCard?.transformation_contract
+            ?? parseJson(row.transformation_contract_json, {}),
+        );
+        const winnerPreservation = asRecord(
+          sourceCard?.winner_preservation
+            ?? transformationContract.winner_preservation,
+        );
+        const winnerProtectionActive = winnerPreservation.required === true;
         return {
-                    slot_key: row.slot_key,
+          slot_key: row.slot_key,
           selection_order: Number(row.selection_order ?? 0),
           cycle_plan_item_id: row.cycle_plan_item_id ?? null,
           cycle_strategy_id: row.cycle_strategy_id ?? null,
@@ -232,19 +246,29 @@ export async function handleOperatorManifestCycleServiceTool(
           internal_source_id: row.internal_source_id ?? null,
           canonical_source_url: row.canonical_source_url ?? null,
           source_title: String(row.source_title ?? "").slice(0, 240),
-                    primary_source: compactLineupCue(parseJson(row.primary_source_json, {})),
-          owner_guidance: row.owner_guidance_id ? {
+          primary_source: compactLineupCue(
+            sourceCard?.primary_source
+              ?? parseJson(row.primary_source_json, {}),
+          ),
+          source_mechanism: sourceCard?.source_mechanism ?? row.source_mechanism ?? null,
+          required_product: sourceCard?.required_product ?? row.required_product ?? null,
+          recommended_direction: sourceCard?.recommended_direction ?? row.recommended_direction ?? null,
+          transformation_contract: compactLineupCue(transformationContract),
+          winner_preservation: compactLineupCue(winnerPreservation),
+          owner_guidance: sourceCard?.owner_guidance ?? (row.owner_guidance_id ? {
             id: row.owner_guidance_id,
             text: String(row.owner_guidance_text ?? ""),
             version_number: Number(row.owner_guidance_version ?? 1),
             updated_at: row.owner_guidance_updated_at ?? null,
             active: true,
-          } : null,
-                    latest_owner_edit_note: parseJson(row.latest_owner_edit_note_json, null),
-          generation_direction: "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
+          } : null),
+          latest_owner_edit_note: parseJson(row.latest_owner_edit_note_json, null),
+          generation_direction: winnerProtectionActive
+            ? "Preserve the winner's performance-bearing language package. Vary only non-load-bearing details without weakening the hook, certainty, specificity, payoff, timing, or visual intensity."
+            : "Use the source card and the owner’s notes to understand the opportunity. Decide what the strongest post should be for Manifest Mental.",
           legacy_source_card_interpretation: {
             preserved_historically: true,
-            active_generation_instruction: false,
+            active_generation_instruction: winnerProtectionActive,
           },
           selection_evidence: {
             lifetime_label: receipt.lifetime_label ?? null,
@@ -254,7 +278,7 @@ export async function handleOperatorManifestCycleServiceTool(
             planned_uses: receipt.planned_uses ?? null,
           },
         };
-      });
+      }));
       const nextOffset = offset + items.length;
       return result({
         success: true,
