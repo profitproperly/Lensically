@@ -251,6 +251,7 @@
       const errorBox = document.getElementById('checkout-error');
       let initialized = false;
       const stickyBuy = document.getElementById('sticky-buy');
+      const firstCta = document.querySelector('.intro .cta');
 
       const showFallback = () => {
         if (loading) loading.style.display = 'none';
@@ -302,9 +303,10 @@
       const updateStickyBuy = () => {
         if (!stickyBuy || !shell) return;
         const checkoutTop = shell.getBoundingClientRect().top;
-        const scrolledEnough = window.scrollY > Math.max(520, window.innerHeight * 1.15);
+        const firstCtaBottom = firstCta ? firstCta.getBoundingClientRect().bottom : 0;
+        const firstButtonOutOfFrame = firstCtaBottom <= 0;
         const beforeCheckout = checkoutTop > window.innerHeight * 0.92;
-        const shouldShow = scrolledEnough && beforeCheckout;
+        const shouldShow = firstButtonOutOfFrame && beforeCheckout;
         stickyBuy.classList.toggle('is-visible', shouldShow);
         stickyBuy.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
       };
