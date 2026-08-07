@@ -376,7 +376,7 @@ export async function handleOperatorManifestPrepareCheckpoint(
       const learning = await dependencies.refreshIntelligenceEngine({
         phase: "learning_observations",
         learning_offset: learningOffset,
-                        learning_limit: 30,
+                                learning_limit: 180,
       });
       const learningSummary = dependencies.compactPayloadValue(
         learning,

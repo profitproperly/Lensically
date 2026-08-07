@@ -1654,7 +1654,7 @@ if (!operatorManifestPrepareCheckpointService.includes("export async function ha
     || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshMeasurementAudit")
     || !operatorManifestPrepareCheckpointService.includes("dependencies.refreshContentFocus")
         || !operatorManifestPrepareCheckpointService.includes('phase: "learning_observations"')
-        || !operatorManifestPrepareCheckpointService.includes('learning_limit: 30')
+            || !operatorManifestPrepareCheckpointService.includes('learning_limit: 180')
     || !operatorManifestPrepareCheckpointService.includes('phase: "cycle_construction"')) {
   lifecycleErrors.push("operator_manifest_prepare_checkpoint_service_module_incomplete");
 }

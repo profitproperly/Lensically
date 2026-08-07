@@ -131,7 +131,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
     expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
       phase: "learning_observations",
       learning_offset: 180,
-                  learning_limit: 30,
+                        learning_limit: 180,
     });
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
       phase: "manifest_intelligence_learning",

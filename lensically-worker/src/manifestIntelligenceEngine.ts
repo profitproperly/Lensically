@@ -593,7 +593,7 @@ export async function ensureManifestIntelligenceEngineTables(db: D1Database): Pr
   ]);
 }
 
-export async function upsertManifestLearningObservation(db: D1Database, input: {
+export type ManifestLearningObservationUpsertInput = {
   brand_key: string;
   level: string;
   feature_key: string;
@@ -605,17 +605,16 @@ export async function upsertManifestLearningObservation(db: D1Database, input: {
   confidence_score: number;
   confidence_label: ManifestConfidenceLabel;
   state: string;
-    evidence: JsonRecord;
+  evidence: JsonRecord;
   reason: string;
-  skip_table_ensure?: boolean;
-}): Promise<{ transitioned: boolean; from_state: string | null; to_state: string }> {
-  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
-  const previous = await db.prepare(`SELECT confidence_label, state
-    FROM operator_manifest_learning_observations
-    WHERE brand_key = ? AND level = ? AND feature_key = ? AND checkpoint_hours = 24 LIMIT 1`)
-    .bind(input.brand_key, input.level, input.feature_key).first<JsonRecord>();
+};
+
+function prepareManifestLearningObservationUpsert(
+  db: Pick<D1Database, "prepare">,
+  input: ManifestLearningObservationUpsertInput,
+): { evidenceJson: string; statement: D1PreparedStatement } {
   const evidenceJson = stableJson(input.evidence);
-  await db.prepare(`INSERT INTO operator_manifest_learning_observations (
+  const statement = db.prepare(`INSERT INTO operator_manifest_learning_observations (
     id, brand_key, level, feature_key, checkpoint_hours, sample_size, supporting_count,
     contradicting_count, median_overall, effect_size, confidence_score, confidence_label,
     state, evidence_json, active, learning_version
@@ -631,21 +630,69 @@ export async function upsertManifestLearningObservation(db: D1Database, input: {
     input.supporting_count, input.contradicting_count, input.median_overall, input.effect_size,
     input.confidence_score, input.confidence_label, input.state, evidenceJson,
     MANIFEST_MULTI_LEVEL_LEARNING_VERSION,
-  ).run();
-  const previousLabel = previous?.confidence_label ? machine(previous.confidence_label, "insufficient") : null;
-  const transitioned = previousLabel !== input.confidence_label;
-  if (transitioned) {
+  );
+  return { evidenceJson, statement };
+}
+
+export async function persistManifestLearningObservationBatch(
+  db: Pick<D1Database, "prepare" | "batch">,
+  inputs: ManifestLearningObservationUpsertInput[],
+  batchSize = MANIFEST_D1_WRITE_BATCH_SIZE,
+): Promise<{
+  results: Array<{ transitioned: boolean; from_state: string | null; to_state: string }>;
+  observation_count: number;
+  transition_count: number;
+  statement_count: number;
+  batch_count: number;
+}> {
+  if (inputs.length === 0) {
+    return { results: [], observation_count: 0, transition_count: 0, statement_count: 0, batch_count: 0 };
+  }
+  const brandKeys = [...new Set(inputs.map((input) => input.brand_key))];
+  if (brandKeys.length !== 1) throw new Error("manifest_learning_batch_single_brand_required");
+  const previous = await db.prepare(`SELECT level, feature_key, confidence_label
+    FROM operator_manifest_learning_observations
+    WHERE brand_key = ? AND checkpoint_hours = 24`).bind(brandKeys[0]).all<JsonRecord>();
+  const previousLabels = new Map((previous.results ?? []).map((row) => [
+    `${machine(row.level, "unknown")}:${machine(row.feature_key, "unknown")}`,
+    machine(row.confidence_label, "insufficient"),
+  ]));
+  const statements: D1PreparedStatement[] = [];
+  const results: Array<{ transitioned: boolean; from_state: string | null; to_state: string }> = [];
+  let transitionCount = 0;
+  for (const input of inputs) {
+    const prepared = prepareManifestLearningObservationUpsert(db, input);
+    statements.push(prepared.statement);
+    const previousLabel = previousLabels.get(`${input.level}:${input.feature_key}`) ?? null;
+    const transitioned = previousLabel !== input.confidence_label;
+    results.push({ transitioned, from_state: previousLabel, to_state: input.confidence_label });
+    if (!transitioned) continue;
     const entityId = `${input.level}:${input.feature_key}`;
-    const transitionKey = fnv1a(`${input.brand_key}|confidence|${entityId}|${previousLabel ?? "none"}|${input.confidence_label}|${evidenceJson}`);
-    await db.prepare(`INSERT OR IGNORE INTO operator_manifest_state_transitions (
+    const transitionKey = fnv1a(`${input.brand_key}|confidence|${entityId}|${previousLabel ?? "none"}|${input.confidence_label}|${prepared.evidenceJson}`);
+    statements.push(db.prepare(`INSERT OR IGNORE INTO operator_manifest_state_transitions (
       id, transition_key, brand_key, entity_type, entity_id, from_state, to_state,
       reason, evidence_json, transitioned_at
     ) VALUES (?, ?, ?, 'confidence', ?, ?, ?, ?, ?, ?)`).bind(
       crypto.randomUUID(), transitionKey, input.brand_key, entityId, previousLabel,
-      input.confidence_label, input.reason, evidenceJson, new Date().toISOString(),
-    ).run();
+      input.confidence_label, input.reason, prepared.evidenceJson, new Date().toISOString(),
+    ));
+    transitionCount += 1;
   }
-  return { transitioned, from_state: previousLabel, to_state: input.confidence_label };
+  const receipt = await executeManifestD1WriteBatches(db, statements, batchSize);
+  return {
+    results,
+    observation_count: inputs.length,
+    transition_count: transitionCount,
+    ...receipt,
+  };
+}
+
+export async function upsertManifestLearningObservation(db: D1Database, input: ManifestLearningObservationUpsertInput & {
+  skip_table_ensure?: boolean;
+}): Promise<{ transitioned: boolean; from_state: string | null; to_state: string }> {
+  if (input.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
+  const receipt = await persistManifestLearningObservationBatch(db, [input]);
+  return receipt.results[0];
 }
 
 export type ManifestSemanticSignatureUpsertInput = {
@@ -1038,7 +1085,8 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       groups.set(key, group);
     }
   }
-    const familyObservations = new Map<string, JsonRecord>();
+      const familyObservations = new Map<string, JsonRecord>();
+  const learningInputs: ManifestLearningObservationUpsertInput[] = [];
   const groupValues = [...groups.values()];
   const learningEnd = Math.min(groupValues.length, learningOffset + learningLimit);
   for (let groupIndex = 0; groupIndex < groupValues.length; groupIndex += 1) {
@@ -1062,23 +1110,22 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       global_median_overall: globalMedian,
       structural_change_allowed: confidence.transition_allowed,
     };
-            if (runLearning && groupIndex >= learningOffset && groupIndex < learningEnd) {
-        await upsertManifestLearningObservation(db, {
-      brand_key: input.brand_key,
-      level: group.level,
-      feature_key: group.feature_key,
-      sample_size: scores.length,
-      supporting_count: supporting,
-      contradicting_count: contradicting,
-      median_overall: groupMedian,
-      effect_size: effect,
-      confidence_score: confidence.score,
-      confidence_label: confidence.label,
-      state,
-            evidence,
-      reason: confidence.reason,
-      skip_table_ensure: true,
-    });
+                if (runLearning && groupIndex >= learningOffset && groupIndex < learningEnd) {
+      learningInputs.push({
+        brand_key: input.brand_key,
+        level: group.level,
+        feature_key: group.feature_key,
+        sample_size: scores.length,
+        supporting_count: supporting,
+        contradicting_count: contradicting,
+        median_overall: groupMedian,
+        effect_size: effect,
+        confidence_score: confidence.score,
+        confidence_label: confidence.label,
+        state,
+        evidence,
+        reason: confidence.reason,
+      });
     }
     if (group.level === "family") familyObservations.set(group.feature_key, {
       sample_size: scores.length, median_overall: groupMedian, supporting_count: supporting,
@@ -1086,13 +1133,19 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       strong_count: scores.filter((score) => score >= 65).length,
       weak_count: scores.filter((score) => score <= 35).length,
     });
-  }
-    if (phase === "learning_observations") {
+    }
+  const learningWriteReceipt = runLearning
+    ? await persistManifestLearningObservationBatch(db, learningInputs)
+    : { observation_count: 0, transition_count: 0, statement_count: 0, batch_count: 0 };
+  if (phase === "learning_observations") {
     return {
       engine_version: MANIFEST_INTELLIGENCE_ENGINE_VERSION,
       phase,
       learning_observations_processed: Math.max(0, learningEnd - learningOffset),
       learning_observation_total: groupValues.length,
+      learning_write_statements: learningWriteReceipt.statement_count,
+      learning_write_batches: learningWriteReceipt.batch_count,
+      learning_transition_count: learningWriteReceipt.transition_count,
       next_offset: learningEnd < groupValues.length ? learningEnd : null,
       continuation_required: learningEnd < groupValues.length,
     };
