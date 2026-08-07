@@ -16,10 +16,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          page="$(curl --fail --silent --show-error https://lensically.com/operator/)"
+                    page="$(curl --fail --silent --show-error https://lensically.com/operator/)"
           grep -Fq 'id="embedded-checkout"' <<<"$page"
           grep -Fq 'https://js.stripe.com/clover/stripe.js' <<<"$page"
           grep -Fq 'api.lensically.com/api/commercial/embedded-checkout-session' <<<"$page"
+          echo 'sales-page-markup=ok'
+
 
           headers="$(mktemp)"
           body="$(mktemp)"
@@ -32,10 +34,17 @@ jobs:
             --header 'Accept: application/json' \
             https://api.lensically.com/api/commercial/embedded-checkout-session)"
 
+                    echo "embedded-endpoint-http=$status"
           test "$status" = "200"
-          grep -iq '^access-control-allow-origin: https://lensically.com' "$headers"
+          if grep -iq '^access-control-allow-origin: https://lensically.com' "$headers"; then
+            echo 'embedded-endpoint-cors=ok'
+          else
+            echo 'embedded-endpoint-cors=missing'
+            exit 1
+          fi
 
           node - "$body" <<'NODE'
+
           const fs = require('fs');
           const payload = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const valid = payload.ok === true
@@ -45,6 +54,12 @@ jobs:
             && payload.client_secret.includes('_secret_')
             && typeof payload.session_id === 'string'
             && payload.session_id.startsWith('cs_live_');
+                    console.log(`payload-ok=${payload.ok === true}`);
+          console.log(`publishable-key-live=${typeof payload.publishable_key === 'string' && payload.publishable_key.startsWith('pk_live_')}`);
+          console.log(`client-secret-present=${typeof payload.client_secret === 'string' && payload.client_secret.includes('_secret_')}`);
+          console.log(`live-session-present=${typeof payload.session_id === 'string' && payload.session_id.startsWith('cs_live_')}`);
+          console.log(`error-code=${typeof payload.error === 'string' ? payload.error : 'none'}`);
           if (!valid) process.exit(1);
           console.log('Live embedded Checkout smoke passed without exposing checkout credentials.');
+
           NODE
