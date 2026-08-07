@@ -199,6 +199,7 @@ const wranglerDeployRetryTests = read("test/wranglerDeployRetry.spec.ts");
 const operatorMcpSchemas = read("src/operatorMcpSchemas.ts");
 const operatorMcpConstants = read("src/operatorMcpConstants.ts");
 const manifestIntelligence = read("src/manifestIntelligence.ts");
+const manifestIntelligenceTests = read("test/manifestIntelligence.spec.ts");
 const manifestIntelligenceMigration = read("database/migrations/0014_manifest_intelligence.sql");
 const manifestMeasurementAudit = read("src/manifestMeasurementAudit.ts");
 const operatorContinuityMigration = read("database/migrations/0008_operator_continuity_and_autonomy.sql");
@@ -3617,8 +3618,8 @@ const manifestAutonomousGrowthChecks = [
   ["measurement_audit_transport_safe", manifestMeasurementAudit.includes("persistManifestSavedPatternIntelligenceBatch")
     && manifestMeasurementAudit.includes("write_statement_count")
     && manifestMeasurementAudit.includes("write_batch_count")
-    && manifestMeasurementAudit.includes("component_durations_ms")
-    && tests.includes("persists Saved Pattern intelligence through bounded batches")],
+        && manifestMeasurementAudit.includes("component_durations_ms")
+    && manifestIntelligenceTests.includes("persists Saved Pattern intelligence through bounded batches")],
     ["one_cycle_strategy", manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_strategies")
     && manifestIntelligenceMigration.includes("CREATE TABLE IF NOT EXISTS operator_manifest_cycle_plan_items")
     && manifestIntelligence.includes('table: "operator_manifest_cycle_strategies"')
