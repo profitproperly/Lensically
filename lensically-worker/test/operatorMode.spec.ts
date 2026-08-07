@@ -2732,7 +2732,11 @@ describe("operator mode backend spine", () => {
     const analysis = {
       opening_phrase: "If your finger touched this",
       realm_entrance_key: "finger_touch",
-      preserved_functions: ["Physical contact with the post acts as personal selection."],
+            preserved_functions: [
+        "Physical contact with the post acts as personal selection.",
+        "Preserve the winning post's recognizable opening hook and directness.",
+        "Preserve the winner's concrete timing or deadline when the timing is part of the hook.",
+      ],
             satisfied_time_or_context_requirements: ["A named month or near-term time boundary is present."],
       audience_reward_delivered: true,
     };
