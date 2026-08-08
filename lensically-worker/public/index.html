@@ -317,7 +317,7 @@
         if (!checkoutSection) return;
         initializeCheckout();
         await waitForCheckoutLayout();
-        const scrollOffset = window.matchMedia('(max-width: 560px)').matches ? 18 : 96;
+        const scrollOffset = window.matchMedia('(max-width: 560px)').matches ? 18 : 172;
         const top = checkoutSection.getBoundingClientRect().top + window.scrollY + scrollOffset;
         window.scrollTo({ top, behavior: 'smooth' });
       };
