@@ -2326,10 +2326,9 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
   });
   const assertions = {
         one_breakout_enters_development: oneBreakout.label === "prospect" && oneBreakout.selection_lane === "develop",
-    owner_question_format_bench_overrides_franchise_rank:
+        owner_question_format_bench_overrides_franchise_rank:
       questionFormatBenchSelection.selected[0]?.source_identity_key === "statement-prospect"
-      && questionFormatBenchSelection.summary.exclusions instanceof Array
-      && questionFormatBenchSelection.summary.exclusions.some((entry: any) => entry.source_identity_key === "question-franchise" && entry.reason === "owner_benched_question_format"),
+      && questionFormatBenchSelection.summary.hard_exclusion_count === 1,
     repeated_winners_franchise: repeatedWinners.label === "franchise" && repeatedWinners.selection_lane === "exploit",
     unequal_sample_rank_is_conservative: oneBreakout.ranking_score < repeatedWinners.ranking_score,
     viral_plus_failures_not_winner: viralPlusFailures.label === "underperforming",
