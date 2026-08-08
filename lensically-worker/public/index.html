@@ -324,13 +324,33 @@
         return (checkoutTitle || checkoutSection).getBoundingClientRect().top + window.scrollY - 18;
       };
 
+      const animateMobileCheckoutScroll = (checkoutSection) => {
+        const start = window.scrollY;
+        const duration = 950;
+        const startedAt = performance.now();
+        const easeOutCubic = (progress) => 1 - Math.pow(1 - progress, 3);
+
+        const step = (now) => {
+          const progress = Math.min(1, (now - startedAt) / duration);
+          const target = getCheckoutScrollTop(checkoutSection, true);
+          window.scrollTo(0, start + ((target - start) * easeOutCubic(progress)));
+          if (progress < 1) requestAnimationFrame(step);
+        };
+
+        requestAnimationFrame(step);
+      };
+
       const scrollToCheckout = async () => {
         const checkoutSection = document.getElementById('checkout');
         if (!checkoutSection) return;
         initializeCheckout();
         await waitForCheckoutLayout();
         const isMobileViewport = window.matchMedia('(max-width: 560px)').matches;
-        window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, isMobileViewport), behavior: 'smooth' });
+        if (isMobileViewport) {
+          animateMobileCheckoutScroll(checkoutSection);
+        } else {
+          window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'smooth' });
+        }
 
         if (!isMobileViewport) {
           clearTimeout(checkoutScrollCorrectionTimer);
@@ -341,15 +361,6 @@
           checkoutScrollFinalTimer = setTimeout(() => {
             window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'auto' });
           }, 1500);
-        } else {
-          clearTimeout(checkoutScrollCorrectionTimer);
-          clearTimeout(checkoutScrollFinalTimer);
-          checkoutScrollCorrectionTimer = setTimeout(() => {
-            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, true), behavior: 'smooth' });
-          }, 220);
-          checkoutScrollFinalTimer = setTimeout(() => {
-            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, true), behavior: 'auto' });
-          }, 700);
         }
       };
 
