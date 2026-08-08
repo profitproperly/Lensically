@@ -1393,26 +1393,7 @@ export async function enrichSourceCandidatesForSelection(
   });
 }
 
-function isManifestQuestionFormatCandidate(candidate: SourceSelectionCandidate): boolean {
-  const primary = candidate.primary_source && typeof candidate.primary_source === "object" && !Array.isArray(candidate.primary_source)
-    ? candidate.primary_source as Record<string, unknown>
-    : {};
-  const semanticSignature = candidate.semantic_signature && typeof candidate.semantic_signature === "object" && !Array.isArray(candidate.semantic_signature)
-    ? candidate.semantic_signature as Record<string, unknown>
-    : {};
-  const questionType = String(semanticSignature.question_type ?? candidate.question_type ?? "").trim().toLowerCase();
-  if (questionType && questionType !== "none") return true;
-  const primaryText = [primary.post_text, primary.text, candidate.text]
-    .map((value) => String(value ?? ""))
-    .filter(Boolean)
-    .join("\n");
-  if (/[?？]/.test(primaryText)) return true;
-  const sourceIntent = [candidate.source_mechanism, candidate.required_product, candidate.recommended_direction]
-    .map((value) => String(value ?? ""))
-    .filter(Boolean)
-    .join("\n");
-  return /\b(?:question|ask(?:s|ed|ing)?|prompt(?:s|ed|ing)?)\b/i.test(sourceIntent);
-}
+
 
 export function selectSourceFamilyLineup(input: {
   candidates: SourceSelectionCandidate[];
@@ -1435,9 +1416,8 @@ export function selectSourceFamilyLineup(input: {
   }));
   const exclusionReason = (candidate: SourceSelectionCandidate): string | null => {
     if (!candidate.source_identity_key) return "source_identity_missing";
-        if (!candidate.source_card_id) return "source_card_missing";
+            if (!candidate.source_card_id) return "source_card_missing";
         if (!candidate.source_card_family_id) return "source_family_missing";
-    if (isManifestQuestionFormatCandidate(candidate)) return "owner_benched_question_format";
     const preselectionExclusion = sourcePreselectionExclusionForCandidate(input.preselection_policy, candidate);
     if (preselectionExclusion) return preselectionExclusion.reason;
         if (candidate.lifetime_label === "underperforming") return "lifetime_underperforming";
@@ -2292,43 +2272,10 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
     slot_keys: ["2026-01-05T00:00"],
     seed: "exploration-fairness",
   });
-    const questionFormatBenchSelection = selectSourceFamilyLineup({
-    candidates: [
-      {
-        source_identity_key: "question-franchise",
-        source_card_id: "question-franchise-card",
-        source_card_family_id: "question-franchise-family",
-        lifetime_label: "franchise",
-        unified_rating: 8,
-        ranking_score: 8,
-        lifetime_index: 8,
-        source_mechanism: "Ask the reader a specific financial question.",
-        required_product: "A direct question that invites a reply.",
-        primary_source: { post_text: "If $50,000 arrived today, what gets handled first?" },
-        uses_24h: 0,
-      },
-      {
-        source_identity_key: "statement-prospect",
-        source_card_id: "statement-prospect-card",
-        source_card_family_id: "statement-prospect-family",
-        lifetime_label: "prospect",
-        unified_rating: 1,
-        ranking_score: 1,
-        lifetime_index: 1,
-        source_mechanism: "Deliver a direct financial blessing.",
-        required_product: "A concise statement of financial relief.",
-        primary_source: { post_text: "A financial breakthrough is getting closer." },
-        uses_24h: 0,
-      },
-    ],
-    slot_keys: ["2026-01-05T03:00"],
-    seed: "owner-question-format-bench",
-  });
+    
   const assertions = {
         one_breakout_enters_development: oneBreakout.label === "prospect" && oneBreakout.selection_lane === "develop",
-        owner_question_format_bench_overrides_franchise_rank:
-      questionFormatBenchSelection.selected[0]?.source_identity_key === "statement-prospect"
-      && questionFormatBenchSelection.summary.hard_exclusion_count === 1,
+        
     repeated_winners_franchise: repeatedWinners.label === "franchise" && repeatedWinners.selection_lane === "exploit",
     unequal_sample_rank_is_conservative: oneBreakout.ranking_score < repeatedWinners.ranking_score,
     viral_plus_failures_not_winner: viralPlusFailures.label === "underperforming",
@@ -2371,8 +2318,8 @@ export function runSourceFamilySelectionEdgeCases(): Record<string, unknown> {
             developmentFairnessSelection: developmentFairnessSelection.receipts,
       explorationFairnessSelection: explorationFairnessSelection.receipts,
       sameMechanismIndependentSelection: sameMechanismIndependentSelection.receipts,
-            advisoryOnlyPolicy,
-      questionFormatBenchSelection,
+                  advisoryOnlyPolicy,
+
     },
   };
 }

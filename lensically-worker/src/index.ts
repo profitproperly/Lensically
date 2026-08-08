@@ -13778,6 +13778,64 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
   }
 
       const sourceLineageBackfillRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
+        set_source_family_bench: async () => {
+      const action = String(payload.action ?? "").trim().toLowerCase();
+      const sourceCardFamilyId = normalizeOperatorText(payload.source_card_family_id, 120, true) ?? "";
+      const sourceCardId = normalizeOperatorText(payload.source_card_id, 120, true) ?? "";
+      const sourceIdentityKey = normalizeOperatorText(payload.source_identity_key, 500, true) ?? "";
+      const reason = normalizeOperatorText(payload.reason, 500, true) ?? "owner_source_family_bench";
+      if (!new Set(["bench", "unbench"]).has(action) || ![sourceCardFamilyId, sourceCardId, sourceIdentityKey].some(Boolean)) {
+        return { body: { success: false, error: "action bench|unbench and one source family reference are required" }, status: 400 };
+      }
+      const family = await env.DB.prepare(
+        `SELECT id AS source_card_family_id, source_identity_key, current_source_card_id
+         FROM operator_source_card_families
+         WHERE brand_key = ?
+           AND (id = ? OR source_identity_key = ? OR current_source_card_id = ?)
+         LIMIT 1`,
+      ).bind(brand.brand_key, sourceCardFamilyId, sourceIdentityKey, sourceCardId).first<{
+        source_card_family_id: string;
+        source_identity_key: string;
+        current_source_card_id: string | null;
+      }>();
+      if (!family) {
+        return { body: { success: false, error: "source_family_not_found" }, status: 404 };
+      }
+      if (action === "bench") {
+        await env.DB.prepare(
+          `INSERT INTO operator_source_exclusions (
+             id, brand_key, source_identity_key, source_type, internal_source_id, reason, active
+           ) VALUES (?, ?, ?, 'source_family', ?, ?, 1)
+           ON CONFLICT(brand_key, source_identity_key) DO UPDATE SET
+             source_type = 'source_family', internal_source_id = excluded.internal_source_id,
+             active = 1, reason = excluded.reason, updated_at = CURRENT_TIMESTAMP`,
+        ).bind(
+          crypto.randomUUID(),
+          brand.brand_key,
+          family.source_identity_key,
+          family.source_card_family_id,
+          reason,
+        ).run();
+      } else {
+        await env.DB.prepare(
+          `UPDATE operator_source_exclusions
+           SET active = 0, updated_at = CURRENT_TIMESTAMP
+           WHERE brand_key = ? AND source_identity_key = ?`,
+        ).bind(brand.brand_key, family.source_identity_key).run();
+      }
+      return {
+        body: {
+          success: true,
+          status: action === "bench" ? "benched" : "unbenched",
+          source_card_family_id: family.source_card_family_id,
+          source_card_id: family.current_source_card_id,
+          source_identity_key: family.source_identity_key,
+          preserved_historical_data: true,
+          future_source_selection_eligible: action === "unbench",
+        },
+        status: 200,
+      };
+    },
     draw_source_candidate_batch: async () => {
     const drawResult = await drawOperatorManifestSourceBatch({
       brandKey: brand.brand_key,
@@ -19521,7 +19579,8 @@ async function handleOperatorMcpAdminTool(
         "schedule_manifest_review_batch",
         "start_workflow_session",
         "admit_context",
-        "delete_saved_pattern_source",
+                "delete_saved_pattern_source",
+        "set_source_family_bench",
         "draw_source_candidate_batch",
         "recover_published_post_lineage",
         "create_source_card",
