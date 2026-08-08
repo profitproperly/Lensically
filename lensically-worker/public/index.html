@@ -341,6 +341,15 @@
           checkoutScrollFinalTimer = setTimeout(() => {
             window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'auto' });
           }, 1500);
+        } else {
+          clearTimeout(checkoutScrollCorrectionTimer);
+          clearTimeout(checkoutScrollFinalTimer);
+          checkoutScrollCorrectionTimer = setTimeout(() => {
+            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, true), behavior: 'auto' });
+          }, 900);
+          checkoutScrollFinalTimer = setTimeout(() => {
+            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, true), behavior: 'auto' });
+          }, 1500);
         }
       };
 
