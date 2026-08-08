@@ -802,7 +802,7 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 85-tool public surface and required Main Cycle dependencies")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact 86-tool public surface and required Main Cycle dependencies")
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
@@ -933,7 +933,7 @@ if (!operatorMcpAccountFoundationRegistry.includes("export const OPERATOR_MCP_AC
     || !operatorMcpAccountFoundationRegistry.includes("export const OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS")) {
   lifecycleErrors.push("operator_mcp_account_foundation_registry_module_incomplete");
 }
-if (!operatorMcpAccountFoundationRegistryTests.includes("preserves the exact ordered 21-tool foundation registry")
+if (!operatorMcpAccountFoundationRegistryTests.includes("preserves the exact ordered 22-tool foundation registry")
     || !operatorMcpAccountFoundationRegistryTests.includes("preserves guided review limits and workflow defaults")
     || !operatorMcpAccountFoundationRegistryTests.includes("preserves source deletion, lineage recovery, and bounded backfill contracts")) {
   lifecycleErrors.push("operator_mcp_account_foundation_registry_tests_incomplete");
@@ -1079,10 +1079,10 @@ if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
     || !operatorMcpRegistryComposition.includes("export function buildComposedOperatorMcpTools")) {
   lifecycleErrors.push("operator_mcp_registry_composition_module_incomplete");
 }
-if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 63-tool account aggregation order")
+if (!operatorMcpRegistryCompositionTests.includes("preserves the exact 64-tool account aggregation order")
     || !operatorMcpRegistryCompositionTests.includes("preserves engineering, admin, and intentional monthly-growth classifications")
     || !operatorMcpRegistryCompositionTests.includes("preserves guided Proceed membership without blocking list_accounts")
-        || !operatorMcpRegistryCompositionTests.includes("builds the exact 124 direct tools with deterministic priority ordering")
+        || !operatorMcpRegistryCompositionTests.includes("builds the exact 125 direct tools with deterministic priority ordering")
     || !operatorMcpRegistryCompositionTests.includes("builds all three scoped account wrapper surfaces without brand_key")) {
   lifecycleErrors.push("operator_mcp_registry_composition_tests_incomplete");
 }
