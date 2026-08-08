@@ -3378,7 +3378,9 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !systemDirectoryTests.includes("defers noncritical scope while allowing only mandatory interruptions")
     || !systemDirectoryTests.includes("blocks operational closure without a selected next action and dependency retirement path")
     || !systemDirectoryTests.includes("registers the durable operator work capabilities")
-    || !agentRules.includes("Lensically Autonomous Business Operator")
+        || !agentRules.includes("Lensically Autonomous Business Operator")
+    || !agentRules.includes("This handoff is mandatory and omission is a closure failure")
+    || !agentRules.includes("MANDATORY NEXT STEP: Refresh the Lensically Operator Mode MCP and start a new chat.")
     || !currentState.includes("single-active-outcome-v1")
     || !operatingMemory.includes("operator_work_ledger")) {
   errors.push("autonomous_business_operator_contract_missing");
