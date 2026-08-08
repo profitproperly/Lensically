@@ -39,8 +39,9 @@ function completeRow(overrides: JsonRecord = {}): JsonRecord {
     source_identity_key: "saved-pattern:42",
     source_type: "saved_pattern",
     internal_source_id: "42",
-    metric_snapshot_count: "4",
+        metric_snapshot_count: "4",
     linked_metric_snapshot_count: "4",
+    total_qualifying_count: "51",
     ...overrides,
   };
 }
@@ -53,32 +54,36 @@ describe("auditOperatorPublishedPostLineage", () => {
       payload: {},
     }, defaults);
 
-    expect(defaults.listRows).toHaveBeenCalledWith({
+        expect(defaults.listRows).toHaveBeenCalledWith({
       minimumLikes: 1000,
       days: 30,
       limit: 25,
+      offset: 0,
     });
     expect(defaultResult.criteria).toEqual({
       minimum_likes: 1000,
       days: 30,
       limit: 25,
+      offset: 0,
     });
 
     const bounded = createDependencies();
     const boundedResult = await auditOperatorPublishedPostLineage({
       brandKey: "manifest_mental",
-      payload: { minimum_likes: -8, days: 900, limit: 0 },
+            payload: { minimum_likes: -8, days: 900, limit: 0, offset: -40 },
     }, bounded);
 
-    expect(bounded.listRows).toHaveBeenCalledWith({
+        expect(bounded.listRows).toHaveBeenCalledWith({
       minimumLikes: 1,
       days: 90,
       limit: 1,
+      offset: 0,
     });
     expect(boundedResult.criteria).toEqual({
       minimum_likes: 1,
       days: 90,
       limit: 1,
+      offset: 0,
     });
   });
 
@@ -87,13 +92,21 @@ describe("auditOperatorPublishedPostLineage", () => {
 
     const result = await auditOperatorPublishedPostLineage({
       brandKey: "manifest_mental",
-      payload: { minimum_likes: 1200, days: 14, limit: 7 },
+            payload: { minimum_likes: 1200, days: 14, limit: 7, offset: 50 },
     }, dependencies);
 
     expect(result).toEqual({
       success: true,
       brand_key: "manifest_mental",
-      criteria: { minimum_likes: 1200, days: 14, limit: 7 },
+            criteria: { minimum_likes: 1200, days: 14, limit: 7, offset: 50 },
+      pagination: {
+        total_count: 51,
+        offset: 50,
+        limit: 7,
+        returned_count: 1,
+        has_more: false,
+        next_offset: null,
+      },
       audited_count: 1,
       complete_count: 1,
       incomplete_count: 0,
@@ -129,6 +142,33 @@ describe("auditOperatorPublishedPostLineage", () => {
         complete: true,
         missing_stages: [],
       }],
+    });
+  });
+
+    it("returns stable next-offset paging metadata for a partial page", async () => {
+    const dependencies = createDependencies([
+      completeRow({ post_id: "post-51", total_qualifying_count: "88" }),
+      completeRow({ post_id: "post-52", total_qualifying_count: "88" }),
+    ]);
+
+    const result = await auditOperatorPublishedPostLineage({
+      brandKey: "manifest_mental",
+      payload: { minimum_likes: 100, days: 90, limit: 2, offset: 50 },
+    }, dependencies);
+
+    expect(dependencies.listRows).toHaveBeenCalledWith({
+      minimumLikes: 100,
+      days: 90,
+      limit: 2,
+      offset: 50,
+    });
+    expect(result.pagination).toEqual({
+      total_count: 88,
+      offset: 50,
+      limit: 2,
+      returned_count: 2,
+      has_more: true,
+      next_offset: 52,
     });
   });
 

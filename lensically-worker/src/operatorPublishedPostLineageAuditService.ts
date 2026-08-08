@@ -1,10 +1,11 @@
 type JsonRecord = Record<string, unknown>;
 
 export interface OperatorPublishedPostLineageAuditDependencies {
-  listRows(input: {
+    listRows(input: {
     minimumLikes: number;
     days: number;
     limit: number;
+    offset: number;
   }): Promise<JsonRecord[]>;
 }
 
@@ -14,8 +15,9 @@ export async function auditOperatorPublishedPostLineage(
 ): Promise<JsonRecord> {
   const minimumLikes = Math.max(1, Math.trunc(Number(input.payload.minimum_likes ?? 1000)));
   const days = Math.min(Math.max(Math.trunc(Number(input.payload.days ?? 30)), 1), 90);
-  const limit = Math.min(Math.max(Math.trunc(Number(input.payload.limit ?? 25)), 1), 50);
-  const rows = await dependencies.listRows({ minimumLikes, days, limit });
+    const limit = Math.min(Math.max(Math.trunc(Number(input.payload.limit ?? 25)), 1), 50);
+  const offset = Math.max(Math.trunc(Number(input.payload.offset ?? 0)), 0);
+  const rows = await dependencies.listRows({ minimumLikes, days, limit, offset });
 
   const posts = rows.map((row) => {
     const missingStages: string[] = [];
@@ -65,10 +67,23 @@ export async function auditOperatorPublishedPostLineage(
     };
   });
 
-    return {
+      const totalQualifyingCount = rows.length > 0
+    ? Number(rows[0].total_qualifying_count ?? rows.length)
+    : offset;
+  const nextOffset = offset + posts.length;
+
+  return {
     success: true,
     brand_key: input.brandKey,
-    criteria: { minimum_likes: minimumLikes, days, limit },
+    criteria: { minimum_likes: minimumLikes, days, limit, offset },
+    pagination: {
+      total_count: totalQualifyingCount,
+      offset,
+      limit,
+      returned_count: posts.length,
+      has_more: nextOffset < totalQualifyingCount,
+      next_offset: nextOffset < totalQualifyingCount ? nextOffset : null,
+    },
     audited_count: posts.length,
     complete_count: posts.filter((post) => post.complete).length,
     incomplete_count: posts.filter((post) => !post.complete).length,

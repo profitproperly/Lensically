@@ -13877,17 +13877,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       brandKey: brand.brand_key,
       payload,
     }, {
-      listRows: async ({ minimumLikes, days, limit }) => {
+            listRows: async ({ minimumLikes, days, limit, offset }) => {
         const rows = await env.DB.prepare(
           `WITH winners AS (
-             SELECT post_id, post_text, post_timestamp, post_permalink,
-                    views, likes, replies, reposts, quotes, shares, engagement_total, last_synced_at
+                          SELECT post_id, post_text, post_timestamp, post_permalink,
+                    views, likes, replies, reposts, quotes, shares, engagement_total, last_synced_at,
+                    COUNT(*) OVER() AS total_qualifying_count
              FROM threads_posts_archive
              WHERE threads_user_id = ?
                AND likes >= ?
                AND datetime(substr(post_timestamp, 1, 19)) >= datetime('now', '-' || ? || ' days')
-             ORDER BY likes DESC, datetime(substr(post_timestamp, 1, 19)) DESC
-             LIMIT ?
+                          ORDER BY likes DESC, datetime(substr(post_timestamp, 1, 19)) DESC
+             LIMIT ? OFFSET ?
            )
            SELECT
              w.*,
@@ -13949,9 +13950,10 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
            ORDER BY w.likes DESC, datetime(w.post_timestamp) DESC`,
         ).bind(
           brand.profile.threads_user_id,
-          minimumLikes,
+                    minimumLikes,
           days,
           limit,
+          offset,
           brand.brand_key,
           brand.brand_key,
           brand.profile.threads_user_id,

@@ -287,14 +287,15 @@ export const OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS: OperatorMcpToolDefinition[] 
   {
     name: "audit_published_post_lineage",
     title: "Audit published winner lineage",
-    description: "Read a bounded set of high-performing published posts and verify every lineage stage from source selection through metric snapshots. Returns complete and incomplete posts without mutating account data.",
+        description: "Read a pageable bounded set of high-performing published posts and verify every lineage stage from source selection through metric snapshots. Continue with next_offset until has_more is false. Returns complete and incomplete posts without mutating account data.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
         minimum_likes: { type: "integer", minimum: 1, default: 1000 },
         days: { type: "integer", minimum: 1, maximum: 90, default: 30 },
-        limit: { type: "integer", minimum: 1, maximum: 50, default: 25 },
+                limit: { type: "integer", minimum: 1, maximum: 50, default: 25 },
+        offset: { type: "integer", minimum: 0, default: 0 },
       },
       required: ["brand_key"],
       additionalProperties: false,
