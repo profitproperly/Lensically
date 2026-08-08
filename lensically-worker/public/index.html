@@ -39,7 +39,7 @@
     .price-note { color:#777; font-size:13px; }
     .cta { display:flex; width:100%; min-height:54px; margin-top:18px; align-items:center; justify-content:center; border-radius:9px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; letter-spacing:-.01em; }
         .micro { margin:9px 0 0; color:#777; text-align:center; font-size:11px; line-height:1.45; }
-    .checkout-section { scroll-margin-top:18px; margin:18px 0 0; padding:18px 0 18px; border-bottom:1px solid var(--line); }
+    .checkout-section { scroll-margin-top:42px; margin:18px 0 0; padding:18px 0 18px; border-bottom:1px solid var(--line); }
     .checkout-section h2 { margin:0 0 18px; display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; font-size:23px; line-height:1.15; letter-spacing:-.035em; }
     .checkout-lock { width:18px; height:18px; flex:0 0 auto; color:#17245d; }
     .checkout-product-summary { margin:0 0 18px; text-align:center; }
@@ -274,8 +274,28 @@
         initializeCheckout();
       }
 
+      const waitForCheckoutLayout = () => new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 80)));
+      });
+
+      const scrollToCheckout = async () => {
+        const checkoutSection = document.getElementById('checkout');
+        if (!checkoutSection) return;
+        initializeCheckout();
+        await waitForCheckoutLayout();
+        const mobileOffset = window.matchMedia('(max-width: 560px)').matches ? 18 : 8;
+        const top = checkoutSection.getBoundingClientRect().top + window.scrollY + mobileOffset;
+        window.scrollTo({ top, behavior: 'smooth' });
+      };
+
       document.querySelectorAll('a[href="#checkout"]').forEach((link) => {
-        link.addEventListener('click', () => initializeCheckout(), { once: true });
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          scrollToCheckout();
+          if (history.pushState) {
+            history.pushState(null, '', '#checkout');
+          }
+        });
       });
 
       const updateStickyBuy = () => {
