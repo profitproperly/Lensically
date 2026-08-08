@@ -317,8 +317,11 @@
         if (!checkoutSection) return;
         initializeCheckout();
         await waitForCheckoutLayout();
-        const scrollOffset = window.matchMedia('(max-width: 560px)').matches ? 18 : 172; // desktop scroll target clears FAQ
-        const top = checkoutSection.getBoundingClientRect().top + window.scrollY + scrollOffset;
+        const isMobileViewport = window.matchMedia('(max-width: 560px)').matches;
+        const checkoutTitle = document.getElementById('checkout-title');
+        const top = isMobileViewport
+          ? checkoutSection.getBoundingClientRect().top + window.scrollY + 18
+          : (checkoutTitle || checkoutSection).getBoundingClientRect().top + window.scrollY - 18;
         window.scrollTo({ top, behavior: 'smooth' });
       };
 
