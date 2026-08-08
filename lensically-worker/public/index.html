@@ -27,34 +27,7 @@
     .cover-copy small { display:block; margin-bottom:14px; color:#777; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .cover-copy strong { display:block; max-width:250px; font-size:36px; line-height:.95; letter-spacing:-.06em; }
     .cover-copy p { margin:16px 0 0; max-width:250px; color:#555; font-size:13px; line-height:1.45; }
-    .hero-app-preview { border:1px solid #d7d7d7; border-radius:12px; background:#fff; box-shadow:0 18px 44px rgba(0,0,0,.08); overflow:hidden; color:#001a42; font-size:8px; line-height:1.25; }
-    .mock-top { height:25px; padding:0 10px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e8edf4; background:#fff; }
-    .mock-brand { display:flex; align-items:center; gap:6px; color:#001534; font-size:11px; font-weight:800; letter-spacing:-.03em; }
-    .mock-brand img { width:18px; height:18px; border-radius:5px; }
-    .mock-account { text-align:right; color:#42608b; font-size:6px; }
-    .mock-account b { display:block; color:#001534; font-size:7px; font-weight:650; }
-    .mock-shell { display:grid; grid-template-columns:83px 1fr; min-height:198px; background:#f6f9fd; }
-    .mock-sidebar { padding:15px 8px; border-right:1px solid #e8edf4; background:#fff; }
-    .mock-avatar { width:42px; height:42px; margin:0 auto 6px; display:grid; place-items:center; border-radius:50%; background:#050505; color:#fff; font-size:16px; font-weight:850; letter-spacing:-.06em; }
-    .mock-handle { margin:0 0 16px; text-align:center; color:#001534; font-size:6px; font-weight:800; }
-    .mock-nav { display:grid; gap:9px; }
-    .mock-nav span { padding:5px 6px; border-radius:6px; color:#000; font-size:6px; }
-    .mock-nav .active { background:#050505; color:#fff; font-weight:750; }
-    .mock-main { padding:17px 11px 12px; }
-    .mock-main-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:9px; }
-    .mock-main h3 { margin:0 0 4px; color:#001534; font-size:13px; line-height:1.05; letter-spacing:-.04em; }
-    .mock-main p { margin:0; color:#17406f; font-size:5.5px; }
-    .mock-create { padding:4px 8px; border:1px solid #cad8ea; border-radius:4px; background:#fff; color:#002a66; font-size:5.5px; white-space:nowrap; }
-    .mock-card { padding:8px; border:1px solid #d7e1ee; border-radius:7px; background:#fff; box-shadow:0 8px 22px rgba(16,39,70,.06); }
-    .mock-select { margin-bottom:6px; padding:6px; display:flex; align-items:center; justify-content:space-between; border:1px solid #d7e1ee; border-radius:5px; color:#002856; font-size:5.5px; }
-    .mock-select button { padding:3px 6px; border:1px solid #c5d3e5; border-radius:4px; background:#fff; color:#002856; font:inherit; }
-    .mock-post { margin-top:6px; padding:7px; border:1px solid #d7e1ee; border-radius:5px; background:#f8fbff; }
-    .mock-post b { display:block; margin-bottom:8px; color:#001534; font-size:6px; font-weight:500; }
-    .mock-post-row { display:flex; align-items:center; justify-content:space-between; gap:6px; color:#17406f; font-size:5px; }
-    .mock-status { padding:2px 4px; border-radius:999px; background:#e9f0f8; color:#17406f; }
-    .mock-actions { display:flex; gap:3px; margin-left:auto; }
-    .mock-actions span { padding:2px 4px; border:1px solid #c5d3e5; border-radius:4px; background:#fff; color:#002856; }
-    .mock-actions span:last-child { border-color:#ffb3b3; color:#e00000; }
+    .hero-app-preview { width:100%; display:block; border:1px solid #d7d7d7; border-radius:12px; background:#fff; box-shadow:0 18px 44px rgba(0,0,0,.08); }
     .intro { padding:28px 0 4px; }
     h1,h2,h3,p { margin-top:0; }
     h1 { margin-bottom:4px; font-size:31px; line-height:1.08; letter-spacing:-.045em; }
@@ -132,7 +105,7 @@
     .sticky-buy-button svg { width:17px; height:17px; }
     @media (min-width:760px) { .top { padding-top:34px; } }
     @media (max-width:560px) { body { padding-bottom:120px; } .sticky-buy { bottom:12px; width:calc(100% - 24px); } .sticky-buy-inner { grid-template-columns:1fr; gap:10px; } .sticky-buy-button { width:100%; min-height:50px; } }
-    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:14px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .mock-shell { grid-template-columns:74px 1fr; } .mock-sidebar { padding:13px 7px; } .mock-main { padding:14px 9px 11px; } .mock-post:nth-of-type(n+5) { display:none; } .intro { padding-top:23px; } h1 { font-size:29px; } }
+    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:14px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
   </style>
 </head>
 <body>
@@ -140,29 +113,7 @@
     <div class="top"><a class="brand" href="/" aria-label="Lensically Operator home"><img class="brand-mark" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt="Lensically logo"><span>Lensically</span></a></div>
     <main>
       <section class="cover" aria-label="Lensically Operator product preview">
-        <div class="hero-app-preview" aria-label="Lensically scheduled posts dashboard preview with a fictional Nova Studio account">
-          <div class="mock-top">
-            <div class="mock-brand"><img src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt=""><span>Lensically</span></div>
-            <div class="mock-account"><b>Nova Studio</b>@novastudio</div>
-          </div>
-          <div class="mock-shell">
-            <aside class="mock-sidebar" aria-hidden="true">
-              <div class="mock-avatar">NS</div>
-              <p class="mock-handle">@novastudio</p>
-              <nav class="mock-nav"><span>Dashboard</span><span>Cycles</span><span>Insights</span><span>Source Cards</span><span>Saved Patterns</span><span>Followers</span><span>Post Archive</span><span>Create Post</span><span class="active">Scheduled Posts</span></nav>
-            </aside>
-            <div class="mock-main">
-              <div class="mock-main-head"><div><h3>Scheduled Posts (18)</h3><p>Times are shown in New York (Eastern Time).</p></div><button class="mock-create" type="button" tabindex="-1">Create Scheduled Post</button></div>
-              <div class="mock-card">
-                <div class="mock-select"><span>Use selection mode to delete multiple scheduled posts at once.</span><button type="button" tabindex="-1">Select Posts</button></div>
-                <div class="mock-post"><b>Your best content system is the one you can repeat every day.</b><div class="mock-post-row"><span class="mock-status">Scheduled</span><span>Sep 14, 2026, 9:00 AM</span><span class="mock-actions"><span>Edit</span><span>Tags</span><span>Delete</span></span></div></div>
-                <div class="mock-post"><b>Turn one customer insight into five useful posts this week.</b><div class="mock-post-row"><span class="mock-status">Scheduled</span><span>Sep 14, 2026, 12:00 PM</span><span class="mock-actions"><span>Edit</span><span>Tags</span><span>Delete</span></span></div></div>
-                <div class="mock-post"><b>Schedule first. Review the signal. Improve the next batch.</b><div class="mock-post-row"><span class="mock-status">Scheduled</span><span>Sep 14, 2026, 3:00 PM</span><span class="mock-actions"><span>Edit</span><span>Tags</span><span>Delete</span></span></div></div>
-                <div class="mock-post"><b>Consistency gets easier when the process is already built.</b><div class="mock-post-row"><span class="mock-status">Scheduled</span><span>Sep 14, 2026, 6:00 PM</span><span class="mock-actions"><span>Edit</span><span>Tags</span><span>Delete</span></span></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <img class="hero-app-preview" src="/lensically-app-hero-mock.png" alt="Lensically scheduled posts dashboard preview with a fictional Nova Studio account">
       </section>
       <section class="intro">
         <h1>Lensically Operator for Threads</h1>
