@@ -10,9 +10,9 @@ import {
 } from "../src/operatorMcpRegistryComposition";
 
 describe("Operator MCP registry composition", () => {
-        it("preserves the exact 63-tool account aggregation order", () => {
+        it("preserves the exact 64-tool account aggregation order", () => {
     const names = OPERATOR_MCP_ACCOUNT_TOOLS.map((tool) => tool.name);
-    expect(names).toHaveLength(63);
+    expect(names).toHaveLength(64);
     expect(names.slice(0, 3)).toEqual([
       "list_accounts",
       "get_account_state",
@@ -65,10 +65,10 @@ describe("Operator MCP registry composition", () => {
     expect(operatorMcpToolNameRequiresProceed("readRepoFile")).toBe(false);
   });
 
-                it("builds the exact 124 direct tools with deterministic priority ordering", () => {
+                it("builds the exact 125 direct tools with deterministic priority ordering", () => {
     const tools = buildComposedOperatorMcpTools(false);
     const names = tools.map((tool) => tool.name);
-    expect(tools).toHaveLength(124);
+    expect(tools).toHaveLength(125);
         expect(names).toContain("operateGitHubRepositories");
     expect(names).toEqual(expect.arrayContaining([
       "getStripeAccountState",
@@ -91,7 +91,7 @@ describe("Operator MCP registry composition", () => {
   it("builds all three scoped account wrapper surfaces without brand_key", () => {
     const directTools = buildComposedOperatorMcpTools(false);
     const scopedTools = buildComposedOperatorMcpTools(true);
-                    expect(scopedTools).toHaveLength(directTools.length + (62 * 3));
+                    expect(scopedTools).toHaveLength(directTools.length + (63 * 3));
 
     for (const prefix of ["mm", "om", "vx"]) {
       const wrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_post_results`);

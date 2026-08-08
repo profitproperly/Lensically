@@ -58,8 +58,8 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-                                it("preserves the exact 85-tool public surface and required Main Cycle dependencies", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(85);
+                                it("preserves the exact 86-tool public surface and required Main Cycle dependencies", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(86);
     expect(isOperatorPublicDirectToolName("operateGitHubRepositories")).toBe(true);
     expect(isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")).toBe(true);
     expect(isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")).toBe(true);
@@ -71,7 +71,8 @@ describe("Operator MCP tool directory", () => {
         expect(isOperatorPublicDirectToolName("engineeringPrecheck")).toBe(true);
     expect(isOperatorPublicDirectToolName("getStripeAccountState")).toBe(true);
     expect(isOperatorPublicDirectToolName("readStripeObjects")).toBe(true);
-    expect(isOperatorPublicDirectToolName("operateStripe")).toBe(true);
+        expect(isOperatorPublicDirectToolName("operateStripe")).toBe(true);
+    expect(isOperatorPublicDirectToolName("set_source_family_bench")).toBe(true);
 
     expect(isOperatorPublicDirectToolName("start_workflow_session")).toBe(false);
     expect(RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has("start_workflow_session")).toBe(true);

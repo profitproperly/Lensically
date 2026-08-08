@@ -7,10 +7,10 @@ import { OPERATOR_WORKFLOW_TEMPLATE_KEY } from "../src/operatorMcpConstants";
 import { SOURCE_TRANSFORMATION_CONTRACT_SCHEMA } from "../src/operatorMcpSchemas";
 
 describe("Operator MCP account foundation registry", () => {
-  it("preserves the exact ordered 21-tool foundation registry", () => {
-    expect(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOL_NAMES).toHaveLength(21);
-    expect(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS).toHaveLength(21);
-    expect(new Set(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOL_NAMES).size).toBe(21);
+  it("preserves the exact ordered 22-tool foundation registry", () => {
+    expect(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOL_NAMES).toHaveLength(22);
+    expect(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS).toHaveLength(22);
+    expect(new Set(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOL_NAMES).size).toBe(22);
     expect(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS.map((tool) => tool.name)).toEqual([
       ...OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOL_NAMES,
     ]);
@@ -56,7 +56,16 @@ describe("Operator MCP account foundation registry", () => {
 
   it("preserves source deletion, lineage recovery, and bounded backfill contracts", () => {
     const byName = new Map(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS.map((tool) => [tool.name, tool]));
-    expect(byName.get("delete_saved_pattern_source")?.annotations).toMatchObject({ destructiveHint: true });
+        expect(byName.get("delete_saved_pattern_source")?.annotations).toMatchObject({ destructiveHint: true });
+    expect(byName.get("set_source_family_bench")?.inputSchema).toMatchObject({
+      required: ["brand_key", "action", "target_type", "target"],
+      properties: {
+        action: { enum: ["bench", "unbench"] },
+        target_type: { enum: ["source_card_family_id", "source_card_id", "source_identity_key"] },
+        target: { minLength: 1, maxLength: 500 },
+      },
+    });
+    expect(byName.get("set_source_family_bench")?.annotations).toMatchObject({ destructiveHint: false });
     expect(byName.get("recover_published_post_lineage")?.inputSchema).toMatchObject({
       required: ["brand_key", "workflow_session_id", "saved_pattern_id", "published_post_ids", "source_card"],
       properties: {
