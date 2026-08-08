@@ -354,7 +354,11 @@
         initializeCheckout();
         await waitForCheckoutLayout();
         const isMobileViewport = window.matchMedia('(max-width: 900px), (pointer: coarse) and (max-width: 1024px)').matches;
-        window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, isMobileViewport), behavior: 'smooth' });
+        if (isMobileViewport) {
+          animateCheckoutScroll(checkoutSection, true);
+        } else {
+          window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'smooth' });
+        }
       };
 
       document.querySelectorAll('a[href="#checkout"]').forEach((link) => {
