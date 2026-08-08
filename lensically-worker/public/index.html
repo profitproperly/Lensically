@@ -312,17 +312,36 @@
         requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 80)));
       });
 
+      let checkoutScrollCorrectionTimer = null;
+      let checkoutScrollFinalTimer = null;
+
+      const getCheckoutScrollTop = (checkoutSection, isMobileViewport) => {
+        if (isMobileViewport) {
+          return checkoutSection.getBoundingClientRect().top + window.scrollY + 18;
+        }
+
+        const checkoutTitle = document.getElementById('checkout-title');
+        return (checkoutTitle || checkoutSection).getBoundingClientRect().top + window.scrollY - 18;
+      };
+
       const scrollToCheckout = async () => {
         const checkoutSection = document.getElementById('checkout');
         if (!checkoutSection) return;
         initializeCheckout();
         await waitForCheckoutLayout();
         const isMobileViewport = window.matchMedia('(max-width: 560px)').matches;
-        const checkoutTitle = document.getElementById('checkout-title');
-        const top = isMobileViewport
-          ? checkoutSection.getBoundingClientRect().top + window.scrollY + 18
-          : (checkoutTitle || checkoutSection).getBoundingClientRect().top + window.scrollY - 18;
-        window.scrollTo({ top, behavior: 'smooth' });
+        window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, isMobileViewport), behavior: 'smooth' });
+
+        if (!isMobileViewport) {
+          clearTimeout(checkoutScrollCorrectionTimer);
+          clearTimeout(checkoutScrollFinalTimer);
+          checkoutScrollCorrectionTimer = setTimeout(() => {
+            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'auto' });
+          }, 900);
+          checkoutScrollFinalTimer = setTimeout(() => {
+            window.scrollTo({ top: getCheckoutScrollTop(checkoutSection, false), behavior: 'auto' });
+          }, 1500);
+        }
       };
 
       document.querySelectorAll('a[href="#checkout"]').forEach((link) => {
