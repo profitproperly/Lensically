@@ -13779,21 +13779,24 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
       const sourceLineageBackfillRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
         set_source_family_bench: async () => {
-      const action = String(payload.action ?? "").trim().toLowerCase();
-      const sourceCardFamilyId = normalizeOperatorText(payload.source_card_family_id, 120, true) ?? "";
-      const sourceCardId = normalizeOperatorText(payload.source_card_id, 120, true) ?? "";
-      const sourceIdentityKey = normalizeOperatorText(payload.source_identity_key, 500, true) ?? "";
+            const action = String(payload.action ?? "").trim().toLowerCase();
+      const targetType = String(payload.target_type ?? "").trim().toLowerCase();
+      const target = normalizeOperatorText(payload.target, 500, true) ?? "";
       const reason = normalizeOperatorText(payload.reason, 500, true) ?? "owner_source_family_bench";
-      if (!new Set(["bench", "unbench"]).has(action) || ![sourceCardFamilyId, sourceCardId, sourceIdentityKey].some(Boolean)) {
-        return { body: { success: false, error: "action bench|unbench and one source family reference are required" }, status: 400 };
+      if (!new Set(["bench", "unbench"]).has(action)
+        || !new Set(["source_card_family_id", "source_card_id", "source_identity_key"]).has(targetType)
+        || !target) {
+        return { body: { success: false, error: "action, target_type, and target are required" }, status: 400 };
       }
       const family = await env.DB.prepare(
         `SELECT id AS source_card_family_id, source_identity_key, current_source_card_id
          FROM operator_source_card_families
          WHERE brand_key = ?
-           AND (id = ? OR source_identity_key = ? OR current_source_card_id = ?)
+           AND ((? = 'source_card_family_id' AND id = ?)
+             OR (? = 'source_identity_key' AND source_identity_key = ?)
+             OR (? = 'source_card_id' AND current_source_card_id = ?))
          LIMIT 1`,
-      ).bind(brand.brand_key, sourceCardFamilyId, sourceIdentityKey, sourceCardId).first<{
+      ).bind(brand.brand_key, targetType, target, targetType, target, targetType, target).first<{
         source_card_family_id: string;
         source_identity_key: string;
         current_source_card_id: string | null;
