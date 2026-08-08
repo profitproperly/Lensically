@@ -648,7 +648,8 @@ const EXPLICIT_INTENT_ALIASES: Record<string, string[]> = {
   recover_published_post_lineage: ["recover published post lineage", "restore published post lineage", "backfill winner lineage"],
     get_source_candidate_batch: ["get source candidate batch", "read source candidate batch"],
   create_all_missing_manifest_source_cards: ["create all missing manifest source cards", "create all missing source cards", "card every manifest saved pattern"],
-  create_source_card: ["create source card", "build source card"],
+    create_source_card: ["create source card", "build source card"],
+  set_source_family_bench: ["bench or unbench source family", "bench source family", "unbench source family", "restore source family"],
 
   create_generation_run: ["create generation run", "start generation run"],
   submit_candidate_draft: ["submit candidate draft", "save generated candidate", "gate draft"],
