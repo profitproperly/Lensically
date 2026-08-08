@@ -296,6 +296,10 @@
         }
       };
 
+      if (window.matchMedia('(min-width: 901px) and (pointer: fine)').matches) {
+        initializeCheckout();
+      }
+
       if ('IntersectionObserver' in window && shell) {
         const observer = new IntersectionObserver((entries) => {
           if (entries.some((entry) => entry.isIntersecting)) {
