@@ -345,7 +345,7 @@
         if (!checkoutSection) return;
         initializeCheckout();
         await waitForCheckoutLayout();
-        const isMobileViewport = window.matchMedia('(max-width: 560px)').matches;
+        const isMobileViewport = window.matchMedia('(max-width: 900px), (pointer: coarse) and (max-width: 1024px)').matches;
         if (isMobileViewport) {
           animateMobileCheckoutScroll(checkoutSection);
         } else {
