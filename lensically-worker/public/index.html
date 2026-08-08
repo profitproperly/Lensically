@@ -223,6 +223,21 @@
   <script src="https://js.stripe.com/clover/stripe.js"></script>
   <script>
     (() => {
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      const forceTopOnReload = () => {
+        const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+        const isReload = nav ? nav.type === 'reload' : performance.navigation && performance.navigation.type === 1;
+        if (!isReload) return;
+        window.scrollTo(0, 0);
+        setTimeout(() => window.scrollTo(0, 0), 0);
+        setTimeout(() => window.scrollTo(0, 0), 120);
+      };
+      forceTopOnReload();
+      window.addEventListener('pageshow', forceTopOnReload);
+    })();
+    (() => {
       const shell = document.getElementById('checkout-shell');
       const mount = document.getElementById('embedded-checkout');
       const loading = document.getElementById('checkout-loading');
