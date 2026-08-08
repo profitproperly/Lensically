@@ -2296,7 +2296,7 @@ if (!source.includes('from "./operatorPublishedPostLineageAuditService"')
     || !source.includes("recover_published_post_lineage: async () =>")
     || !source.includes("auditOperatorPublishedPostLineage({")
     || !source.includes("recoverOperatorPublishedPostLineage({")
-    || !source.includes("listRows: async ({ minimumLikes, days, limit })")
+        || !source.includes("listRows: async ({ minimumLikes, days, limit, offset })")
     || !source.includes("recoverLineage: async (recoveryPayload, minimumVerifiedLikes)")) {
   lifecycleErrors.push("operator_published_post_lineage_audit_service_import_or_binding_missing");
 }
@@ -2321,8 +2321,10 @@ if (!operatorPublishedPostLineageAuditService.includes("export async function au
     || !operatorPublishedPostLineageAuditService.includes("dependencies.listRows")
     || !operatorPublishedPostLineageAuditService.includes('missingStages.push("source")')
     || !operatorPublishedPostLineageAuditService.includes('missingStages.push("metrics")')
-    || !operatorPublishedPostLineageAuditService.includes("saved_pattern_id")
-        || !operatorPublishedPostLineageAuditService.includes("complete_count")
+        || !operatorPublishedPostLineageAuditService.includes("saved_pattern_id")
+    || !operatorPublishedPostLineageAuditService.includes("next_offset")
+    || !operatorPublishedPostLineageAuditService.includes("total_count")
+    || !operatorPublishedPostLineageAuditService.includes("complete_count")
     || !operatorPublishedPostLineageAuditService.includes("incomplete_count")
     || !operatorPublishedPostLineageAuditService.includes("export async function recoverOperatorPublishedPostLineage")
     || !operatorPublishedPostLineageAuditService.includes("compatibilityWorkflowSessionId")
@@ -2332,8 +2334,9 @@ if (!operatorPublishedPostLineageAuditService.includes("export async function au
   lifecycleErrors.push("operator_published_post_lineage_audit_service_module_incomplete");
 }
 if (!operatorPublishedPostLineageAuditServiceTests.includes("applies exact defaults and bounded criteria before row retrieval")
-    || !operatorPublishedPostLineageAuditServiceTests.includes("serializes complete lineage with stable metrics and numeric identifiers")
-        || !operatorPublishedPostLineageAuditServiceTests.includes("classifies every missing lineage stage in deterministic order")
+        || !operatorPublishedPostLineageAuditServiceTests.includes("serializes complete lineage with stable metrics and numeric identifiers")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("returns stable next-offset paging metadata for a partial page")
+    || !operatorPublishedPostLineageAuditServiceTests.includes("classifies every missing lineage stage in deterministic order")
     || !operatorPublishedPostLineageAuditServiceTests.includes("counts mixed results and omits saved-pattern identity for other source types")
     || !operatorPublishedPostLineageAuditServiceTests.includes("routes the $label through the bounded Manifest backfill bridge")
     || !operatorPublishedPostLineageAuditServiceTests.includes("coerces an invalid compatibility bridge status to 200")
