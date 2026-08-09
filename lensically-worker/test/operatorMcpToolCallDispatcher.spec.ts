@@ -209,7 +209,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(executeAccountTool).not.toHaveBeenCalled();
   });
 
-  it("preserves completed idempotency replay without re-execution", async () => {
+    it("preserves completed idempotency replay without re-execution", async () => {
     const executeAccountTool = vi.fn(async () => ({ ok: true }));
     const dependencies = baseDependencies({
       executeAccountTool,
@@ -239,6 +239,61 @@ describe("Operator MCP tool-call dispatcher", () => {
       },
     });
     expect(executeAccountTool).not.toHaveBeenCalled();
+  });
+
+  it("reconciles duplicate delivery to the original completed receipt without re-execution", async () => {
+    vi.useFakeTimers();
+    try {
+      const executeAccountTool = vi.fn(async () => ({ ok: true }));
+      const beginOperationReceipt = vi.fn()
+        .mockResolvedValueOnce({
+          existing: {
+            status: "started",
+            request_fingerprint: "fp-live",
+            created_at: new Date().toISOString(),
+          },
+          fingerprint: "fp-live",
+          created: false,
+        })
+        .mockResolvedValueOnce({
+          existing: {
+            status: "completed",
+            request_fingerprint: "fp-live",
+            result_json: JSON.stringify({ ok: true, durable: true, scheduled_post_id: 999 }),
+          },
+          fingerprint: "fp-live",
+          created: false,
+        });
+      const dependencies = baseDependencies({
+        executeAccountTool,
+        operatorIdempotencyKey: vi.fn(async () => "idem-live"),
+        operationLeaseMs: vi.fn(() => 120000),
+        beginOperationReceipt,
+      });
+      const responsePromise = dispatchOperatorMcpToolCall({
+        request: new Request("https://lensically.test/mcp", { method: "POST" }),
+        id: 41,
+        params: { name: "persist_manifest_autonomous_batch", arguments: {} },
+      }, dependencies);
+      await vi.advanceTimersByTimeAsync(250);
+      const response = await responsePromise;
+      expect(await structuredContent(response)).toMatchObject({
+        ok: true,
+        durable: true,
+        scheduled_post_id: 999,
+        idempotency: {
+          version: "idempotency-v1",
+          key: "idem-live",
+          replayed: true,
+          request_fingerprint: "fp-live",
+          reconciled_in_progress: true,
+        },
+      });
+      expect(beginOperationReceipt).toHaveBeenCalledTimes(2);
+      expect(executeAccountTool).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
     it("expires a stale started receipt from immutable creation time even when updated_at is fresh", async () => {
