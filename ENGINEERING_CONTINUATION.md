@@ -6,13 +6,21 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: add a shared release-authority guard that makes every Operator request fail closed when the executing Worker commit is older than the currently released production SHA, validate and deploy it, then resume the preserved GitHub and Manifest live proofs only after request-level commit convergence is proven
+active_checkpoint: repair the rejected release-authority workflow insertion so it satisfies the canonical GitHub Actions indentation/validation contract, then finish wiring shared D1 release enforcement, validate, deploy, and resume request-level convergence proof
 validated_source_head: 196edd6bfbe32a99834c1930aa56cd7f0c471522
-documentation_source_head: 6052798955c10d2350f2b056e5ed32599bc88c0a
+documentation_source_head: c48b8927db5d3daba036cd617cee11df57bb22e4
 production_sha: 196edd6bfbe32a99834c1930aa56cd7f0c471522
-active_interrupt_id: mcp-request-level-release-drift-20260809
+active_interrupt_id: release-authority-workflow-indentation-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: release-authority-workflow-indentation-20260809
+
+- Trigger: atomic release-authority integration patch was rejected with `github_workflow_step_indentation_invalid` at `.github/workflows/lensically-engineering.yml` line 606. Hardening incident `d11833ba-d471-4c63-9ea6-427eda5001f3`. The result explicitly reported `no_commit_created=true`.
+- Impact: no integration source or workflow mutation from the rejected patch reached `main`; the already committed standalone release-authority module, migration, and unit test remain intact.
+- Current action: preserve the Worker/source integration as a separate atomic patch, inspect the canonical workflow validator’s accepted step/run-block shape, then insert the release-authority publication step using that exact shape and validate the workflow before continuing.
+- Prevention requirement: workflow mutations must pass the repository’s source validator before commit; never bypass the indentation gate.
+- Deferred work preserved: `mcp-request-level-release-drift-20260809` and every lower GitHub/Manifest P1 remain open underneath this interrupt.
 
 ## Active P1 Interrupt: mcp-request-level-release-drift-20260809
 
