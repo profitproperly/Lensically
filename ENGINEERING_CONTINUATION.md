@@ -6,13 +6,21 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: reconcile and permanently repair GitHub workflow-run lookup 404 for a freshly listed validation run, then complete exact-head validation of the Manifest reused-lineage contract, deploy, live-replay midnight, and run terminal cycle coverage
-validated_source_head: df38ef3772dbfa15be89df4b949a4c880ae9d707
-documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
+active_checkpoint: reconcile the HTTP 522 exact-SHA worker-deploy dispatch for `541dce188fc9f3817160a65c3cbcda7d1ddf681b`, permanently classify ambiguous 52x dispatch responses, then resume workflow-run 404 proof and Manifest reused-lineage live exit verification
+validated_source_head: 541dce188fc9f3817160a65c3cbcda7d1ddf681b
+documentation_source_head: 0d2dd9599a74e898fb4302f47f7d49f14ae6dab9
 production_sha: df38ef3772dbfa15be89df4b949a4c880ae9d707
-active_interrupt_id: github-workflow-run-lookup-404-20260809
+active_interrupt_id: github-workflow-dispatch-522-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: github-workflow-dispatch-522-20260809
+
+- Trigger: exact-SHA Worker deployment dispatch for validated head `541dce188fc9f3817160a65c3cbcda7d1ddf681b` returned HTTP `522` from `runGitHubWorkflow`.
+- Returned safety evidence: the tool reported `side_effect_state=not_confirmed`, while hardening incident `17fded26-3d2f-4f5c-a96d-9c8878cc9a41` classified the boundary as server P1 and the actual side-effect state as `may_have_happened`; normal work is blocked.
+- Source-level defect already visible in the dispatch handler: transient ambiguous dispatch handling recognizes only HTTP `502` and `504`, so `522` is incorrectly collapsed into non-retryable `workflow_dispatch_failed` even though a dispatch response can be lost after GitHub accepts the request.
+- Current action: list authoritative recent workflow runs before any retry; if the exact release dispatch exists, treat the side effect as succeeded and do not duplicate it. Then generalize ambiguous dispatch handling to the relevant transient 52x class, preserve list-before-retry semantics, add regression protection, validate, and resume the interrupted exact-SHA release.
+- Deferred work preserved: `github-workflow-run-lookup-404-20260809` and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all validation and live-exit evidence intact.
 
 ## Active P1 Interrupt: github-workflow-run-lookup-404-20260809
 
