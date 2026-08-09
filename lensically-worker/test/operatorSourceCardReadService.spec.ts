@@ -199,14 +199,16 @@ describe("Manifest winner preservation", () => {
       notes: "Use universe as the religion-neutral alternative.",
     });
 
-    expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([]);
+        expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([
+      "Normalize thanking the universe before asking for more",
+    ]);
     expect(result.winner_preservation).toMatchObject({
       required: true,
-            observed_likes: 1800,
+      observed_likes: 1800,
       winner_post_id: "manifest-gratitude-winner",
-
-      exact_surfaces: [],
+      exact_surfaces: ["Normalize thanking the universe before asking for more"],
     });
+
     expect((result.transformation_contract as Record<string, unknown>).must_preserve_function).toEqual(
       expect.arrayContaining([
         "Open with a normalization statement about expressing gratitude before making another request.",
