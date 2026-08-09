@@ -3,9 +3,10 @@ type JsonRecord = Record<string, unknown>;
 export const MANIFEST_WINNING_SOURCE_MIN_LIKES = 1000;
 export const MANIFEST_WINNER_PRESERVATION_VERSION = "manifest-winner-preservation-v1";
 
-const GENDERED_FALLBACK_ANCHOR_WORDS = new Set([
+const UNSAFE_MANIFEST_EXACT_ANCHOR_WORDS = new Set([
   "woman", "women", "man", "men", "girl", "girls", "boy", "boys",
   "she", "he", "her", "hers", "him", "his",
+  "god", "gods", "jesus", "christ", "lord", "allah",
 ]);
 const CERTAINTY_WORDS = new Set([
   "expect", "will", "going", "about", "coming", "arrive", "arrives",
@@ -120,11 +121,15 @@ function forbiddenAnchorSurfaces(sourceCard: JsonRecord, contract: JsonRecord): 
   return new Set(surfaces.map(comparable).filter(Boolean));
 }
 
-function isSafeExactAnchor(anchor: string, forbidden: Set<string>): boolean {
+function isSafeExactAnchor(
+  anchor: string,
+  forbidden: Set<string>,
+  options: { allowSingleWord?: boolean } = {},
+): boolean {
   const words = extractWords(anchor);
-  if (words.length < 2) return false;
+  if (words.length < (options.allowSingleWord ? 1 : 2)) return false;
   const loweredWords = words.map((word) => word.toLowerCase().replace(/[^a-z]/g, ""));
-  if (loweredWords.some((word) => GENDERED_FALLBACK_ANCHOR_WORDS.has(word))) return false;
+  if (loweredWords.some((word) => UNSAFE_MANIFEST_EXACT_ANCHOR_WORDS.has(word))) return false;
   const normalized = comparable(anchor);
   if (!normalized) return false;
   for (const surface of forbidden) {
@@ -277,9 +282,12 @@ export function applyManifestWinnerPreservation(
     };
   }
 
-  const winnerText = strongest?.text ?? cleanText(existing?.winner_text, 2_000) ?? "";
-  const existingExact = stringList(contract.must_preserve_exact);
-  const metadataExact = stringList(existing?.exact_surfaces);
+    const winnerText = strongest?.text ?? cleanText(existing?.winner_text, 2_000) ?? "";
+  const forbiddenExactSurfaces = forbiddenAnchorSurfaces(sourceCard, contract);
+  const existingExact = stringList(contract.must_preserve_exact)
+    .filter((anchor) => isSafeExactAnchor(anchor, forbiddenExactSurfaces, { allowSingleWord: true }));
+  const metadataExact = stringList(existing?.exact_surfaces)
+    .filter((anchor) => isSafeExactAnchor(anchor, forbiddenExactSurfaces, { allowSingleWord: true }));
   const exactSurfaces = existingExact.length
     ? existingExact
     : metadataExact.length

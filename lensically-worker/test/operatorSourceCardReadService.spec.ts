@@ -148,7 +148,7 @@ describe("Manifest winner preservation", () => {
     });
   });
 
-  it("keeps explicit safe winner anchors instead of deriving gendered source language", () => {
+    it("keeps explicit safe winner anchors instead of deriving gendered source language", () => {
     const result = applyManifestWinnerPreservation({
       id: "card-universe",
       primary_source: {
@@ -166,6 +166,43 @@ describe("Manifest winner preservation", () => {
       "Universe",
       "the person reading this",
     ]);
+  });
+
+  it("does not auto-protect deity-specific wording for religion-neutral Manifest winners", () => {
+    const result = applyManifestWinnerPreservation({
+      id: "card-gratitude",
+      primary_source: {
+        text: "Normalize thanking God before asking Him for more. Gratitude changes everything.",
+        metrics: { likes: 5700 },
+      },
+      owner_revision_history: [],
+      forbidden_surfaces: [],
+      danger_surfaces: [],
+    }, {
+      must_preserve_exact: [],
+      must_preserve_function: [
+        "Open with a normalization statement about expressing gratitude before making another request.",
+        "Keep gratitude as the central spiritual practice.",
+      ],
+      may_reuse: ["Normalize thanking the universe", "Gratitude changes everything"],
+      must_transform: [],
+      audience_reward: "A religion-neutral gratitude-first spiritual reminder.",
+      notes: "Use universe as the religion-neutral alternative.",
+    });
+
+    expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([]);
+    expect(result.winner_preservation).toMatchObject({
+      required: true,
+      observed_likes: 5700,
+      exact_surfaces: [],
+    });
+    expect((result.transformation_contract as Record<string, unknown>).must_preserve_function).toEqual(
+      expect.arrayContaining([
+        "Open with a normalization statement about expressing gratitude before making another request.",
+        "Keep gratitude as the central spiritual practice.",
+        "Preserve the winning post's recognizable opening hook and directness.",
+      ]),
+    );
   });
 });
 
