@@ -1911,7 +1911,101 @@ export async function getManifestCycleReceipt(db: D1Database, input: {
     defects,
     follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
     noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
-  };
+    };
+}
+
+export async function getManifestCycleReceiptEventsPage(db: D1Database, input: {
+  brandKey: string;
+  cycleId?: string | null;
+  operationId?: string | null;
+  offset?: number;
+  limit?: number;
+}): Promise<JsonRecord | null> {
+  await ensureManifestIntelligenceTables(db);
+  const row = input.cycleId
+    ? await db.prepare(`SELECT * FROM operator_manifest_cycle_receipts WHERE brand_key = ? AND cycle_id = ? LIMIT 1`)
+      .bind(input.brandKey, input.cycleId).first<JsonRecord>()
+    : input.operationId
+      ? await db.prepare(`SELECT * FROM operator_manifest_cycle_receipts WHERE brand_key = ? AND operation_id = ? ORDER BY created_at DESC LIMIT 1`)
+        .bind(input.brandKey, input.operationId).first<JsonRecord>()
+      : await db.prepare(`SELECT * FROM operator_manifest_cycle_receipts WHERE brand_key = ? ORDER BY created_at DESC LIMIT 1`)
+        .bind(input.brandKey).first<JsonRecord>();
+  if (!row) return null;
+
+  const cycleId = String(row.cycle_id ?? "");
+  const offset = Number.isFinite(Number(input.offset)) ? Math.max(0, Math.trunc(Number(input.offset))) : 0;
+  const limit = Number.isFinite(Number(input.limit)) ? Math.min(10, Math.max(1, Math.trunc(Number(input.limit)))) : 10;
+  const [eventCountRow, hypothesisCountRow, defectStatsRow, eventPage, inputStrategy, outputCycleStrategy, outputLegacyStrategy, exposure] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_cycle_receipt_events WHERE cycle_id = ?`)
+      .bind(cycleId).first<JsonRecord>(),
+    db.prepare(`SELECT COUNT(*) AS total FROM operator_manifest_post_hypotheses WHERE cycle_id = ?`)
+      .bind(cycleId).first<JsonRecord>(),
+    db.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status IN ('open', 'repairing') THEN 1 ELSE 0 END) AS open_total,
+              SUM(CASE WHEN status IN ('open', 'repairing') AND blocking = 1 THEN 1 ELSE 0 END) AS blocking_open_total
+       FROM operator_manifest_cycle_defects WHERE cycle_id = ?`,
+    ).bind(cycleId).first<JsonRecord>(),
+    db.prepare(
+      `SELECT * FROM operator_manifest_cycle_receipt_events
+       WHERE cycle_id = ?
+       ORDER BY datetime(created_at) ASC, event_key ASC
+       LIMIT ? OFFSET ?`,
+    ).bind(cycleId, limit, offset).all<JsonRecord>(),
+    row.input_strategy_version_id
+      ? db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ?`)
+        .bind(row.input_strategy_version_id).first<JsonRecord>()
+      : Promise.resolve(null),
+    row.output_strategy_version_id
+      ? db.prepare(`SELECT * FROM operator_manifest_cycle_strategies WHERE id = ? AND brand_key = ? LIMIT 1`)
+        .bind(row.output_strategy_version_id, input.brandKey).first<JsonRecord>()
+      : Promise.resolve(null),
+    row.output_strategy_version_id
+      ? db.prepare(`SELECT * FROM operator_manifest_strategy_versions WHERE id = ? AND brand_key = ? LIMIT 1`)
+        .bind(row.output_strategy_version_id, input.brandKey).first<JsonRecord>()
+      : Promise.resolve(null),
+    row.exposure_snapshot_id
+      ? db.prepare(`SELECT * FROM operator_manifest_exposure_snapshots WHERE id = ?`)
+        .bind(row.exposure_snapshot_id).first<JsonRecord>()
+      : Promise.resolve(null),
+  ]);
+
+  const eventTotal = Math.max(0, Math.trunc(Number(eventCountRow?.total ?? 0)));
+  const hypothesisTotal = Math.max(0, Math.trunc(Number(hypothesisCountRow?.total ?? 0)));
+  const defectTotal = Math.max(0, Math.trunc(Number(defectStatsRow?.total ?? 0)));
+  const openDefectTotal = Math.min(defectTotal, Math.max(0, Math.trunc(Number(defectStatsRow?.open_total ?? 0))));
+  const blockingOpenDefectTotal = Math.min(openDefectTotal, Math.max(0, Math.trunc(Number(defectStatsRow?.blocking_open_total ?? 0))));
+
+  const sparseEvents: unknown[] = new Array(eventTotal).fill(null);
+  const boundedEvents = (eventPage.results ?? []).map((event) => ({
+    ...event,
+    payload: parseJson(event.payload_json, {}),
+  }));
+  boundedEvents.forEach((event, index) => {
+    const targetIndex = offset + index;
+    if (targetIndex < sparseEvents.length) sparseEvents[targetIndex] = event;
+  });
+  const defectPlaceholders: JsonRecord[] = [
+    ...Array.from({ length: blockingOpenDefectTotal }, () => ({ status: "open", blocking: true })),
+    ...Array.from({ length: openDefectTotal - blockingOpenDefectTotal }, () => ({ status: "open", blocking: false })),
+    ...Array.from({ length: defectTotal - openDefectTotal }, () => ({ status: "resolved", blocking: false })),
+  ];
+
+  return buildManifestCycleReceiptRead({
+    ...serializeReceipt(row),
+    input_strategy_version: inputStrategy ? serializeStrategy(inputStrategy) : null,
+    output_strategy_version: outputCycleStrategy
+      ? serializeCycleStrategy(outputCycleStrategy)
+      : outputLegacyStrategy
+        ? serializeStrategy(outputLegacyStrategy)
+        : null,
+    exposure_snapshot: exposure ? serializeExposure(exposure) : null,
+    events: sparseEvents,
+    hypotheses: new Array(hypothesisTotal).fill(null),
+    defects: defectPlaceholders,
+    follower_attribution_policy: MANIFEST_FOLLOWER_ATTRIBUTION_POLICY,
+    noninterference_policy: MANIFEST_NONINTERFERENCE_POLICY,
+  }, "events", offset, limit);
 }
 
 type ManifestCycleReceiptReadSection =

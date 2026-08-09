@@ -52,10 +52,17 @@ export interface OperatorManifestCycleServiceDependencies {
   }): Promise<JsonRecord[]>;
   commitStrategy(input: JsonRecord): Promise<JsonRecord>;
   appendCycleEvent(input: JsonRecord): Promise<unknown>;
-    getCycleReceipt(input: {
+        getCycleReceipt(input: {
     brandKey: string;
     cycleId?: string | null;
     operationId?: string | null;
+  }): Promise<JsonRecord | null>;
+  getCycleReceiptEventsPage?(input: {
+    brandKey: string;
+    cycleId?: string | null;
+    operationId?: string | null;
+    offset?: number;
+    limit?: number;
   }): Promise<JsonRecord | null>;
     buildCycleReceiptRead(
     receipt: JsonRecord,
@@ -334,19 +341,27 @@ export async function handleOperatorManifestCycleServiceTool(
     if (toolName === "get_manifest_cycle_receipt") {
     const cycleId = normalizeText(payload.cycle_id, 160, true);
     const operationId = normalizeText(payload.cycle_operation_id, 240, true);
-    const receipt = await dependencies.getCycleReceipt({
-      brandKey,
-      cycleId,
-      operationId,
-    });
-    const receiptRead = receipt
-      ? dependencies.buildCycleReceiptRead(
-        receipt,
-        payload.receipt_section,
-        payload.offset,
-        payload.limit,
-      )
-      : null;
+        const requestedSection = normalizeText(payload.receipt_section, 80, true) ?? "summary";
+    const offset = Math.max(0, Math.trunc(Number(payload.offset ?? 0)));
+    const limit = Math.min(10, Math.max(1, Math.trunc(Number(payload.limit ?? 10))));
+    const receiptRead = requestedSection === "events" && dependencies.getCycleReceiptEventsPage
+      ? await dependencies.getCycleReceiptEventsPage({
+        brandKey,
+        cycleId,
+        operationId,
+        offset,
+        limit,
+      })
+      : await (async () => {
+        const receipt = await dependencies.getCycleReceipt({
+          brandKey,
+          cycleId,
+          operationId,
+        });
+        return receipt
+          ? dependencies.buildCycleReceiptRead(receipt, requestedSection, offset, limit)
+          : null;
+      })();
     const receiptSection = receiptRead ? { ...receiptRead } : null;
     if (receiptSection) delete receiptSection.summary;
     return result({
