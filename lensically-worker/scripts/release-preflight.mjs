@@ -659,9 +659,11 @@ if (!testSyntaxValidator.includes('import { transform } from "esbuild"')
   errors.push("test_syntax_validator_incomplete");
 }
 if (!workflowLint.includes('name: Lensically workflow lint')
-    || !workflowLint.includes('".github/workflows/lensically-engineering.yml"')
+    || !workflowLint.includes('".github/workflows/**"')
+    || !workflowLint.includes("ruby lensically-worker/scripts/validate-workflow-yaml.rb")
     || !workflowLint.includes("ruby lensically-worker/scripts/validate-engineering-workflow.rb")
     || !workflowLint.includes("workflow_dispatch:")) {
+
   errors.push("independent_workflow_yaml_watchdog_incomplete");
 }
 if (!workflowStructureValidator.includes("document = YAML.parse(source, filename: path)")
