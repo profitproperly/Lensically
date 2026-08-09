@@ -68,7 +68,6 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 import {
     OPERATOR_GOVERNING_STANDARDS,
-  OPERATOR_GOVERNING_STANDARDS_ACK,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
@@ -21536,22 +21535,10 @@ async function handleOperatorMcpEngineeringTool(
         payload: await readJsonSafe(liveResponse) as Record<string, unknown> | null,
       };
     };
-                                const listed = await callLiveMcp(2, "tools/list", {});
-    const startupResponse = await fetch(`${DEFAULT_WORKER_ORIGIN}/api/operator/tools/getOperatorStartupContext`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": authorization,
-      },
-      body: JSON.stringify({ governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK }),
-    });
-    const startupPayload = await readJsonSafe(startupResponse) as Record<string, unknown> | null;
-    const startupRuntime = startupPayload?.runtime && typeof startupPayload.runtime === "object" && !Array.isArray(startupPayload.runtime)
-      ? startupPayload.runtime as Record<string, unknown>
-      : {};
+                                                const listed = await callLiveMcp(2, "tools/list", {});
     const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
       env.LENSICALLY_COMMIT_SHA,
-      startupRuntime.commit_sha,
+      response.headers.get("x-lensically-commit-sha"),
     );
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
@@ -21581,8 +21568,7 @@ async function handleOperatorMcpEngineeringTool(
     return {
                         ok: response.ok
         && Boolean(liveSessionId)
-        && listed.status < 400
-        && startupResponse.ok
+                && listed.status < 400
         && deploymentIdentity.verification_ready
         && boundaryTest.startup_tool_advertised
         && boundaryTest.persist_tool_advertised
@@ -21603,9 +21589,9 @@ async function handleOperatorMcpEngineeringTool(
       advertised_tool_count: listedToolRows.length,
       current_handler_commit: deploymentIdentity.current_handler_commit,
       fresh_endpoint_commit: deploymentIdentity.fresh_endpoint_commit,
-      session_commit_match: deploymentIdentity.commit_match,
+            session_commit_match: deploymentIdentity.commit_match,
       session_refresh_required: deploymentIdentity.session_refresh_required,
-      fresh_startup_status: startupResponse.status,
+      fresh_identity_source: "initialize_response_header",
       boundary_test: boundaryTest,
     };
   }
