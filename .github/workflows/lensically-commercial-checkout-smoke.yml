@@ -106,7 +106,7 @@ jobs:
             fi
           }
 
-          check_page root-sales https://lensically.com/
+                    check_page operator-sales https://lensically.com/operator/
 
           app_status="$(curl --silent --show-error --output /tmp/app-root.html --write-out '%{http_code}' --location https://app.lensically.com/)"
           echo "app-root-http=$app_status"
