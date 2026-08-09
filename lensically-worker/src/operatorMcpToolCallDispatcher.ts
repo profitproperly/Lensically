@@ -386,13 +386,12 @@ export async function dispatchOperatorMcpToolCall(
       const startedAt = Date.parse(String(receipt.existing.created_at ?? receipt.existing.updated_at ?? ""));
       const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
       const leaseMs = dependencies.operationLeaseMs(toolName);
-      if (ageMs < leaseMs) {
-        const reconciliationDeadline = Date.now() + Math.min(15_000, Math.max(0, leaseMs - ageMs));
-        let activeReceipt = receipt;
-        while (Date.now() < reconciliationDeadline && activeReceipt.existing?.status === "started") {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          activeReceipt = await dependencies.beginOperationReceipt(idempotencyKey, toolName, args);
+            if (ageMs < leaseMs) {
+        const reconciliationWaitMs = Math.min(8_000, Math.max(0, leaseMs - ageMs));
+        if (reconciliationWaitMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, reconciliationWaitMs));
         }
+        const activeReceipt = await dependencies.beginOperationReceipt(idempotencyKey, toolName, args);
         if (activeReceipt.existing?.status === "completed" && activeReceipt.existing.result_json) {
           const replayed = dependencies.parseJson(String(activeReceipt.existing.result_json));
           const resultPayload = asRecord(replayed) ?? { ok: false, error: "idempotency_receipt_parse_failed" };
