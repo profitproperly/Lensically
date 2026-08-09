@@ -115,6 +115,65 @@ describe("Operator Manifest prepare checkpoint service", () => {
     });
   });
 
+    it("persists bounded comparable-analysis continuation offsets", async () => {
+    const { dependencies, mocks } = createHarness();
+    mocks.readCheckpoint.mockResolvedValueOnce({
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      phase: "manifest_intelligence_comparables",
+      state: { comparable_offset: 96, intelligence_engine: { maturity: true } },
+    });
+    mocks.refreshIntelligenceEngine.mockResolvedValueOnce({
+      continuation_required: true,
+      next_offset: 192,
+      comparable_analyses: 96,
+    });
+    const result = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
+    expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
+      phase: "comparable_analyses",
+      comparable_offset: 96,
+      comparable_limit: 96,
+    });
+    expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "manifest_intelligence_comparables",
+      state: expect.objectContaining({ comparable_offset: 192 }),
+    }));
+    expect(result).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        stage_completed: "manifest_intelligence_comparables_batch",
+        next_stage: "manifest_intelligence_comparables",
+      }),
+    });
+  });
+
+  it("advances from bounded comparables to learning only after the final batch", async () => {
+    const { dependencies, mocks } = createHarness();
+    mocks.readCheckpoint.mockResolvedValueOnce({
+      timezone: "America/New_York",
+      horizon_hours: 48,
+      phase: "manifest_intelligence_comparables",
+      state: { comparable_offset: 192, intelligence_engine: { maturity: true } },
+    });
+    mocks.refreshIntelligenceEngine.mockResolvedValueOnce({
+      continuation_required: false,
+      next_offset: 240,
+      comparable_analyses: 48,
+    });
+    const result = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
+    expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "manifest_intelligence_learning",
+      state: expect.objectContaining({ comparable_offset: 240, learning_offset: 0 }),
+    }));
+    expect(result).toEqual({
+      handled: true,
+      response: expect.objectContaining({
+        stage_completed: "manifest_intelligence_comparables",
+        next_stage: "manifest_intelligence_learning",
+      }),
+    });
+  });
+
   it("persists bounded learning continuation offsets", async () => {
     const { dependencies, mocks } = createHarness();
     mocks.readCheckpoint.mockResolvedValueOnce({

@@ -323,10 +323,11 @@ export async function handleOperatorManifestPrepareCheckpoint(
         state: {
           runtime_now_iso: runtimeNowIso,
           threads_snapshot: state.threads_snapshot ?? {},
-          intelligence_engine: {
+                    intelligence_engine: {
             ...dependencies.operatorRecord(state.intelligence_engine),
             maturity_evaluations: maturitySummary,
           },
+          comparable_offset: 0,
         },
       });
       return continuation(
@@ -339,16 +340,26 @@ export async function handleOperatorManifestPrepareCheckpoint(
       );
     }
 
-    if (String(checkpoint.phase ?? "") === "manifest_intelligence_comparables") {
-      const comparables = await dependencies.refreshIntelligenceEngine({ phase: "comparable_analyses" });
+        if (String(checkpoint.phase ?? "") === "manifest_intelligence_comparables") {
+      const comparableOffset = Math.max(0, Math.trunc(Number(state.comparable_offset ?? 0)));
+      const comparables = await dependencies.refreshIntelligenceEngine({
+        phase: "comparable_analyses",
+        comparable_offset: comparableOffset,
+        comparable_limit: 96,
+      });
       const comparableSummary = dependencies.compactPayloadValue(
         comparables,
         "manifest_intelligence.comparables",
       );
+      const comparableContinuation = comparables.continuation_required === true;
+      const nextComparableOffset = Math.max(
+        comparableOffset,
+        Math.trunc(Number(comparables.next_offset ?? comparableOffset)),
+      );
       await dependencies.writeCheckpoint({
         brand_key: brandKey,
         operation_id: explicitOperationId,
-        phase: "manifest_intelligence_learning",
+        phase: comparableContinuation ? "manifest_intelligence_comparables" : "manifest_intelligence_learning",
         timezone,
         horizon_hours: horizonHours,
         state: {
@@ -358,15 +369,18 @@ export async function handleOperatorManifestPrepareCheckpoint(
             ...dependencies.operatorRecord(state.intelligence_engine),
             comparable_analyses: comparableSummary,
           },
+          comparable_offset: nextComparableOffset,
           learning_offset: 0,
         },
       });
       return continuation(
         explicitOperationId,
         dependencies.checkpointVersion,
-        "manifest_intelligence_comparables",
-        "manifest_intelligence_learning",
-        "Call prepare_manifest_autonomous_cycle again with the identical inputs. Comparable analyses are refreshed; the next invocation begins bounded multi-level learning observations.",
+        comparableContinuation ? "manifest_intelligence_comparables_batch" : "manifest_intelligence_comparables",
+        comparableContinuation ? "manifest_intelligence_comparables" : "manifest_intelligence_learning",
+        comparableContinuation
+          ? "Call prepare_manifest_autonomous_cycle again with the identical inputs. One bounded comparable-analysis batch is durably complete; the next invocation resumes from the saved comparable offset."
+          : "Call prepare_manifest_autonomous_cycle again with the identical inputs. Comparable analyses are refreshed; the next invocation begins bounded multi-level learning observations.",
         { intelligence_engine: comparableSummary },
       );
     }

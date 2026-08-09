@@ -926,6 +926,8 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
   threads_user_id: string;
 }, options: {
     phase?: "full" | "semantic_signatures" | "maturity_comparables" | "maturity_evaluations" | "comparable_analyses" | "learning_observations" | "portfolio_experiments";
+    comparable_offset?: number;
+  comparable_limit?: number;
   learning_offset?: number;
   learning_limit?: number;
 } = {}): Promise<JsonRecord> {
@@ -1094,11 +1096,25 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       continuation_required: false,
     };
   }
+    const comparableOffset = Math.max(0, Math.trunc(options.comparable_offset ?? 0));
+  const comparableLimit = Math.max(1, Math.min(120, Math.trunc(options.comparable_limit ?? 96)));
+  const comparableEnd = Math.min(candidates.length, comparableOffset + comparableLimit);
+  const boundedComparablePhase = phase === "comparable_analyses" || phase === "maturity_comparables";
+  const comparableTargets = boundedComparablePhase ? candidates.slice(comparableOffset, comparableEnd) : candidates;
+  const comparableCandidatesByCheckpoint = new Map<number, ManifestComparableCandidate[]>();
+  for (const candidate of candidates) {
+    const group = comparableCandidatesByCheckpoint.get(candidate.checkpoint_hours) ?? [];
+    group.push(candidate);
+    comparableCandidatesByCheckpoint.set(candidate.checkpoint_hours, group);
+  }
   let comparableWriteReceipt = { statement_count: 0, batch_count: 0 };
   if (runComparableAnalyses) {
     const comparableWriteStatements: D1PreparedStatement[] = [];
-    for (const target of candidates) {
-      const analysis = buildManifestComparableAnalysis(target, candidates);
+    for (const target of comparableTargets) {
+      const analysis = buildManifestComparableAnalysis(
+        target,
+        comparableCandidatesByCheckpoint.get(target.checkpoint_hours) ?? candidates,
+      );
       comparableWriteStatements.push(db.prepare(`INSERT INTO operator_manifest_comparable_analyses (
         id, brand_key, published_post_id, checkpoint_hours, analysis_version, comparable_post_ids_json, analysis_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1109,7 +1125,7 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
         MANIFEST_COMPARABLE_ANALYSIS_VERSION, stableJson(analysis.comparable_post_ids ?? []), stableJson(analysis),
       ));
     }
-    comparableWriteReceipt = await executeManifestD1WriteBatches(db, comparableWriteStatements);
+        comparableWriteReceipt = await executeManifestD1WriteBatches(db, comparableWriteStatements, 100);
   }
   if (phase === "maturity_comparables" || phase === "comparable_analyses") {
     return {
@@ -1117,9 +1133,12 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       phase,
       maturity_evaluations: phase === "maturity_comparables" ? maturityRows.length : 0,
       maturity_write_batches: maturityWriteReceipt.batch_count,
-      comparable_analyses: candidates.length,
+      comparable_analyses: comparableTargets.length,
+      comparable_total: candidates.length,
+      comparable_offset: comparableOffset,
+      next_offset: comparableEnd,
       comparable_write_batches: comparableWriteReceipt.batch_count,
-      continuation_required: false,
+      continuation_required: comparableEnd < candidates.length,
     };
   }
   const learningOffset = Math.max(0, Math.trunc(options.learning_offset ?? 0));
