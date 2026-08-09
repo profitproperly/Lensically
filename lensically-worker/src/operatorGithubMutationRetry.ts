@@ -28,3 +28,29 @@ export function shouldRetryGithubMutationResponse(
 export function githubMutationRetryDelayMs(attempt: number): number {
   return Math.min(1_200, 300 * (2 ** Math.max(0, attempt)));
 }
+
+export function classifyGithubWorkflowRunLookup404(
+  requestedRunId: number,
+  recentRunIds: number[],
+): {
+  error: "workflow_run_temporarily_unreadable" | "workflow_run_not_found_after_reconciliation";
+  retryable: boolean;
+  requested_run_listed: boolean;
+  required_next_action: string;
+} {
+  const requestedRunListed = recentRunIds.includes(Math.trunc(requestedRunId));
+  return requestedRunListed
+    ? {
+        error: "workflow_run_temporarily_unreadable",
+        retryable: true,
+        requested_run_listed: true,
+        required_next_action: "Retry the same listed run ID after a short delay; do not infer workflow failure from the temporary detail-endpoint 404.",
+      }
+    : {
+        error: "workflow_run_not_found_after_reconciliation",
+        retryable: false,
+        requested_run_listed: false,
+        required_next_action: "Use the authoritative recent workflow list and do not retry or infer status from this stale or superseded run ID.",
+      };
+}
+

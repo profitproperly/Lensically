@@ -152,6 +152,7 @@ import {
 import { persistOperatorManifestBatch } from "./operatorManifestBatchPersistenceService";
 import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import {
+  classifyGithubWorkflowRunLookup404,
   githubMutationRetryDelayMs,
   shouldRetryGithubMutationResponse,
 } from "./operatorGithubMutationRetry";
@@ -21345,11 +21346,43 @@ async function handleOperatorMcpEngineeringTool(
         const waitSeconds = Math.min(Math.max(Number(args.wait_seconds ?? 0), 0), 60);
     const deadline = Date.now() + waitSeconds * 1000;
     let run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
-    while (waitSeconds > 0 && Date.now() < deadline) {
+        while (waitSeconds > 0 && Date.now() < deadline) {
       const runData = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
       if (["completed", "cancelled"].includes(String(runData.status ?? ""))) break;
       await new Promise((resolve) => setTimeout(resolve, Math.min(5000, Math.max(250, deadline - Date.now()))));
       run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
+    }
+    if (!run.ok && Number(run.status) === 404) {
+      const recent = await githubRepoApi(env, `/actions/runs?per_page=20`);
+      const recentRunIds = recent.data && typeof recent.data === "object" && !Array.isArray(recent.data)
+        && Array.isArray((recent.data as Record<string, unknown>).workflow_runs)
+        ? ((recent.data as Record<string, unknown>).workflow_runs as Array<Record<string, unknown>>)
+          .map((row) => Number(row.id))
+          .filter((id) => Number.isFinite(id))
+          .map((id) => Math.trunc(id))
+        : [];
+      const reconciliation = classifyGithubWorkflowRunLookup404(Math.trunc(runId), recentRunIds);
+      return {
+        ok: false,
+        status: 404,
+        error: reconciliation.error,
+        retryable: reconciliation.retryable,
+        required_next_action: reconciliation.required_next_action,
+        requested_run_id: Math.trunc(runId),
+        jobs_ok: null,
+        jobs_status: null,
+        run: { id: Math.trunc(runId), name: null, status: null, conclusion: null, html_url: null },
+        jobs: [],
+        failed_steps: [],
+        failed_log_excerpt: null,
+        failed_log_unavailable: null,
+        reconciliation: {
+          list_ok: recent.ok,
+          list_status: recent.status,
+          requested_run_listed: reconciliation.requested_run_listed,
+          recent_run_ids: recentRunIds,
+        },
+      };
     }
     const jobs = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}/jobs?per_page=20`);
     const jobList = jobs.data && typeof jobs.data === "object" && !Array.isArray(jobs.data) && Array.isArray((jobs.data as Record<string, unknown>).jobs)
