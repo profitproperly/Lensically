@@ -2987,13 +2987,19 @@ if (!operatorScheduledPostListReadService.includes("export async function readOp
     || !operatorScheduledPostListReadService.includes("dependencies.isValidIsoDate(date)")
     || !operatorScheduledPostListReadService.includes("dependencies.listForLocalDate")
     || !operatorScheduledPostListReadService.includes("returned_count: items.length")
-    || !operatorScheduledPostListReadService.includes("has_more: false")
-    || !operatorScheduledPostListReadService.includes("deletion_history_exposed_to_model: false")) {
+        || !operatorScheduledPostListReadService.includes("has_more: false")
+    || !operatorScheduledPostListReadService.includes("dependencies.listDeletions")
+    || !operatorScheduledPostListReadService.includes("deletions,")
+    || !operatorScheduledPostListReadService.includes("deletion_history_exposed_to_model: true")
+    || !operatorScheduledPostListReadService.includes('deletion_history_learning_effect: "none"')) {
+
   lifecycleErrors.push("operator_scheduled_post_list_read_service_module_incomplete");
 }
 if (!operatorScheduledPostListReadServiceTests.includes("retrieves one valid local date with the normalized explicit timezone")
     || !operatorScheduledPostListReadServiceTests.includes("uses the workspace timezone and returns an empty exact response when date is absent")
-    || !operatorScheduledPostListReadServiceTests.includes("suppresses retrieval for an invalid normalized date")) {
+    || !operatorScheduledPostListReadServiceTests.includes("suppresses retrieval for an invalid normalized date")
+    || !operatorScheduledPostListReadServiceTests.includes("exposes deletion receipts without creating a learning effect")) {
+
   lifecycleErrors.push("operator_scheduled_post_list_read_service_tests_incomplete");
 }
 if (!source.includes('from "./operatorScheduledPostDeletionService"')
