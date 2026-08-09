@@ -10,7 +10,7 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     environment: production
-        timeout-minutes: 5
+            timeout-minutes: 5
     steps:
       - name: Remove obsolete Pages apex association
         env:
