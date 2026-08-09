@@ -57,18 +57,9 @@ function metricLikes(value: unknown): number {
 
 function collectWinnerCandidates(sourceCard: JsonRecord): WinnerCandidate[] {
   const candidates: WinnerCandidate[] = [];
-  const primarySource = asRecord(sourceCard.primary_source);
-  const primaryText = cleanText(primarySource.text ?? primarySource.post_text);
-  if (primaryText) {
-    candidates.push({
-      text: primaryText,
-      likes: Math.max(metricLikes(sourceCard.metrics_snapshot), metricLikes(primarySource.metrics)),
-      evidenceSource: "canonical_source_metrics",
-      publishedPostId: cleanText(primarySource.threads_post_id, 240),
-    });
-  }
 
   for (const revision of asRecordList(sourceCard.owner_revision_history)) {
+
     const text = cleanText(
       revision.exact_published_text
         ?? revision.revised_text
@@ -76,7 +67,8 @@ function collectWinnerCandidates(sourceCard: JsonRecord): WinnerCandidate[] {
         ?? revision.draft_text
         ?? revision.post_text,
     );
-    if (!text) continue;
+        const publishedPostId = cleanText(revision.published_post_id, 240);
+    if (!text || !publishedPostId) continue;
     candidates.push({
       text,
       likes: Math.max(
@@ -84,9 +76,10 @@ function collectWinnerCandidates(sourceCard: JsonRecord): WinnerCandidate[] {
         metricLikes(revision.metrics),
         metricLikes(revision.performance),
       ),
-      evidenceSource: "published_execution_24h",
-      publishedPostId: cleanText(revision.published_post_id, 240),
+      evidenceSource: "manifest_published_descendant_24h",
+      publishedPostId,
     });
+
   }
   return candidates.sort((left, right) => right.likes - left.likes);
 }
@@ -262,27 +255,29 @@ export function applyManifestWinnerPreservation(
   normalizedTransformationContract: JsonRecord,
 ): JsonRecord {
   const contract = { ...normalizedTransformationContract };
-  const existing = normalizeManifestWinnerPreservation(contract.winner_preservation);
+    const existing = normalizeManifestWinnerPreservation(contract.winner_preservation);
   const strongest = collectWinnerCandidates(sourceCard)[0] ?? null;
-  const existingObservedLikes = Number(existing?.observed_likes ?? 0);
-  const observedLikes = Math.max(
-    strongest?.likes ?? 0,
-    Number.isFinite(existingObservedLikes) ? existingObservedLikes : 0,
-  );
-  const required = existing?.required === true
-    || observedLikes >= MANIFEST_WINNING_SOURCE_MIN_LIKES;
+  const observedLikes = strongest?.likes ?? 0;
+  const required = observedLikes >= MANIFEST_WINNING_SOURCE_MIN_LIKES;
   if (!required) {
+    const staleExact = new Set(stringList(existing?.exact_surfaces));
+    const staleFunctions = new Set(stringList(existing?.required_functions));
+    const cleanedContract = {
+      ...contract,
+      must_preserve_exact: stringList(contract.must_preserve_exact).filter((item) => !staleExact.has(item)),
+      must_preserve_function: stringList(contract.must_preserve_function).filter((item) => !staleFunctions.has(item)),
+      winner_preservation: null,
+    };
     return {
       ...sourceCard,
-      transformation_contract: {
-        ...contract,
-        winner_preservation: existing,
-      },
-      winner_preservation: existing,
+      transformation_contract: cleanedContract,
+      winner_preservation: null,
     };
   }
 
-    const winnerText = strongest?.text ?? cleanText(existing?.winner_text, 2_000) ?? "";
+
+        const winnerText = strongest?.text ?? "";
+
   const forbiddenExactSurfaces = forbiddenAnchorSurfaces(sourceCard, contract);
   const existingExact = stringList(contract.must_preserve_exact)
     .filter((anchor) => isSafeExactAnchor(anchor, forbiddenExactSurfaces, { allowSingleWord: true }));
@@ -305,8 +300,9 @@ export function applyManifestWinnerPreservation(
     required: true,
     threshold_likes: MANIFEST_WINNING_SOURCE_MIN_LIKES,
     observed_likes: observedLikes,
-    evidence_source: strongest?.evidenceSource ?? existing?.evidence_source ?? null,
-    winner_post_id: strongest?.publishedPostId ?? existing?.winner_post_id ?? null,
+        evidence_source: strongest?.evidenceSource ?? null,
+    winner_post_id: strongest?.publishedPostId ?? null,
+
     winner_text: winnerText || null,
     exact_surfaces: exactSurfaces,
     required_functions: requiredFunctions,

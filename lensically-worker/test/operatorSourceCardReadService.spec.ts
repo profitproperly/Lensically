@@ -131,12 +131,14 @@ describe("Manifest winner preservation", () => {
     });
   });
 
-  it("does not activate winner enforcement below the evidence threshold", () => {
+    it("does not activate winner enforcement from Saved Pattern or source likes", () => {
     const result = applyManifestWinnerPreservation({
       id: "card-prospect",
-      primary_source: { text: "A useful but unproven idea.", metrics: { likes: 300 } },
+      primary_source: { text: "A source post with huge external engagement.", metrics: { likes: 50000 } },
+      metrics_snapshot: { likes: 50000 },
       owner_revision_history: [],
     }, {
+
       must_preserve_exact: [],
       must_preserve_function: ["Preserve the premise."],
     });
@@ -148,7 +150,7 @@ describe("Manifest winner preservation", () => {
     });
   });
 
-    it("keeps explicit safe winner anchors instead of deriving gendered source language", () => {
+      it("does not let source likes activate preservation, while retaining source-card guidance", () => {
     const result = applyManifestWinnerPreservation({
       id: "card-universe",
       primary_source: {
@@ -162,23 +164,30 @@ describe("Manifest winner preservation", () => {
       must_preserve_function: ["Deliver a decisive blessing of substantial wealth."],
     });
 
+    expect(result.winner_preservation).toBeNull();
     expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([
       "Universe",
       "the person reading this",
     ]);
   });
 
-  it("does not auto-protect deity-specific wording for religion-neutral Manifest winners", () => {
+
+    it("uses the highest-performing Manifest descendant rather than the Saved Pattern source", () => {
     const result = applyManifestWinnerPreservation({
       id: "card-gratitude",
       primary_source: {
         text: "Normalize thanking God before asking Him for more. Gratitude changes everything.",
         metrics: { likes: 5700 },
       },
-      owner_revision_history: [],
+      owner_revision_history: [{
+        exact_published_text: "Normalize thanking the universe before asking for more. Gratitude changes everything.",
+        published_post_id: "manifest-gratitude-winner",
+        performance_24h: { likes: 1800 },
+      }],
       forbidden_surfaces: [],
       danger_surfaces: [],
     }, {
+
       must_preserve_exact: [],
       must_preserve_function: [
         "Open with a normalization statement about expressing gratitude before making another request.",
@@ -193,7 +202,9 @@ describe("Manifest winner preservation", () => {
     expect((result.transformation_contract as Record<string, unknown>).must_preserve_exact).toEqual([]);
     expect(result.winner_preservation).toMatchObject({
       required: true,
-      observed_likes: 5700,
+            observed_likes: 1800,
+      winner_post_id: "manifest-gratitude-winner",
+
       exact_surfaces: [],
     });
     expect((result.transformation_contract as Record<string, unknown>).must_preserve_function).toEqual(
