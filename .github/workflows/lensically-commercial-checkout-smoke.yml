@@ -11,7 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 5
-    steps:
+        steps:
+      - name: Remove obsolete Pages apex association
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          if (!token || !account) throw new Error('cloudflare_credentials_missing');
+          const headers = { Authorization: `Bearer ${token}` };
+          const api = 'https://api.cloudflare.com/client/v4';
+          const projectName = 'lensically-operator';
+          const apex = 'lensically.com';
+          const read = async (url) => {
+            const response = await fetch(url, { headers });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) throw new Error(`cloudflare_read_failed_${response.status}`);
+            return payload.result;
+          };
+          let project = await read(`${api}/accounts/${account}/pages/projects/${projectName}`);
+          const domains = Array.isArray(project?.domains) ? project.domains : [];
+          if (domains.includes(apex)) {
+            const response = await fetch(`${api}/accounts/${account}/pages/projects/${projectName}/domains/${encodeURIComponent(apex)}`, { method: 'DELETE', headers });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) throw new Error(`pages_apex_delete_failed_${response.status}`);
+            console.log('obsolete-pages-apex-association=removed');
+          } else {
+            console.log('obsolete-pages-apex-association=already-absent');
+          }
+          project = await read(`${api}/accounts/${account}/pages/projects/${projectName}`);
+          if ((Array.isArray(project?.domains) ? project.domains : []).includes(apex)) {
+            throw new Error('obsolete_pages_apex_association_still_present');
+          }
+          console.log('obsolete-pages-apex-association=absent');
+          NODE
+
       - name: Inspect Cloudflare production topology
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
