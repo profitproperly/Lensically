@@ -6,45 +6,43 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: repair the rejected release-authority workflow insertion so it satisfies the canonical GitHub Actions indentation/validation contract, then finish wiring shared D1 release enforcement, validate, deploy, and resume request-level convergence proof
-validated_source_head: 196edd6bfbe32a99834c1930aa56cd7f0c471522
-documentation_source_head: c48b8927db5d3daba036cd617cee11df57bb22e4
-production_sha: 196edd6bfbe32a99834c1930aa56cd7f0c471522
-active_interrupt_id: release-authority-workflow-indentation-20260809
+active_checkpoint: live-prove the hardened GitHub workflow run-detail and stale-ID reconciliation paths on production SHA 2cda4d3d310b29489a787e2c36880ac44701ff6c, close the preserved GitHub transport P1s, then complete the Manifest bounded-call exit proof
+validated_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
+documentation_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
+production_sha: 2cda4d3d310b29489a787e2c36880ac44701ff6c
+active_interrupt_id: github-workflow-run-detail-522-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
 
-## Active P1 Interrupt: release-authority-workflow-indentation-20260809
+## Resolved P1 Interrupt: release-authority-workflow-indentation-20260809
 
-- Trigger: atomic release-authority integration patch was rejected with `github_workflow_step_indentation_invalid` at `.github/workflows/lensically-engineering.yml` line 606. Hardening incident `d11833ba-d471-4c63-9ea6-427eda5001f3`. The result explicitly reported `no_commit_created=true`.
-- Impact: no integration source or workflow mutation from the rejected patch reached `main`; the already committed standalone release-authority module, migration, and unit test remain intact.
-- Current action: preserve the Worker/source integration as a separate atomic patch, inspect the canonical workflow validator’s accepted step/run-block shape, then insert the release-authority publication step using that exact shape and validate the workflow before continuing.
-- Prevention requirement: workflow mutations must pass the repository’s source validator before commit; never bypass the indentation gate.
-- Deferred work preserved: `mcp-request-level-release-drift-20260809` and every lower GitHub/Manifest P1 remain open underneath this interrupt.
+- Trigger: atomic release-authority integration patch was rejected with `github_workflow_step_indentation_invalid`; both workflow attempts reported `no_commit_created=true`, so no malformed workflow mutation reached `main`.
+- Root cause: touching the workflow invoked the repository-wide YAML safety scan, making workflow insertion an unnecessary and failure-prone path for release authority publication.
+- Durable resolution: release authority publication was moved into the typed `runGitHubWorkflow` worker-deploy handler instead of weakening or bypassing the workflow validator. The handler publishes the exact target SHA into shared D1 before dispatch, restores the previous authority only on definite dispatch failure, and preserves the future target on ambiguous transport failure so normal work remains fail-closed during reconciliation.
+- Prevention: workflow indentation errors are now explicit expected hardening controls; the canonical workflow safety validator remains intact and no workflow edit is required for this release-authority mechanism.
+- Validation/release: full push validation `31298327092` passed on SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`; exact-SHA deployment `31298432636` succeeded, including migration `0029_operator_release_authority.sql`.
 
-## Active P1 Interrupt: mcp-request-level-release-drift-20260809
+## Resolved P1 Interrupt: mcp-request-level-release-drift-20260809
 
-- Trigger: production verifier on SHA `196edd6bfbe32a99834c1930aa56cd7f0c471522` returned `current_handler_commit=196edd6bfbe32a99834c1930aa56cd7f0c471522`, `fresh_endpoint_commit=196edd6bfbe32a99834c1930aa56cd7f0c471522`, and `session_commit_match=true`. The immediately following direct `getGitHubWorkflowRun` request nevertheless executed with action-closure `production_commit=5edda8dada2198f1594653e796a8bc49e398dc33`, proving post-deploy routing can drift per request after a one-shot verifier passes.
-- Impact: a live proof can still execute on an older Worker after a successful version check. Session-local deployment validation is insufficient because the request itself may be routed to a prior Worker version during propagation.
-- Current action: identify or add a shared production-release authority visible to all Worker versions, write the exact released SHA into that authority during the exact-SHA deployment path, and make the universal Operator request dispatcher compare its own `LENSICALLY_COMMIT_SHA` against the shared released SHA before substantive execution. An older Worker must fail closed with an explicit stale-runtime/retry-or-refresh result rather than performing the requested operation.
-- Prevention requirement: the guard applies to every Operator tool request, not only `verifyDeployedMcpVersion`; post-deploy live verification is accepted only from requests whose executing commit equals the shared released production SHA.
-- Secondary defect observed during this proof: the expected non-retryable `workflow_run_not_found_after_reconciliation` classification was still auto-promoted by generic hardening as a novel P1. Preserve this for repair after request-level release drift is contained so expected classified not-found outcomes do not create false incidents.
-- Deferred work preserved: `deployed-version-startup-probe-400-20260809`, `mcp-post-deploy-stale-session-20260809`, `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all existing source, validation, deployment, and live evidence preserved.
+- Trigger: a one-shot production verifier could pass on one Worker version while the immediately following tool request routed to an older Worker version.
+- Root cause: release identity was session/request-local; there was no shared production-release authority consulted by every substantive Operator tool call.
+- Durable repair: SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c` adds D1 singleton `operator_release_authority`, publishes exact worker-deploy targets before dispatch, and enforces the shared expected SHA in the universal MCP boundary. Normal tools fail closed with `stale_operator_runtime_release`; a bounded release-repair engineering set remains available to reconcile or repair rollout failures.
+- Regression protection: `operatorReleaseAuthority.spec.ts` proves bootstrap/matching-release allowance, stale normal-tool blocking, and release-control exemption. Generic hardening also treats intentional stale-runtime and classified workflow-run controls as expected results rather than novel P1s.
+- Live proof: after deployment `31298432636`, a verifier request executed on `2cda4d3d310b29489a787e2c36880ac44701ff6c`, matched a fresh endpoint on the same SHA, bootstrapped shared authority to `expected_release_sha=2cda4d3d310b29489a787e2c36880ac44701ff6c`, `state=active`, `release_authority_match=true`; the following normal scheduler read also executed on the same SHA and returned healthy with zero overdue posts.
 
-## Active P1 Interrupt: deployed-version-startup-probe-400-20260809
+## Resolved P1 Interrupt: deployed-version-startup-probe-400-20260809
 
-- Trigger: first live run of the new post-deploy identity guard on production SHA `5edda8dada2198f1594653e796a8bc49e398dc33` correctly failed closed, but its fresh startup identity probe returned HTTP `400`, leaving `fresh_endpoint_commit=null` and `error=deployment_commit_identity_unavailable`. Hardening incident: `1ce296e6-4cc3-4878-8ddb-dbbd1d0c4980`.
-- Root cause direction: `verifyDeployedMcpVersion` initialized a valid fresh MCP session successfully, then attempted to obtain startup identity through `/api/operator/tools/getOperatorStartupContext` as an external HTTP call. That path is an internal direct-tool dispatch surface and is not the established client transport used by the fresh session.
-- Current action: invoke `getOperatorStartupContext` through the already initialized fresh MCP session using the MCP tool-call transport, parse its runtime commit, preserve the fail-closed current-handler versus fresh-endpoint comparison, add regression coverage for the probe/identity path, validate and deploy, then rerun the verifier live.
-- Deferred work preserved: `mcp-post-deploy-stale-session-20260809`, `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt.
+- Trigger: the first commit-identity verifier used an internal direct-tool URL as an external probe and received HTTP 400.
+- Root cause: the verifier ignored the authoritative `X-Lensically-Commit-Sha` runtime header already emitted by the fresh MCP initialize response.
+- Durable repair: the verifier now reads and validates that initialize-response header through `readOperatorMcpCommitHeader`, eliminating the extra external startup probe while preserving fail-closed current-handler versus fresh-endpoint comparison.
+- Regression/live proof: runtime-header identity parsing and match/mismatch/missing-identity states are covered by tests; production verifier on `2cda4d3d310b29489a787e2c36880ac44701ff6c` returned matching current/fresh commits with `fresh_identity_source=initialize_response_header`.
 
-## Active P1 Interrupt: mcp-post-deploy-stale-session-20260809
+## Resolved P1 Interrupt: mcp-post-deploy-stale-session-20260809
 
-- Trigger: exact-SHA deployment run `31297276888` succeeded and fresh `verifyDeployedMcpVersion` reported production commit `9dfff53b851f0b81358f70ad4a497e651098373c`; immediately afterward, a direct `getGitHubWorkflowRun` call still executed the pre-deploy 404 behavior and its action-closure evidence identified the executing connector runtime as `df38ef3772dbfa15be89df4b949a4c880ae9d707`.
-- Impact: a chat connector session can remain silently bound to an older Worker after deployment instead of terminating, so live verification can falsely appear to exercise newly deployed code while subsequent direct calls actually use stale handlers.
-- Current action: harden deployed-version verification to compare the current executing handler/session commit with the fresh live endpoint commit, return an explicit stale-session/fresh-session-required state on mismatch, and add regression protection. After that guard is validated and released, refresh the Lensically connector session in this same chat, re-bootstrap, and rerun the GitHub 404/52x proofs before resuming Manifest closure.
-- Prevention requirement: no post-deploy live proof may be accepted when the tool execution session commit differs from the freshly initialized live endpoint commit; stale connector state must fail closed with a specific refresh requirement rather than permitting further verification calls.
-- Deferred work preserved: `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all existing source, validation, deployment, and cycle evidence preserved.
+- Trigger: post-deploy calls could execute against an older Worker after a fresh endpoint already exposed the newer SHA.
+- Root cause: the observed behavior was request-level rollout drift, not a permanently pinned chat session; a session-only invalidation rule could not prevent a later request from landing on an older deployment during propagation.
+- Durable repair: commit-identity verification was first hardened, then generalized into shared D1 release authority enforced at the universal tool boundary in SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`. This removes the need to depend on manual chat refresh as the primary safety mechanism.
+- Live proof: shared authority is active on `2cda4d3d310b29489a787e2c36880ac44701ff6c`, the verifier and following normal scheduler read both executed on that SHA, and future releases publish their target before dispatch so stale guard-capable Workers fail closed during propagation.
 
 ## Active P1 Interrupt: github-workflow-run-detail-522-20260809
 
