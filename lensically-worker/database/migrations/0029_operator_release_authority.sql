@@ -1,3 +1,7 @@
+-- lensically-migration-class: schema
+-- lensically-migration-owner: operator-engineering
+-- lensically-migration-risk: low
+
 CREATE TABLE IF NOT EXISTS operator_release_authority (
   authority_id TEXT PRIMARY KEY,
   expected_release_sha TEXT NOT NULL,
