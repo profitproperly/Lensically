@@ -275,7 +275,9 @@ describe("Operator MCP tool-call dispatcher", () => {
         id: 41,
         params: { name: "persist_manifest_autonomous_batch", arguments: {} },
       }, dependencies);
-      await vi.advanceTimersByTimeAsync(250);
+            await vi.advanceTimersByTimeAsync(7999);
+      expect(beginOperationReceipt).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
       const response = await responsePromise;
       expect(await structuredContent(response)).toMatchObject({
         ok: true,
