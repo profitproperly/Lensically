@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
     classifyGithubWorkflowRunLookup404,
-  githubMutationRetryDelayMs,
+    githubMutationRetryDelayMs,
   isAmbiguousGithubWorkflowDispatchStatus,
+  isTransientGithubWorkflowReadStatus,
   shouldRetryGithubMutationResponse,
 } from "../src/operatorGithubMutationRetry";
 
@@ -40,6 +41,15 @@ describe("operator GitHub mutation retry policy", () => {
     }
     for (const status of [400, 401, 403, 404, 422, 500, 525, 526]) {
       expect(isAmbiguousGithubWorkflowDispatchStatus(status)).toBe(false);
+    }
+  });
+
+    it("classifies transient GitHub workflow read transport statuses for list reconciliation", () => {
+    for (const status of [502, 503, 504, 520, 521, 522, 523, 524]) {
+      expect(isTransientGithubWorkflowReadStatus(status)).toBe(true);
+    }
+    for (const status of [400, 401, 403, 404, 422, 500, 525, 526]) {
+      expect(isTransientGithubWorkflowReadStatus(status)).toBe(false);
     }
   });
 

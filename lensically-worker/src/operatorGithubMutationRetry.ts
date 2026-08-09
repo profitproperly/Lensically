@@ -33,6 +33,10 @@ export function isAmbiguousGithubWorkflowDispatchStatus(status: number): boolean
   return [502, 503, 504, 520, 521, 522, 523, 524].includes(Math.trunc(status));
 }
 
+export function isTransientGithubWorkflowReadStatus(status: number): boolean {
+  return [502, 503, 504, 520, 521, 522, 523, 524].includes(Math.trunc(status));
+}
+
 export function classifyGithubWorkflowRunLookup404(
   requestedRunId: number,
   recentRunIds: number[],

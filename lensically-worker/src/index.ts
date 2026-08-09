@@ -153,8 +153,9 @@ import { persistOperatorManifestBatch } from "./operatorManifestBatchPersistence
 import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import {
     classifyGithubWorkflowRunLookup404,
-  githubMutationRetryDelayMs,
+    githubMutationRetryDelayMs,
   isAmbiguousGithubWorkflowDispatchStatus,
+  isTransientGithubWorkflowReadStatus,
   shouldRetryGithubMutationResponse,
 } from "./operatorGithubMutationRetry";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
@@ -21353,6 +21354,51 @@ async function handleOperatorMcpEngineeringTool(
       await new Promise((resolve) => setTimeout(resolve, Math.min(5000, Math.max(250, deadline - Date.now()))));
       run = await githubRepoApi(env, `/actions/runs/${Math.trunc(runId)}`);
     }
+        let reconciledRunData: Record<string, unknown> | null = null;
+    let transientRunReconciliation: Record<string, unknown> | null = null;
+    if (!run.ok && isTransientGithubWorkflowReadStatus(Number(run.status))) {
+      const recent = await githubRepoApi(env, `/actions/runs?per_page=20`);
+      const recentRuns = recent.data && typeof recent.data === "object" && !Array.isArray(recent.data)
+        && Array.isArray((recent.data as Record<string, unknown>).workflow_runs)
+        ? (recent.data as Record<string, unknown>).workflow_runs as Array<Record<string, unknown>>
+        : [];
+      const matchingRun = recentRuns.find((row) => Number(row.id) === Math.trunc(runId)) ?? null;
+      if (recent.ok && matchingRun) {
+        reconciledRunData = matchingRun;
+        transientRunReconciliation = {
+          mode: "authoritative_recent_run_list",
+          run_detail_ok: false,
+          run_detail_status: run.status,
+          list_ok: true,
+          list_status: recent.status,
+          requested_run_listed: true,
+        };
+      } else {
+        return {
+          ok: false,
+          status: run.status,
+          error: "workflow_run_temporarily_unreadable",
+          retryable: true,
+          required_next_action: "Re-list recent workflow runs before retrying this run lookup; do not infer workflow failure from a transient run-detail transport response.",
+          requested_run_id: Math.trunc(runId),
+          jobs_ok: null,
+          jobs_status: null,
+          run: { id: Math.trunc(runId), name: null, status: null, conclusion: null, html_url: null },
+          jobs: [],
+          failed_steps: [],
+          failed_log_excerpt: null,
+          failed_log_unavailable: null,
+          reconciliation: {
+            mode: "authoritative_recent_run_list",
+            run_detail_ok: false,
+            run_detail_status: run.status,
+            list_ok: recent.ok,
+            list_status: recent.status,
+            requested_run_listed: Boolean(matchingRun),
+          },
+        };
+      }
+    }
     if (!run.ok && Number(run.status) === 404) {
       const recent = await githubRepoApi(env, `/actions/runs?per_page=20`);
       const recentRunIds = recent.data && typeof recent.data === "object" && !Array.isArray(recent.data)
@@ -21429,13 +21475,19 @@ async function handleOperatorMcpEngineeringTool(
         };
       }
     }
-        const data = run.data && typeof run.data === "object" && !Array.isArray(run.data) ? run.data as Record<string, unknown> : {};
+                const data = run.ok && run.data && typeof run.data === "object" && !Array.isArray(run.data)
+      ? run.data as Record<string, unknown>
+      : reconciledRunData ?? {};
     const failed_steps = jobList.flatMap((job) => Array.isArray(job.steps)
       ? job.steps.filter((step) => step.conclusion === "failure").map((step) => ({ job_id: job.id, job_name: job.name, ...step }))
       : []);
-    return {
-      ok: run.ok,
-      status: run.status,
+        return {
+      ok: run.ok || Boolean(reconciledRunData),
+      status: run.ok ? run.status : reconciledRunData ? 200 : run.status,
+      run_detail_ok: run.ok,
+      run_detail_status: run.status,
+      reconciled_from_list: Boolean(reconciledRunData),
+      reconciliation: transientRunReconciliation,
       jobs_ok: jobs.ok,
       jobs_status: jobs.status,
       run: { id: data.id, name: data.name, status: data.status, conclusion: data.conclusion, html_url: data.html_url },
