@@ -6,13 +6,21 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: reconcile the HTTP 522 exact-SHA worker-deploy dispatch for `541dce188fc9f3817160a65c3cbcda7d1ddf681b`, permanently classify ambiguous 52x dispatch responses, then resume workflow-run 404 proof and Manifest reused-lineage live exit verification
-validated_source_head: 541dce188fc9f3817160a65c3cbcda7d1ddf681b
-documentation_source_head: 0d2dd9599a74e898fb4302f47f7d49f14ae6dab9
+active_checkpoint: reconcile transient HTTP 522 workflow-run detail reads from authoritative run-list and successful jobs evidence, permanently harden read-side 52x classification, then resume the recorded deployment-dispatch 522 and Manifest live exit path
+validated_source_head: 627e65434376ec6f32b5b30f24ea1aed2469c842
+documentation_source_head: 0da0105075dd093f3df0e269821223ffbde5a318
 production_sha: df38ef3772dbfa15be89df4b949a4c880ae9d707
-active_interrupt_id: github-workflow-dispatch-522-20260809
+active_interrupt_id: github-workflow-run-detail-522-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: github-workflow-run-detail-522-20260809
+
+- Trigger: `getGitHubWorkflowRun` for push-validation run `31297045038` returned HTTP `522` from the run-detail endpoint while the same tool invocation returned `jobs_ok=true`, `jobs_status=200`, and an in-progress push-validation job for the exact run.
+- Classification: server P1 hardening incident `d34aa792-0bfd-4b08-a741-9d676bc3216e`; this is a partial read transport failure, not evidence that validation failed.
+- Root-cause direction: run-detail handling only has special reconciliation for `404`; transient read-side `502/503/504/520-524` responses are returned as hard tool failures even when the authoritative workflow list or jobs endpoint can still establish run identity and progress.
+- Current action: reconcile run `31297045038` through `listGitHubWorkflowRuns`; then generalize transient run-detail handling to authoritative list reconciliation, preserve jobs evidence when available, classify unreadable detail responses as retryable rather than workflow failure, add regression protection, validate, and resume the lower P1 stack.
+- Deferred work preserved: `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt.
 
 ## Active P1 Interrupt: github-workflow-dispatch-522-20260809
 
