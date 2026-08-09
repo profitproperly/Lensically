@@ -426,10 +426,11 @@ export async function admitOperatorManifestPersistence(
         && priorScheduledPostId === existingScheduledPostId) {
         return {
           handled: true,
-          response: {
+                    response: {
             success: true,
             reused: true,
             replayed_persist_event: true,
+            operation_id: operationId,
             slot_key: slotKey,
             scheduled_post_id: existingScheduledPostId,
             lineage: existingLineage.lineage ?? {
@@ -439,11 +440,19 @@ export async function admitOperatorManifestPersistence(
               draft_id: existingLineup?.draft_id ?? null,
             },
             publish_lineage_complete: true,
+            intelligence_lineage_complete: true,
             hypothesis_id: priorPersistPayloadRecord.hypothesis_id ?? postHypothesis.id ?? null,
             strategy_version_id: priorPersistPayloadRecord.strategy_version_id ?? outputStrategyVersion.id,
             experiment_assignment: priorPersistPayloadRecord.experiment_assignment ?? null,
             decision_influence: priorPersistPayloadRecord.decision_influence ?? null,
             coverage_reconciliation_required: true,
+            batch_reconciliation_context: {
+              strategic_thesis: effectiveStrategicThesis,
+              output_strategy_version_id: String(outputStrategyVersion.id ?? ""),
+              fallback_cycle: cycle,
+              fallback_timezone: timezone,
+              slot_key: slotKey,
+            },
           },
         };
       }
@@ -515,9 +524,10 @@ export async function admitOperatorManifestPersistence(
       });
       return {
         handled: true,
-        response: {
+                response: {
           success: true,
           reused: true,
+          operation_id: operationId,
           slot_key: slotKey,
           scheduled_post_id: existingScheduledPostId,
           lineage: existingLineage.lineage ?? {
@@ -526,11 +536,19 @@ export async function admitOperatorManifestPersistence(
             draft_id: existingLineup?.draft_id ?? null,
           },
           publish_lineage_complete: true,
+          intelligence_lineage_complete: true,
           hypothesis_id: postHypothesis.id ?? null,
           strategy_version_id: outputStrategyVersion.id,
           experiment_assignment: experimentAssignment,
           decision_influence: decisionInfluence,
           coverage_reconciliation_required: true,
+          batch_reconciliation_context: {
+            strategic_thesis: effectiveStrategicThesis,
+            output_strategy_version_id: String(outputStrategyVersion.id ?? ""),
+            fallback_cycle: cycle,
+            fallback_timezone: timezone,
+            slot_key: slotKey,
+          },
         },
       };
     }

@@ -258,12 +258,19 @@ describe("operatorManifestPersistenceAdmissionService", () => {
 
     expect(result.handled).toBe(true);
     if (!result.handled) throw new Error("expected replay response");
-    expect(result.response).toMatchObject({
+        expect(result.response).toMatchObject({
       success: true,
       reused: true,
       replayed_persist_event: true,
+      operation_id: "persist-1",
       scheduled_post_id: 91,
       hypothesis_id: "hypothesis-prior",
+      publish_lineage_complete: true,
+      intelligence_lineage_complete: true,
+      batch_reconciliation_context: expect.objectContaining({
+        output_strategy_version_id: "strategy-1",
+        slot_key: "2026-07-27T19:00",
+      }),
     });
     expect(harness.mocks.linkHypothesisResult).not.toHaveBeenCalled();
     expect(harness.mocks.registerExperimentAssignment).not.toHaveBeenCalled();
@@ -291,12 +298,19 @@ describe("operatorManifestPersistenceAdmissionService", () => {
 
     expect(result.handled).toBe(true);
     if (!result.handled) throw new Error("expected reuse response");
-    expect(result.response).toMatchObject({
+        expect(result.response).toMatchObject({
       success: true,
       reused: true,
+      operation_id: "persist-1",
       scheduled_post_id: 92,
+      publish_lineage_complete: true,
+      intelligence_lineage_complete: true,
       experiment_assignment: { id: "experiment-assignment-1" },
       decision_influence: { id: "decision-influence-1" },
+      batch_reconciliation_context: expect.objectContaining({
+        output_strategy_version_id: "strategy-1",
+        slot_key: "2026-07-27T19:00",
+      }),
     });
     expect(harness.mocks.linkHypothesisResult).toHaveBeenCalledWith(expect.objectContaining({
       scheduledPostId: 92,

@@ -12015,7 +12015,11 @@ async function persistManifestAutonomousPost(
     registerExperimentAssignment: (input) => registerManifestExperimentAssignment(env.DB, input as Parameters<typeof registerManifestExperimentAssignment>[1]),
     recordDecisionInfluence: (input) => recordManifestDecisionInfluence(env.DB, input as Parameters<typeof recordManifestDecisionInfluence>[1]),
   });
-  if (admission.handled) return admission.response;
+    if (admission.handled) {
+    if (options.deferCoverageReconciliation === true) return admission.response;
+    const { batch_reconciliation_context: _batchReconciliationContext, ...publicAdmissionResponse } = admission.response;
+    return publicAdmissionResponse;
+  }
   const {
     cycle,
     operationId,
