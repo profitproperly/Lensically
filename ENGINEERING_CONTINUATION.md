@@ -6,13 +6,21 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: repair Manifest bounded-call 502 failure class, validate, deploy, live-verify the final midnight persistence plus cycle-receipt event paging, then resume the preserved commercial `/operator/*` proxy checkpoint
-validated_source_head: 7e246b5e0bd411acf173ba00797031f7087f29db
+active_checkpoint: reconcile and permanently repair GitHub workflow-run lookup 404 for a freshly listed validation run, then complete exact-head validation of the Manifest reused-lineage contract, deploy, live-replay midnight, and run terminal cycle coverage
+validated_source_head: df38ef3772dbfa15be89df4b949a4c880ae9d707
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
-production_sha: 7e246b5e0bd411acf173ba00797031f7087f29db
-active_interrupt_id: manifest-bounded-call-502-20260809
+production_sha: df38ef3772dbfa15be89df4b949a4c880ae9d707
+active_interrupt_id: github-workflow-run-lookup-404-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: github-workflow-run-lookup-404-20260809
+
+- Trigger: during exact-head validation of Manifest reused-lineage repair head `9dd6ad1c097092d1e14f446b567412246be3d8a6`, `listGitHubWorkflowRuns` returned push-validation run `31296704579`, but the immediate `getGitHubWorkflowRun` lookup for that exact run ID returned HTTP 404 for both run and jobs endpoints.
+- Server classification: hardening incident `d1b2d999-c08f-4231-967b-752a926d684b`, severity P1, novel failure, normal work blocked.
+- Known evidence: targeted typecheck `31296708409` and targeted operator-tests `31296718642` are still the validation path for the same reuse-lineage head; the 404 does not prove those tests failed and must not be interpreted as a code failure.
+- Current action: reconcile the missing run through the authoritative workflow list; identify whether the ID was superseded/cancelled/stale or the run-fetch wrapper is wrong; fix the root cause if wrapper behavior is defective; add prevention/regression; then resume exact-head validation without fabricating status.
+- Deferred work preserved: `manifest-bounded-call-502-20260809` remains open underneath this interrupt, including the reused-midnight lineage contract discovered by its live exit test.
 
 ## Active P1 Interrupt: manifest-bounded-call-502-20260809
 
