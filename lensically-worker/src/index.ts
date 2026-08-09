@@ -18991,9 +18991,8 @@ async function getOperatorMcpBoundaryBlock(
     authority: releaseAuthority,
   });
   if (!releaseGate.allowed) {
-    return {
+        return {
       ok: false,
-      error: releaseGate.error,
       retryable: true,
       required_next_action: "Retry this tool only after the executing Worker reaches the shared released production SHA. Release-repair engineering tools remain available while rollout converges or is repaired.",
       ...releaseGate,
