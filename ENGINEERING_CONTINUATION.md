@@ -1,18 +1,18 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-09
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`
-validated_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-documentation_source_head: b99cce6c5af90ae7e73f621f642e3f732055d939
-production_sha: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-active_interrupt_id: commercial-next-route-path-validator-20260807
-active_interrupt_state: open
-active_interrupt_precedence: P1
+active_job_id: none
+active_checkpoint: none
+validated_source_head: 40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce
+documentation_source_head: c869093130a78983868b638dfec6f00c679ed1a5
+production_sha: 40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce
+active_interrupt_id: none
+active_interrupt_state: resolved
+active_interrupt_precedence: none
 
 ## Resolved P1 Interrupt: release-authority-workflow-indentation-20260809
 
@@ -92,7 +92,7 @@ active_interrupt_precedence: P1
 - Deferred commercial P1 restored: `commercial-next-route-path-validator-20260807` is again the active interrupt with its `/operator/*` proxy checkpoint unchanged.
 - Status: resolved.
 
-## Active Commercial Inline Checkout: commercial-inline-checkout-20260807
+## Completed Commercial Inline Checkout: commercial-inline-checkout-20260807
 
 - Owner direction: keep the simplified mobile-first white sales page, but place the payment experience directly on the product page instead of sending buyers to a separate hosted checkout link.
 - Verified Stripe capability: Stripe supports embedded Checkout Sessions with `ui_mode=embedded`, a server-created `client_secret`, and a `return_url`; the payment form remains Stripe-hosted inside the page.
@@ -109,8 +109,10 @@ active_interrupt_precedence: P1
 - Live verification exposed a separate P1 routing defect: the deployed Pages project contains the new embedded-checkout sales page, but `https://lensically.com/operator/` is still served by the existing OpenNext `lensically-web` Worker. Public evidence shows the apex returns the Lensically Next.js app (`307 /dashboard`), while `lensically-operator.pages.dev/operator/` contains the new checkout surface.
 - Root cause: the commercial Pages project was never attached to the production apex, and the apex is already legitimately occupied by the main Lensically web application. Attempting to attach the whole apex to Pages is the wrong topology because it would displace `/dashboard`, `/cycles`, and the internal web product. Cloudflare Pages reports `verification-error=CNAME record not set`; the existing apex cannot become the Pages origin without breaking the main app.
 - Durable repair direction: preserve the main web application on the apex and add an explicit `lensically-web` route handler for `/operator` and `/operator/*` that proxies the canonical commercial Pages origin. This gives the sales funnel one production URL without changing apex DNS or disrupting the app. Commercial deployment is not considered live until the production-domain smoke validates both the proxied page and embedded Checkout endpoint.
-- Current action: resolve the `lensically-commercial-checkout-smoke.yml` GitHub 422 dispatch interrupt introduced after the `/operator/*` proxy release, then remove/verify absence of the unnecessary Pages apex association and run the permanent commercial checkout smoke through `https://lensically.com/operator/`.
-- Active P1 dispatch interrupt (2026-08-09): `operateGitHubRepositories.dispatch_workflow` returned HTTP 422 for `lensically-commercial-checkout-smoke.yml` after commit `d8887dbdf6ad2c6ef68a5a8116814b4cb0cbf541`; auto-hardening incident `f9f034f2-c946-4cce-843f-8df2cacddae6`. Side effect is unverified, so reconcile workflow validity/run state before retry. Root cause and prevention remain open until diagnosed and regression-protected.
+- Completion (2026-08-09): `/operator` and `/operator/*` now proxy from the main `lensically-web` application to the canonical `lensically-operator.pages.dev` commercial origin. Focused web regression and full push validation passed in run `31311491802`; exact tested web head `40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce` deployed successfully in release run `31311681737`.
+- Pages apex cleanup reconciliation: prior Cloudflare topology evidence in run `31215180173` already showed `pages-domains=lensically-operator.pages.dev` only, so the supposed pending `lensically.com` Pages association was already absent; no destructive cleanup remained necessary.
+- Dispatch interrupt root cause: the first cleanup workflow edit malformed YAML indentation, causing GitHub HTTP 422. Permanent prevention is source-controlled in `lensically-worker/scripts/validate-workflow-yaml.rb` and `.github/workflows/lensically-workflow-lint.yml`, which now syntax-parse every workflow on any workflow change. Validation run `31311949445` passed.
+- Permanent commercial smoke: run `31311971428` passed through `https://lensically.com/operator/`, including the proxied embedded-checkout page and live embedded Checkout session endpoint. The commercial P1 is closed.
 - P1 implementation interrupt: `operateGitHubRepositories.upsert_file` rejects repository paths containing Next.js optional-catchall square brackets, so the direct `app/operator/[[...commercialPath]]/route.ts` file could not be created through the bounded repository tool. Root cause is the engineering path validator, not Next.js. Prevention: do not retry bracketed repository paths through this tool; use a supported configuration-level proxy/rewrites surface with an ordinary repository path, preserving the same route behavior without bypassing repository safety.
 - Security constraints: never expose the Stripe secret key; do not accept client-supplied price, amount, product, release, or fulfillment authority; keep price, line item, currency, metadata, and return target server-owned.
 
