@@ -106,6 +106,12 @@ export function buildOperatorMcpRuntimeHeaders(options: {
   };
 }
 
+export function readOperatorMcpCommitHeader(headers: Headers): string | null {
+  const value = headers.get("x-lensically-commit-sha")?.trim().toLowerCase() ?? "";
+  return /^[a-f0-9]{40}$/.test(value) ? value : null;
+}
+
+
 export function operatorTransportFailureResponse(options: {
   requestId: string;
   phase: string;

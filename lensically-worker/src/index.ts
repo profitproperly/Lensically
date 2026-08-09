@@ -267,6 +267,7 @@ import {
 import {
   buildOperatorMcpRuntimeHeaders,
   operatorTransportFailureResponse,
+  readOperatorMcpCommitHeader,
   type OperatorMcpJsonRpcId,
 } from "./operatorMcpTransport";
 
@@ -21536,9 +21537,9 @@ async function handleOperatorMcpEngineeringTool(
       };
     };
                                                 const listed = await callLiveMcp(2, "tools/list", {});
-    const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
+        const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
       env.LENSICALLY_COMMIT_SHA,
-      response.headers.get("x-lensically-commit-sha"),
+      readOperatorMcpCommitHeader(response.headers),
     );
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools

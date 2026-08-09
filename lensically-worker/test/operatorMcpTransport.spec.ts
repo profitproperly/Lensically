@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildMcpToolResultEnvelope,
+    buildMcpToolResultEnvelope,
   buildOperatorMcpRuntimeHeaders,
   buildOperatorMcpToolCompletionText,
+  readOperatorMcpCommitHeader,
   mcpErrorResponse,
   mcpJsonResponse,
   mcpToolCompletionResponse,
@@ -89,12 +90,21 @@ describe("Operator MCP transport", () => {
       "X-Lensically-Commit-Sha": "abc123",
       "X-Lensically-Execution-Kernel": "kernel-v1",
     });
-    expect(buildOperatorMcpRuntimeHeaders({
+        expect(buildOperatorMcpRuntimeHeaders({
       deploymentId: "deployment-1",
       commitSha: "unknown",
       executionKernelVersion: "kernel-v1",
     })).not.toHaveProperty("Mcp-Session-Id");
   });
+
+  it("reads only a valid commit identity from MCP runtime headers", () => {
+    expect(readOperatorMcpCommitHeader(new Headers({
+      "X-Lensically-Commit-Sha": "9DFFF53B851F0B81358F70AD4A497E651098373C",
+    }))).toBe("9dfff53b851f0b81358f70ad4a497e651098373c");
+    expect(readOperatorMcpCommitHeader(new Headers({ "X-Lensically-Commit-Sha": "unknown" }))).toBeNull();
+    expect(readOperatorMcpCommitHeader(new Headers())).toBeNull();
+  });
+
 
   it("preserves bounded transport failures and runtime evidence", async () => {
     const response = operatorTransportFailureResponse({
