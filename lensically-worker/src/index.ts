@@ -152,8 +152,9 @@ import {
 import { persistOperatorManifestBatch } from "./operatorManifestBatchPersistenceService";
 import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import {
-  classifyGithubWorkflowRunLookup404,
+    classifyGithubWorkflowRunLookup404,
   githubMutationRetryDelayMs,
+  isAmbiguousGithubWorkflowDispatchStatus,
   shouldRetryGithubMutationResponse,
 } from "./operatorGithubMutationRetry";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
@@ -21309,7 +21310,7 @@ async function handleOperatorMcpEngineeringTool(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ref, inputs }),
     });
-        const transientDispatchFailure = !result.ok && [502, 504].includes(Number(result.status));
+                const transientDispatchFailure = !result.ok && isAmbiguousGithubWorkflowDispatchStatus(Number(result.status));
     await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : transientDispatchFailure ? "retryable" : "failed", metadata: { status: result.status, transient_dispatch_failure: transientDispatchFailure } });
     return {
       ok: result.ok,

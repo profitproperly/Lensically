@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  classifyGithubWorkflowRunLookup404,
+    classifyGithubWorkflowRunLookup404,
   githubMutationRetryDelayMs,
+  isAmbiguousGithubWorkflowDispatchStatus,
   shouldRetryGithubMutationResponse,
 } from "../src/operatorGithubMutationRetry";
 
@@ -31,6 +32,15 @@ describe("operator GitHub mutation retry policy", () => {
     expect(githubMutationRetryDelayMs(1)).toBe(600);
     expect(githubMutationRetryDelayMs(2)).toBe(1200);
     expect(githubMutationRetryDelayMs(4)).toBe(1200);
+  });
+
+    it("classifies ambiguous GitHub workflow dispatch transport statuses without blind retries", () => {
+    for (const status of [502, 503, 504, 520, 521, 522, 523, 524]) {
+      expect(isAmbiguousGithubWorkflowDispatchStatus(status)).toBe(true);
+    }
+    for (const status of [400, 401, 403, 404, 422, 500, 525, 526]) {
+      expect(isAmbiguousGithubWorkflowDispatchStatus(status)).toBe(false);
+    }
   });
 
   it("classifies workflow-run 404s from a reconciled authoritative list", () => {
