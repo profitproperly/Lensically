@@ -231,6 +231,59 @@ describe("operatorManifestBatchPersistenceService", () => {
     });
   });
 
+    it("counts a reused lineage-complete scheduled candidate as accepted and reconciles it", async () => {
+    const harness = createDependencies();
+    harness.persistCandidate.mockResolvedValueOnce({
+      success: true,
+      reused: true,
+      operation_id: "candidate-reused",
+      slot_key: "2026-08-11T00:00",
+      scheduled_post_id: 1036,
+      publish_lineage_complete: true,
+      intelligence_lineage_complete: true,
+      hypothesis_id: "hypothesis-midnight",
+      coverage_reconciliation_deferred: true,
+      batch_reconciliation_context: reconciliationContext("2026-08-11T00:00"),
+    });
+
+    const result = await persistOperatorManifestBatch({
+      brandKey: "manifest_mental",
+      defaultTimezone: "America/New_York",
+      payload: {
+        batch_operation_id: "batch-reused",
+        cycle_id: "cycle-1",
+        cycle_strategy_id: "strategy-1",
+        candidates: [
+          { operation_id: "candidate-reused", cycle_plan_item_id: "plan-reused", post: {}, model_evaluation: {} },
+        ],
+      },
+    }, harness.dependencies);
+
+    expect(result).toMatchObject({
+      success: true,
+      partial_success: false,
+      requested_count: 1,
+      processed_count: 1,
+      accepted_count: 1,
+      rejected_count: 0,
+      deferred_count: 0,
+      accepted_slots: ["2026-08-11T00:00"],
+      reconciliation_count: 1,
+      results: [{
+        success: true,
+        reused: true,
+        operation_id: "candidate-reused",
+        slot_key: "2026-08-11T00:00",
+        scheduled_post_id: 1036,
+        publish_lineage_complete: true,
+        intelligence_lineage_complete: true,
+        hypothesis_id: "hypothesis-midnight",
+      }],
+    });
+    expect(harness.persistCandidate).toHaveBeenCalledTimes(1);
+    expect(harness.reconcileBatch).toHaveBeenCalledTimes(1);
+  });
+
   it("does not reconcile when every candidate is rejected", async () => {
     const harness = createDependencies();
     harness.persistCandidate.mockResolvedValue({
