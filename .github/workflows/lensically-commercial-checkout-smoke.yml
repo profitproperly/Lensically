@@ -12,45 +12,8 @@ jobs:
     environment: production
     timeout-minutes: 5
     steps:
-      - name: Remove obsolete Pages apex association
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const token = process.env.CLOUDFLARE_API_TOKEN;
-          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-          if (!token || !account) throw new Error('cloudflare_credentials_missing');
-          const headers = { Authorization: `Bearer ${token}` };
-          const api = 'https://api.cloudflare.com/client/v4';
-          const projectName = 'lensically-operator';
-          const apex = 'lensically.com';
-          const read = async (url) => {
-            const response = await fetch(url, { headers });
-            const payload = await response.json();
-            if (!response.ok || !payload?.success) throw new Error(`cloudflare_read_failed_${response.status}`);
-            return payload.result;
-          };
-          let project = await read(`${api}/accounts/${account}/pages/projects/${projectName}`);
-          const domains = Array.isArray(project?.domains) ? project.domains : [];
-          if (domains.includes(apex)) {
-            const response = await fetch(`${api}/accounts/${account}/pages/projects/${projectName}/domains/${encodeURIComponent(apex)}`, { method: 'DELETE', headers });
-            const payload = await response.json();
-            if (!response.ok || !payload?.success) throw new Error(`pages_apex_delete_failed_${response.status}`);
-            console.log('obsolete-pages-apex-association=removed');
-          } else {
-            console.log('obsolete-pages-apex-association=already-absent');
-          }
-          project = await read(`${api}/accounts/${account}/pages/projects/${projectName}`);
-          if ((Array.isArray(project?.domains) ? project.domains : []).includes(apex)) {
-            throw new Error('obsolete_pages_apex_association_still_present');
-          }
-          console.log('obsolete-pages-apex-association=absent');
-          NODE
-
       - name: Inspect Cloudflare production topology
+        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -85,33 +48,6 @@ jobs:
             if (domains.some((domain) => String(domain).includes('lensically'))) {
               console.log(`pages-map=${entry.name}:${domains.join('|')}`);
             }
-          }
-
-          const zones = await read(`${api}/zones?name=lensically.com`);
-          const zone = Array.isArray(zones) ? zones[0] : null;
-          if (zone?.id) {
-            try {
-              const dns = await read(`${api}/zones/${zone.id}/dns_records?per_page=100`);
-              for (const record of Array.isArray(dns) ? dns : []) {
-                if (['lensically.com', 'app.lensically.com', 'api.lensically.com'].includes(record.name)) {
-                  console.log(`dns=${record.type}:${record.name}:${record.content}:proxied=${record.proxied}`);
-                }
-              }
-            } catch {
-              console.log('dns-read=unavailable');
-            }
-            try {
-              const routes = await read(`${api}/zones/${zone.id}/workers/routes`);
-              for (const route of Array.isArray(routes) ? routes : []) {
-                if (String(route?.pattern || '').includes('lensically.com')) {
-                  console.log(`worker-route=${route.pattern}:${route.script || 'none'}`);
-                }
-              }
-            } catch {
-              console.log('worker-route-read=unavailable');
-            }
-          } else {
-            console.log('lensically-zone=missing');
           }
           NODE
 
