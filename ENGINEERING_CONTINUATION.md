@@ -6,11 +6,11 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: live-prove the hardened GitHub workflow run-detail and stale-ID reconciliation paths on production SHA 2cda4d3d310b29489a787e2c36880ac44701ff6c, close the preserved GitHub transport P1s, then complete the Manifest bounded-call exit proof
+active_checkpoint: complete the Manifest bounded-call live exit test on production SHA 2cda4d3d310b29489a787e2c36880ac44701ff6c: prove deep event paging, final midnight durability/lineage, and terminal zero-gap hourly coverage, then close the P1 and restore the preserved commercial `/operator/*` proxy checkpoint
 validated_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-documentation_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
+documentation_source_head: 8078365077278e2b6ff8834b567f2d3436170a3f
 production_sha: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-active_interrupt_id: github-workflow-run-detail-522-20260809
+active_interrupt_id: manifest-bounded-call-502-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
 
@@ -44,29 +44,29 @@ active_interrupt_precedence: P1
 - Durable repair: commit-identity verification was first hardened, then generalized into shared D1 release authority enforced at the universal tool boundary in SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`. This removes the need to depend on manual chat refresh as the primary safety mechanism.
 - Live proof: shared authority is active on `2cda4d3d310b29489a787e2c36880ac44701ff6c`, the verifier and following normal scheduler read both executed on that SHA, and future releases publish their target before dispatch so stale guard-capable Workers fail closed during propagation.
 
-## Active P1 Interrupt: github-workflow-run-detail-522-20260809
+## Resolved P1 Interrupt: github-workflow-run-detail-522-20260809
 
-- Trigger: `getGitHubWorkflowRun` for push-validation run `31297045038` returned HTTP `522` from the run-detail endpoint while the same tool invocation returned `jobs_ok=true`, `jobs_status=200`, and an in-progress push-validation job for the exact run.
-- Classification: server P1 hardening incident `d34aa792-0bfd-4b08-a741-9d676bc3216e`; this is a partial read transport failure, not evidence that validation failed.
-- Root-cause direction: run-detail handling only has special reconciliation for `404`; transient read-side `502/503/504/520-524` responses are returned as hard tool failures even when the authoritative workflow list or jobs endpoint can still establish run identity and progress.
-- Current action: reconcile run `31297045038` through `listGitHubWorkflowRuns`; then generalize transient run-detail handling to authoritative list reconciliation, preserve jobs evidence when available, classify unreadable detail responses as retryable rather than workflow failure, add regression protection, validate, and resume the lower P1 stack.
-- Deferred work preserved: `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt.
+- Trigger: run-detail HTTP `522` occurred while the jobs endpoint for the same run remained healthy, proving a partial GitHub read transport failure rather than workflow failure.
+- Durable repair: transient run-detail `502/503/504/520-524` responses now reconcile against the authoritative recent-run list; an exact listed run is recoverable and retryable, jobs evidence is preserved, and a transient detail failure is never treated as workflow failure.
+- Regression/release: the transient-read classifier and list reconciliation shipped in the validated production chain culminating at SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`.
+- Live proof: valid completed deployment run `31298432636` is readable on production with run-detail status 200, jobs status 200, complete step evidence, and action-closure production commit `2cda4d3d310b29489a787e2c36880ac44701ff6c`.
+- Status: resolved.
 
-## Active P1 Interrupt: github-workflow-dispatch-522-20260809
+## Resolved P1 Interrupt: github-workflow-dispatch-522-20260809
 
-- Trigger: exact-SHA Worker deployment dispatch for validated head `541dce188fc9f3817160a65c3cbcda7d1ddf681b` returned HTTP `522` from `runGitHubWorkflow`.
-- Returned safety evidence: the tool reported `side_effect_state=not_confirmed`, while hardening incident `17fded26-3d2f-4f5c-a96d-9c8878cc9a41` classified the boundary as server P1 and the actual side-effect state as `may_have_happened`; normal work is blocked.
-- Source-level defect already visible in the dispatch handler: transient ambiguous dispatch handling recognizes only HTTP `502` and `504`, so `522` is incorrectly collapsed into non-retryable `workflow_dispatch_failed` even though a dispatch response can be lost after GitHub accepts the request.
-- Current action: list authoritative recent workflow runs before any retry; if the exact release dispatch exists, treat the side effect as succeeded and do not duplicate it. Then generalize ambiguous dispatch handling to the relevant transient 52x class, preserve list-before-retry semantics, add regression protection, validate, and resume the interrupted exact-SHA release.
-- Deferred work preserved: `github-workflow-run-lookup-404-20260809` and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all validation and live-exit evidence intact.
+- Trigger: an exact-SHA Worker deployment dispatch returned HTTP `522`, an ambiguous boundary where GitHub may have accepted the side effect even if the response was lost.
+- Durable repair: dispatch ambiguity now covers `502/503/504/520-524`; these responses return a retryable unknown side-effect state and require authoritative run-list reconciliation before any retry. Definite failures remain non-retryable and shared release authority is restored only for definite failure, never for ambiguous transport outcomes.
+- Regression/release: the complete ambiguous-status set is regression-tested and deployed in the production chain culminating at SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`.
+- Live proof: subsequent exact-SHA deployment dispatches succeeded normally, including production deployment `31298432636`, confirming the hardened dispatch path can complete and be reconciled without duplicate release creation.
+- Status: resolved.
 
-## Active P1 Interrupt: github-workflow-run-lookup-404-20260809
+## Resolved P1 Interrupt: github-workflow-run-lookup-404-20260809
 
-- Trigger: during exact-head validation of Manifest reused-lineage repair head `9dd6ad1c097092d1e14f446b567412246be3d8a6`, `listGitHubWorkflowRuns` returned push-validation run `31296704579`, but the immediate `getGitHubWorkflowRun` lookup for that exact run ID returned HTTP 404 for both run and jobs endpoints.
-- Server classification: hardening incident `d1b2d999-c08f-4231-967b-752a926d684b`, severity P1, novel failure, normal work blocked.
-- Known evidence: targeted typecheck `31296708409` and targeted operator-tests `31296718642` are still the validation path for the same reuse-lineage head; the 404 does not prove those tests failed and must not be interpreted as a code failure.
-- Current action: reconcile the missing run through the authoritative workflow list; identify whether the ID was superseded/cancelled/stale or the run-fetch wrapper is wrong; fix the root cause if wrapper behavior is defective; add prevention/regression; then resume exact-head validation without fabricating status.
-- Deferred work preserved: `manifest-bounded-call-502-20260809` remains open underneath this interrupt, including the reused-midnight lineage contract discovered by its live exit test.
+- Trigger: a previously surfaced workflow run ID returned 404 from both run and jobs endpoints.
+- Root cause: the requested ID was stale/superseded rather than a currently listed GitHub Actions run; the wrapper lacked deterministic list reconciliation and therefore could not distinguish a stale ID from temporary detail-endpoint lag.
+- Durable repair: 404 lookups now re-list authoritative recent runs. Listed IDs classify as retryable `workflow_run_temporarily_unreadable`; absent IDs classify as non-retryable `workflow_run_not_found_after_reconciliation`; missing runs do not trigger a meaningless jobs request.
+- Live proof on production `2cda4d3d310b29489a787e2c36880ac44701ff6c`: stale ID `31296704579` returned exactly `workflow_run_not_found_after_reconciliation`, `retryable=false`, `requested_run_listed=false`, no jobs request, and the expected-control path closed two prior hardening incidents instead of opening another false P1.
+- Status: resolved.
 
 ## Active P1 Interrupt: manifest-bounded-call-502-20260809
 
