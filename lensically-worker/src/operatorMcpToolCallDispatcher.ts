@@ -382,31 +382,64 @@ export async function dispatchOperatorMcpToolCall(
         true,
       );
     }
-    if (!receipt.created && receipt.existing?.status === "started") {
-            const startedAt = Date.parse(String(receipt.existing.created_at ?? receipt.existing.updated_at ?? ""));
+        if (!receipt.created && receipt.existing?.status === "started") {
+      const startedAt = Date.parse(String(receipt.existing.created_at ?? receipt.existing.updated_at ?? ""));
       const ageMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
       const leaseMs = dependencies.operationLeaseMs(toolName);
       if (ageMs < leaseMs) {
-        const resultPayload: JsonRecord = {
-          ok: false,
-          error: "operation_already_in_progress",
-          retryable_after_seconds: Math.max(1, Math.ceil((leaseMs - ageMs) / 1000)),
-          idempotency: {
+        const reconciliationDeadline = Date.now() + Math.min(15_000, Math.max(0, leaseMs - ageMs));
+        let activeReceipt = receipt;
+        while (Date.now() < reconciliationDeadline && activeReceipt.existing?.status === "started") {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          activeReceipt = await dependencies.beginOperationReceipt(idempotencyKey, toolName, args);
+        }
+        if (activeReceipt.existing?.status === "completed" && activeReceipt.existing.result_json) {
+          const replayed = dependencies.parseJson(String(activeReceipt.existing.result_json));
+          const resultPayload = asRecord(replayed) ?? { ok: false, error: "idempotency_receipt_parse_failed" };
+          resultPayload.execution_kernel = { ...dependencies.executionKernelMetadata(), policy: executionPolicy };
+          resultPayload.idempotency = {
             version: dependencies.idempotencyVersion,
             key: idempotencyKey,
-            replayed: false,
+            replayed: true,
             request_fingerprint: receiptFingerprint,
-          },
-          execution_kernel: { ...dependencies.executionKernelMetadata(), policy: executionPolicy },
-        };
-        return mcpToolResultResponse(
-          id,
-          resultPayload,
-          `Lensically Operator Mode operation ${toolName} is already in progress.`,
-          true,
-        );
+            reconciled_in_progress: true,
+          };
+          const isError = resultPayload.ok === false;
+          return mcpToolResultResponse(
+            id,
+            resultPayload,
+            isError
+              ? `Lensically Operator Mode replayed failed operation ${toolName} after in-progress reconciliation.`
+              : `Lensically Operator Mode replayed completed operation ${toolName} after in-progress reconciliation.`,
+            isError,
+          );
+        }
+        const refreshedStartedAt = Date.parse(String(activeReceipt.existing?.created_at ?? activeReceipt.existing?.updated_at ?? ""));
+        const refreshedAgeMs = Number.isFinite(refreshedStartedAt) ? Date.now() - refreshedStartedAt : ageMs;
+        if (activeReceipt.existing?.status === "started" && refreshedAgeMs < leaseMs) {
+          const resultPayload: JsonRecord = {
+            ok: false,
+            error: "operation_already_in_progress",
+            retryable_after_seconds: Math.max(1, Math.ceil((leaseMs - refreshedAgeMs) / 1000)),
+            reconciliation_wait_ms: 15_000,
+            idempotency: {
+              version: dependencies.idempotencyVersion,
+              key: idempotencyKey,
+              replayed: false,
+              request_fingerprint: receiptFingerprint,
+            },
+            execution_kernel: { ...dependencies.executionKernelMetadata(), policy: executionPolicy },
+          };
+          return mcpToolResultResponse(
+            id,
+            resultPayload,
+            `Lensically Operator Mode operation ${toolName} is still in progress after receipt reconciliation.`,
+            true,
+          );
+        }
       }
     }
+
   }
 
   const autonomyAuthorization: OperatorMcpAutonomyAuthorization = sourceDefinedDirectEngineering && !sourceDefinedProtectedOperation
