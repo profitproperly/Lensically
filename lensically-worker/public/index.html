@@ -55,7 +55,9 @@
     .copy p { margin-bottom:20px; }
     .copy strong { font-weight:800; }
     .plain-lines { margin:22px 0; font-weight:800; line-height:1.7; }
-    .section { padding:24px 0; border-top:1px solid var(--line); }
+        .section { padding:24px 0; border-top:1px solid var(--line); }
+    .intro + .section { border-top:0; }
+
     .section h2 { margin-bottom:12px; font-size:23px; line-height:1.15; letter-spacing:-.035em; }
     .section p { color:#333; }
     .check-list,.simple-list { margin:16px 0 0; padding:0; list-style:none; }
@@ -136,7 +138,7 @@
         <h2>Here’s What You’re Getting</h2>
         <ul class="check-list">
           <li><b>Customizable Threads analytics website you own</b><span>This is Lensically. Your Threads account connects to this website, and your AI connects to it through a custom MCP. All your posts, analytics, followers, scheduling, saved content, performance history, and account data live here. Through the MCP, your AI can view that data, make changes, manage content, and control your Threads operation through Lensically, while you or your AI can customize the website, branding, domain, settings, and rules.</span></li>
-          <li><b>Custom MCP connection for your AI</b><span>The MCP (Model Context Protocol) is what connects your AI to Lensically. Through that connection, your AI can view your Threads data, use Lensically’s tools, make changes, create and manage posts, control scheduling, review performance, and manage your Threads operation.</span><span style="margin-top:8px;font-weight:700;color:#111;">Your AI → Custom MCP → Your customizable website (Lensically)</span></li>
+          <li><b>Custom MCP connection for your AI</b><span>The MCP (Model Context Protocol) is what connects your AI to Lensically. Through that connection, your AI can view your Threads data, use Lensically’s tools, make changes, create and manage posts, control scheduling, review performance, and manage your Threads operation.</span><span style="display:block;margin-top:8px;font-weight:700;color:#111;">Your AI → Custom MCP → Lensically</span></li>
           <li><b>Post creation and scheduling</b><span>Create, publish, edit, and schedule Threads posts directly through Lensically. Schedule one post or batches of posts ahead of time and manage your upcoming posting schedule from the website.</span></li>
           <li><b>Threads post saver</b><span>Save your own Threads posts or posts from other accounts directly into Lensically. The post, source, and available performance data are stored for future reference and content creation.</span></li>
           <li><b>Automatic follower tracking</b><span>Lensically automatically records your Threads follower count over time. See daily changes, historical growth, averages, and previous follower totals without tracking them yourself.</span></li>
