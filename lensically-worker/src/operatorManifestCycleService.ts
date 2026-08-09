@@ -367,7 +367,7 @@ export async function handleOperatorManifestCycleServiceTool(
     return result({
       success: true,
       brand_key: brandKey,
-      available: Boolean(receipt),
+            available: Boolean(receiptRead),
       cycle_receipt: receiptRead?.summary ?? null,
       receipt_section: receiptSection,
     });
