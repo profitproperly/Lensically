@@ -15051,12 +15051,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       normalizeText: normalizeOperatorText,
       defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
       isValidIsoDate,
-      listForLocalDate: async ({ date, timezone }) => await listScheduledPostsForThreadsAccountOnLocalDate(
+            listForLocalDate: async ({ date, timezone }) => await listScheduledPostsForThreadsAccountOnLocalDate(
         env,
         brand.profile.threads_user_id,
         date,
         timezone,
       ),
+      listDeletions: async ({ date, timezone }) => await listScheduledPostDeletionsForThreadsAccount(
+        env,
+        brand.profile.threads_user_id,
+        { date, timezone, limit: 200 },
+      ),
+
     });
         return operatorJsonResponse(scheduledPostList);
   };
