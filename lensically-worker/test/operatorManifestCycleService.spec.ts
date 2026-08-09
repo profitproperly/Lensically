@@ -285,7 +285,53 @@ describe("Operator Manifest cycle product service", () => {
     expect(mocks.buildCycleReceiptRead).toHaveBeenCalledOnce();
   });
 
-    it("preserves adjacent Manifest intelligence reads and audit normalization", async () => {
+      it("pages deep cycle events without hydrating the full receipt", async () => {
+    const { dependencies, mocks } = createHarness();
+    const getCycleReceiptEventsPage = vi.fn(async () => ({
+      summary: { id: "receipt-summary", event_count: 141 },
+      receipt_read_version: "manifest-cycle-receipt-read-v3",
+      section: "events",
+      items: [{ id: "event-131" }, { id: "event-132" }],
+      pagination: { offset: 130, limit: 10, returned: 2, total: 141, has_more: true, next_offset: 132 },
+    } as JsonRecord));
+    dependencies.getCycleReceiptEventsPage = getCycleReceiptEventsPage;
+
+    const response = await handleOperatorManifestCycleServiceTool({
+      toolName: "get_manifest_cycle_receipt",
+      brandKey: "manifest_mental",
+      payload: {
+        cycle_id: "cycle-1",
+        receipt_section: "events",
+        offset: 130,
+        limit: 10,
+      },
+    }, dependencies);
+
+    expect(getCycleReceiptEventsPage).toHaveBeenCalledWith({
+      brandKey: "manifest_mental",
+      cycleId: "cycle-1",
+      operationId: null,
+      offset: 130,
+      limit: 10,
+    });
+    expect(mocks.getCycleReceipt).not.toHaveBeenCalled();
+    expect(mocks.buildCycleReceiptRead).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      status: 200,
+      body: {
+        success: true,
+        available: true,
+        cycle_receipt: { id: "receipt-summary", event_count: 141 },
+        receipt_section: {
+          receipt_read_version: "manifest-cycle-receipt-read-v3",
+          section: "events",
+          pagination: { offset: 130, total: 141 },
+        },
+      },
+    });
+  });
+
+  it("preserves adjacent Manifest intelligence reads and audit normalization", async () => {
     const { dependencies, mocks } = createHarness();
 
     const foundation = await handleOperatorManifestCycleServiceTool({
