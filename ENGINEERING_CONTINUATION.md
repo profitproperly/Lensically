@@ -6,21 +6,26 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: repair Manifest winner-preservation religion-neutral exact-anchor conflict, validate, deploy, live-verify the blocked 2026-08-10T16:00 slot, then resume the preserved commercial inline-checkout checkpoint
-validated_source_head: 0b9d7e9483e876d8ed018b875236723109a2642c
+active_checkpoint: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`
+validated_source_head: 7e246b5e0bd411acf173ba00797031f7087f29db
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
-production_sha: 0b9d7e9483e876d8ed018b875236723109a2642c
-active_interrupt_id: manifest-winner-religion-neutral-anchor-20260809
+production_sha: 7e246b5e0bd411acf173ba00797031f7087f29db
+active_interrupt_id: commercial-next-route-path-validator-20260807
 active_interrupt_state: open
 active_interrupt_precedence: P1
 
-## Active P1 Interrupt: manifest-winner-religion-neutral-anchor-20260809
+## Resolved P1 Interrupt: manifest-winner-religion-neutral-anchor-20260809
 
 - Trigger: live Main Manifest cycle `0f862e76-41d3-4905-b731-03a7a9106e13` rejected the religion-neutral gratitude adaptation for `2026-08-10T16:00` because winner preservation required the exact surface `Normalize thanking God before`.
 - Verified contradiction: the same canonical source card explicitly directs religion-neutral adaptation using `universe`, so satisfying the auto-derived exact anchor would violate the source-specific transformation guidance and Manifest Mental brand policy.
-- Root cause: `manifest-winner-preservation-v1` filters auto-derived fallback anchors for gendered wording and explicit transform/forbidden surfaces, but it has no equivalent religion-neutral safety filter. A 1,000+ like legacy source can therefore promote deity-specific source wording into a mandatory exact anchor even when that wording must be neutralized.
-- Current action: generalize winner exact-anchor safety for Manifest to reject deity-specific and gender-specific exact surfaces while preserving safe one-word anchors such as `Universe`; add regression coverage; validate the exact head; deploy; verify the blocked gratitude slot passes with religion-neutral wording; resolve the cycle defect; then restore `commercial-next-route-path-validator-20260807` as the active deferred P1 interrupt.
-- Deferred work preserved: `commercial-next-route-path-validator-20260807` remains open underneath this interrupt with its existing `/operator/*` proxy checkpoint unchanged.
+- Root cause: `manifest-winner-preservation-v1` filtered exact fallback anchors for gendered wording and explicit transform/forbidden surfaces, but not deity-specific wording. A 1,000+ like legacy source could therefore promote religion-specific source language into a mandatory exact anchor even when the source-specific transformation contract required neutralization.
+- Durable repair: SHA `7e246b5e0bd411acf173ba00797031f7087f29db` generalizes Manifest exact-anchor safety across both auto-derived and legacy exact surfaces, rejects gender- and deity-specific anchors, preserves safe explicit one-word anchors such as `Universe`, and retains the winner's functional hook/certainty/payoff protections when exact wording is unsafe.
+- Regression protection: typecheck `31295316271`, all eight Operator shards `31295322677`, push validation `31295310397`, plus a focused 5,700-like gratitude-source regression proving deity-specific exact wording is dropped while functional winner preservation remains active.
+- Release evidence: exact-SHA Worker deployment `31295387855` succeeded and production receipts report `7e246b5e0bd411acf173ba00797031f7087f29db`.
+- Live proof: the religion-neutral replacement for `2026-08-10T16:00` passed all gates and persisted as scheduled post `1028` with complete publish and intelligence lineage.
+- Manifest cycle defect `winner-preservation-religion-neutral-conflict-20260809` is durably resolved with root cause, repair SHA, regression evidence, deployment evidence, and live verification.
+- Deferred commercial P1 restored: `commercial-next-route-path-validator-20260807` is again the active interrupt with its `/operator/*` proxy checkpoint unchanged.
+- Status: resolved.
 
 ## Active Commercial Inline Checkout: commercial-inline-checkout-20260807
 
