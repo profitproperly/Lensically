@@ -1944,7 +1944,7 @@ export async function getManifestCycleReceiptEventsPage(db: D1Database, input: {
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN status IN ('open', 'repairing') THEN 1 ELSE 0 END) AS open_total,
               SUM(CASE WHEN status IN ('open', 'repairing') AND blocking = 1 THEN 1 ELSE 0 END) AS blocking_open_total
-       FROM operator_manifest_cycle_defects WHERE cycle_id = ?`,
+              FROM operator_manifest_cycle_defect_receipts WHERE cycle_id = ?`,
     ).bind(cycleId).first<JsonRecord>(),
     db.prepare(
       `SELECT * FROM operator_manifest_cycle_receipt_events

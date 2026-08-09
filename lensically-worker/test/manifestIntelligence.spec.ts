@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
 import {
   buildManifestEvidencePages,
   MANIFEST_EVIDENCE_FRAGMENT_CONTRACT_VERSION,
@@ -7,6 +9,14 @@ import {
 
 import { executeManifestD1WriteBatches } from "../src/manifestIntelligenceEngine";
 import { persistManifestSavedPatternIntelligenceBatch } from "../src/manifestMeasurementAudit";
+
+describe("Manifest cycle receipt schema references", () => {
+  it("uses the canonical defect-receipt table in bounded event paging", () => {
+    const source = readFileSync(new URL("../src/manifestIntelligence.ts", import.meta.url), "utf8");
+    expect(source).toContain("FROM operator_manifest_cycle_defect_receipts WHERE cycle_id = ?");
+    expect(source).not.toContain("FROM operator_manifest_cycle_defects WHERE cycle_id = ?");
+  });
+});
 
 describe("Manifest follower attribution boundary", () => {
   it("allows explicit no-attribution policy statements that use a no-follower noun phrase", () => {
