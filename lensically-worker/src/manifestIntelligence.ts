@@ -14,6 +14,8 @@ export const MANIFEST_CANDIDATE_GATE_RECEIPT_VERSION = "manifest-candidate-gate-
 export const MANIFEST_POST_HYPOTHESIS_VERSION = "manifest-post-hypothesis-v3";
 export const MANIFEST_CYCLE_RECEIPT_READ_VERSION = "manifest-cycle-receipt-read-v3";
 export const MANIFEST_CYCLE_DEFECT_RECEIPT_VERSION = "manifest-cycle-defect-receipt-v1";
+export const MANIFEST_CYCLE_DEFECT_RECEIPT_TABLE = "operator_manifest_cycle_defect_receipts";
+
 export const MANIFEST_ANALYSIS_WINDOW_DAYS = 28;
 export const MANIFEST_RECENT_EXPOSURE_HOURS = 72;
 export const MANIFEST_EVIDENCE_PAGE_SIZE = 12;
@@ -1944,7 +1946,7 @@ export async function getManifestCycleReceiptEventsPage(db: D1Database, input: {
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN status IN ('open', 'repairing') THEN 1 ELSE 0 END) AS open_total,
               SUM(CASE WHEN status IN ('open', 'repairing') AND blocking = 1 THEN 1 ELSE 0 END) AS blocking_open_total
-              FROM operator_manifest_cycle_defect_receipts WHERE cycle_id = ?`,
+                     FROM ${MANIFEST_CYCLE_DEFECT_RECEIPT_TABLE} WHERE cycle_id = ?`,
     ).bind(cycleId).first<JsonRecord>(),
     db.prepare(
       `SELECT * FROM operator_manifest_cycle_receipt_events
