@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-    OPERATOR_GOVERNING_STANDARDS,
+        OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   buildOperatorMcpInstructions,
+  evaluateOperatorDeploymentCommitIdentity,
 } from "../src/operatorMcpProtocol";
 
 describe("Operator MCP protocol contract", () => {
@@ -19,6 +20,38 @@ describe("Operator MCP protocol contract", () => {
         version: OPERATOR_MCP_VERSION,
       },
       instructions: buildOperatorMcpInstructions(75),
+    });
+  });
+
+    it("fails closed when the executing handler and fresh endpoint commits differ", () => {
+    const same = evaluateOperatorDeploymentCommitIdentity(
+      "9dfff53b851f0b81358f70ad4a497e651098373c",
+      "9DFFF53B851F0B81358F70AD4A497E651098373C",
+    );
+    expect(same).toMatchObject({
+      commit_match: true,
+      verification_ready: true,
+      session_refresh_required: false,
+      error: null,
+    });
+
+    const mismatch = evaluateOperatorDeploymentCommitIdentity(
+      "df38ef3772dbfa15be89df4b949a4c880ae9d707",
+      "9dfff53b851f0b81358f70ad4a497e651098373c",
+    );
+    expect(mismatch).toMatchObject({
+      commit_match: false,
+      verification_ready: false,
+      session_refresh_required: true,
+      error: "mcp_session_commit_mismatch",
+    });
+
+    const unavailable = evaluateOperatorDeploymentCommitIdentity(null, "9dfff53b851f0b81358f70ad4a497e651098373c");
+    expect(unavailable).toMatchObject({
+      commits_comparable: false,
+      verification_ready: false,
+      session_refresh_required: false,
+      error: "deployment_commit_identity_unavailable",
     });
   });
 

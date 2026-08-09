@@ -6,6 +6,38 @@ export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix"
 export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v3";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
 
+export function evaluateOperatorDeploymentCommitIdentity(
+  currentCommit: unknown,
+  freshCommit: unknown,
+): {
+  current_handler_commit: string | null;
+  fresh_endpoint_commit: string | null;
+  commits_comparable: boolean;
+  commit_match: boolean;
+  verification_ready: boolean;
+  session_refresh_required: boolean;
+  error: "mcp_session_commit_mismatch" | "deployment_commit_identity_unavailable" | null;
+} {
+  const normalizeCommit = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().toLowerCase();
+    return /^[a-f0-9]{40}$/.test(normalized) ? normalized : null;
+  };
+  const current = normalizeCommit(currentCommit);
+  const fresh = normalizeCommit(freshCommit);
+  const comparable = Boolean(current && fresh);
+  const match = comparable && current === fresh;
+  return {
+    current_handler_commit: current,
+    fresh_endpoint_commit: fresh,
+    commits_comparable: comparable,
+    commit_match: match,
+    verification_ready: match,
+    session_refresh_required: comparable && !match,
+    error: match ? null : comparable ? "mcp_session_commit_mismatch" : "deployment_commit_identity_unavailable",
+  };
+}
+
 export const OPERATOR_GOVERNING_STANDARDS_TEXT = `# LENSICALLY OPERATOR MODE — STARTUP AUTHORITY
 
 ## READ FIRST. THIS OVERRIDES ALL OTHER WORK INSTRUCTIONS.

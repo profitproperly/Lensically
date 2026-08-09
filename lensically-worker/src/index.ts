@@ -68,9 +68,11 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 import {
     OPERATOR_GOVERNING_STANDARDS,
+  OPERATOR_GOVERNING_STANDARDS_ACK,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
+  evaluateOperatorDeploymentCommitIdentity,
 } from "./operatorMcpProtocol";
 import { type OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
 import {
@@ -21534,7 +21536,23 @@ async function handleOperatorMcpEngineeringTool(
         payload: await readJsonSafe(liveResponse) as Record<string, unknown> | null,
       };
     };
-                const listed = await callLiveMcp(2, "tools/list", {});
+                                const listed = await callLiveMcp(2, "tools/list", {});
+    const startupResponse = await fetch(`${DEFAULT_WORKER_ORIGIN}/api/operator/tools/getOperatorStartupContext`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": authorization,
+      },
+      body: JSON.stringify({ governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK }),
+    });
+    const startupPayload = await readJsonSafe(startupResponse) as Record<string, unknown> | null;
+    const startupRuntime = startupPayload?.runtime && typeof startupPayload.runtime === "object" && !Array.isArray(startupPayload.runtime)
+      ? startupPayload.runtime as Record<string, unknown>
+      : {};
+    const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
+      env.LENSICALLY_COMMIT_SHA,
+      startupRuntime.commit_sha,
+    );
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
@@ -21561,9 +21579,11 @@ async function handleOperatorMcpEngineeringTool(
       account_state_mutated: false,
     };
     return {
-            ok: response.ok
+                        ok: response.ok
         && Boolean(liveSessionId)
         && listed.status < 400
+        && startupResponse.ok
+        && deploymentIdentity.verification_ready
         && boundaryTest.startup_tool_advertised
         && boundaryTest.persist_tool_advertised
         && boundaryTest.retired_commit_hidden
@@ -21571,10 +21591,21 @@ async function handleOperatorMcpEngineeringTool(
         && boundaryTest.model_evaluation_required
         && boundaryTest.no_internal_multi_post_contract,
       status: response.status,
+      error: deploymentIdentity.error,
+      required_next_action: deploymentIdentity.session_refresh_required
+        ? "Refresh the Lensically Operator Mode connector session before accepting any post-deploy live verification."
+        : deploymentIdentity.verification_ready
+          ? null
+          : "Retry deployed-version verification only after the fresh endpoint exposes a valid commit identity.",
       initialize: payload?.result ?? null,
       transport_mode: "direct_typed_main_tools",
       live_tool_count: await operatorPublicMcpToolCount(env),
       advertised_tool_count: listedToolRows.length,
+      current_handler_commit: deploymentIdentity.current_handler_commit,
+      fresh_endpoint_commit: deploymentIdentity.fresh_endpoint_commit,
+      session_commit_match: deploymentIdentity.commit_match,
+      session_refresh_required: deploymentIdentity.session_refresh_required,
+      fresh_startup_status: startupResponse.status,
       boundary_test: boundaryTest,
     };
   }
