@@ -270,6 +270,13 @@ import {
   readOperatorMcpCommitHeader,
   type OperatorMcpJsonRpcId,
 } from "./operatorMcpTransport";
+import {
+  activateOperatorReleaseAuthority,
+  evaluateOperatorReleaseAuthority,
+  publishOperatorReleaseTarget,
+  readOperatorReleaseAuthority,
+  restoreOperatorReleaseAuthority,
+} from "./operatorReleaseAuthority";
 
 
 
@@ -17539,7 +17546,10 @@ const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
     "scheduled_post_not_due", "only_approved_scheduled_posts_can_be_edited", "scheduled_post_already_published",
       "owner_response_required_for_growth_plan_approval", "invalid_strategy_memory_kind", "strategy_memory_body_required",
     "active_review_batch_not_found", "autonomous_cycle_review_tool_forbidden",
-    "workflow_dispatch_temporarily_unavailable", "repository_file_search_requires_exact_file",
+        "workflow_dispatch_temporarily_unavailable", "workflow_run_not_found_after_reconciliation", "workflow_run_temporarily_unreadable",
+    "stale_operator_runtime_release", "deployment_commit_identity_unavailable", "mcp_session_commit_mismatch", "operator_release_authority_mismatch",
+    "github_workflow_step_indentation_invalid", "github_workflow_embedded_step_marker", "yaml_tab_indentation_forbidden",
+    "repository_file_search_requires_exact_file",
 ]);
 export function isExpectedHardeningControlResult(
   toolName: string,
@@ -18974,6 +18984,21 @@ async function getOperatorMcpBoundaryBlock(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
+  const releaseAuthority = await readOperatorReleaseAuthority(env.DB);
+  const releaseGate = evaluateOperatorReleaseAuthority({
+    toolName,
+    executingSha: env.LENSICALLY_COMMIT_SHA,
+    authority: releaseAuthority,
+  });
+  if (!releaseGate.allowed) {
+    return {
+      ok: false,
+      error: releaseGate.error,
+      retryable: true,
+      required_next_action: "Retry this tool only after the executing Worker reaches the shared released production SHA. Release-repair engineering tools remain available while rollout converges or is repaired.",
+      ...releaseGate,
+    };
+  }
     if (!OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)) {
     return null;
   }
@@ -21299,10 +21324,17 @@ async function handleOperatorMcpEngineeringTool(
       return { ok: false, error: "workflow_task_required", allowed_tasks: [...allowedWorkflowTasks] };
     }
     const releaseSha = normalizeOperatorText(args.release_sha, 40, true);
-    const releaseId = normalizeOperatorText(args.release_id, 80, true) ?? releaseSha?.slice(0, 12) ?? "";
+        const releaseId = normalizeOperatorText(args.release_id, 80, true) ?? releaseSha?.slice(0, 12) ?? "";
     if (task === "worker-deploy" && (!releaseSha || !/^[a-fA-F0-9]{40}$/.test(releaseSha))) {
       return { ok: false, error: "exact_release_sha_required" };
     }
+    const previousReleaseAuthority = task === "worker-deploy" && releaseSha
+      ? await publishOperatorReleaseTarget(env.DB, {
+          releaseSha,
+          currentSha: env.LENSICALLY_COMMIT_SHA,
+          releaseId: releaseId || null,
+        })
+      : null;
     const workflowId = "lensically-engineering.yml";
     const ref = config.branch;
     const inputs: Record<string, string> = { task };
@@ -21313,7 +21345,10 @@ async function handleOperatorMcpEngineeringTool(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ref, inputs }),
     });
-                const transientDispatchFailure = !result.ok && isAmbiguousGithubWorkflowDispatchStatus(Number(result.status));
+                                const transientDispatchFailure = !result.ok && isAmbiguousGithubWorkflowDispatchStatus(Number(result.status));
+    if (task === "worker-deploy" && releaseSha && !result.ok && !transientDispatchFailure) {
+      await restoreOperatorReleaseAuthority(env.DB, previousReleaseAuthority);
+    }
     await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : transientDispatchFailure ? "retryable" : "failed", metadata: { status: result.status, transient_dispatch_failure: transientDispatchFailure } });
     return {
       ok: result.ok,
@@ -21537,10 +21572,20 @@ async function handleOperatorMcpEngineeringTool(
       };
     };
                                                 const listed = await callLiveMcp(2, "tools/list", {});
-        const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
+            const deploymentIdentity = evaluateOperatorDeploymentCommitIdentity(
       env.LENSICALLY_COMMIT_SHA,
       readOperatorMcpCommitHeader(response.headers),
     );
+    const releaseAuthority = await readOperatorReleaseAuthority(env.DB);
+    const expectedReleaseSha = typeof releaseAuthority?.expected_release_sha === "string"
+      ? releaseAuthority.expected_release_sha.trim().toLowerCase()
+      : null;
+    const releaseAuthorityMatch = !expectedReleaseSha
+      || deploymentIdentity.current_handler_commit === expectedReleaseSha;
+    if (deploymentIdentity.verification_ready && releaseAuthorityMatch && deploymentIdentity.current_handler_commit) {
+      await activateOperatorReleaseAuthority(env.DB, deploymentIdentity.current_handler_commit);
+    }
+    const effectiveReleaseAuthority = await readOperatorReleaseAuthority(env.DB);
     const listedTools = listed.payload?.result && typeof listed.payload.result === "object" && !Array.isArray(listed.payload.result)
       ? (listed.payload.result as Record<string, unknown>).tools
       : [];
@@ -21569,21 +21614,24 @@ async function handleOperatorMcpEngineeringTool(
     return {
                         ok: response.ok
         && Boolean(liveSessionId)
-                && listed.status < 400
+                        && listed.status < 400
         && deploymentIdentity.verification_ready
+        && releaseAuthorityMatch
         && boundaryTest.startup_tool_advertised
         && boundaryTest.persist_tool_advertised
         && boundaryTest.retired_commit_hidden
         && boundaryTest.one_post_per_call
         && boundaryTest.model_evaluation_required
         && boundaryTest.no_internal_multi_post_contract,
-      status: response.status,
-      error: deploymentIdentity.error,
+            status: response.status,
+      error: deploymentIdentity.error ?? (releaseAuthorityMatch ? null : "operator_release_authority_mismatch"),
       required_next_action: deploymentIdentity.session_refresh_required
         ? "Refresh the Lensically Operator Mode connector session before accepting any post-deploy live verification."
-        : deploymentIdentity.verification_ready
-          ? null
-          : "Retry deployed-version verification only after the fresh endpoint exposes a valid commit identity.",
+        : !releaseAuthorityMatch
+          ? "Retry deployed-version verification only when this Worker and the fresh endpoint both equal the shared released production SHA."
+          : deploymentIdentity.verification_ready
+            ? null
+            : "Retry deployed-version verification only after the fresh endpoint exposes a valid commit identity.",
       initialize: payload?.result ?? null,
       transport_mode: "direct_typed_main_tools",
       live_tool_count: await operatorPublicMcpToolCount(env),
@@ -21591,8 +21639,17 @@ async function handleOperatorMcpEngineeringTool(
       current_handler_commit: deploymentIdentity.current_handler_commit,
       fresh_endpoint_commit: deploymentIdentity.fresh_endpoint_commit,
             session_commit_match: deploymentIdentity.commit_match,
-      session_refresh_required: deploymentIdentity.session_refresh_required,
+            session_refresh_required: deploymentIdentity.session_refresh_required,
       fresh_identity_source: "initialize_response_header",
+      release_authority: effectiveReleaseAuthority ? {
+        expected_release_sha: effectiveReleaseAuthority.expected_release_sha,
+        previous_release_sha: effectiveReleaseAuthority.previous_release_sha,
+        release_id: effectiveReleaseAuthority.release_id,
+        state: effectiveReleaseAuthority.state,
+        source: effectiveReleaseAuthority.source,
+        updated_at: effectiveReleaseAuthority.updated_at,
+      } : null,
+      release_authority_match: releaseAuthorityMatch,
       boundary_test: boundaryTest,
     };
   }
