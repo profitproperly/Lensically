@@ -6,13 +6,20 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: permanently detect post-deploy stale MCP connector sessions when the current handler commit differs from the fresh live endpoint, then refresh the connector session and resume the GitHub transport proofs plus Manifest live exit verification
-validated_source_head: 9dfff53b851f0b81358f70ad4a497e651098373c
-documentation_source_head: 3016d65e7e93b328276802c660da162bd514e9cb
-production_sha: 9dfff53b851f0b81358f70ad4a497e651098373c
-active_interrupt_id: mcp-post-deploy-stale-session-20260809
+active_checkpoint: repair the deployed-version verifier fresh-startup probe to use the established MCP session transport instead of the internal direct-tool URL, validate and deploy, then prove current-handler/fresh-endpoint commit matching before resuming the preserved GitHub and Manifest live proofs
+validated_source_head: 5edda8dada2198f1594653e796a8bc49e398dc33
+documentation_source_head: 2f075a1cc681da4ba7e8986029b84fcda3b827ff
+production_sha: 5edda8dada2198f1594653e796a8bc49e398dc33
+active_interrupt_id: deployed-version-startup-probe-400-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: deployed-version-startup-probe-400-20260809
+
+- Trigger: first live run of the new post-deploy identity guard on production SHA `5edda8dada2198f1594653e796a8bc49e398dc33` correctly failed closed, but its fresh startup identity probe returned HTTP `400`, leaving `fresh_endpoint_commit=null` and `error=deployment_commit_identity_unavailable`. Hardening incident: `1ce296e6-4cc3-4878-8ddb-dbbd1d0c4980`.
+- Root cause direction: `verifyDeployedMcpVersion` initialized a valid fresh MCP session successfully, then attempted to obtain startup identity through `/api/operator/tools/getOperatorStartupContext` as an external HTTP call. That path is an internal direct-tool dispatch surface and is not the established client transport used by the fresh session.
+- Current action: invoke `getOperatorStartupContext` through the already initialized fresh MCP session using the MCP tool-call transport, parse its runtime commit, preserve the fail-closed current-handler versus fresh-endpoint comparison, add regression coverage for the probe/identity path, validate and deploy, then rerun the verifier live.
+- Deferred work preserved: `mcp-post-deploy-stale-session-20260809`, `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt.
 
 ## Active P1 Interrupt: mcp-post-deploy-stale-session-20260809
 
