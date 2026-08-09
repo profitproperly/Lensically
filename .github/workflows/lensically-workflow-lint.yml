@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/lensically-engineering.yml"
-      - ".github/workflows/lensically-workflow-lint.yml"
+        paths:
+      - ".github/workflows/**"
       - "lensically-worker/scripts/validate-engineering-workflow.rb"
+      - "lensically-worker/scripts/validate-workflow-yaml.rb"
   workflow_dispatch:
 
 permissions:
@@ -21,4 +21,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Parse and validate engineering workflow
-        run: ruby lensically-worker/scripts/validate-engineering-workflow.rb .github/workflows/lensically-engineering.yml
+                run: ruby lensically-worker/scripts/validate-workflow-yaml.rb && ruby lensically-worker/scripts/validate-engineering-workflow.rb .github/workflows/lensically-engineering.yml
