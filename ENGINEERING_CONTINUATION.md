@@ -6,11 +6,11 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: complete the Manifest bounded-call live exit test on production SHA 2cda4d3d310b29489a787e2c36880ac44701ff6c: prove deep event paging, final midnight durability/lineage, and terminal zero-gap hourly coverage, then close the P1 and restore the preserved commercial `/operator/*` proxy checkpoint
+active_checkpoint: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`
 validated_source_head: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-documentation_source_head: 8078365077278e2b6ff8834b567f2d3436170a3f
+documentation_source_head: b99cce6c5af90ae7e73f621f642e3f732055d939
 production_sha: 2cda4d3d310b29489a787e2c36880ac44701ff6c
-active_interrupt_id: manifest-bounded-call-502-20260809
+active_interrupt_id: commercial-next-route-path-validator-20260807
 active_interrupt_state: open
 active_interrupt_precedence: P1
 
@@ -68,14 +68,16 @@ active_interrupt_precedence: P1
 - Live proof on production `2cda4d3d310b29489a787e2c36880ac44701ff6c`: stale ID `31296704579` returned exactly `workflow_run_not_found_after_reconciliation`, `retryable=false`, `requested_run_listed=false`, no jobs request, and the expected-control path closed two prior hardening incidents instead of opening another false P1.
 - Status: resolved.
 
-## Active P1 Interrupt: manifest-bounded-call-502-20260809
+## Resolved P1 Interrupt: manifest-bounded-call-502-20260809
 
-- Trigger: the final two-candidate Main Manifest persistence call returned an upstream 502 after `2026-08-10T23:00` durably persisted as scheduled post `1035`; authoritative reconciliation proved `2026-08-11T00:00` remained missing. A subsequent bounded `get_manifest_cycle_receipt` events-page read also returned an upstream 502.
-- Source-proven root cause class: `persistOperatorManifestBatch` always attempts the second candidate regardless of elapsed first-candidate runtime, so a nominal two-item call can overrun the client/gateway response envelope after durable first-item work. Separately, `getManifestCycleReceipt` loads every cycle event, hypothesis, defect, strategy, and exposure record before `buildManifestCycleReceiptRead` slices the requested page, so the public pageable events surface is not bounded at the data-fetch layer.
-- Required repair: add a server-side batch execution slice that returns any unstarted sibling as explicit deferred work once the safe response-time budget is consumed; add direct bounded D1 event paging for `get_manifest_cycle_receipt` so an events request reads only its receipt summary/counts and requested rows instead of reconstructing the complete receipt first.
-- Prevention requirements: preserve item-level idempotency and accepted siblings; deferred candidates must be explicit and retryable under a new batch operation without being misclassified as rejected; event-page response shape must preserve the stable summary + pagination contract; add focused regressions for slow-first-candidate deferral and deep event-page reads.
-- Live exit test: production must accept the sole remaining midnight plan item without another ambiguous 502, then a deep events page at offset >= 130 must return successfully, followed by the single terminal hourly-coverage reconciliation proving zero missing slots.
-- Deferred work preserved: `commercial-next-route-path-validator-20260807` remains open underneath this interrupt with its existing `/operator/*` proxy checkpoint unchanged.
+- Trigger: the final two-candidate Main Manifest persistence call returned an upstream 502 after `2026-08-10T23:00` durably persisted as scheduled post `1035`; the midnight sibling remained missing, and a deep cycle-receipt event read also returned an upstream 502.
+- Root causes: batch persistence could overrun the response envelope after durable first-item work, and event paging reconstructed the full cycle receipt before slicing. A later live proof also exposed one schema typo in the bounded defect-count query (`operator_manifest_cycle_defects` instead of canonical `operator_manifest_cycle_defect_receipts`). Reused scheduled candidates additionally needed complete intelligence-lineage identity preserved through the compact batch contract.
+- Durable repair chain: server-side bounded batch execution and direct event paging shipped first; the canonical defect-receipt table fix and regression shipped next; reused-candidate lineage and top-level `hypothesis_id` preservation were then hardened. The complete repair chain is included in production SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`.
+- Live midnight proof: scheduled post `1036` is durably `approved` for `2026-08-11T04:00:00.000Z` with no publish error. Terminal receipt event `persist:manifest-slot-20260811-0000-v1` records `scheduled_post_id=1036`, `publish_lineage_complete=true`, `intelligence_lineage_complete=true`, generation run, draft, hypothesis, source card, source selection, and strategy identities. The later reuse event for the same midnight slot preserves `scheduled_post_id=1036` and `publish_lineage_complete=true`.
+- Live deep-page proof: production event pages at offsets `130` and `140` both returned HTTP 200 under the bounded read contract; the receipt now contains `154` events, all `9` recorded defects are resolved, and there are zero open/blocking defects.
+- Terminal coverage proof: fresh operation `manifest-bounded-call-final-coverage-20260809-v2` returned `cycle_authoritative_remaining_missing_count=0`, `cycle_elapsed_unfilled_count=0`, `cycle_locked_source_plan_count=48`, `next_cycle_plan_item=null`, `next_cycle_plan_items_count=0`, and the completed scheduled set contains posts `990` through `1036` including final post `1036`.
+- Scheduler proof: universal scheduler is healthy/operational with `current_overdue_count=0` on production SHA `2cda4d3d310b29489a787e2c36880ac44701ff6c`.
+- Status: resolved. The preserved commercial `/operator/*` proxy P1 is restored as the sole active interrupt.
 
 ## Resolved P1 Interrupt: manifest-winner-religion-neutral-anchor-20260809
 
