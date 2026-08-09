@@ -6,13 +6,21 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: reconcile transient HTTP 522 workflow-run detail reads from authoritative run-list and successful jobs evidence, permanently harden read-side 52x classification, then resume the recorded deployment-dispatch 522 and Manifest live exit path
-validated_source_head: 627e65434376ec6f32b5b30f24ea1aed2469c842
-documentation_source_head: 0da0105075dd093f3df0e269821223ffbde5a318
-production_sha: df38ef3772dbfa15be89df4b949a4c880ae9d707
-active_interrupt_id: github-workflow-run-detail-522-20260809
+active_checkpoint: permanently detect post-deploy stale MCP connector sessions when the current handler commit differs from the fresh live endpoint, then refresh the connector session and resume the GitHub transport proofs plus Manifest live exit verification
+validated_source_head: 9dfff53b851f0b81358f70ad4a497e651098373c
+documentation_source_head: 3016d65e7e93b328276802c660da162bd514e9cb
+production_sha: 9dfff53b851f0b81358f70ad4a497e651098373c
+active_interrupt_id: mcp-post-deploy-stale-session-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: mcp-post-deploy-stale-session-20260809
+
+- Trigger: exact-SHA deployment run `31297276888` succeeded and fresh `verifyDeployedMcpVersion` reported production commit `9dfff53b851f0b81358f70ad4a497e651098373c`; immediately afterward, a direct `getGitHubWorkflowRun` call still executed the pre-deploy 404 behavior and its action-closure evidence identified the executing connector runtime as `df38ef3772dbfa15be89df4b949a4c880ae9d707`.
+- Impact: a chat connector session can remain silently bound to an older Worker after deployment instead of terminating, so live verification can falsely appear to exercise newly deployed code while subsequent direct calls actually use stale handlers.
+- Current action: harden deployed-version verification to compare the current executing handler/session commit with the fresh live endpoint commit, return an explicit stale-session/fresh-session-required state on mismatch, and add regression protection. After that guard is validated and released, refresh the Lensically connector session in this same chat, re-bootstrap, and rerun the GitHub 404/52x proofs before resuming Manifest closure.
+- Prevention requirement: no post-deploy live proof may be accepted when the tool execution session commit differs from the freshly initialized live endpoint commit; stale connector state must fail closed with a specific refresh requirement rather than permitting further verification calls.
+- Deferred work preserved: `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all existing source, validation, deployment, and cycle evidence preserved.
 
 ## Active P1 Interrupt: github-workflow-run-detail-522-20260809
 
