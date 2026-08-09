@@ -6,13 +6,22 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: implement the `/operator/*` proxy inside `lensically-web`, validate the exact web head, deploy it, remove the unnecessary pending Pages apex-domain association, then run the permanent commercial checkout smoke through `https://lensically.com/operator/`
+active_checkpoint: repair Manifest bounded-call 502 failure class, validate, deploy, live-verify the final midnight persistence plus cycle-receipt event paging, then resume the preserved commercial `/operator/*` proxy checkpoint
 validated_source_head: 7e246b5e0bd411acf173ba00797031f7087f29db
 documentation_source_head: 8c5afa672e1a47d1d63be2241c4235160a1bff8b
 production_sha: 7e246b5e0bd411acf173ba00797031f7087f29db
-active_interrupt_id: commercial-next-route-path-validator-20260807
+active_interrupt_id: manifest-bounded-call-502-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: manifest-bounded-call-502-20260809
+
+- Trigger: the final two-candidate Main Manifest persistence call returned an upstream 502 after `2026-08-10T23:00` durably persisted as scheduled post `1035`; authoritative reconciliation proved `2026-08-11T00:00` remained missing. A subsequent bounded `get_manifest_cycle_receipt` events-page read also returned an upstream 502.
+- Source-proven root cause class: `persistOperatorManifestBatch` always attempts the second candidate regardless of elapsed first-candidate runtime, so a nominal two-item call can overrun the client/gateway response envelope after durable first-item work. Separately, `getManifestCycleReceipt` loads every cycle event, hypothesis, defect, strategy, and exposure record before `buildManifestCycleReceiptRead` slices the requested page, so the public pageable events surface is not bounded at the data-fetch layer.
+- Required repair: add a server-side batch execution slice that returns any unstarted sibling as explicit deferred work once the safe response-time budget is consumed; add direct bounded D1 event paging for `get_manifest_cycle_receipt` so an events request reads only its receipt summary/counts and requested rows instead of reconstructing the complete receipt first.
+- Prevention requirements: preserve item-level idempotency and accepted siblings; deferred candidates must be explicit and retryable under a new batch operation without being misclassified as rejected; event-page response shape must preserve the stable summary + pagination contract; add focused regressions for slow-first-candidate deferral and deep event-page reads.
+- Live exit test: production must accept the sole remaining midnight plan item without another ambiguous 502, then a deep events page at offset >= 130 must return successfully, followed by the single terminal hourly-coverage reconciliation proving zero missing slots.
+- Deferred work preserved: `commercial-next-route-path-validator-20260807` remains open underneath this interrupt with its existing `/operator/*` proxy checkpoint unchanged.
 
 ## Resolved P1 Interrupt: manifest-winner-religion-neutral-anchor-20260809
 
