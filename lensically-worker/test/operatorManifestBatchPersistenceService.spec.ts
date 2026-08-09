@@ -128,9 +128,9 @@ describe("operatorManifestBatchPersistenceService", () => {
       },
       timing: {
         policy: "telemetry_only",
-        candidate_persistence_ms: 10,
+                candidate_persistence_ms: 20,
         reconciliation_ms: 10,
-        total_elapsed_ms: 20,
+        total_elapsed_ms: 30,
       },
     });
         expect(harness.persistCandidate).toHaveBeenCalledTimes(2);
@@ -176,6 +176,58 @@ describe("operatorManifestBatchPersistenceService", () => {
       success: false,
       error: "semantic_repetition_collision",
       retryable: true,
+    });
+  });
+
+    it("defers an unstarted sibling when the first candidate consumes the response-time slice", async () => {
+    const harness = createDependencies();
+    const times = [1000, 7010, 7020, 7030, 7040];
+    let timeIndex = 0;
+    harness.dependencies.nowMs = vi.fn(() => times[Math.min(timeIndex++, times.length - 1)]);
+    harness.persistCandidate.mockResolvedValue({
+      success: true,
+      operation_id: "candidate-1",
+      slot_key: "2026-08-10T23:00",
+      scheduled_post_id: 303,
+      publish_lineage_complete: true,
+      intelligence_lineage_complete: true,
+      coverage_reconciliation_deferred: true,
+      batch_reconciliation_context: reconciliationContext("2026-08-10T23:00"),
+    });
+
+    const result = await persistOperatorManifestBatch({
+      brandKey: "manifest_mental",
+      defaultTimezone: "America/New_York",
+      payload: {
+        batch_operation_id: "batch-slow",
+        cycle_id: "cycle-1",
+        cycle_strategy_id: "strategy-1",
+        candidates: [
+          { operation_id: "candidate-1", cycle_plan_item_id: "plan-1", post: { date: "2026-08-10", time: "23:00" }, model_evaluation: {} },
+          { operation_id: "candidate-2", cycle_plan_item_id: "plan-2", post: { date: "2026-08-11", time: "00:00" }, model_evaluation: {} },
+        ],
+      },
+    }, harness.dependencies);
+
+    expect(harness.persistCandidate).toHaveBeenCalledTimes(1);
+    expect(harness.reconcileBatch).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      success: false,
+      partial_success: true,
+      requested_count: 2,
+      processed_count: 1,
+      accepted_count: 1,
+      rejected_count: 0,
+      deferred_count: 1,
+      continuation_required: true,
+      deferred_candidates: [{
+        index: 1,
+        operation_id: "candidate-2",
+        cycle_plan_item_id: "plan-2",
+        slot_key: "2026-08-11T00:00",
+        reason: "batch_response_time_slice_exhausted",
+        retryable: true,
+      }],
     });
   });
 

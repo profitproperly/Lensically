@@ -1,5 +1,7 @@
 type JsonRecord = Record<string, unknown>;
 
+const MANIFEST_BATCH_RESPONSE_SLICE_MS = 6000;
+
 export type OperatorManifestBatchCandidateResult = JsonRecord & {
   success?: boolean;
   slot_key?: unknown;
@@ -114,12 +116,13 @@ export async function persistOperatorManifestBatch(
 
 
   const startedAtMs = dependencies.nowMs();
-  const itemResults: JsonRecord[] = [];
+    const itemResults: JsonRecord[] = [];
   const persistedCandidates: Array<{
     operation_id: string;
     slot_key: string;
     scheduled_post_id: number;
   }> = [];
+  const deferredCandidates: JsonRecord[] = [];
   const reconciliationContexts: JsonRecord[] = [];
 
   for (let index = 0; index < candidates.length; index += 1) {
@@ -154,13 +157,34 @@ export async function persistOperatorManifestBatch(
       160,
       true,
     );
-    if (result.success === true && scheduledPostId > 0 && slotKey && Object.keys(reconciliationContext).length) {
+        if (result.success === true && scheduledPostId > 0 && slotKey && Object.keys(reconciliationContext).length) {
       persistedCandidates.push({
         operation_id: operationId,
         slot_key: slotKey,
         scheduled_post_id: scheduledPostId,
       });
       reconciliationContexts.push(reconciliationContext);
+    }
+
+    if (index < candidates.length - 1) {
+      const batchElapsedMs = Math.max(0, dependencies.nowMs() - startedAtMs);
+      if (batchElapsedMs >= MANIFEST_BATCH_RESPONSE_SLICE_MS) {
+        for (let deferredIndex = index + 1; deferredIndex < candidates.length; deferredIndex += 1) {
+          const deferredCandidate = candidates[deferredIndex];
+          const deferredPost = record(deferredCandidate.post);
+          const deferredDate = dependencies.normalizeText(deferredPost.date, 20, true);
+          const deferredTime = dependencies.normalizeText(deferredPost.time, 20, true);
+          deferredCandidates.push({
+            index: deferredIndex,
+            operation_id: dependencies.normalizeText(deferredCandidate.operation_id, 160, true),
+            cycle_plan_item_id: dependencies.normalizeText(deferredCandidate.cycle_plan_item_id, 160, true),
+            slot_key: deferredDate && deferredTime ? `${deferredDate}T${deferredTime}` : null,
+            reason: "batch_response_time_slice_exhausted",
+            retryable: true,
+          });
+        }
+        break;
+      }
     }
   }
 
@@ -217,14 +241,18 @@ export async function persistOperatorManifestBatch(
   const completedAtMs = dependencies.nowMs();
   const reconciliationMs = Math.max(0, completedAtMs - persistenceCompletedAtMs);
 
-  return {
-    success: rejected.length === 0,
-    partial_success: rejected.length > 0,
+    return {
+    success: rejected.length === 0 && deferredCandidates.length === 0 && itemResults.length === candidates.length,
+    partial_success: persistedCandidates.length > 0 && (rejected.length > 0 || deferredCandidates.length > 0),
     batch_operation_id: batchOperationId,
     cycle_id: cycleId,
     requested_count: candidates.length,
+    processed_count: itemResults.length,
     accepted_count: persistedCandidates.length,
     rejected_count: rejected.length,
+    deferred_count: deferredCandidates.length,
+    continuation_required: deferredCandidates.length > 0,
+    deferred_candidates: deferredCandidates,
     results: itemResults,
     accepted_slots: persistedCandidates.map((candidate) => candidate.slot_key),
     rejected_slots: rejectedSlots,
