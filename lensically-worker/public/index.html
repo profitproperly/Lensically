@@ -23,11 +23,7 @@
     .top { padding:26px 0 18px; }
     .brand { display:inline-flex; align-items:center; gap:9px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:-.02em; }
     .brand-mark { width:32px; height:32px; display:block; object-fit:contain; }
-    .cover { min-height:302px; overflow:hidden; border:1px solid #dcdcdc; border-radius:14px; background:#f7f7f7; padding:20px; display:block; }
-    .cover-copy small { display:block; margin-bottom:14px; color:#777; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    .cover-copy strong { display:block; max-width:250px; font-size:36px; line-height:.95; letter-spacing:-.06em; }
-    .cover-copy p { margin:16px 0 0; max-width:250px; color:#555; font-size:13px; line-height:1.45; }
-    .hero-app-preview { width:100%; display:block; border:1px solid #d7d7d7; border-radius:12px; background:#fff; box-shadow:0 18px 44px rgba(0,0,0,.08); }
+    
     .intro { padding:28px 0 4px; }
     h1,h2,h3,p { margin-top:0; }
     h1 { margin-bottom:4px; font-size:31px; line-height:1.08; letter-spacing:-.045em; }
@@ -103,37 +99,32 @@
     .sticky-buy-badge { display:none; padding:2px 6px; border-radius:3px; background:#f00; color:#fff; font-size:10px; font-weight:900; text-decoration:none; }
     .sticky-buy-button { min-width:146px; min-height:56px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:7px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; }
     .sticky-buy-button svg { width:17px; height:17px; }
-    @media (min-width:760px) {
+        @media (min-width:760px) {
       .top { padding:18px 0 12px; }
-      .cover { padding:14px; }
       .intro { padding:16px 0 0; }
       .seller { margin-top:10px; }
       .price-row { margin-top:10px; }
       .cta { min-height:50px; margin-top:12px; }
     }
-    @media (min-width:900px) {
-      .page { width:min(1100px,calc(100% - 56px)); }
+
+        @media (min-width:900px) {
       .top { padding:22px 0 22px; }
-      main { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(330px,.9fr); gap:28px; align-items:center; }
-      .cover { grid-column:1; min-height:0; padding:14px; }
-      .intro { grid-column:2; padding:0; }
-      .copy,.section,.checkout-section { grid-column:1 / -1; width:min(var(--column),100%); justify-self:center; }
       h1 { font-size:34px; }
       .subtitle { font-size:17px; }
       .price { font-size:42px; }
       .cta { margin-top:16px; }
     }
+
     @media (max-width:560px) { body { padding-bottom:120px; } .sticky-buy { bottom:12px; width:calc(100% - 24px); } .sticky-buy-inner { grid-template-columns:1fr; gap:10px; } .sticky-buy-button { width:100%; min-height:50px; } .checkout-policy { margin:-78px auto 0; } }
-    @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .cover { min-height:0; padding:14px; } .cover-copy strong { max-width:300px; font-size:34px; } .cover-copy p { max-width:320px; } .hero-app-preview { display:block; } .intro { padding-top:23px; } h1 { font-size:29px; } }
+        @media (max-width:560px) { .page { width:min(100% - 28px,var(--column)); } .intro { padding-top:23px; } h1 { font-size:29px; } }
+
   </style>
 </head>
 <body>
   <div class="page">
     <div class="top"><a class="brand" href="/" aria-label="Lensically Operator home"><img class="brand-mark" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt="Lensically logo"><span>Lensically</span></a></div>
     <main>
-      <section class="cover" aria-label="Lensically Operator product preview">
-        <img class="hero-app-preview" src="/lensically-app-hero-preview.png" alt="Lensically scheduled posts dashboard preview with a fictional Nova Studio account">
-      </section>
+      
       <section class="intro">
         <h1>Lensically Operator for Threads</h1>
         <p class="subtitle">The system that puts your Threads on autopilot.</p>
