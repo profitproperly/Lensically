@@ -6,13 +6,22 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: commercial-inline-checkout-20260807
-active_checkpoint: repair the deployed-version verifier fresh-startup probe to use the established MCP session transport instead of the internal direct-tool URL, validate and deploy, then prove current-handler/fresh-endpoint commit matching before resuming the preserved GitHub and Manifest live proofs
-validated_source_head: 5edda8dada2198f1594653e796a8bc49e398dc33
-documentation_source_head: 2f075a1cc681da4ba7e8986029b84fcda3b827ff
-production_sha: 5edda8dada2198f1594653e796a8bc49e398dc33
-active_interrupt_id: deployed-version-startup-probe-400-20260809
+active_checkpoint: add a shared release-authority guard that makes every Operator request fail closed when the executing Worker commit is older than the currently released production SHA, validate and deploy it, then resume the preserved GitHub and Manifest live proofs only after request-level commit convergence is proven
+validated_source_head: 196edd6bfbe32a99834c1930aa56cd7f0c471522
+documentation_source_head: 6052798955c10d2350f2b056e5ed32599bc88c0a
+production_sha: 196edd6bfbe32a99834c1930aa56cd7f0c471522
+active_interrupt_id: mcp-request-level-release-drift-20260809
 active_interrupt_state: open
 active_interrupt_precedence: P1
+
+## Active P1 Interrupt: mcp-request-level-release-drift-20260809
+
+- Trigger: production verifier on SHA `196edd6bfbe32a99834c1930aa56cd7f0c471522` returned `current_handler_commit=196edd6bfbe32a99834c1930aa56cd7f0c471522`, `fresh_endpoint_commit=196edd6bfbe32a99834c1930aa56cd7f0c471522`, and `session_commit_match=true`. The immediately following direct `getGitHubWorkflowRun` request nevertheless executed with action-closure `production_commit=5edda8dada2198f1594653e796a8bc49e398dc33`, proving post-deploy routing can drift per request after a one-shot verifier passes.
+- Impact: a live proof can still execute on an older Worker after a successful version check. Session-local deployment validation is insufficient because the request itself may be routed to a prior Worker version during propagation.
+- Current action: identify or add a shared production-release authority visible to all Worker versions, write the exact released SHA into that authority during the exact-SHA deployment path, and make the universal Operator request dispatcher compare its own `LENSICALLY_COMMIT_SHA` against the shared released SHA before substantive execution. An older Worker must fail closed with an explicit stale-runtime/retry-or-refresh result rather than performing the requested operation.
+- Prevention requirement: the guard applies to every Operator tool request, not only `verifyDeployedMcpVersion`; post-deploy live verification is accepted only from requests whose executing commit equals the shared released production SHA.
+- Secondary defect observed during this proof: the expected non-retryable `workflow_run_not_found_after_reconciliation` classification was still auto-promoted by generic hardening as a novel P1. Preserve this for repair after request-level release drift is contained so expected classified not-found outcomes do not create false incidents.
+- Deferred work preserved: `deployed-version-startup-probe-400-20260809`, `mcp-post-deploy-stale-session-20260809`, `github-workflow-run-detail-522-20260809`, `github-workflow-dispatch-522-20260809`, `github-workflow-run-lookup-404-20260809`, and `manifest-bounded-call-502-20260809` remain open underneath this interrupt with all existing source, validation, deployment, and live evidence preserved.
 
 ## Active P1 Interrupt: deployed-version-startup-probe-400-20260809
 
