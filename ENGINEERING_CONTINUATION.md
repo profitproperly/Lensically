@@ -14,6 +14,14 @@ active_interrupt_id: none
 active_interrupt_state: resolved
 active_interrupt_precedence: none
 
+## Resolved P1 Interrupt: repository-large-file-generic-patch-route-20260810
+
+- Trigger: `operateGitHubRepositories.patch_file` was used against `lensically-worker/src/index.ts`, a ~1.5 MB monolithic file; the generic repository mutation route rejected the request with `repository_file_content_too_large` at its 100 KB safety cap. No source mutation was committed.
+- Root cause: the generic multi-repository mutation route is intentionally bounded for ordinary files and is not the canonical edit path for Lensically's oversized monolithic Worker entrypoint.
+- Durable resolution: large known-file Lensically edits must use the source-defined `applyRepoTextPatch` / bounded direct engineering path, which performs exact server-side replacement without transporting the full file through the generic mutation payload.
+- Prevention: engineering precheck already advertises `applyRepoTextPatch` as the mandatory isolated-replacement route; this incident is now durably recorded so future work must not retry the generic patch route against oversized known files.
+- Resume: continue the public live-evidence endpoint through `applyRepoTextPatch`, focused validation, exact-SHA release, and live proof.
+
 ## Resolved P1 Interrupt: release-authority-workflow-indentation-20260809
 
 - Trigger: atomic release-authority integration patch was rejected with `github_workflow_step_indentation_invalid`; both workflow attempts reported `no_commit_created=true`, so no malformed workflow mutation reached `main`.
