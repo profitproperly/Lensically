@@ -6,6 +6,7 @@ import { validateDatabaseAuthority } from "./validate-database-authority.mjs";
 // Validates the verified release marker, capability lifecycle, Guided Growth Mission, and client-safety registry before deployment.
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const readOptional = (path) => existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
 const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
 const commercialDeliveryService = read("src/commercialDeliveryService.ts");
