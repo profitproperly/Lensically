@@ -45,7 +45,7 @@
 
 ## Engineering
 
-- For exact find/replace edits against copy or other frequently changing text, obtain a fresh bounded read/search of the target immediately before patching. Never construct an exact-match patch from remembered or stale wording; a mismatch must trigger target re-resolution before retry. Default
+- For copy or other rapidly evolving text files that are safely below the repository mutation size limit, prefer one fresh full-file read followed by one coherent whole-file upsert. Use exact find/replace only when the exact target was freshly retrieved in the same execution step. After one exact-match mismatch, do not retry another guessed patch; switch to the bounded whole-file route. Default
 
 - Implementation tasks default to complete execution unless the owner explicitly requests discussion only.
 - Routine engineering target is under ten minutes when the underlying platform operation permits it.
