@@ -1,0 +1,27 @@
+name: Lensically AI Brief Live Proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove-live-ai-brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify live AI product brief evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
+          grep -Fq 'Technical due diligence and release evidence' /tmp/lensically-ai.html
+          grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
+          grep -Fq '41c2b4646689a9c814e77cc9660eec051aea55b223a684a9d22556966464c745' /tmp/lensically-ai.html
+          grep -Fq 'fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe' /tmp/lensically-ai.html
+          grep -Fq '0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html
+          grep -Fq 'No fixed release cadence' /tmp/lensically-ai.html
+          grep -Fq 'Publishing safeguards' /tmp/lensically-ai.html
+          grep -Fq 'Database upgrades' /tmp/lensically-ai.html
+          echo 'live-ai-product-brief-proof=passed'
