@@ -17,20 +17,26 @@ jobs:
           set -euo pipefail
 
           curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
-          grep -Fq 'The central value is ownership' /tmp/lensically-ai.html
-          grep -Fq 'Lensically is built for anyone who wants to use Threads better' /tmp/lensically-ai.html
-          grep -Fq 'You are buying the finished result, not the engineering journey' /tmp/lensically-ai.html
-          grep -Fq 'Why a scheduler + analytics tool + ordinary ChatGPT is not the same product' /tmp/lensically-ai.html
-          grep -Fq 'AI-led installation is part of the product' /tmp/lensically-ai.html
-          grep -Fq 'The customer chooses the AI provider and cost model' /tmp/lensically-ai.html
-          grep -Fq 'What $977 is paying for' /tmp/lensically-ai.html
-          grep -Fq 'Technical due diligence' /tmp/lensically-ai.html
-          grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
-          grep -Fq 'https://api.lensically.com/api/public/lensically-proof' /tmp/lensically-ai.html
-                    grep -Fq 'There is no fixed release cadence' /tmp/lensically-ai.html
 
-          if grep -Fqi 'Weak fit:' /tmp/lensically-ai.html; then
-            echo 'ai-brief-regressed-to-artificial-weak-fit-positioning'
+          grep -Fq 'Ownership gives you control, not homework.' /tmp/lensically-ai.html
+          grep -Fq 'No coding knowledge is part of the intended customer role' /tmp/lensically-ai.html
+          grep -Fq 'Lensically is for anyone who wants to use Threads better' /tmp/lensically-ai.html
+          grep -Fq 'Capability depth is optional.' /tmp/lensically-ai.html
+          grep -Fq 'What using Lensically actually feels like' /tmp/lensically-ai.html
+          grep -Fq 'Implemented product surfaces' /tmp/lensically-ai.html
+          grep -Fq 'What the AI connection can actually do' /tmp/lensically-ai.html
+          grep -Fq 'The AI installer is part of the product' /tmp/lensically-ai.html
+          grep -Fq 'The AI is given the map.' /tmp/lensically-ai.html
+          grep -Fq 'The few actions only the account owner can perform' /tmp/lensically-ai.html
+          grep -Fq 'Why starting from the finished system matters' /tmp/lensically-ai.html
+          grep -Fq 'What the $977 one-time purchase represents' /tmp/lensically-ai.html
+          grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
+          grep -Fq '41c2b4646689a9c814e77cc9660eec051aea55b223a684a9d22556966464c745' /tmp/lensically-ai.html
+          grep -Fq 'https://api.lensically.com/api/public/lensically-proof' /tmp/lensically-ai.html
+          grep -Fq 'There is no fixed release cadence' /tmp/lensically-ai.html
+
+          if grep -Eqi 'Weak fit:|only for serious|for serious Threads|requires coding knowledge|customer must personally administer' /tmp/lensically-ai.html; then
+            echo 'ai-brief-regressed-to-artificial-buyer-or-technical-burden-positioning'
             exit 19
           fi
 
