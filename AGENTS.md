@@ -43,7 +43,9 @@
 - For Manifest, Proceed restores and reconciles live state under `manifest-autonomous-growth-engine-v1`. Routine strategy, generation, scheduling, evaluation, recovery, and engineering continue autonomously; owner criticism and override are optional and non-blocking. Only narrow protected business or infrastructure boundaries require ratification.
 - Account execution requires the current persistent Growth Mission to be approved or active. Routine engineering remains autonomous. Full autonomous account mode requires an explicit owner-authorized mode change and must never be inferred from ordinary approval language.
 
-## Engineering Default
+## Engineering
+
+- For exact find/replace edits against copy or other frequently changing text, obtain a fresh bounded read/search of the target immediately before patching. Never construct an exact-match patch from remembered or stale wording; a mismatch must trigger target re-resolution before retry. Default
 
 - Implementation tasks default to complete execution unless the owner explicitly requests discussion only.
 - Routine engineering target is under ten minutes when the underlying platform operation permits it.
