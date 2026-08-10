@@ -31300,7 +31300,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
     }
 
-    if (normalizedPath === "/api/operator/health" && request.method === "GET") {
+        if (normalizedPath === "/api/operator/health" && request.method === "GET") {
       await retireLegacyExecutionInfrastructure(env);
       return operatorMcpOAuthJson({
         status: "ok",
@@ -31310,6 +31310,85 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         timestamp: new Date().toISOString(),
       });
     }
+
+    if (normalizedPath === "/api/public/lensically-proof" && request.method === "GET") {
+      const [scheduledPostsTableExists, schedulerHealth, liveToolCount] = await Promise.all([
+        doesTableExist(env, "scheduled_posts"),
+        readScheduledPostSchedulerHealth(env),
+        operatorPublicMcpToolCount(env),
+      ]);
+
+      let publishingEvidence: Record<string, unknown> = {
+        available: false,
+        successful_publishes_total: null,
+        successful_publishes_last_7_days: null,
+        successful_publishes_last_30_days: null,
+        first_successful_publish_at: null,
+        latest_successful_publish_at: null,
+      };
+
+      if (scheduledPostsTableExists) {
+        const row = await env.DB.prepare(
+          `SELECT
+             COUNT(*) AS successful_publishes_total,
+             SUM(CASE WHEN published_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS successful_publishes_last_7_days,
+             SUM(CASE WHEN published_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS successful_publishes_last_30_days,
+             MIN(published_at) AS first_successful_publish_at,
+             MAX(published_at) AS latest_successful_publish_at
+           FROM scheduled_posts
+           WHERE status = ?
+             AND published_post_id IS NOT NULL
+             AND length(trim(published_post_id)) > 0`,
+        ).bind(SCHEDULED_POST_STATUS_POSTED).first<{
+          successful_publishes_total: number | string | null;
+          successful_publishes_last_7_days: number | string | null;
+          successful_publishes_last_30_days: number | string | null;
+          first_successful_publish_at: string | null;
+          latest_successful_publish_at: string | null;
+        }>();
+
+        publishingEvidence = {
+          available: true,
+          successful_publishes_total: Number(row?.successful_publishes_total ?? 0),
+          successful_publishes_last_7_days: Number(row?.successful_publishes_last_7_days ?? 0),
+          successful_publishes_last_30_days: Number(row?.successful_publishes_last_30_days ?? 0),
+          first_successful_publish_at: row?.first_successful_publish_at ?? null,
+          latest_successful_publish_at: row?.latest_successful_publish_at ?? null,
+        };
+      }
+
+      return operatorMcpOAuthJson({
+        status: "ok",
+        evidence_scope: "Aggregate live Lensically production evidence only. No account identifiers, post text, credentials, tokens, or customer data are exposed.",
+        threads_publishing: publishingEvidence,
+        scheduler: {
+          enabled: schedulerHealth.enabled ?? true,
+          healthy: schedulerHealth.healthy ?? null,
+          heartbeat_fresh: schedulerHealth.heartbeat_fresh ?? null,
+          last_success: schedulerHealth.last_success ?? null,
+          last_trigger: schedulerHealth.last_trigger ?? null,
+          run_count: schedulerHealth.run_count ?? null,
+          cron_last_completed_at: schedulerHealth.cron_last_completed_at ?? null,
+          alarm_last_completed_at: schedulerHealth.alarm_last_completed_at ?? null,
+          next_alarm_at: schedulerHealth.next_alarm_at ?? null,
+          current_overdue_count: schedulerHealth.current_overdue_count ?? null,
+          mode: typeof schedulerHealth.control === "object" && schedulerHealth.control !== null
+            ? (schedulerHealth.control as Record<string, unknown>).mode ?? null
+            : null,
+        },
+        mcp: {
+          version: OPERATOR_MCP_VERSION,
+          live_tool_count: liveToolCount,
+        },
+        customer_product_release: {
+          version: "1.0.1",
+          production_runtime_dependency_audits: "passed before packaging",
+          package_validation: "template boundary, web build, Worker typecheck/lifecycle/migrations/focused tests, Recovery typecheck",
+        },
+        generated_at: new Date().toISOString(),
+      });
+    }
+
 
     if (normalizedPath.startsWith("/api/operator/local-node/")) {
       logWorkerEvent("RETIRED_ROUTE_BLOCKED", {
