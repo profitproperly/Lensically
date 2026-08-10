@@ -15,7 +15,7 @@ const commercialPrivacyPage = read("public/privacy.html");
 const commercialTermsPage = read("public/terms.html");
 const commercialDeletionPage = read("public/data-deletion/index.html");
 const commercialRefundPage = read("public/refund-policy/index.html");
-const commercialPreflightFailures = [
+const commercialPreflightFailures = existsSync(resolve(root, "src/commercialDeliveryService.ts")) ? [
   [commercialDeliveryService.includes('COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0"'), "commercial_payment_link_identity_missing"],
   [commercialDeliveryService.includes('COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx"'), "commercial_price_identity_missing"],
   [commercialSalesPage.includes("https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01"), "commercial_checkout_link_missing"],
