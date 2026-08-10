@@ -27,7 +27,7 @@ jobs:
           grep -Fq 'Technical due diligence' /tmp/lensically-ai.html
           grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
           grep -Fq 'https://api.lensically.com/api/public/lensically-proof' /tmp/lensically-ai.html
-          grep -Fq 'No fixed release cadence' /tmp/lensically-ai.html
+                    grep -Fq 'There is no fixed release cadence' /tmp/lensically-ai.html
 
           if grep -Fqi 'Weak fit:' /tmp/lensically-ai.html; then
             echo 'ai-brief-regressed-to-artificial-weak-fit-positioning'
