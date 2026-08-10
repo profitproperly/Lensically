@@ -17,13 +17,22 @@ jobs:
           set -euo pipefail
 
           curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
-          grep -Fq 'Technical due diligence and release evidence' /tmp/lensically-ai.html
+          grep -Fq 'The central value is ownership' /tmp/lensically-ai.html
+          grep -Fq 'Lensically is built for anyone who wants to use Threads better' /tmp/lensically-ai.html
+          grep -Fq 'You are buying the finished result, not the engineering journey' /tmp/lensically-ai.html
+          grep -Fq 'Why a scheduler + analytics tool + ordinary ChatGPT is not the same product' /tmp/lensically-ai.html
+          grep -Fq 'AI-led installation is part of the product' /tmp/lensically-ai.html
+          grep -Fq 'The customer chooses the AI provider and cost model' /tmp/lensically-ai.html
+          grep -Fq 'What $977 is paying for' /tmp/lensically-ai.html
+          grep -Fq 'Technical due diligence' /tmp/lensically-ai.html
           grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
-          grep -Fq '41c2b4646689a9c814e77cc9660eec051aea55b223a684a9d22556966464c745' /tmp/lensically-ai.html
           grep -Fq 'https://api.lensically.com/api/public/lensically-proof' /tmp/lensically-ai.html
           grep -Fq 'No fixed release cadence' /tmp/lensically-ai.html
-          grep -Fq 'Publishing safeguards' /tmp/lensically-ai.html
-          grep -Fq 'Database upgrades' /tmp/lensically-ai.html
+
+          if grep -Fqi 'Weak fit:' /tmp/lensically-ai.html; then
+            echo 'ai-brief-regressed-to-artificial-weak-fit-positioning'
+            exit 19
+          fi
 
           if grep -Eqi 'github\.com/profitproperly/Lensically|fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe|0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html; then
             echo 'ai-brief-exposes-internal-repository-or-source-sha'
