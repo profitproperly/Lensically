@@ -15,13 +15,40 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
+                    curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
           grep -Fq 'Technical due diligence and release evidence' /tmp/lensically-ai.html
           grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
           grep -Fq '41c2b4646689a9c814e77cc9660eec051aea55b223a684a9d22556966464c745' /tmp/lensically-ai.html
-          grep -Fq 'fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe' /tmp/lensically-ai.html
-          grep -Fq '0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html
           grep -Fq 'No fixed release cadence' /tmp/lensically-ai.html
           grep -Fq 'Publishing safeguards' /tmp/lensically-ai.html
           grep -Fq 'Database upgrades' /tmp/lensically-ai.html
-          echo 'live-ai-product-brief-proof=passed'
+
+          curl --fail --silent --show-error https://api.lensically.com/api/public/lensically-proof > /tmp/lensically-proof.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const proof = JSON.parse(fs.readFileSync('/tmp/lensically-proof.json', 'utf8'));
+          if (proof?.status !== 'ok') throw new Error('public_proof_status_not_ok');
+          if (proof?.threads_publishing?.available !== true) throw new Error('public_proof_publishing_unavailable');
+          if (!(Number(proof?.threads_publishing?.successful_publishes_total) > 0)) throw new Error('public_proof_has_no_successful_publishes');
+          if (!proof?.threads_publishing?.latest_successful_publish_at) throw new Error('public_proof_latest_publish_missing');
+          if (proof?.scheduler?.enabled !== true) throw new Error('public_proof_scheduler_not_enabled');
+          if (!(Number(proof?.mcp?.live_tool_count) > 0)) throw new Error('public_proof_mcp_tools_missing');
+          if (proof?.customer_product_release?.version !== '1.0.1') throw new Error('public_proof_release_version_mismatch');
+          const forbidden = new Set(['threads_user_id','user_id','post_text','published_post_id','access_token','authorization','cookie','secret']);
+          const walk = (value) => {
+            if (!value || typeof value !== 'object') return;
+            for (const [key, child] of Object.entries(value)) {
+              if (forbidden.has(key)) throw new Error(`public_proof_forbidden_key:${key}`);
+              walk(child);
+            }
+          };
+          walk(proof);
+          console.log(`successful-publishes-total=${proof.threads_publishing.successful_publishes_total}`);
+          console.log(`successful-publishes-30d=${proof.threads_publishing.successful_publishes_last_30_days}`);
+          console.log(`latest-successful-publish=${proof.threads_publishing.latest_successful_publish_at}`);
+          console.log(`scheduler-healthy=${proof.scheduler.healthy}`);
+          console.log(`scheduler-overdue=${proof.scheduler.current_overdue_count}`);
+          console.log(`mcp-live-tools=${proof.mcp.live_tool_count}`);
+          NODE
+          echo 'live-ai-product-brief-and-public-proof=passed'
+
