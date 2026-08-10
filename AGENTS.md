@@ -45,7 +45,7 @@
 
 ## Engineering
 
-- For copy or other rapidly evolving text files that are safely below the repository mutation size limit, prefer one fresh full-file read followed by one coherent whole-file upsert. Use exact find/replace only when the exact target was freshly retrieved in the same execution step. After one exact-match mismatch, do not retry another guessed patch; switch to the bounded whole-file route. Default
+- For copy or other rapidly evolving text files that are safely below the repository mutation size limit, require one fresh full-file read followed by one coherent whole-file upsert. Do not use exact find/replace for that class of file. After any exact-match mismatch, patching that file is prohibited for the remainder of the objective; use only the bounded whole-file route. Default
 
 - Implementation tasks default to complete execution unless the owner explicitly requests discussion only.
 - Routine engineering target is under ten minutes when the underlying platform operation permits it.
