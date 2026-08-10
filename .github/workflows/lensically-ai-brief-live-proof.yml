@@ -32,10 +32,14 @@ jobs:
 
           curl --fail --silent --show-error https://api.lensically.com/api/public/lensically-proof > /tmp/lensically-proof.json
           jq -e '.status == "ok"' /tmp/lensically-proof.json >/dev/null
-          jq -e '.evidence.successful_threads_publishes >= 1' /tmp/lensically-proof.json >/dev/null
-          jq -e '.evidence.latest_successful_publish_at != null' /tmp/lensically-proof.json >/dev/null
-          jq -e '.evidence.mcp_live_tool_count >= 1' /tmp/lensically-proof.json >/dev/null
-          jq -e '.evidence.scheduler != null' /tmp/lensically-proof.json >/dev/null
+          jq -e '.threads_publishing.available == true' /tmp/lensically-proof.json >/dev/null
+          jq -e '.threads_publishing.successful_publishes_total >= 1' /tmp/lensically-proof.json >/dev/null
+          jq -e '.threads_publishing.latest_successful_publish_at != null' /tmp/lensically-proof.json >/dev/null
+          jq -e '.mcp.live_tool_count >= 1' /tmp/lensically-proof.json >/dev/null
+          jq -e '.mcp.version != null' /tmp/lensically-proof.json >/dev/null
+          jq -e '.scheduler.enabled != null' /tmp/lensically-proof.json >/dev/null
+          jq -e '.customer_product_release.version == "1.0.1"' /tmp/lensically-proof.json >/dev/null
+          jq -e '.evidence_scope | contains("No account identifiers, post text, credentials, tokens, or customer data are exposed")' /tmp/lensically-proof.json >/dev/null
 
           if jq -e 'paths(scalars) as $p | ($p | map(tostring) | join(".")) | test("post_text|threads_user_id|published_post_id|access_token|refresh_token|authorization|cookie|secret|github|repository"; "i")' /tmp/lensically-proof.json >/dev/null; then
             echo 'public-proof-sensitive-or-repository-key-detected'
