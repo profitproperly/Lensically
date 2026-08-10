@@ -9,13 +9,13 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const readOptional = (path) => existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
 const databaseAuthorityReceipt = validateDatabaseAuthority(root);
 
-const commercialDeliveryService = read("src/commercialDeliveryService.ts");
-const commercialSalesPage = read("public/index.html");
-const commercialDownloadPage = read("public/download/index.html");
-const commercialPrivacyPage = read("public/privacy.html");
-const commercialTermsPage = read("public/terms.html");
-const commercialDeletionPage = read("public/data-deletion/index.html");
-const commercialRefundPage = read("public/refund-policy/index.html");
+const commercialDeliveryService = readOptional("src/commercialDeliveryService.ts");
+const commercialSalesPage = readOptional("public/index.html");
+const commercialDownloadPage = readOptional("public/download/index.html");
+const commercialPrivacyPage = readOptional("public/privacy.html");
+const commercialTermsPage = readOptional("public/terms.html");
+const commercialDeletionPage = readOptional("public/data-deletion/index.html");
+const commercialRefundPage = readOptional("public/refund-policy/index.html");
 const commercialPreflightFailures = existsSync(resolve(root, "src/commercialDeliveryService.ts")) ? [
   [commercialDeliveryService.includes('COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0"'), "commercial_payment_link_identity_missing"],
   [commercialDeliveryService.includes('COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx"'), "commercial_price_identity_missing"],
