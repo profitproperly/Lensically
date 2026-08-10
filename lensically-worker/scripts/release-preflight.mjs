@@ -27,7 +27,7 @@ const commercialPreflightFailures = existsSync(resolve(root, "src/commercialDeli
   [commercialTermsPage.includes("support@lensically.com"), "commercial_terms_support_channel_missing"],
   [commercialDeletionPage.includes("support@lensically.com"), "commercial_deletion_support_channel_missing"],
   [commercialRefundPage.includes("support@lensically.com"), "commercial_refund_support_channel_missing"],
-].filter(([passed]) => !passed).map(([, failure]) => failure);
+].filter(([passed]) => !passed).map(([, failure]) => failure) : [];
 if (commercialPreflightFailures.length) {
   throw new Error(`commercial_release_preflight_failed:${commercialPreflightFailures.join(",")}`);
 }
