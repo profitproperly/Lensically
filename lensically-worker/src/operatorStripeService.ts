@@ -168,8 +168,10 @@ export const OPERATOR_STRIPE_TOOLS: OperatorMcpToolDefinition[] = [
           type: "string",
           enum: [
             "validate_configuration",
-            "create_product",
+                        "create_product",
+            "update_product",
             "create_price",
+            "update_price",
             "create_customer",
             "create_checkout_session",
             "create_payment_link",
