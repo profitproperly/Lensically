@@ -1,27 +1,29 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-10
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-hidden-schedule-side-effect-20260810
-active_checkpoint: trace_and_repair_idempotent_gate_self_collision
-validated_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
-documentation_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
-production_sha: 99d0c284bb8203c2703a1577a695d69244ad4a83
-active_interrupt_id: manifest-hidden-schedule-side-effect-20260810
-active_interrupt_state: detected
-active_interrupt_precedence: P1
+active_job_id: none
+active_checkpoint: none
+validated_source_head: 16de96e42bbec00de629441ab06e294c61eb4ffc
+documentation_source_head: 16de96e42bbec00de629441ab06e294c61eb4ffc
+production_sha: 16de96e42bbec00de629441ab06e294c61eb4ffc
+active_interrupt_id: none
+active_interrupt_state: resolved
+active_interrupt_precedence: none
 
-## Active P1 Interrupt: manifest-hidden-schedule-side-effect-20260810
+## Resolved P1 Interrupt: manifest-hidden-schedule-side-effect-20260810
 
-- Trigger: Main Cycle batch `manifest-cycle-2026-08-10T20-14-00-04-batch-02` reported both candidates rejected with `accepted_count: 0`, but scheduled post `1039` was created at `2026-08-11 00:29:50` for the exact 01:00 candidate text. Later authoritative coverage treated 01:00 as occupied, while batch `...-batch-02b` again reported that replacement candidate as not persisted. `auditScheduledPost(1039)` proves the hidden scheduled side effect exists.
-- Impact: a candidate can be reported as rejected while leaving an approved scheduled post behind. Regeneration can then self-collide with that hidden row, misreport acceptance, and risk duplicate or wrong-slot handling. Batch persistence cannot be trusted until response truth and idempotent resume semantics are repaired.
-- Working root-cause hypothesis: persistence can encounter an exact idempotent scheduled row on resume and exclude it from its early duplicate probe, but the later global gate suite does not exclude that same scheduled row and can reject the candidate against its own prior side effect. The batch wrapper then treats the result as rejected even though authoritative coverage is occupied.
-- Current action: trace the exact schedule-creation/replay path and global duplicate-gate exclusion contract; repair idempotent resume so an exact prior scheduled side effect is either reconciled as a reused successful candidate with complete lineage or deterministically recovered, never hidden behind a rejected response. Add regression coverage proving rejected candidates cannot leave undisclosed schedule mutations and exact idempotent rows cannot self-fail duplicate gates.
-- Reconciliation requirement: verify whether scheduled post `1039` has complete source/strategy/plan/hypothesis lineage for plan item `54d1af54-48e2-4e40-8485-7abaaeec9d37`. Preserve it only if fully valid; otherwise retire it as technical corruption before resuming the cycle.
-- Deferred objective: resume the same cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` after verified repair and complete the remaining runway without preparing a second cycle.
+- Trigger: Main Cycle batch `manifest-cycle-2026-08-10T20-14-00-04-batch-02` reported both candidates rejected with `accepted_count: 0`, while scheduled post `1039` was created at `2026-08-11 00:29:50` for the exact 01:00 candidate text. Later authoritative coverage treated 01:00 as occupied, and a replacement call mislabeled that covered slot as not persisted.
+- Root cause: same-operation concurrent/retried persistence could converge on the scheduler's deterministic idempotency row while the global duplicate gate still saw that same operation's scheduled artifact and rejected against itself. The batch wrapper then collapsed two materially different states—failed-after-schedule side effects and successful nonfatal `slot_already_covered` reconciliation—into ordinary regenerate-able rejection semantics.
+- Durable repair: SHA `c784941c32d2f47111bc515983a01b2890dfa239` carries deterministic same-operation draft and schedule identities through duplicate gates and excludes the operation's own scheduled ID/idempotency key. SHA `588a8058898d1fb8b8b618724c279940cc3a27af` makes failed-after-schedule side effects explicit with exact-operation recovery instructions and preserves nonfatal covered-slot outcomes instead of relabeling them. SHA `16de96e42bbec00de629441ab06e294c61eb4ffc` updates release lifecycle enforcement to require those recovery contracts.
+- Regression protection: tests prove deterministic same-operation identities reach the gate engine, the exact-duplicate adapter receives schedule exclusions, failed candidates with a scheduled side effect demand exact-operation retry rather than regeneration, and covered-slot outcomes preserve authoritative continuation semantics.
+- Validation: operator campaign `31447364933` passed all eight shards on `16de96e42bbec00de629441ab06e294c61eb4ffc`; full push validation `31447358951` passed typecheck, lifecycle, and the complete mapped suite.
+- Release: exact-SHA deployment `31447525794` succeeded. External live verification then confirmed current handler, fresh endpoint, and shared release authority all match `16de96e42bbec00de629441ab06e294c61eb4ffc` with 86 tools and no session refresh required.
+- Live recovery proof: replaying the exact original operation `manifest-cycle-2026-08-10T20-14-00-04-slot-04-v1` reused scheduled post `1039`, passed duplicate/repetition checks against its own prior artifact, restored source batch/selection/card/family, generation run, draft, hypothesis, strategy and inventory lineage, and returned both `publish_lineage_complete=true` and `intelligence_lineage_complete=true`. Authoritative reconciliation reports five occupied slots and 43 remaining, beginning at `2026-08-11T02:00`.
+- Resolution: preserve post `1039`; it is now valid recovered cycle output and must not be deleted. Resume the same cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` from 02:00 without preparing a second cycle.
 
 ## Resolved P1 Interrupt: manifest-batch-expected-gate-control-20260810
 
