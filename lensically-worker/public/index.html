@@ -99,7 +99,22 @@
     .sticky-buy-badge { display:none; padding:2px 6px; border-radius:3px; background:#f00; color:#fff; font-size:10px; font-weight:900; text-decoration:none; }
     .sticky-buy-button { min-width:146px; min-height:56px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:7px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; }
         .sticky-buy-button svg { width:17px; height:17px; }
-    .ai-choice-button { border:0; font-family:inherit; cursor:pointer; }
+        .ai-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .ai-brand-button { min-height:54px; padding:0 15px; display:flex; align-items:center; justify-content:center; gap:10px; border-radius:11px; text-decoration:none; font-family:inherit; font-size:15px; font-weight:850; letter-spacing:-.01em; cursor:pointer; transition:transform .16s ease, box-shadow .16s ease, filter .16s ease; }
+    .ai-brand-button:hover { transform:translateY(-1px); filter:saturate(1.04); }
+    .ai-brand-button:active { transform:translateY(0); }
+    .ai-brand-icon { width:31px; height:31px; flex:0 0 31px; display:grid; place-items:center; border-radius:9px; box-shadow:0 4px 10px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.65); }
+    .ai-brand-icon img { width:23px; height:23px; display:block; object-fit:contain; }
+    .ai-brand-label { line-height:1; }
+    .ai-brand-chatgpt { background:#fff; color:#111; border:1px solid #d8d8d8; box-shadow:0 4px 14px rgba(0,0,0,.07); }
+    .ai-brand-chatgpt .ai-brand-icon { background:#fff; border:1px solid #ececec; }
+    .ai-brand-claude { background:#d97757; color:#fff; border:1px solid #c96847; box-shadow:0 5px 15px rgba(217,119,87,.25); }
+    .ai-brand-claude .ai-brand-icon { background:#fff4ed; }
+    .ai-brand-gemini { background:linear-gradient(135deg,#ffb2b2 0%,#ffe28a 27%,#9be7b3 49%,#91c5ff 73%,#b4a3ff 100%); color:#111; border:1px solid rgba(74,97,180,.22); box-shadow:0 5px 16px rgba(82,122,224,.18); }
+    .ai-brand-gemini .ai-brand-icon { background:rgba(255,255,255,.88); }
+    .ai-brand-grok { background:#000; color:#fff; border:1px solid #000; box-shadow:0 5px 15px rgba(0,0,0,.24); }
+    .ai-brand-grok .ai-brand-icon { background:#121212; box-shadow:0 4px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12); }
+    .ai-choice-button { border:0; }
     .ai-handoff-dialog { width:min(430px,calc(100% - 32px)); padding:0; border:0; border-radius:12px; background:#fff; color:#111; box-shadow:0 22px 70px rgba(0,0,0,.28); }
     .ai-handoff-dialog::backdrop { background:rgba(0,0,0,.58); }
     .ai-handoff-card { padding:22px; }
