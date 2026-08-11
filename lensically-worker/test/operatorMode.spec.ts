@@ -5053,11 +5053,21 @@ active_checkpoint: none
       "unexpected_result",
       { ok: false, status: 500, failure: { phase: "commit_failed" } },
     )).toBe(false);
-    expect(isExpectedHardeningControlResult(
+        expect(isExpectedHardeningControlResult(
       "operateGitHubRepositories",
       "repository_file_search_requires_exact_file",
       { ok: false, status: 200 },
     )).toBe(true);
+    expect(isExpectedHardeningControlResult(
+      "persist_manifest_autonomous_batch",
+      "unexpected_result",
+      { ok: false, status: 400, results: [{ error: "exact_duplicate_post" }, { error: "candidate_gate_suite_failed" }] },
+    )).toBe(true);
+    expect(isExpectedHardeningControlResult(
+      "persist_manifest_autonomous_batch",
+      "unexpected_result",
+      { ok: false, status: 500, results: [{ error: "exact_duplicate_post" }, { error: "database_write_failed" }] },
+    )).toBe(false);
   });
 
   it.skip("retired: bloated internal registry contract", async () => {

@@ -17578,7 +17578,7 @@ export function isExpectedHardeningControlResult(
   if (toolName === "commit_manifest_cycle_strategy") {
     return error.startsWith("manifest_") || error === "follower_attribution_forbidden";
   }
-  if (toolName === "persist_manifest_autonomous_post") {
+    if (["persist_manifest_autonomous_post", "persist_manifest_autonomous_batch"].includes(toolName)) {
     const expectedExact = new Set([
       "autonomous_operator_mode_required", "stable_operation_id_required", "autonomous_cycle_id_required",
       "autonomous_cycle_not_found", "post_hypothesis_invalid", "source_context_invalid",
@@ -17591,12 +17591,22 @@ export function isExpectedHardeningControlResult(
       "autonomous_source_lineage_missing", "autonomous_lineage_incomplete_after_persist",
       "invalid_date_time", "autonomous_schedule_failed",
     ]);
-    return expectedExact.has(error)
-      || error.startsWith("manifest_")
-      || error.startsWith("slot_")
-      || error.startsWith("source_")
-      || error.startsWith("candidate_")
-      || error.startsWith("model_evaluation_");
+    const expectedManifestPersistenceError = (candidateError: string): boolean => expectedExact.has(candidateError)
+      || candidateError.startsWith("manifest_")
+      || candidateError.startsWith("slot_")
+      || candidateError.startsWith("source_")
+      || candidateError.startsWith("candidate_")
+      || candidateError.startsWith("model_evaluation_");
+    if (toolName === "persist_manifest_autonomous_batch") {
+      const batchResults = Array.isArray(result.results) ? result.results : [];
+      if (batchResults.length > 0) {
+        const candidateErrors = batchResults.map((item) => item && typeof item === "object" && !Array.isArray(item)
+          ? normalizeOperatorMachineKey((item as Record<string, unknown>).error, "")
+          : "");
+        if (candidateErrors.every((candidateError) => candidateError.length > 0 && expectedManifestPersistenceError(candidateError))) return true;
+      }
+    }
+    return expectedManifestPersistenceError(error);
   }
   return status === 410 && error.endsWith("_retired");
 }
