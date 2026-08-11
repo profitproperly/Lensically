@@ -1,18 +1,26 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-10
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: manifest-temporal-winner-surface-20260810
+active_checkpoint: repair_stale_month_exact_surface
 validated_source_head: 16de96e42bbec00de629441ab06e294c61eb4ffc
-documentation_source_head: 16de96e42bbec00de629441ab06e294c61eb4ffc
+documentation_source_head: 4876c972a68fd79c8bfaf9f9b9b37a5d3dfa1ea7
 production_sha: 16de96e42bbec00de629441ab06e294c61eb4ffc
-active_interrupt_id: none
-active_interrupt_state: resolved
-active_interrupt_precedence: none
+active_interrupt_id: manifest-temporal-winner-surface-20260810
+active_interrupt_state: detected
+active_interrupt_precedence: P1
+
+## Active P1 Interrupt: manifest-temporal-winner-surface-20260810
+
+- Trigger: active Main Cycle slot `2026-08-11T21:00` correctly advanced verified winner copy from `IF YOUR FINGER TOUCHED THIS IN JULY, AUGUST WILL BEGIN WITH GOOD FINANCIAL NEWS.` to the live-calendar execution `IF YOUR FINGER TOUCHED THIS IN AUGUST, SEPTEMBER WILL BEGIN WITH GOOD FINANCIAL NEWS.`, but `global_source_transformation_contract_gate` blocked it because winner preservation required the literal stale exact surface `IF YOUR FINGER TOUCHED THIS IN JULY`.
+- Impact: a time-bearing winner can become impossible to execute truthfully in future months. Literal exact-surface preservation can force stale calendar copy and directly conflict with contextual generation quality.
+- Root cause: the source transformation gate treats every `must_preserve_exact` winner surface as timeless. Although the gate engine already accepts scheduling context, Main persistence does not pass the candidate schedule into the gate suite and exact-surface evaluation has no narrowly scoped temporal rollover rule.
+- Current action: pass the candidate date/time/timezone into Main gate evaluation; permit an otherwise-missing exact surface only when it contains a named calendar month that is stale relative to the scheduled month and the candidate contains the same normalized surface with that month replaced by the scheduled month. Preserve every other exact surface and every winner function unchanged. Add regression coverage proving stale month rollover passes while arbitrary exact-surface changes still fail; validate, release exact SHA, verify live, replay only the rejected 21:00 candidate, then resume the same cycle.
+- Deferred objective: complete cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c`. Current authoritative occupancy is 23/48 before the rejected 20:00 and 21:00 replacements; 20:00 also requires ordinary archive-aware regeneration because its gender-neutral wording exactly matched posted record `777`.
 
 ## Resolved P1 Interrupt: manifest-hidden-schedule-side-effect-20260810
 
