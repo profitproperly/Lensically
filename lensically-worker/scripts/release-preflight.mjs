@@ -17,7 +17,7 @@ const commercialTermsPage = readOptional("public/terms.html");
 const commercialDeletionPage = readOptional("public/data-deletion/index.html");
 const commercialRefundPage = readOptional("public/refund-policy/index.html");
 const commercialPreflightFailures = existsSync(resolve(root, "src/commercialDeliveryService.ts")) ? [
-  [commercialDeliveryService.includes('COMMERCIAL_PAYMENT_LINK_ID = "plink_1U04xX4dwsz5Id6r1mYvbYr0"'), "commercial_payment_link_identity_missing"],
+  [commercialDeliveryService.includes('COMMERCIAL_PAYMENT_LINK_ID = "plink_1U3Hs24dwsz5Id6ryF7lLlTs"'), "commercial_payment_link_identity_missing"],
   [commercialDeliveryService.includes('COMMERCIAL_PRODUCT_PRICE_ID = "price_1U04xK4dwsz5Id6rMBTw8Nbx"'), "commercial_price_identity_missing"],
   [commercialSalesPage.includes("https://buy.stripe.com/bJeeV6gs22CV3pf9yT5wI01"), "commercial_checkout_link_missing"],
   [commercialSalesPage.includes('<link rel="canonical" href="https://lensically.com/">'), "commercial_root_canonical_missing"],
