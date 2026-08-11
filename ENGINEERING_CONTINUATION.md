@@ -1,12 +1,19 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: ai-evaluator-freshness-20260811
+active_checkpoint: release-and-live-proof
+
+## ACTIVE — AI Evaluator Freshness
+
+job_id: `ai-evaluator-freshness-20260811`
+root_cause: An external evaluator returned the retired $977/Manifest Mental version of the AI brief after the new $97 architecture-first page was already live, showing that the unversioned evaluator prompt could resolve through stale indexed or cached content rather than the current production brief.
+fix: Sales-page evaluator buttons now instruct supported AIs to open a versioned `/ai?v=20260811-2` URL directly. The commercial production smoke permanently requires that current direct-fetch URL so the evaluator path cannot silently regress to the stale unversioned prompt.
+current_action: Release exact SHA `4566292e31feb1a3a9097887b23cb88e7d830ff5`, run the live commercial smoke, verify the current evaluator link and current $97 AI brief in production, then close this job.
 validated_source_head: c2ef19054a42f663118f12f7d200c277d92fbe13
 documentation_source_head: c2ef19054a42f663118f12f7d200c277d92fbe13
 production_sha: c2ef19054a42f663118f12f7d200c277d92fbe13
