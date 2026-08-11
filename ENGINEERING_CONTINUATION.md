@@ -10,9 +10,19 @@ active_checkpoint: none
 validated_source_head: d80663a3f7f11dbe81a2d900a7fc314a140ca208
 documentation_source_head: d80663a3f7f11dbe81a2d900a7fc314a140ca208
 production_sha: d80663a3f7f11dbe81a2d900a7fc314a140ca208
-active_interrupt_id: none
-active_interrupt_state: resolved
-active_interrupt_precedence: none
+active_interrupt_id: ai-page-path-discovery-20260811
+active_interrupt_state: active
+active_interrupt_precedence: P1
+
+## ACTIVE INTERRUPT — AI Page Path Discovery
+
+interrupt_id: `ai-page-path-discovery-20260811`
+incident_ids: `66a81f73-8137-4833-a406-41c986324f38`, `385a3385-c941-42d1-a084-a9245ff96b6c`
+state: active
+severity: P1
+root_cause: The model guessed `lensically-web/app/ai/page.tsx` instead of discovering the exact repository path first. The follow-up generic `patch_file` route then failed because `ENGINEERING_CONTINUATION.md` exceeds that route's 100 KB content ceiling.
+prevention: Never guess an unknown repository path. Discover it from `list_files` or a verified search before any read or mutation. For the canonical continuation ledger, use the dedicated server-side `applyRepoTextPatch` path rather than the generic repository patch route.
+current_action: Discover the exact AI page path from repository files, verify it, resolve this interrupt, then resume the AI-page repositioning objective.
 
 ## Completed — Stripe Catalog Reconciliation
 
