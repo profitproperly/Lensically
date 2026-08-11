@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: ai-evaluator-freshness-20260811
-active_checkpoint: release-and-live-proof
+active_job_id: none
+active_checkpoint: none
 
 ## ACTIVE — AI Evaluator Freshness
 
