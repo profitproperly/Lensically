@@ -431,9 +431,42 @@ export async function runOperatorGateEngine<TStage extends string>(
         dependencies.normalizeSourceContractStringList(input.draftAnalysis?.satisfied_time_or_context_requirements)
           .map((item) => dependencies.normalizeComparableText(item)),
       );
+            const monthNames = [
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+      ];
+      const scheduledDate = dependencies.normalizeText(input.scheduling?.date, 20, true) ?? "";
+      const scheduledMonthNumber = /^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)
+        ? Number(scheduledDate.slice(5, 7))
+        : 0;
+      const scheduledMonth = scheduledMonthNumber >= 1 && scheduledMonthNumber <= 12
+        ? monthNames[scheduledMonthNumber - 1]
+        : null;
+      const temporalExactSurfaceRollovers: Array<Record<string, unknown>> = [];
       const missingExact = mustPreserveExact.filter((surface) => {
         const normalizedSurface = dependencies.normalizeComparableText(surface);
-        return normalizedSurface && !normalizedDraft.includes(normalizedSurface);
+        if (!normalizedSurface || normalizedDraft.includes(normalizedSurface)) return false;
+        if (!scheduledMonth) return true;
+        const tokens = normalizedSurface.split(/\s+/).filter(Boolean);
+        const monthTokenIndexes = tokens
+          .map((token, index) => monthNames.includes(token) ? index : -1)
+          .filter((index) => index >= 0);
+        if (monthTokenIndexes.length !== 1) return true;
+        const monthIndex = monthTokenIndexes[0];
+        const sourceMonth = tokens[monthIndex];
+        if (sourceMonth === scheduledMonth) return true;
+        const adaptedTokens = [...tokens];
+        adaptedTokens[monthIndex] = scheduledMonth;
+        const adaptedSurface = adaptedTokens.join(" ");
+        if (!normalizedDraft.includes(adaptedSurface)) return true;
+        temporalExactSurfaceRollovers.push({
+          source_surface: surface,
+          source_month: sourceMonth,
+          scheduled_month: scheduledMonth,
+          accepted_surface: adaptedSurface,
+          scheduled_date: scheduledDate,
+        });
+        return false;
       });
       const requiredFunctions = Array.isArray(sourceContract.must_preserve_function)
         ? sourceContract.must_preserve_function.map(String)
@@ -519,8 +552,9 @@ export async function runOperatorGateEngine<TStage extends string>(
           gate,
           "fail",
           "Draft does not satisfy the active source transformation contract.",
-                    {
+                                        {
             ...failures,
+            temporal_exact_surface_rollovers: temporalExactSurfaceRollovers,
             winner_preservation_active: manifestWinnerPreservationRequired,
             winner_preservation: winnerPreservation,
           },
@@ -539,9 +573,10 @@ export async function runOperatorGateEngine<TStage extends string>(
           gate,
           "pass",
                     "Draft satisfies the active source transformation contract.",
-          manifestWinnerPreservationRequired ? {
+                    manifestWinnerPreservationRequired ? {
             winner_preservation_active: true,
             winner_preservation: winnerPreservation,
+            temporal_exact_surface_rollovers: temporalExactSurfaceRollovers,
           } : null,
         ));
       }

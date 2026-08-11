@@ -482,6 +482,86 @@ describe("operator gate engine", () => {
     ]));
   });
 
+    it("rolls a stale month inside an exact winner surface to the scheduled month without weakening other exact surfaces", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "transform", gate_key: "source_transformation_contract_gate", severity: "block", evaluator: "hybrid" },
+    ]);
+    dependencies.getSourceCard.mockResolvedValue({
+      status: "locked",
+      primary_source: { text: "IF YOUR FINGER TOUCHED THIS IN JULY, AUGUST WILL BEGIN WITH GOOD FINANCIAL NEWS." },
+      transformation_contract: {
+        must_preserve_exact: [
+          "IF YOUR FINGER TOUCHED THIS IN JULY",
+          "WILL BEGIN WITH GOOD FINANCIAL NEWS",
+        ],
+        must_preserve_function: ["Preserve the winner's certainty level."],
+        audience_reward: "Personal timing and positive financial anticipation.",
+        winner_preservation: {
+          required: true,
+          observed_likes: 4246,
+          exact_surfaces: [
+            "IF YOUR FINGER TOUCHED THIS IN JULY",
+            "WILL BEGIN WITH GOOD FINANCIAL NEWS",
+          ],
+        },
+      },
+    });
+
+    const rolled = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-month-winner",
+      threadsUserId: "threads-month-winner",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-month-winner",
+      draftText: "IF YOUR FINGER TOUCHED THIS IN AUGUST, SEPTEMBER WILL BEGIN WITH GOOD FINANCIAL NEWS.",
+      scheduling: { date: "2026-08-11", time: "21:00", timezone: "America/New_York" },
+      draftAnalysis: {
+        preserved_functions: ["Preserve the winner's certainty level."],
+        audience_reward_delivered: true,
+      },
+    }, dependencies);
+
+    expect(rolled.showable).toBe(true);
+    expect(rolled.gate_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        gate_key: "source_transformation_contract_gate",
+        result: "pass",
+        evidence: expect.objectContaining({
+          temporal_exact_surface_rollovers: [expect.objectContaining({
+            source_surface: "IF YOUR FINGER TOUCHED THIS IN JULY",
+            source_month: "july",
+            scheduled_month: "august",
+            scheduled_date: "2026-08-11",
+          })],
+        }),
+      }),
+    ]));
+
+    const weakened = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-month-winner",
+      threadsUserId: "threads-month-winner",
+      stageScope: "gate_evaluation",
+      sourceCardId: "card-month-winner",
+      draftText: "IF YOUR HAND TOUCHED THIS IN AUGUST, SEPTEMBER WILL BEGIN WITH GOOD FINANCIAL NEWS.",
+      scheduling: { date: "2026-08-11", time: "21:00", timezone: "America/New_York" },
+      draftAnalysis: {
+        preserved_functions: ["Preserve the winner's certainty level."],
+        audience_reward_delivered: true,
+      },
+    }, dependencies);
+
+    expect(weakened.showable).toBe(false);
+    expect(weakened.blocking_failures).toEqual([
+      expect.objectContaining({
+        gate_key: "source_transformation_contract_gate",
+        evidence: expect.objectContaining({
+          missing_exact_surfaces: ["IF YOUR FINGER TOUCHED THIS IN JULY"],
+        }),
+      }),
+    ]);
+  });
+
   it("uses source-specific owner guidance instead of legacy Manifest mimicry rules", async () => {
     const dependencies = createGateEngineDependencies([
       { id: "transform", gate_key: "source_transformation_contract_gate", severity: "block", evaluator: "hybrid" },

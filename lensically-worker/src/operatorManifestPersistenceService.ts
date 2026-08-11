@@ -449,8 +449,9 @@ export async function persistOperatorManifestCandidate(
     stageScope: "gate_evaluation",
     laneKey: dependencies.normalizeMachineKey(postStrategy.pillar, "") || null,
     contentType: dependencies.normalizeText(postStrategy.format, 120, true),
-    draftAnalysis,
+        draftAnalysis,
     modelGateResults: suppliedGateResults,
+    scheduling: { date, time, timezone },
     excludedScheduledPostId: Number(exactScheduled?.id ?? 0) || null,
     excludedScheduledIdempotencyKey: scheduleIdempotencyKey,
   });

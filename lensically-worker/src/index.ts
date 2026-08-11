@@ -12155,9 +12155,16 @@ async function persistManifestAutonomousPost(
       laneKey: normalizeOperatorText(input.laneKey, 160, true),
       contentType: normalizeOperatorText(input.contentType, 160, true),
       draftAnalysis: input.draftAnalysis as Parameters<typeof runOperatorGates>[1]["draftAnalysis"],
-      modelGateResults: Array.isArray(input.modelGateResults)
+            modelGateResults: Array.isArray(input.modelGateResults)
         ? input.modelGateResults as Record<string, unknown>[]
         : [],
+      scheduling: input.scheduling && typeof input.scheduling === "object" && !Array.isArray(input.scheduling)
+        ? {
+          date: normalizeOperatorText((input.scheduling as Record<string, unknown>).date, 20, true),
+          time: normalizeOperatorText((input.scheduling as Record<string, unknown>).time, 20, true),
+          timezone: normalizeOperatorText((input.scheduling as Record<string, unknown>).timezone, 100, true),
+        }
+        : null,
       excludedScheduledPostId: Number(input.excludedScheduledPostId ?? 0) || null,
       excludedScheduledIdempotencyKey: normalizeOperatorText(input.excludedScheduledIdempotencyKey, 240, true),
     }),
