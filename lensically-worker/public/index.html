@@ -148,9 +148,20 @@
                   <a class="cta" style="margin:0;" href="https://claude.ai/new?q=Read%20https%3A%2F%2Flensically.com%2Fai%20and%20tell%20me%20what%20you%20think." target="_blank" rel="noopener noreferrer">Claude</a>
                                                       <button class="cta ai-choice-button" style="margin:0;" type="button" id="gemini-advisor-button">Gemini</button>
 
-                  <a class="cta" style="margin:0;" href="https://grok.com/?q=Read%20https%3A%2F%2Flensically.com%2Fai%20and%20tell%20me%20what%20you%20think." target="_blank" rel="noopener noreferrer">Grok</a>
+                                    <a class="cta" style="margin:0;" href="https://grok.com/?q=Read%20https%3A%2F%2Flensically.com%2Fai%20and%20tell%20me%20what%20you%20think." target="_blank" rel="noopener noreferrer">Grok</a>
                 </div>
+                <dialog class="ai-handoff-dialog" id="gemini-handoff-dialog" aria-labelledby="gemini-handoff-title">
+                  <div class="ai-handoff-card">
+                    <p class="ai-handoff-title" id="gemini-handoff-title">Prompt copied</p>
+                    <p class="ai-handoff-copy">Gemini does not support prefilled prompts from links yet. Paste the copied prompt into Gemini, then send it.</p>
+                    <div class="ai-handoff-actions">
+                      <button class="ai-handoff-cancel" type="button" id="gemini-handoff-cancel">Cancel</button>
+                      <a class="ai-handoff-open" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer" id="gemini-open-link">Open Gemini</a>
+                    </div>
+                  </div>
+                </dialog>
       </section>
+
                   <section class="section">
         <h2>Here’s What You’re Getting</h2>
         <ul class="check-list">
