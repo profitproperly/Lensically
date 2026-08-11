@@ -89,13 +89,26 @@ jobs:
             echo 'sales-root-price-97=missing'
             exit 25
           fi
-          if grep -Fq '$977' <<<"$sales_root"; then
+                    if grep -Fq '$977' <<<"$sales_root"; then
             echo 'sales-root-stale-price-977=present'
             exit 26
           else
             echo 'sales-root-stale-price-977=absent'
           fi
 
+          ai_advisory="$(curl --fail --silent --show-error https://lensically.com/ai/)"
+          if grep -Fq '$97' <<<"$ai_advisory"; then
+            echo 'ai-advisory-price-97=ok'
+          else
+            echo 'ai-advisory-price-97=missing'
+            exit 27
+          fi
+          if grep -Fq '$977' <<<"$ai_advisory"; then
+            echo 'ai-advisory-stale-price-977=present'
+            exit 28
+          else
+            echo 'ai-advisory-stale-price-977=absent'
+          fi
 
           app_status="$(curl --silent --show-error --output /tmp/app-root.html --write-out '%{http_code}' --location https://app.lensically.com/)"
           echo "app-root-http=$app_status"
