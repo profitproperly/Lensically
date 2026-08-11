@@ -347,7 +347,47 @@
         });
       });
 
+            const advisorPrompt = 'Read https://lensically.com/ai and tell me what you think.';
+      const geminiButton = document.getElementById('gemini-advisor-button');
+      const geminiDialog = document.getElementById('gemini-handoff-dialog');
+      const geminiCancel = document.getElementById('gemini-handoff-cancel');
+      const geminiOpen = document.getElementById('gemini-open-link');
+
+      const copyAdvisorPrompt = async () => {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(advisorPrompt);
+          return true;
+        }
+        const textarea = document.createElement('textarea');
+        textarea.value = advisorPrompt;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        return copied;
+      };
+
+      if (geminiButton && geminiDialog) {
+        geminiButton.addEventListener('click', async () => {
+          try {
+            await copyAdvisorPrompt();
+          } catch (_) {}
+          if (typeof geminiDialog.showModal === 'function') {
+            geminiDialog.showModal();
+          } else {
+            window.alert('Prompt copied. Paste it into Gemini, then send it.');
+            window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer');
+          }
+        });
+        if (geminiCancel) geminiCancel.addEventListener('click', () => geminiDialog.close());
+        if (geminiOpen) geminiOpen.addEventListener('click', () => geminiDialog.close());
+      }
+
       const updateStickyBuy = () => {
+
         if (!stickyBuy || !shell) return;
         const checkoutSection = document.getElementById('checkout');
         const checkoutRect = checkoutSection ? checkoutSection.getBoundingClientRect() : shell.getBoundingClientRect();
