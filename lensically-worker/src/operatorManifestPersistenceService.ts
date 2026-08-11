@@ -433,18 +433,26 @@ export async function persistOperatorManifestCandidate(
     audience_reward_delivered: true,
     contract_declarations_injected_by_backend: true,
   };
-    const suppliedGateSummary = record(modelEvaluation.gate_summary);
+      const suppliedGateSummary = record(modelEvaluation.gate_summary);
   const suppliedGateResults = records(suppliedGateSummary.results);
   const canonicalHardBans = await dependencies.listHardBans(brandKey);
+  const identityHash = await dependencies.sha256(`${brandKey}|${cycleId}|${slotKey}|${operationId}`);
+  const runId = `autonomous-run-${identityHash.slice(0, 32)}`;
+  const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
+  const lineupId = `autonomous-lineup-${identityHash.slice(0, 32)}`;
+  const inventoryId = `autonomous-inventory-${identityHash.slice(0, 32)}`;
 
   const serverGateSuite = await dependencies.runGateSuite({
     sourceCardId,
+    draftId,
     draftText: text,
     stageScope: "gate_evaluation",
     laneKey: dependencies.normalizeMachineKey(postStrategy.pillar, "") || null,
     contentType: dependencies.normalizeText(postStrategy.format, 120, true),
     draftAnalysis,
     modelGateResults: suppliedGateResults,
+    excludedScheduledPostId: Number(exactScheduled?.id ?? 0) || null,
+    excludedScheduledIdempotencyKey: scheduleIdempotencyKey,
   });
   if (!serverGateSuite.gate_results.length) {
     return rejectPersist("required_candidate_gate_execution_empty", { slot_key: slotKey }, slotKey);
@@ -529,12 +537,7 @@ export async function persistOperatorManifestCandidate(
     modelEvaluation,
   });
 
-  const identityHash = await dependencies.sha256(`${brandKey}|${cycleId}|${slotKey}|${operationId}`);
-  const runId = `autonomous-run-${identityHash.slice(0, 32)}`;
-  const draftId = `autonomous-draft-${identityHash.slice(0, 32)}`;
-  const lineupId = `autonomous-lineup-${identityHash.slice(0, 32)}`;
-  const inventoryId = `autonomous-inventory-${identityHash.slice(0, 32)}`;
-  const strategy: JsonRecord = {
+    const strategy: JsonRecord = {
     ...postStrategy,
     autonomous_engine_version: dependencies.growthEngineVersion,
     autonomous_cycle_id: cycleId,

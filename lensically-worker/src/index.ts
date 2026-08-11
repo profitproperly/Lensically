@@ -8366,8 +8366,10 @@ async function runOperatorGates(
     laneKey?: string | null;
     contentType?: string | null;
     draftAnalysis?: Record<string, unknown> | null;
-    modelGateResults?: Array<Record<string, unknown>> | null;
+        modelGateResults?: Array<Record<string, unknown>> | null;
     scheduling?: { date?: string | null; time?: string | null; timezone?: string | null } | null;
+    excludedScheduledPostId?: number | null;
+    excludedScheduledIdempotencyKey?: string | null;
   },
 ): Promise<{ showable: boolean; gate_results: Record<string, unknown>[]; blocking_failures: Record<string, unknown>[]; warnings: string[] }> {
   return runOperatorGateEngine({
@@ -8381,8 +8383,10 @@ async function runOperatorGates(
     laneKey: input.laneKey,
     contentType: input.contentType,
     draftAnalysis: input.draftAnalysis,
-    modelGateResults: input.modelGateResults,
+        modelGateResults: input.modelGateResults,
     scheduling: input.scheduling,
+    excludedScheduledPostId: input.excludedScheduledPostId ?? null,
+    excludedScheduledIdempotencyKey: input.excludedScheduledIdempotencyKey ?? null,
   }, {
     defaultTimezone: WORKSPACE_DEFAULT_TIMEZONE,
     prepare: () => prepareOperatorMode(env),
@@ -8405,7 +8409,14 @@ async function runOperatorGates(
       null,
     ),
     getLatestInventory: (brandKey) => getLatestOperatorInventory(env, brandKey as GptBrandKey),
-    findExactDuplicate: async ({ accountId, threadsUserId, draftId, normalizedDraft }) => {
+        findExactDuplicate: async ({
+      accountId,
+      threadsUserId,
+      draftId,
+      normalizedDraft,
+      excludedScheduledPostId,
+      excludedScheduledIdempotencyKey,
+    }) => {
       const duplicateRows = await env.DB.prepare(
         `SELECT text AS candidate_text, 'draft' AS source_type
          FROM gpt_generation_drafts
@@ -8419,13 +8430,19 @@ async function runOperatorGates(
         (row) => normalizeComparableText(row.candidate_text) === normalizedDraft,
       ) ?? null;
       if (!duplicate) {
-        const scheduledRows = await env.DB.prepare(
+                const scheduledRows = await env.DB.prepare(
           `SELECT post_text AS candidate_text, 'scheduled_post' AS source_type
            FROM scheduled_posts
            WHERE threads_user_id = ?
+             AND id <> COALESCE(?, 0)
+             AND COALESCE(idempotency_key, '') <> COALESCE(?, '')
            ORDER BY scheduled_time DESC
            LIMIT 200`,
-        ).bind(threadsUserId).all<{ candidate_text: string; source_type: string }>();
+        ).bind(
+          threadsUserId,
+          excludedScheduledPostId ?? 0,
+          excludedScheduledIdempotencyKey ?? '',
+        ).all<{ candidate_text: string; source_type: string }>();
         duplicate = (scheduledRows.results ?? []).find(
           (row) => normalizeComparableText(row.candidate_text) === normalizedDraft,
         ) ?? null;
@@ -12128,9 +12145,10 @@ async function persistManifestAutonomousPost(
         extractOpeningPhrase: (text) => extractOpeningPhrase(text) ?? "",
 
     listHardBans: (brandKey) => listManifestHardBans(env.DB, brandKey),
-    runGateSuite: (input) => runOperatorGates(env, {
+        runGateSuite: (input) => runOperatorGates(env, {
       brand,
       sourceCardId: normalizeOperatorText(input.sourceCardId, 160, true),
+      draftId: normalizeOperatorText(input.draftId, 160, true),
       draftText: normalizeOperatorText(input.draftText, 20000, true) ?? "",
             stageScope: "gate_evaluation",
 
@@ -12140,6 +12158,8 @@ async function persistManifestAutonomousPost(
       modelGateResults: Array.isArray(input.modelGateResults)
         ? input.modelGateResults as Record<string, unknown>[]
         : [],
+      excludedScheduledPostId: Number(input.excludedScheduledPostId ?? 0) || null,
+      excludedScheduledIdempotencyKey: normalizeOperatorText(input.excludedScheduledIdempotencyKey, 240, true),
     }),
     recordGateReceipt: (input) => recordManifestCandidateGateReceipt(
       env.DB,

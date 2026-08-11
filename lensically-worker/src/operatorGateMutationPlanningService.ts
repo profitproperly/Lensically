@@ -208,8 +208,10 @@ type OperatorGateEngineInput<TStage extends string> = {
   laneKey?: string | null;
   contentType?: string | null;
   draftAnalysis?: Record<string, unknown> | null;
-  modelGateResults?: Array<Record<string, unknown>> | null;
+    modelGateResults?: Array<Record<string, unknown>> | null;
   scheduling?: { date?: string | null; time?: string | null; timezone?: string | null } | null;
+  excludedScheduledPostId?: number | null;
+  excludedScheduledIdempotencyKey?: string | null;
 };
 
 type OperatorGateEngineDependencies<TStage extends string> = {
@@ -225,11 +227,13 @@ type OperatorGateEngineDependencies<TStage extends string> = {
   getRejectionContext(): Promise<Record<string, unknown> | null>;
   getLatestContextAdmission(brandKey: string): Promise<Record<string, unknown> | null>;
   getLatestInventory(brandKey: string): Promise<Record<string, unknown> | null>;
-  findExactDuplicate(input: {
+    findExactDuplicate(input: {
     accountId: string;
     threadsUserId: string;
     draftId: string | null;
     normalizedDraft: string;
+    excludedScheduledPostId: number | null;
+    excludedScheduledIdempotencyKey: string | null;
   }): Promise<{ source_type: string } | null>;
   getDraft(draftId: string): Promise<Record<string, unknown> | null>;
   listScheduledPosts(input: {
@@ -884,11 +888,13 @@ export async function runOperatorGateEngine<TStage extends string>(
       continue;
     }
     if (gateKey === "exact_duplicate_gate") {
-      const duplicate = await dependencies.findExactDuplicate({
+            const duplicate = await dependencies.findExactDuplicate({
         accountId: input.accountId,
         threadsUserId: input.threadsUserId,
         draftId: input.draftId ?? null,
         normalizedDraft,
+        excludedScheduledPostId: input.excludedScheduledPostId ?? null,
+        excludedScheduledIdempotencyKey: input.excludedScheduledIdempotencyKey ?? null,
       });
       results.push(duplicate
         ? buildOperatorGateResult(
