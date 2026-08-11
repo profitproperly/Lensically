@@ -23,11 +23,20 @@ severity: P1
 root_cause: The model guessed `lensically-web/app/ai/page.tsx` instead of discovering the exact repository path first. The follow-up generic `patch_file` route then failed because `ENGINEERING_CONTINUATION.md` exceeds that route's 100 KB content ceiling.
 verified_resolution: Engineering audit identified the live AI brief source as `lensically-worker/public/ai/index.html`. Existing `AGENTS.md` rules already require unknown-location discovery before reads and require `applyRepoTextPatch` for oversized known files, so the durable prevention contract was already source-controlled; this incident records the violation and exact recovery route.
 
-## ACTIVE — AI Brief Repositioning
+## Completed — AI Brief Repositioning
 
 job_id: `ai-page-reposition-20260811`
-objective: Replace the current proof-heavy AI brief with a materially stronger evaluator brief that explains the real transferred asset: a finished Threads operator plus an owned, extensible, AI-operable software environment and reusable operator architecture, without exposing proprietary implementation details.
-current_action: Read the current `lensically-worker/public/ai/index.html` once, rewrite it coherently, update live-proof assertions to the new contract, validate, release the exact tested SHA, verify live `/ai`, and close this job.
+- Replaced the proof-heavy `/ai` brief with a product-architecture brief centered on four buyer truths: finished Threads product, customer ownership, AI-operable software environment, and extensible operator architecture.
+- Removed Manifest Mental performance examples and the account-specific evidence argument from `/ai`; the page no longer depends on post likes, follower movement, or seller-account results to establish value.
+- Added explicit distinction between ordinary SaaS AI access and ownership-level AI access: the buyer's authorized AI can operate the Threads product and work on the buyer's owned software environment.
+- Added setup positioning that accurately frames installation as configuration of an already-built system rather than construction from source.
+- Added portability boundaries: Threads is the included finished implementation; the reusable operator architecture can be adapted internally, while other platform integrations are not represented as included.
+- Protected proprietary implementation details by explaining the consequences of bounded execution, continuity, validation, recovery, idempotency, release controls, and secret boundaries without publishing private thresholds, production history, credentials, or seller internals.
+- Corrected the `/ai` structured-data offer from stale `$977` to the active `$97` one-time price.
+- Rewrote `lensically-ai-brief-live-proof.yml` so production verification enforces the new ownership/extensibility contract and fails if Manifest Mental proof language or stale `$977` returns.
+- Validation: workflow lint passed on exact final source SHA `c2ef19054a42f663118f12f7d200c277d92fbe13` (push run `31543713988`). Exact-SHA production release run `31543743234` passed all release gates and live runtime verification. AI brief live proof run `31543962011` passed against production.
+- Production SHA: `c2ef19054a42f663118f12f7d200c277d92fbe13`.
+- Status: completed.
 
 ## Completed — Stripe Catalog Reconciliation
 
