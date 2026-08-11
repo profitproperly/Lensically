@@ -98,7 +98,18 @@
     .sticky-buy-price span { color:#777; font-size:12px; font-weight:650; }
     .sticky-buy-badge { display:none; padding:2px 6px; border-radius:3px; background:#f00; color:#fff; font-size:10px; font-weight:900; text-decoration:none; }
     .sticky-buy-button { min-width:146px; min-height:56px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:7px; background:#111; color:#fff; text-decoration:none; font-size:15px; font-weight:850; }
-    .sticky-buy-button svg { width:17px; height:17px; }
+        .sticky-buy-button svg { width:17px; height:17px; }
+    .ai-choice-button { border:0; font-family:inherit; cursor:pointer; }
+    .ai-handoff-dialog { width:min(430px,calc(100% - 32px)); padding:0; border:0; border-radius:12px; background:#fff; color:#111; box-shadow:0 22px 70px rgba(0,0,0,.28); }
+    .ai-handoff-dialog::backdrop { background:rgba(0,0,0,.58); }
+    .ai-handoff-card { padding:22px; }
+    .ai-handoff-title { margin:0 0 8px; font-size:21px; font-weight:850; letter-spacing:-.03em; }
+    .ai-handoff-copy { margin:0; color:#555; font-size:14px; line-height:1.5; }
+    .ai-handoff-actions { margin-top:18px; display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
+    .ai-handoff-actions button,.ai-handoff-actions a { min-height:48px; display:flex; align-items:center; justify-content:center; border-radius:8px; font:inherit; font-size:14px; font-weight:800; text-decoration:none; cursor:pointer; }
+    .ai-handoff-cancel { border:1px solid #ddd; background:#fff; color:#111; }
+    .ai-handoff-open { border:1px solid #111; background:#111; color:#fff; }
+
         @media (min-width:760px) {
       
       .intro { padding:16px 0 0; }
