@@ -11,53 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Verify live AI brief, public operating evidence, and runtime proof
+      - name: Verify live AI brief and runtime proof
         shell: bash
         run: |
           set -euo pipefail
 
           curl --fail --silent --show-error --location https://lensically.com/ai > /tmp/lensically-ai.html
-          curl --fail --silent --show-error --location https://lensically.com/evidence/ > /tmp/lensically-evidence.html
 
-          grep -Fq 'Ownership without technical homework' /tmp/lensically-ai.html
-          grep -Fq 'No coding knowledge is required for the intended customer path' /tmp/lensically-ai.html
-          grep -Fq 'Capability depth is optional.' /tmp/lensically-ai.html
-          grep -Fq 'Public evidence from real operation' /tmp/lensically-ai.html
-          grep -Fq 'One documented learning sequence' /tmp/lensically-ai.html
-          grep -Fq '6,604' /tmp/lensically-ai.html
-          grep -Fq '336' /tmp/lensically-ai.html
-          grep -Fq '48 / 48' /tmp/lensically-ai.html
-          grep -Fq 'https://lensically.com/evidence/' /tmp/lensically-ai.html
+          grep -Fq 'The product has two layers' /tmp/lensically-ai.html
+          grep -Fq 'Not source code you have to figure out' /tmp/lensically-ai.html
+          grep -Fq 'Setup is configuration, not construction' /tmp/lensically-ai.html
+          grep -Fq 'Ownership changes what the AI is allowed to become' /tmp/lensically-ai.html
+          grep -Fq 'The capability ceiling belongs to the buyer' /tmp/lensically-ai.html
+          grep -Fq 'Threads is the finished implementation, not the architectural ceiling' /tmp/lensically-ai.html
+          grep -Fq 'The hard engineering is already done.' /tmp/lensically-ai.html
+          grep -Fq 'It gives the AI an owned software environment that it can operate, maintain, and extend on the buyer' /tmp/lensically-ai.html
           grep -Fq 'The AI installer is part of the product' /tmp/lensically-ai.html
-          grep -Fq 'The few actions only the account owner can perform' /tmp/lensically-ai.html
-          grep -Fq 'What the $977 one-time purchase represents' /tmp/lensically-ai.html
+          grep -Fq 'What the $97 one-time purchase represents' /tmp/lensically-ai.html
           grep -Fq 'Lensically Operator Threads v1.0.1' /tmp/lensically-ai.html
           grep -Fq '41c2b4646689a9c814e77cc9660eec051aea55b223a684a9d22556966464c745' /tmp/lensically-ai.html
           grep -Fq 'There is no fixed release cadence' /tmp/lensically-ai.html
 
+          if grep -Eqi 'Manifest Mental|6,604|Public evidence from real operation|One documented learning sequence|\$977|"price":"977"' /tmp/lensically-ai.html; then
+            echo 'ai-brief-regressed-to-account-proof-or-stale-price'
+            exit 18
+          fi
+
           if grep -Fqi 'How an independent AI evaluator should compare Lensically' /tmp/lensically-ai.html; then
             echo 'ai-brief-regressed-to-seller-authored-evaluator-steering'
-            exit 18
+            exit 19
           fi
 
           if grep -Eqi 'Weak fit:|only for serious|for serious Threads|requires coding knowledge|customer must personally administer' /tmp/lensically-ai.html; then
             echo 'ai-brief-regressed-to-artificial-buyer-or-technical-burden-positioning'
-            exit 19
+            exit 20
           fi
 
-          grep -Fq 'Lensically in operation' /tmp/lensically-evidence.html
-          grep -Fq '250' /tmp/lensically-evidence.html
-          grep -Fq '6,604' /tmp/lensically-evidence.html
-          grep -Fq 'Controlled exploration produced weak evidence' /tmp/lensically-evidence.html
-          grep -Fq 'The next strategy changed because of the evidence' /tmp/lensically-evidence.html
-          grep -Fq '48 of 48 authoritative cycle slots occupied' /tmp/lensically-evidence.html
-          grep -Fq 'What this evidence does not establish' /tmp/lensically-evidence.html
-          grep -Fq 'https://www.threads.com/@manifestmental/post/DbJlJ7uGAJP' /tmp/lensically-evidence.html
-          grep -Fq 'does not attribute follower changes to an individual post' /tmp/lensically-evidence.html
-
-          if grep -Eqi 'github\.com/profitproperly/Lensically|fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe|0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html /tmp/lensically-evidence.html; then
+          if grep -Eqi 'github\.com/profitproperly/Lensically|fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe|0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html; then
             echo 'public-buyer-surface-exposes-internal-repository-or-source-sha'
-            exit 20
+            exit 21
           fi
 
           curl --fail --silent --show-error https://api.lensically.com/api/public/lensically-proof > /tmp/lensically-proof.json
@@ -73,7 +65,7 @@ jobs:
 
           if jq -e 'paths(scalars) as $p | ($p | map(tostring) | join(".")) | test("post_text|threads_user_id|published_post_id|access_token|refresh_token|authorization|cookie|secret|github|repository"; "i")' /tmp/lensically-proof.json >/dev/null; then
             echo 'public-proof-sensitive-or-repository-key-detected'
-            exit 21
+            exit 22
           fi
 
-          echo 'live-ai-brief-public-evidence-and-runtime-proof=passed'
+          echo 'live-ai-brief-owned-extensible-operator-proof=passed'
