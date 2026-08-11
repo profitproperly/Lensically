@@ -75,6 +75,8 @@
 - Check the current repository head before mutations.
 - Use Profit Properly credentials for `profitproperly/Lensically`. Do not fall back to global personal GitHub or Cloudflare identity unless the owner explicitly asks for that account.
 - Large Worker files use Git blob, tree, commit, and ref APIs rather than the GitHub Contents API.
+- Files larger than the repository mutation byte limit, including `ENGINEERING_CONTINUATION.md`, must never use `operateGitHubRepositories.patch_file`; use `applyRepoTextPatch` for exact replacements or the chunked large-file write path for whole-file changes.
+
 - Known exact files should be read once through the main bounded file-read route and searched locally. Free-text or unknown-location repository discovery uses Recovery; do not send it through the main public gateway.
 - Exact text replacements must match once. A stale head or ambiguous anchor requires refreshed source and corrected input, not a new route.
 - YAML workflow changes require complete-block or whole-file replacement, correct indentation, and readback before dispatch.
