@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
-updated_at: 2026-08-10
+status: active
+updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: stripe-catalog-reconcile-20260811
+active_checkpoint: refresh_mcp_then_archive_old_stripe_catalog
 validated_source_head: 6661152d7a0e068060898a3cf3c4647ba6af019f
 documentation_source_head: 6661152d7a0e068060898a3cf3c4647ba6af019f
 production_sha: 6661152d7a0e068060898a3cf3c4647ba6af019f
