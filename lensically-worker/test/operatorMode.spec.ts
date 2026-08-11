@@ -7647,13 +7647,20 @@ active_checkpoint: none
     });
         expect(Number(memoryCountAfter?.total ?? 0)).toBe(Number(memoryCountBefore?.total ?? 0));
 
-    const listed = await mcpTool<{ deletion_history_exposed_to_model: boolean; deleted_items?: unknown[] }>("list_scheduled_posts", {
+        const listed = await mcpTool<{
+      deletion_history_exposed_to_model: boolean;
+      deletions?: Array<Record<string, unknown>>;
+      deletion_count?: number;
+    }>("list_scheduled_posts", {
       brand_key: BRAND_KEY,
       date: "2099-01-03",
       timezone: "America/New_York",
     });
-    expect(listed.deletion_history_exposed_to_model).toBe(false);
-    expect(listed.deleted_items).toBeUndefined();
+    expect(listed.deletion_history_exposed_to_model).toBe(true);
+    expect(Number(listed.deletion_count ?? 0)).toBeGreaterThanOrEqual(1);
+    expect(listed.deletions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scheduled_post_id: scheduledPostId, reason_code: "technical_corruption" }),
+    ]));
   }, 30000);
 
   it.skip("retired: free-text bulk scheduled-post deletion and recovery history", async () => {
