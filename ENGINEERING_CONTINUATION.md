@@ -1,18 +1,27 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-10
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: manifest-hidden-schedule-side-effect-20260810
+active_checkpoint: trace_and_repair_idempotent_gate_self_collision
 validated_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
 documentation_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
 production_sha: 99d0c284bb8203c2703a1577a695d69244ad4a83
-active_interrupt_id: none
-active_interrupt_state: resolved
-active_interrupt_precedence: none
+active_interrupt_id: manifest-hidden-schedule-side-effect-20260810
+active_interrupt_state: detected
+active_interrupt_precedence: P1
+
+## Active P1 Interrupt: manifest-hidden-schedule-side-effect-20260810
+
+- Trigger: Main Cycle batch `manifest-cycle-2026-08-10T20-14-00-04-batch-02` reported both candidates rejected with `accepted_count: 0`, but scheduled post `1039` was created at `2026-08-11 00:29:50` for the exact 01:00 candidate text. Later authoritative coverage treated 01:00 as occupied, while batch `...-batch-02b` again reported that replacement candidate as not persisted. `auditScheduledPost(1039)` proves the hidden scheduled side effect exists.
+- Impact: a candidate can be reported as rejected while leaving an approved scheduled post behind. Regeneration can then self-collide with that hidden row, misreport acceptance, and risk duplicate or wrong-slot handling. Batch persistence cannot be trusted until response truth and idempotent resume semantics are repaired.
+- Working root-cause hypothesis: persistence can encounter an exact idempotent scheduled row on resume and exclude it from its early duplicate probe, but the later global gate suite does not exclude that same scheduled row and can reject the candidate against its own prior side effect. The batch wrapper then treats the result as rejected even though authoritative coverage is occupied.
+- Current action: trace the exact schedule-creation/replay path and global duplicate-gate exclusion contract; repair idempotent resume so an exact prior scheduled side effect is either reconciled as a reused successful candidate with complete lineage or deterministically recovered, never hidden behind a rejected response. Add regression coverage proving rejected candidates cannot leave undisclosed schedule mutations and exact idempotent rows cannot self-fail duplicate gates.
+- Reconciliation requirement: verify whether scheduled post `1039` has complete source/strategy/plan/hypothesis lineage for plan item `54d1af54-48e2-4e40-8485-7abaaeec9d37`. Preserve it only if fully valid; otherwise retire it as technical corruption before resuming the cycle.
+- Deferred objective: resume the same cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` after verified repair and complete the remaining runway without preparing a second cycle.
 
 ## Resolved P1 Interrupt: manifest-batch-expected-gate-control-20260810
 
