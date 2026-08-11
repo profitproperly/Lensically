@@ -14,15 +14,20 @@ active_interrupt_id: none
 active_interrupt_state: resolved
 active_interrupt_precedence: none
 
-## ACTIVE INTERRUPT — AI Page Path Discovery
+## Resolved P1 Interrupt — AI Page Path Discovery
 
 interrupt_id: `ai-page-path-discovery-20260811`
 incident_ids: `66a81f73-8137-4833-a406-41c986324f38`, `385a3385-c941-42d1-a084-a9245ff96b6c`
-state: active
+state: resolved
 severity: P1
 root_cause: The model guessed `lensically-web/app/ai/page.tsx` instead of discovering the exact repository path first. The follow-up generic `patch_file` route then failed because `ENGINEERING_CONTINUATION.md` exceeds that route's 100 KB content ceiling.
-prevention: Never guess an unknown repository path. Discover it from `list_files` or a verified search before any read or mutation. For the canonical continuation ledger, use the dedicated server-side `applyRepoTextPatch` path rather than the generic repository patch route.
-current_action: Discover the exact AI page path from repository files, verify it, resolve this interrupt, then resume the AI-page repositioning objective.
+verified_resolution: Engineering audit identified the live AI brief source as `lensically-worker/public/ai/index.html`. Existing `AGENTS.md` rules already require unknown-location discovery before reads and require `applyRepoTextPatch` for oversized known files, so the durable prevention contract was already source-controlled; this incident records the violation and exact recovery route.
+
+## ACTIVE — AI Brief Repositioning
+
+job_id: `ai-page-reposition-20260811`
+objective: Replace the current proof-heavy AI brief with a materially stronger evaluator brief that explains the real transferred asset: a finished Threads operator plus an owned, extensible, AI-operable software environment and reusable operator architecture, without exposing proprietary implementation details.
+current_action: Read the current `lensically-worker/public/ai/index.html` once, rewrite it coherently, update live-proof assertions to the new contract, validate, release the exact tested SHA, verify live `/ai`, and close this job.
 
 ## Completed — Stripe Catalog Reconciliation
 
