@@ -1,18 +1,25 @@
 # Lensically Continuation Ledger
 
-status: completed
-updated_at: 2026-08-09
+status: active
+updated_at: 2026-08-10
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: manifest-batch-expected-gate-control-20260810
+active_checkpoint: repair_expected_control_classifier
 validated_source_head: 40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce
 documentation_source_head: c869093130a78983868b638dfec6f00c679ed1a5
-production_sha: 40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce
-active_interrupt_id: none
-active_interrupt_state: resolved
-active_interrupt_precedence: none
+production_sha: 2b92ba0b6109f2714480f509ff67f08aae1c7a53
+active_interrupt_id: manifest-batch-expected-gate-control-20260810
+active_interrupt_state: detected
+active_interrupt_precedence: P1
+
+## Active P1 Interrupt: manifest-batch-expected-gate-control-20260810
+
+- Trigger: live Main Cycle batch `manifest-cycle-2026-08-10T20-14-00-04-batch-02` correctly rejected two candidates for known duplicate-content gates, but `persist_manifest_autonomous_batch` was classified as an unexplained tool failure and automatically opened blocking hardening incident `793f248b-dc46-4ffe-982d-d24186c9cccc`.
+- Root cause: `isExpectedHardeningControlResult` contains the normal Manifest persistence rejection taxonomy only for `persist_manifest_autonomous_post`; the batch tool returns candidate-level errors inside `results[]` with no top-level error, so its expected duplicate/gate feedback falls through as `unexpected_result` and is escalated to a novel P1.
+- Current action: extend expected-control classification to batch persistence only when every returned candidate failure belongs to the existing Manifest persistence rejection taxonomy; add regression coverage proving all-expected batches do not harden while mixed unexpected failures still do; validate, release the exact repaired SHA, verify live, close the hardening incident, then resume cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` from the rejected slots without preparing a second cycle.
+- Deferred objective: complete the active Manifest Mental 48-hour cycle to zero missing slots. Accepted scheduled posts `1037` and `1038` remain preserved.
 
 ## Resolved P1 Interrupt: repository-large-file-generic-patch-route-20260810
 
