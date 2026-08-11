@@ -1,18 +1,30 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: stripe-catalog-reconcile-20260811
-active_checkpoint: refresh_mcp_then_archive_old_stripe_catalog
-validated_source_head: 6661152d7a0e068060898a3cf3c4647ba6af019f
-documentation_source_head: 6661152d7a0e068060898a3cf3c4647ba6af019f
-production_sha: 6661152d7a0e068060898a3cf3c4647ba6af019f
+active_job_id: none
+active_checkpoint: none
+validated_source_head: d80663a3f7f11dbe81a2d900a7fc314a140ca208
+documentation_source_head: d80663a3f7f11dbe81a2d900a7fc314a140ca208
+production_sha: d80663a3f7f11dbe81a2d900a7fc314a140ca208
 active_interrupt_id: none
 active_interrupt_state: resolved
 active_interrupt_precedence: none
+
+## Completed — Stripe Catalog Reconciliation
+
+job_id: `stripe-catalog-reconcile-20260811`
+
+- Stripe now has exactly one active product: `Lensically Operator for Threads — Commercial License` (`prod_V0574p9of5FVl1`). The older `prod_V051TLKhvd3YyF` is archived.
+- Exactly one active price remains: one-time USD 97 (`price_1U3Hro4dwsz5Id6rKaAguF1o`), and it is the commercial product default. Both historical USD 997 prices are inactive.
+- Commercial product metadata now records `launch_price_usd=97`.
+- Root sales page hero, checkout summary, and sticky buy bar were corrected from `$977` to `$97`; exact source release SHA is `d80663a3f7f11dbe81a2d900a7fc314a140ca208`.
+- Prevention: the production commercial checkout smoke now verifies the root sales page contains `$97` and rejects stale `$977`, closing the coverage gap that previously checked only `/operator/`.
+- Validation/release: workflow lint run `31511572668` passed; exact-SHA production deployment `31511632795` passed release gates and runtime verification; live commercial checkout smoke `31511957617` passed with the new price guard and embedded Checkout proof.
+- Status: completed. No active continuation remains for this job.
 
 ## Resolved P1 Interrupt: manifest-temporal-winner-surface-20260810
 
