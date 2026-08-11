@@ -297,6 +297,15 @@ export async function handleOperatorStripeTool(
     return stripeRequest(env, "/prices", { method: "POST", params, idempotencyKey: operationId });
   }
 
+    if (operation === "update_price") {
+    const priceId = normalizeText(args.price_id, 255);
+    if (!priceId) return { ok: false, error: "price_id_required" };
+    const active = normalizeBoolean(args.active);
+    if (active !== null) params.set("active", String(active));
+    if (!params.toString()) return { ok: false, error: "price_update_fields_required" };
+    return stripeRequest(env, `/prices/${encodeURIComponent(priceId)}`, { method: "POST", params, idempotencyKey: operationId });
+  }
+
   if (operation === "create_customer") {
     const email = normalizeText(args.email, 320);
     const customerName = normalizeText(args.customer_name ?? args.name, 250);
