@@ -1,25 +1,28 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-10
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-batch-expected-gate-control-20260810
-active_checkpoint: repair_expected_control_classifier
-validated_source_head: 40c7d3d7e6324ce846ae989f6fc4fdd4c1a203ce
-documentation_source_head: c869093130a78983868b638dfec6f00c679ed1a5
-production_sha: 2b92ba0b6109f2714480f509ff67f08aae1c7a53
-active_interrupt_id: manifest-batch-expected-gate-control-20260810
-active_interrupt_state: detected
-active_interrupt_precedence: P1
+active_job_id: none
+active_checkpoint: none
+validated_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
+documentation_source_head: 99d0c284bb8203c2703a1577a695d69244ad4a83
+production_sha: 99d0c284bb8203c2703a1577a695d69244ad4a83
+active_interrupt_id: none
+active_interrupt_state: resolved
+active_interrupt_precedence: none
 
-## Active P1 Interrupt: manifest-batch-expected-gate-control-20260810
+## Resolved P1 Interrupt: manifest-batch-expected-gate-control-20260810
 
 - Trigger: live Main Cycle batch `manifest-cycle-2026-08-10T20-14-00-04-batch-02` correctly rejected two candidates for known duplicate-content gates, but `persist_manifest_autonomous_batch` was classified as an unexplained tool failure and automatically opened blocking hardening incident `793f248b-dc46-4ffe-982d-d24186c9cccc`.
-- Root cause: `isExpectedHardeningControlResult` contains the normal Manifest persistence rejection taxonomy only for `persist_manifest_autonomous_post`; the batch tool returns candidate-level errors inside `results[]` with no top-level error, so its expected duplicate/gate feedback falls through as `unexpected_result` and is escalated to a novel P1.
-- Current action: extend expected-control classification to batch persistence only when every returned candidate failure belongs to the existing Manifest persistence rejection taxonomy; add regression coverage proving all-expected batches do not harden while mixed unexpected failures still do; validate, release the exact repaired SHA, verify live, close the hardening incident, then resume cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` from the rejected slots without preparing a second cycle.
-- Deferred objective: complete the active Manifest Mental 48-hour cycle to zero missing slots. Accepted scheduled posts `1037` and `1038` remain preserved.
+- Root cause: `isExpectedHardeningControlResult` covered the normal Manifest persistence rejection taxonomy only for `persist_manifest_autonomous_post`; the batch tool returns candidate-level errors inside `results[]` with no top-level error, so expected duplicate/gate feedback fell through as `unexpected_result` and escalated to a novel P1.
+- Durable repair: SHA `82f9932edf9e974f465264be1443dc4e3d2bc620` extends the same Manifest persistence taxonomy to `persist_manifest_autonomous_batch` only when every returned candidate error is expected; any mixed unexpected candidate failure still hardens normally. Regression coverage proves both paths.
+- Validation hardening: the first operator campaign exposed an unrelated stale assertion that still expected scheduled-post deletion history to be hidden after the intentional deletion-visibility repair. SHA `99d0c284bb8203c2703a1577a695d69244ad4a83` updates that regression to require visible, unobserved deletion history. Operator test run `31446481354` passed all eight shards and full push-validation run `31446475838` passed.
+- Release: exact-SHA worker deployment `31446658447` succeeded for `99d0c284bb8203c2703a1577a695d69244ad4a83`; live verifier confirmed current handler, fresh endpoint, and shared release authority all match that SHA with 86 tools.
+- Live proof: replaying the exact previously rejected batch on the repaired runtime returned the same expected `exact_duplicate_post` and `candidate_gate_suite_failed` outcomes without a new blocking incident and returned `resolved_hardening_incidents: 1`, closing the original P1 by exact request fingerprint.
+- Resume: continue cycle `52fd6fee-4142-4869-a324-0d8c6e73fe2c` from the rejected 00:00 and 01:00 slots using materially different source-backed candidates; do not prepare a second cycle. Accepted scheduled posts `1037` and `1038` remain preserved.
 
 ## Resolved P1 Interrupt: repository-large-file-generic-patch-route-20260810
 
