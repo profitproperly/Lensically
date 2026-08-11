@@ -1790,14 +1790,18 @@ if (!operatorManifestBatchPersistenceService.includes("export async function per
         || !operatorManifestBatchPersistenceService.includes("candidates.length < 1 || candidates.length > 2")
     || !operatorManifestBatchPersistenceService.includes("deferCoverageReconciliation: true")
     || !operatorManifestBatchPersistenceService.includes("reconciliation_count: 1")
-    || !operatorManifestBatchPersistenceService.includes("Regenerate only the rejected slots")
+    || !operatorManifestBatchPersistenceService.includes("Retry the exact candidate operation_ids listed in partial_side_effects")
+    || !operatorManifestBatchPersistenceService.includes("Regenerate only the genuinely rejected slots")
         || !operatorManifestBatchPersistenceServiceTests.includes("preserves successful siblings and reconciles once for a safe two-post Main batch")
+    || !operatorManifestBatchPersistenceServiceTests.includes("surfaces a failed candidate that already created a schedule as an exact-operation recovery")
+    || !operatorManifestBatchPersistenceServiceTests.includes("preserves nonfatal occupied-slot outcomes instead of relabeling them as candidate_not_persisted")
     || !operatorManifestBatchPersistenceServiceTests.includes("does not reconcile when every candidate is rejected")
         || !operatorManifestBatchPersistenceServiceTests.includes("rejects Main batch sizes above two before item persistence")) {
   lifecycleErrors.push("operator_manifest_batch_persistence_service_incomplete");
 }
 if (!operatorManifestPersistenceServiceTests.includes("blocks exact duplicate text before source and gate execution")
     || !operatorManifestPersistenceServiceTests.includes("executes canonical hard bans server-side without model-written pass evidence")
+    || !operatorManifestPersistenceServiceTests.includes("carries deterministic same-operation identities into gates so a concurrent replay can converge")
     || !operatorManifestPersistenceServiceTests.includes("blocks publication and records exact missing lineage stages")
     || !operatorManifestPersistenceServiceTests.includes("persists complete lineage and leaves the next authoritative slot open")
     || !operatorManifestPersistenceServiceTests.includes("finalizes the cycle when authoritative coverage is complete")) {
