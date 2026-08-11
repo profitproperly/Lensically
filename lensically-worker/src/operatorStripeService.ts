@@ -265,6 +265,21 @@ export async function handleOperatorStripeTool(
     return stripeRequest(env, "/products", { method: "POST", params, idempotencyKey: operationId });
   }
 
+    if (operation === "update_product") {
+    const productId = normalizeText(args.product_id, 255);
+    if (!productId) return { ok: false, error: "product_id_required" };
+    const name = normalizeText(args.name, 250);
+    const description = normalizeText(args.description, 4000);
+    const defaultPriceId = normalizeText(args.price_id, 255);
+    const active = normalizeBoolean(args.active);
+    if (name) params.set("name", name);
+    if (description) params.set("description", description);
+    if (defaultPriceId) params.set("default_price", defaultPriceId);
+    if (active !== null) params.set("active", String(active));
+    if (!params.toString()) return { ok: false, error: "product_update_fields_required" };
+    return stripeRequest(env, `/products/${encodeURIComponent(productId)}`, { method: "POST", params, idempotencyKey: operationId });
+  }
+
   if (operation === "create_price") {
     const productId = normalizeText(args.product_id, 255);
     const unitAmount = normalizeInteger(args.unit_amount, 1, Number.MAX_SAFE_INTEGER);
