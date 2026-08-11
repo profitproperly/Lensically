@@ -46,6 +46,32 @@ jobs:
             }
           }
           NODE
-          echo 'diagnostic-complete-intentional-exit'
-          exit 99
+                    echo 'diagnostic-complete'
+
+  http_redirects_to_https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require HTTP to HTTPS redirect
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl --silent --show-error --dump-header "$headers" --output /dev/null --max-redirs 0 http://lensically.com/operator/ || true
+          grep -Eiq '^HTTP/.* (301|302|307|308)' "$headers"
+          grep -Eiq '^location: https://lensically\.com/operator/?' "$headers"
+
+  https_threads_user_agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require secure page delivery for Meta in-app browser user agent
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --user-agent 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/Threads]' \
+            https://lensically.com/operator/ \
+            | grep -Fq 'id="embedded-checkout"'
+
 
