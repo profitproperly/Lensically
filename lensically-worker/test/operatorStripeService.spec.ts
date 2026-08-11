@@ -78,7 +78,43 @@ describe("native Stripe operator service", () => {
     expect(String(init?.body)).toContain("metadata%5Brelease%5D=1.0.0");
   });
 
-    it("creates embedded Checkout Sessions without hosted success or cancel URLs", async () => {
+      it("updates Stripe catalog objects so obsolete products and prices can be archived", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "stripe_object_test",
+      active: false,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const productResult = await handleOperatorStripeTool(
+      { LENSICALLY_STRIPE_KEY: "sk_test_example" },
+      "operateStripe",
+      {
+        operation: "update_product",
+        operation_id: "stripe-update-product-20260811",
+        product_id: "prod_old",
+        active: false,
+      },
+    );
+    const priceResult = await handleOperatorStripeTool(
+      { LENSICALLY_STRIPE_KEY: "sk_test_example" },
+      "operateStripe",
+      {
+        operation: "update_price",
+        operation_id: "stripe-update-price-20260811",
+        price_id: "price_old",
+        active: false,
+      },
+    );
+
+    expect(productResult).toMatchObject({ ok: true });
+    expect(priceResult).toMatchObject({ ok: true });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[0][0]).toBe("https://api.stripe.com/v1/products/prod_old");
+    expect(String(fetchSpy.mock.calls[0][1]?.body)).toContain("active=false");
+    expect(fetchSpy.mock.calls[1][0]).toBe("https://api.stripe.com/v1/prices/price_old");
+    expect(String(fetchSpy.mock.calls[1][1]?.body)).toContain("active=false");
+  });
+
+  it("creates embedded Checkout Sessions without hosted success or cancel URLs", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
       id: "cs_test_embedded",
       client_secret: "cs_test_embedded_secret_test",
