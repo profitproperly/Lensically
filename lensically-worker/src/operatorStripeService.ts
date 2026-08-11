@@ -160,7 +160,7 @@ export const OPERATOR_STRIPE_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "operateStripe",
     title: "Operate Stripe",
-    description: "Create Stripe products, prices, customers, Checkout Sessions, Payment Links, or an owner-approved refund through the native Lensically Stripe connection. Reuse operation_id for idempotent retries.",
+    description: "Create or update Stripe products and prices, create customers, Checkout Sessions, Payment Links, or an owner-approved refund through the native Lensically Stripe connection. Reuse operation_id for idempotent retries.",
     inputSchema: {
       type: "object",
       properties: {
