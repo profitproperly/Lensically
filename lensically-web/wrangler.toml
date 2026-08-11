@@ -1,5 +1,5 @@
 name = "lensically-web"
-main = ".open-next/worker.js"
+main = "cloudflare-entry.js"
 compatibility_date = "2026-03-08"
 compatibility_flags = ["nodejs_compat"]
 
