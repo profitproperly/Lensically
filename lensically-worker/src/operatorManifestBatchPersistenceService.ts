@@ -56,8 +56,26 @@ function publicCandidateResult(
   result: OperatorManifestBatchCandidateResult,
 ): JsonRecord {
   const { batch_reconciliation_context: _internalContext, ...publicResult } = result;
-  if (result.success !== true) {
+    if (result.success !== true) {
     return { index, ...publicResult };
+  }
+  const scheduledPostId = Number(result.scheduled_post_id ?? 0);
+  if (scheduledPostId <= 0) {
+    return {
+      index,
+      success: true,
+      persisted: false,
+      operation_id: result.operation_id ?? null,
+      slot_key: result.slot_key ?? null,
+      scheduled_post_id: 0,
+      outcome: result.outcome ?? "candidate_not_persisted",
+      preserved_existing: result.preserved_existing === true,
+      collision_reconciled: result.collision_reconciled === true,
+      candidate_requires_reslot: result.candidate_requires_reslot === true,
+      next_missing_slot: result.next_missing_slot ?? null,
+      remaining_missing_count: result.remaining_missing_count ?? null,
+      next_action: result.next_action ?? null,
+    };
   }
   const lineage = record(result.lineage);
   return {
@@ -66,7 +84,7 @@ function publicCandidateResult(
     reused: result.reused === true,
     operation_id: result.operation_id ?? null,
     slot_key: result.slot_key ?? null,
-    scheduled_post_id: Number(result.scheduled_post_id ?? 0),
+        scheduled_post_id: scheduledPostId,
     scheduled_time_utc: result.scheduled_time_utc ?? null,
         publish_lineage_complete: result.publish_lineage_complete === true,
     intelligence_lineage_complete: result.intelligence_lineage_complete === true,
@@ -123,8 +141,9 @@ export async function persistOperatorManifestBatch(
     slot_key: string;
     scheduled_post_id: number;
   }> = [];
-  const deferredCandidates: JsonRecord[] = [];
+    const deferredCandidates: JsonRecord[] = [];
   const reconciliationContexts: JsonRecord[] = [];
+  const partialSideEffects: JsonRecord[] = [];
 
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
@@ -158,6 +177,16 @@ export async function persistOperatorManifestBatch(
       160,
       true,
     );
+            if (result.success !== true && scheduledPostId > 0) {
+      partialSideEffects.push({
+        index,
+        operation_id: operationId,
+        slot_key: slotKey,
+        scheduled_post_id: scheduledPostId,
+        error: result.error ?? "candidate_failed_after_schedule_side_effect",
+        recovery_action: "Retry this exact candidate operation_id. Do not regenerate or reslot until the existing schedule side effect is reconciled.",
+      });
+    }
         if (result.success === true && scheduledPostId > 0 && slotKey && Object.keys(reconciliationContext).length) {
       persistedCandidates.push({
         operation_id: operationId,
@@ -191,13 +220,14 @@ export async function persistOperatorManifestBatch(
 
     const persistenceCompletedAtMs = dependencies.nowMs();
   const candidatePersistenceMs = Math.max(0, persistenceCompletedAtMs - startedAtMs);
-  const rejected = itemResults.filter((result) => !(
-    result.success === true && Number(result.scheduled_post_id ?? 0) > 0
+    const rejected = itemResults.filter((result) => result.success !== true);
+  const notPersisted = itemResults.filter((result) => (
+    result.success === true && Number(result.scheduled_post_id ?? 0) <= 0
   ));
   const rejectedSlots = rejected.map((result) => ({
     index: result.index,
     slot_key: result.slot_key ?? null,
-    error: result.error ?? result.outcome ?? "candidate_not_persisted",
+    error: result.error ?? "candidate_rejected",
   }));
 
   if (!persistedCandidates.length) {
@@ -207,8 +237,12 @@ export async function persistOperatorManifestBatch(
       batch_operation_id: batchOperationId,
       cycle_id: cycleId,
       requested_count: candidates.length,
-      accepted_count: 0,
+            accepted_count: 0,
       rejected_count: rejected.length,
+      not_persisted_count: notPersisted.length,
+      partial_side_effect_count: partialSideEffects.length,
+      partial_side_effects: partialSideEffects,
+      continuation_required: partialSideEffects.length > 0 || notPersisted.length > 0,
       results: itemResults,
       rejected_slots: rejectedSlots,
             reconciliation: null,
@@ -219,7 +253,12 @@ export async function persistOperatorManifestBatch(
         reconciliation_ms: 0,
         total_elapsed_ms: candidatePersistenceMs,
       },
-      retryable: true,
+            retryable: true,
+      next_action: partialSideEffects.length > 0
+        ? "Retry the exact candidate operation_ids listed in partial_side_effects. Do not regenerate or reslot them until their existing schedule side effects are reconciled."
+        : notPersisted.length > 0
+          ? String(notPersisted[0]?.next_action ?? "Continue from authoritative coverage; do not regenerate an already-covered slot.")
+          : "Regenerate only genuinely rejected candidates using their exact server reasons.",
     };
   }
 
@@ -250,9 +289,12 @@ export async function persistOperatorManifestBatch(
     requested_count: candidates.length,
     processed_count: itemResults.length,
     accepted_count: persistedCandidates.length,
-    rejected_count: rejected.length,
+        rejected_count: rejected.length,
+    not_persisted_count: notPersisted.length,
+    partial_side_effect_count: partialSideEffects.length,
+    partial_side_effects: partialSideEffects,
     deferred_count: deferredCandidates.length,
-    continuation_required: deferredCandidates.length > 0,
+    continuation_required: deferredCandidates.length > 0 || partialSideEffects.length > 0 || notPersisted.length > 0,
     deferred_candidates: deferredCandidates,
     results: itemResults,
     accepted_slots: persistedCandidates.map((candidate) => candidate.slot_key),
@@ -265,9 +307,13 @@ export async function persistOperatorManifestBatch(
       reconciliation_ms: reconciliationMs,
       total_elapsed_ms: Math.max(0, completedAtMs - startedAtMs),
     },
-    retryable: rejected.length > 0,
-    next_action: rejected.length
-      ? "Regenerate only the rejected slots using their exact server reasons, then submit one bounded batch containing only those replacements."
-      : reconciliation.next_action,
+        retryable: rejected.length > 0 || partialSideEffects.length > 0,
+    next_action: partialSideEffects.length > 0
+      ? "Retry the exact candidate operation_ids listed in partial_side_effects. Do not regenerate or reslot them until their existing schedule side effects are reconciled."
+      : rejected.length
+        ? "Regenerate only the genuinely rejected slots using their exact server reasons, then submit one bounded batch containing only those replacements."
+        : notPersisted.length > 0
+          ? String(notPersisted[0]?.next_action ?? reconciliation.next_action)
+          : reconciliation.next_action,
   };
 }

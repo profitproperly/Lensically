@@ -592,6 +592,31 @@ describe("operator gate engine", () => {
     ]);
   });
 
+    it("passes same-operation schedule exclusions into the exact-duplicate adapter", async () => {
+    const dependencies = createGateEngineDependencies([
+      { id: "duplicate", gate_key: "exact_duplicate_gate", severity: "block", evaluator: "backend" },
+    ]);
+    dependencies.findExactDuplicate.mockResolvedValue(null);
+
+    const result = await runOperatorGateEngine({
+      brandKey: "manifest_mental",
+      accountId: "account-3",
+      threadsUserId: "threads-3",
+      stageScope: "gate_evaluation",
+      draftId: "autonomous-draft-1",
+      draftText: "Candidate",
+      excludedScheduledPostId: 1039,
+      excludedScheduledIdempotencyKey: "schedule-key-1",
+    }, dependencies);
+
+    expect(result.showable).toBe(true);
+    expect(dependencies.findExactDuplicate).toHaveBeenCalledWith(expect.objectContaining({
+      draftId: "autonomous-draft-1",
+      excludedScheduledPostId: 1039,
+      excludedScheduledIdempotencyKey: "schedule-key-1",
+    }));
+  });
+
   it("preserves duplicate and scheduling collision outcomes through explicit adapters", async () => {
     const dependencies = createGateEngineDependencies([
       { id: "duplicate", gate_key: "exact_duplicate_gate", severity: "block", evaluator: "backend" },

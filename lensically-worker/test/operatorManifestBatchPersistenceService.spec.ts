@@ -284,6 +284,92 @@ describe("operatorManifestBatchPersistenceService", () => {
     expect(harness.reconcileBatch).toHaveBeenCalledTimes(1);
   });
 
+    it("surfaces a failed candidate that already created a schedule as an exact-operation recovery, never a normal regeneration", async () => {
+    const harness = createDependencies();
+    harness.persistCandidate.mockResolvedValue({
+      success: false,
+      operation_id: "candidate-side-effect",
+      slot_key: "2026-07-30T19:00",
+      scheduled_post_id: 777,
+      error: "autonomous_lineage_incomplete_after_persist",
+    });
+
+    const result = await persistOperatorManifestBatch({
+      brandKey: "manifest_mental",
+      defaultTimezone: "America/New_York",
+      payload: {
+        batch_operation_id: "batch-side-effect",
+        cycle_id: "cycle-1",
+        cycle_strategy_id: "strategy-1",
+        candidates: [
+          { operation_id: "candidate-side-effect", cycle_plan_item_id: "plan-1", post: {}, model_evaluation: {} },
+        ],
+      },
+    }, harness.dependencies);
+
+    expect(result).toMatchObject({
+      success: false,
+      accepted_count: 0,
+      rejected_count: 1,
+      partial_side_effect_count: 1,
+      continuation_required: true,
+      partial_side_effects: [{
+        operation_id: "candidate-side-effect",
+        slot_key: "2026-07-30T19:00",
+        scheduled_post_id: 777,
+        error: "autonomous_lineage_incomplete_after_persist",
+      }],
+    });
+    expect(String(result.next_action)).toContain("Retry the exact candidate operation_ids");
+    expect(String(result.next_action)).not.toContain("Regenerate");
+    expect(harness.reconcileBatch).not.toHaveBeenCalled();
+  });
+
+  it("preserves nonfatal occupied-slot outcomes instead of relabeling them as candidate_not_persisted", async () => {
+    const harness = createDependencies();
+    harness.persistCandidate.mockResolvedValue({
+      success: true,
+      persisted: false,
+      operation_id: "candidate-covered",
+      slot_key: "2026-07-30T19:00",
+      scheduled_post_id: 0,
+      outcome: "slot_already_covered",
+      preserved_existing: true,
+      collision_reconciled: true,
+      candidate_requires_reslot: true,
+      next_missing_slot: { key: "2026-07-30T20:00", date: "2026-07-30", time: "20:00" },
+      remaining_missing_count: 1,
+      next_action: "Re-evaluate the candidate for the returned next_missing_slot.",
+    });
+
+    const result = await persistOperatorManifestBatch({
+      brandKey: "manifest_mental",
+      defaultTimezone: "America/New_York",
+      payload: {
+        batch_operation_id: "batch-covered",
+        cycle_id: "cycle-1",
+        cycle_strategy_id: "strategy-1",
+        candidates: [
+          { operation_id: "candidate-covered", cycle_plan_item_id: "plan-1", post: {}, model_evaluation: {} },
+        ],
+      },
+    }, harness.dependencies);
+
+    expect(result).toMatchObject({
+      accepted_count: 0,
+      rejected_count: 0,
+      not_persisted_count: 1,
+      continuation_required: true,
+      results: [{
+        success: true,
+        persisted: false,
+        outcome: "slot_already_covered",
+        candidate_requires_reslot: true,
+      }],
+    });
+    expect(String(result.next_action)).toContain("Re-evaluate the candidate");
+  });
+
   it("does not reconcile when every candidate is rejected", async () => {
     const harness = createDependencies();
     harness.persistCandidate.mockResolvedValue({

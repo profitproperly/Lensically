@@ -316,6 +316,30 @@ describe("operatorManifestPersistenceService", () => {
     }));
   });
 
+    it("carries deterministic same-operation identities into gates so a concurrent replay can converge", async () => {
+    const harness = createHarness();
+    harness.mocks.createScheduledPost.mockResolvedValue({
+      success: true,
+      scheduledPostId: 91,
+      scheduledTimeUtc: "2026-07-27T19:00:00.000Z",
+      reused: true,
+    });
+
+    const result = await persistOperatorManifestCandidate({
+      brandKey: "manifest_mental",
+      accountId: "account-1",
+      threadsUserId: "threads-1",
+      context: harness.context,
+    }, harness.dependencies);
+
+    expect(result).toMatchObject({ success: true, scheduled_post_id: 91 });
+    expect(harness.mocks.runGateSuite).toHaveBeenCalledWith(expect.objectContaining({
+      draftId: `autonomous-draft-${"a".repeat(32)}`,
+      excludedScheduledIdempotencyKey: "schedule-key-1",
+      excludedScheduledPostId: null,
+    }));
+  });
+
   it("blocks publication and records exact missing lineage stages", async () => {
     const harness = createHarness();
     harness.mocks.readLineageStatus.mockResolvedValue({
