@@ -1,0 +1,64 @@
+name: Lensically Enforce HTTPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    steps:
+      - name: Enable Cloudflare Always Use HTTPS
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          if (!token) throw new Error('cloudflare_token_missing');
+          const api = 'https://api.cloudflare.com/client/v4';
+          const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+          const read = async (url, init = {}) => {
+            const response = await fetch(url, { ...init, headers: { ...headers, ...(init.headers || {}) } });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload?.success) {
+              throw new Error(`cloudflare_request_failed_${response.status}_${JSON.stringify(payload?.errors || [])}`);
+            }
+            return payload.result;
+          };
+          const zones = await read(`${api}/zones?name=lensically.com&status=active`);
+          const zone = Array.isArray(zones) ? zones.find((entry) => entry?.name === 'lensically.com') : null;
+          if (!zone?.id) throw new Error('lensically_zone_not_found');
+          const result = await read(`${api}/zones/${zone.id}/settings/always_use_https`, {
+            method: 'PATCH',
+            body: JSON.stringify({ value: 'on' }),
+          });
+          if (result?.value !== 'on') throw new Error('always_use_https_not_enabled');
+          console.log('always_use_https=on');
+          NODE
+
+  verify_http_redirect:
+    needs: enforce
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify HTTP redirects to HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            headers="$(mktemp)"
+            curl --silent --show-error --dump-header "$headers" --output /dev/null --max-redirs 0 http://lensically.com/operator/ || true
+            if grep -Eiq '^HTTP/.* (301|302|307|308)' "$headers" && grep -Eiq '^location: https://lensically\.com/operator/?' "$headers"; then
+              echo 'http-to-https=ok'
+              exit 0
+            fi
+            sleep 3
+          done
+          echo 'http-to-https=missing'
+          exit 1
