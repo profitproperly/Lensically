@@ -142,10 +142,16 @@ jobs:
             https://lensically.com/favicon.ico; do
 
             icon_type="$(curl --fail --silent --show-error --location --head "$icon_url" | tr -d '\r' | awk -F': ' 'tolower($1) == "content-type" {print tolower($2); exit}')"
-            if [[ "$icon_type" != image/png* ]]; then
+                        if [[ "$icon_url" == *.ico ]]; then
+              if [[ "$icon_type" != image/vnd.microsoft.icon* && "$icon_type" != image/x-icon* ]]; then
+                echo "brand-icon-content-type-invalid url=$icon_url type=$icon_type"
+                exit 34
+              fi
+            elif [[ "$icon_type" != image/png* ]]; then
               echo "brand-icon-content-type-invalid url=$icon_url type=$icon_type"
               exit 34
             fi
+
           done
           echo 'sales-root-brand-icons=ok'
 
