@@ -5,8 +5,16 @@ updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: ai-reference-manual-20260811
-active_checkpoint: harden-then-build-validate-release
+active_job_id: brand-identity-surfaces-20260811
+active_checkpoint: build-validate-release-live-proof
+
+## ACTIVE — Brand Identity Surfaces
+
+job_id: `brand-identity-surfaces-20260811`
+objective: Standardize Lensically brand presentation across the website body, browser/favicon surfaces, Apple touch/share surfaces, manifests, and link previews using deterministic derivatives of the existing Lensically artwork; remove excess blank perimeter, self-host production assets, use platform-native masking rather than baked rounded corners, and add durable metadata/regression coverage.
+owner_direction: Proceed with a professional implementation in all places the Lensically logo lives. Website presentation may use rounded styling; browser, Apple, and social assets must use platform-appropriate square/rectangular masters without baked corner masks. No image generation is permitted.
+current_action: Build deterministic brand assets from the existing repository logo, wire self-hosted favicon/apple-touch/manifest/Open Graph/Twitter metadata and visible website logo references, add production validation, release the exact SHA, and verify live behavior.
+previous_active_job: `ai-reference-manual-20260811` completed live proof on production SHA `7a873502b1656faa87459fc35560961894075791` via workflow run `31559510274`; preserve its completed source and proof while executing this owner-prioritized brand job.
 
 ## Resolved P1 Interrupt — Continuation Generic Patch Ceiling Recurrence
 
