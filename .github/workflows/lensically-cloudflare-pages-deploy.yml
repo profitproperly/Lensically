@@ -53,7 +53,7 @@ jobs:
           PROJECT_NAME: ${{ inputs.project_name }}
           BRANCH: ${{ inputs.branch }}
           DIRECTORY: ${{ inputs.directory }}
-                run: |
+                        run: |
           set -euo pipefail
           if [[ "${PROJECT_NAME}" == "lensically-operator" ]]; then
             echo 'lensically-operator is Worker-hosted production. Use the exact-SHA worker release workflow; Pages deployment is forbidden.'
