@@ -79,6 +79,17 @@ jobs:
             exit 23
           fi
 
+                    curl --fail --silent --show-error https://lensically.com/47adcef50017f57709ad7acc5f6a04be.txt | grep -Fxq '47adcef50017f57709ad7acc5f6a04be'
+          curl --fail --silent --show-error https://lensically.com/robots.txt | grep -Fq 'Sitemap: https://lensically.com/sitemap.xml'
+          curl --fail --silent --show-error https://lensically.com/sitemap.xml | grep -Fq '<loc>https://lensically.com/ai</loc>'
+
+          indexnow_status="$(curl --silent --show-error --output /tmp/indexnow.out --write-out '%{http_code}' 'https://api.indexnow.org/indexnow?url=https%3A%2F%2Flensically.com%2Fai&key=47adcef50017f57709ad7acc5f6a04be')"
+          echo "indexnow-status=$indexnow_status"
+          if [ "$indexnow_status" != "200" ] && [ "$indexnow_status" != "202" ]; then
+            cat /tmp/indexnow.out
+            exit 24
+          fi
+
           curl --fail --silent --show-error https://api.lensically.com/api/public/lensically-proof > /tmp/lensically-proof.json
           jq -e '.status == "ok"' /tmp/lensically-proof.json >/dev/null
           jq -e '.threads_publishing.available == true' /tmp/lensically-proof.json >/dev/null
