@@ -85,8 +85,9 @@ expected = {
     "lensically-flat-512.png": (512, 512),
     "lensically-flat-192.png": (192, 192),
     "lensically-flat-180.png": (180, 180),
-    "lensically-tab-rounded-32.png": (32, 32),
+        "lensically-tab-rounded-32.png": (32, 32),
     "lensically-tab-rounded-16.png": (16, 16),
+    "lensically-seller-192.png": (192, 192),
 }
 for name, dimensions in expected.items():
     image = Image.open(OUT / name).convert("RGBA")
