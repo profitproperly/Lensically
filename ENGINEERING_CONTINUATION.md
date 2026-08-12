@@ -1,19 +1,26 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: sales-page-logo-restoration-20260812
-active_checkpoint: restore-guard-validate-release-live-proof
+active_job_id: none
+active_checkpoint: none
 
-## ACTIVE — Sales Page Logo Restoration
+## COMPLETED — Sales Page Logo Restoration
 
 job_id: `sales-page-logo-restoration-20260812`
 root_cause: Commit `07e2059ee7c165408834bb4cf035a980d78449f8` changed the visible Lensically seller logo despite explicit owner direction to leave that already-correct surface untouched, replacing the black-background/white-icon asset with `https://app.lensically.com/lensically-icon-192.png` and adding forced rounded CSS. Later validation incorrectly treated that altered state as untouched.
 owner_direction: Preserve the proven rounded browser-tab assets. Restore the visible `lensically.com` seller logo to the exact pre-change black-background/white-icon treatment and permanently prevent the sales-page logo surface from silently drifting again.
-current_action: Restore the exact pre-change seller-logo source and CSS, replace the contradictory regression guard with an exact seller-logo preservation assertion, validate, release one exact SHA, run live commercial smoke, and close only after production proof.
+current_action: None. The exact pre-change seller-logo source and CSS are restored, the rounded browser-tab metadata remains intact, and a live regression now requires the restored seller logo before completion.
+completion_evidence:
+- Source commit `1f8bc0e192e200f5bfeee78eb0826bcbcd926e23` restores the exact black-background/white-icon seller asset `lensically-logo-white-with-black-bg.png` and removes the unintended forced `border-radius:7px` from `.seller-logo`.
+- The same source still advertises `/brand/lensically-tab-rounded-32.png` and `/brand/lensically-tab-rounded-16.png` for the `lensically.com` browser tab.
+- Push validation run `31563200827` completed successfully on exact SHA `1f8bc0e192e200f5bfeee78eb0826bcbcd926e23`.
+- Exact-SHA production release run `31563352660` completed successfully.
+- Live commercial smoke run `31563417863` completed successfully and now permanently verifies the restored visible seller logo while retaining the rounded tab, Messages/social preview, Apple/share assets, $97 page, AI reference, app root, and live Stripe checkout.
+- Production commit: `1f8bc0e192e200f5bfeee78eb0826bcbcd926e23`.
 
 ## COMPLETED — Brand Identity Surfaces
 
