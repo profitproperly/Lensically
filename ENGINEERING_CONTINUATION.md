@@ -1,12 +1,19 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: brand-surface-color-scale-correction-20260812
+active_checkpoint: correct-validate-release-live-proof
+
+## ACTIVE — Brand Surface Color + Scale Correction
+
+job_id: `brand-surface-color-scale-correction-20260812`
+root_cause: The rounded browser-tab asset generator reused the black-background/white-mark source even though the owner ordered only a shape change from the original white-background/black-mark tab. Separately, restoring the old sales-page source reintroduced its smaller internal artwork padding instead of matching the larger visual footprint the owner explicitly preferred.
+owner_direction: Change nothing beyond these two exact surfaces: the `lensically.com` browser tab must be white background + black Lensically mark + rounded square; the visible sales-page seller logo must be black background + white Lensically mark with the exact same visual geometry/footprint as the larger white-background logo that was wrongly placed there. Messages/social preview and every other surface remain unchanged. No image generation.
+current_action: Build both corrected assets deterministically from the existing app icon geometry, add permanent color/geometry guards, update only the tab and seller-logo routes, validate, release one exact SHA, run live commercial smoke, and close only after production proof.
 
 ## COMPLETED — Sales Page Logo Restoration
 
