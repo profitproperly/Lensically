@@ -99,12 +99,45 @@ jobs:
             echo 'sales-root-price-97=missing'
             exit 25
           fi
-                    if grep -Fq '$977' <<<"$sales_root"; then
+                              if grep -Fq '$977' <<<"$sales_root"; then
             echo 'sales-root-stale-price-977=present'
             exit 26
           else
             echo 'sales-root-stale-price-977=absent'
           fi
+
+          if grep -Fq 'property="og:image" content="https://app.lensically.com/lensically-icon-512.png"' <<<"$sales_root" \
+            && grep -Fq 'rel="apple-touch-icon" sizes="192x192" href="https://app.lensically.com/lensically-icon-192.png"' <<<"$sales_root" \
+            && grep -Fq 'rel="icon" type="image/png" sizes="32x32" href="https://app.lensically.com/lensically-icon-32.png"' <<<"$sales_root" \
+            && grep -Fq 'rel="manifest" href="/site.webmanifest"' <<<"$sales_root"; then
+            echo 'sales-root-brand-metadata=ok'
+          else
+            echo 'sales-root-brand-metadata=missing'
+            exit 31
+          fi
+          if grep -Fq 'raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png' <<<"$sales_root"; then
+            echo 'sales-root-remote-github-logo-regression=present'
+            exit 32
+          fi
+          brand_manifest="$(curl --fail --silent --show-error https://lensically.com/site.webmanifest)"
+          if jq -e '.name == "Lensically Operator for Threads" and (.icons | any(.src == "https://app.lensically.com/lensically-icon-192.png" and .sizes == "192x192")) and (.icons | any(.src == "https://app.lensically.com/lensically-icon-512.png" and .sizes == "512x512"))' <<<"$brand_manifest" > /dev/null; then
+            echo 'sales-root-brand-manifest=ok'
+          else
+            echo 'sales-root-brand-manifest=invalid'
+            exit 33
+          fi
+          for icon_url in \
+            https://app.lensically.com/lensically-icon-16.png \
+            https://app.lensically.com/lensically-icon-32.png \
+            https://app.lensically.com/lensically-icon-192.png \
+            https://app.lensically.com/lensically-icon-512.png; do
+            icon_type="$(curl --fail --silent --show-error --location --head "$icon_url" | tr -d '\r' | awk -F': ' 'tolower($1) == "content-type" {print tolower($2); exit}')"
+            if [[ "$icon_type" != image/png* ]]; then
+              echo "brand-icon-content-type-invalid url=$icon_url type=$icon_type"
+              exit 34
+            fi
+          done
+          echo 'sales-root-brand-icons=ok'
 
           ai_advisory="$(curl --fail --silent --show-error https://lensically.com/ai/)"
           if grep -Fq '$97' <<<"$ai_advisory"; then
