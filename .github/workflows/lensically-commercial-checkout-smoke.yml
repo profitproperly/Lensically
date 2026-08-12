@@ -82,12 +82,16 @@ jobs:
 
                     check_page operator-sales https://lensically.com/operator/
 
-                    sales_root="$(curl --fail --silent --show-error https://lensically.com/)"
-          if grep -Fq 'Open%20https%3A%2F%2Flensically.com%2Fai%3Fv%3D20260811-2%20directly' <<<"$sales_root"; then
-            echo 'sales-root-ai-current-brief-link=ok'
+                                        sales_root="$(curl --fail --silent --show-error https://lensically.com/)"
+          if grep -Fq 'Open%20https%3A%2F%2Flensically.com%2Fai%20directly%20and%20read%20the%20current%20live%20page' <<<"$sales_root" && grep -Fq 'Reference%20revision%202026-08-11.3' <<<"$sales_root"; then
+            echo 'sales-root-ai-clean-current-brief-handoff=ok'
           else
-            echo 'sales-root-ai-current-brief-link=missing'
+            echo 'sales-root-ai-clean-current-brief-handoff=missing'
             exit 29
+          fi
+          if grep -Fq 'lensically.com%2Fai%3F' <<<"$sales_root"; then
+            echo 'sales-root-ai-query-string-regression=present'
+            exit 30
           fi
           if grep -Fq '<span class="price">$97</span>' <<<"$sales_root"; then
             echo 'sales-root-price-97=ok'
