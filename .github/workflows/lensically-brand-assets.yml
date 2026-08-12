@@ -23,19 +23,41 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check pillow==11.3.0
 
-      - name: Build deterministic brand assets
+      - name: Build exact icon variants
         run: python lensically-worker/scripts/build-brand-assets.py
+
+      - name: Capture the real sales-page first fold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m http.server 4173 --directory lensically-worker/public >/tmp/lensically-brand-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 0.25
+          done
+          npx --yes playwright@1.55.0 install chromium
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --viewport-size="1200,630" --wait-for-timeout=1200 http://127.0.0.1:4173/ lensically-worker/public/brand/lensically-sales-preview-1200x630.png
+          python - <<'PY'
+          from PIL import Image
+          path = 'lensically-worker/public/brand/lensically-sales-preview-1200x630.png'
+          if Image.open(path).size != (1200, 630):
+              raise SystemExit('invalid-sales-preview-dimensions')
+          print('sales-preview=ok')
+          PY
 
       - name: Commit generated assets
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- lensically-worker/public/brand; then
+          if git diff --quiet -- lensically-worker/public/brand lensically-worker/public/favicon.ico; then
             echo 'brand-assets=unchanged'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add lensically-worker/public/brand
-          git commit -m 'Build Lensically production brand assets'
+          git add lensically-worker/public/brand lensically-worker/public/favicon.ico
+          git commit -m 'Build Lensically surface-specific brand assets'
           git push origin HEAD:main
+
