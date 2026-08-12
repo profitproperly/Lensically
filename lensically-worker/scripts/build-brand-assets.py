@@ -96,9 +96,23 @@ for name, dimensions in expected.items():
 
 if Image.open(OUT / "lensically-flat-512.png").convert("RGBA").getpixel((0, 0))[3] != 255:
     raise RuntimeError("flat_asset_must_be_full_bleed")
-rounded_corner_alpha = Image.open(OUT / "lensically-tab-rounded-32.png").convert("RGBA").getpixel((0, 0))[3]
+rounded_tab = Image.open(OUT / "lensically-tab-rounded-32.png").convert("RGBA")
+rounded_corner_alpha = rounded_tab.getpixel((0, 0))[3]
 if rounded_corner_alpha > 8:
     raise RuntimeError(f"rounded_tab_asset_corner_not_transparent:{rounded_corner_alpha}")
+rounded_pixels = list(rounded_tab.getdata())
+if not any(a > 200 and r > 230 and g > 230 and b > 230 for r, g, b, a in rounded_pixels):
+    raise RuntimeError("rounded_tab_must_contain_white_background")
+if not any(a > 200 and r < 25 and g < 25 and b < 25 for r, g, b, a in rounded_pixels):
+    raise RuntimeError("rounded_tab_must_contain_black_mark")
+
+seller_check = Image.open(OUT / "lensically-seller-192.png").convert("RGBA")
+app_check = Image.open(APP_ICON_192).convert("RGBA")
+for seller_pixel, app_pixel in zip(seller_check.getdata(), app_check.getdata()):
+    sr, sg, sb, sa = seller_pixel
+    ar, ag, ab, aa = app_pixel
+    if (sr, sg, sb, sa) != (255 - ar, 255 - ag, 255 - ab, aa):
+        raise RuntimeError("seller_asset_must_exactly_invert_app_icon_geometry")
 
 
 print("brand-assets=ok")
