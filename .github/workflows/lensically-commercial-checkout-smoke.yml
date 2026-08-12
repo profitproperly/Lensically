@@ -82,12 +82,21 @@ jobs:
 
                     check_page operator-sales https://lensically.com/operator/
 
-                                        sales_root="$(curl --fail --silent --show-error https://lensically.com/)"
-          if grep -Fq 'Open%20https%3A%2F%2Flensically.com%2Fai%20directly%20and%20read%20the%20current%20live%20page' <<<"$sales_root" && grep -Fq 'Reference%20revision%202026-08-11.3' <<<"$sales_root"; then
-            echo 'sales-root-ai-clean-current-brief-handoff=ok'
+                                                                                sales_root="$(curl --fail --silent --show-error https://lensically.com/)"
+          clean_ai_prompt='Read%20https%3A%2F%2Flensically.com%2Fai%20and%20tell%20me%20what%20you%20think.'
+          if grep -Fq "https://chatgpt.com/?prompt=${clean_ai_prompt}" <<<"$sales_root" \
+            && grep -Fq "https://claude.ai/new?q=${clean_ai_prompt}" <<<"$sales_root" \
+            && grep -Fq "https://grok.com/?q=${clean_ai_prompt}" <<<"$sales_root" \
+            && grep -Fq "const advisorPrompt = 'Read https://lensically.com/ai and tell me what you think.';" <<<"$sales_root"; then
+            echo 'sales-root-ai-professional-handoff=ok'
           else
-            echo 'sales-root-ai-clean-current-brief-handoff=missing'
+            echo 'sales-root-ai-professional-handoff=missing'
             exit 29
+          fi
+          if grep -Fq 'Do not rely on cached or indexed summaries' <<<"$sales_root" \
+            || grep -Fq 'Before evaluating, verify it says Reference revision' <<<"$sales_root"; then
+            echo 'sales-root-ai-internal-freshness-instructions-regression=present'
+            exit 30
           fi
           if grep -Fq 'lensically.com%2Fai%3F' <<<"$sales_root"; then
             echo 'sales-root-ai-query-string-regression=present'
@@ -159,11 +168,17 @@ jobs:
           done
           echo 'sales-root-brand-icons=ok'
 
-          ai_advisory="$(curl --fail --silent --show-error https://lensically.com/ai/)"
+                    ai_advisory="$(curl --fail --silent --show-error https://lensically.com/ai/)"
           if grep -Fq '$97' <<<"$ai_advisory"; then
             echo 'ai-advisory-price-97=ok'
           else
             echo 'ai-advisory-price-97=missing'
+            exit 27
+          fi
+          if grep -Fq 'Reference revision 2026-08-11.3' <<<"$ai_advisory"; then
+            echo 'ai-advisory-reference-revision=ok'
+          else
+            echo 'ai-advisory-reference-revision=missing'
             exit 27
           fi
           if grep -Fq '$977' <<<"$ai_advisory"; then
@@ -171,6 +186,14 @@ jobs:
             exit 28
           else
             echo 'ai-advisory-stale-price-977=absent'
+          fi
+          ai_headers="$(curl --fail --silent --show-error --head https://lensically.com/ai/ | tr -d '\r')"
+          if grep -Fiq 'cache-control: no-store, no-cache, must-revalidate, max-age=0' <<<"$ai_headers" \
+            && grep -Fiq 'x-robots-tag: index, follow, noarchive' <<<"$ai_headers"; then
+            echo 'ai-advisory-freshness-headers=ok'
+          else
+            echo 'ai-advisory-freshness-headers=missing'
+            exit 28
           fi
 
           app_status="$(curl --silent --show-error --output /tmp/app-root.html --write-out '%{http_code}' --location https://app.lensically.com/)"
