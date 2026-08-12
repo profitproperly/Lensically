@@ -47,13 +47,13 @@ jobs:
           node-version: 22
 
       - name: Deploy Pages directory
-        env:
+                env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ inputs.project_name }}
           BRANCH: ${{ inputs.branch }}
           DIRECTORY: ${{ inputs.directory }}
-                        run: |
+        run: |
           set -euo pipefail
           if [[ "${PROJECT_NAME}" == "lensically-operator" ]]; then
             echo 'lensically-operator is Worker-hosted production. Use the exact-SHA worker release workflow; Pages deployment is forbidden.'
