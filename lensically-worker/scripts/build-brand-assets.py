@@ -64,9 +64,15 @@ save_png(flat_master, OUT / "lensically-flat-1024.png")
 for size in (512, 192, 180):
     save_png(flat_master.resize((size, size), RESAMPLE), OUT / f"lensically-flat-{size}.png")
 
-rounded_master = rounded_tile(flat_master)
+app_icon_512 = Image.open(APP_ICON_512).convert("RGBA")
+rounded_master = rounded_tile(app_icon_512)
 for size in (32, 16):
     save_png(rounded_master.resize((size, size), RESAMPLE), OUT / f"lensically-tab-rounded-{size}.png")
+
+app_icon_192 = Image.open(APP_ICON_192).convert("RGBA")
+seller_asset = ImageOps.invert(app_icon_192.convert("RGB")).convert("RGBA")
+seller_asset.putalpha(app_icon_192.getchannel("A"))
+save_png(seller_asset, OUT / "lensically-seller-192.png")
 
 flat_master.convert("RGB").save(
     PUBLIC / "favicon.ico",
