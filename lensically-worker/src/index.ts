@@ -151,7 +151,7 @@ import {
   type OperatorManifestReconciliationDependencies,
 } from "./operatorManifestPersistenceService";
 import { persistOperatorManifestBatch } from "./operatorManifestBatchPersistenceService";
-import { validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
+import { getRepositoryMutationMaxBytes, validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
 import {
     classifyGithubWorkflowRunLookup404,
     githubMutationRetryDelayMs,
@@ -20786,7 +20786,8 @@ async function handleOperatorMcpEngineeringTool(
         if (count !== 1) return { ok: false, error: "find_must_match_once", match_count: count, repository: target.full_name, branch, path };
         nextContent = existing.content.replace(find, replace);
       }
-      if (new TextEncoder().encode(nextContent).length > 100000) return { ok: false, error: "repository_file_content_too_large", max_bytes: 100000, repository: target.full_name, branch, path };
+            const repositoryMutationMaxBytes = getRepositoryMutationMaxBytes(path, operation);
+      if (new TextEncoder().encode(nextContent).length > repositoryMutationMaxBytes) return { ok: false, error: "repository_file_content_too_large", max_bytes: repositoryMutationMaxBytes, repository: target.full_name, branch, path };
       const patchSafety = validateRepositoryPatchContent(path, nextContent);
       if (!patchSafety.ok) return { ...patchSafety, repository: target.full_name, branch, path, no_commit_created: true };
       if (existing.ok && existing.content === nextContent) return { ok: true, no_change: true, no_commit_created: true, operation, operation_id: operationId, repository: target.full_name, branch, path, sha: existing.sha };

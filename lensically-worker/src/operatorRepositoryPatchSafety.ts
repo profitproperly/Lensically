@@ -4,6 +4,12 @@ export type RepositoryPatchSafetyResult = {
   line_numbers?: number[];
 };
 
+export function getRepositoryMutationMaxBytes(path: string, operation: string): number {
+  if (path === "ENGINEERING_CONTINUATION.md" && operation === "patch_file") return 500000;
+  return 100000;
+}
+
+
 export function validateRepositoryPatchContent(
   path: string,
   content: string,

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { validateRepositoryPatchContent } from "../src/operatorRepositoryPatchSafety";
+import { getRepositoryMutationMaxBytes, validateRepositoryPatchContent } from "../src/operatorRepositoryPatchSafety";
 
 describe("operatorRepositoryPatchSafety", () => {
+  it("permits exact patching of the canonical continuation ledger beyond the ordinary 100 KB mutation ceiling", () => {
+    expect(getRepositoryMutationMaxBytes("ENGINEERING_CONTINUATION.md", "patch_file")).toBe(500000);
+    expect(getRepositoryMutationMaxBytes("ENGINEERING_CONTINUATION.md", "upsert_file")).toBe(100000);
+    expect(getRepositoryMutationMaxBytes("other.md", "patch_file")).toBe(100000);
+  });
+
+
   it("rejects an over-indented GitHub Actions step before repository commit", () => {
     const result = validateRepositoryPatchContent(
       ".github/workflows/lensically-engineering.yml",
