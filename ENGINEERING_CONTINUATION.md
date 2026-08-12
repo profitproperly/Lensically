@@ -8,10 +8,10 @@ continuation_contract: canonical-continuation-v1
 active_job_id: ai-reference-manual-20260811
 active_checkpoint: harden-then-build-validate-release
 
-## ACTIVE P1 INTERRUPT — Continuation Generic Patch Ceiling Recurrence
+## Resolved P1 Interrupt — Continuation Generic Patch Ceiling Recurrence
 
 incident_id: `66780301-fbaf-48c4-8a1e-e7a567e20cb3`
-state: verified_on_live_handler
+state: resolved
 root_cause: The model again used `operateGitHubRepositories.patch_file` on the >100 KB canonical continuation ledger despite the existing operating rule, and the generic handler still enforced a hard 100 KB post-patch content ceiling. Documentation-only prevention was insufficient because the server route itself remained capable of repeating the failure.
 durable_fix_in_source: SHA `9e0311a84df9fc62135f9875705cfe2ae730d971` raises only exact `patch_file` mutations of `ENGINEERING_CONTINUATION.md` to a 500 KB server-side ceiling while preserving the 100 KB limit for every other path and for whole-file upserts. Focused regression coverage was added in `operatorRepositoryPatchSafety.spec.ts`.
 current_action: Validate and release the server-side ceiling repair, prove the formerly failing generic continuation patch succeeds on the deployed runtime, close this P1, then continue the AI reference manual objective.
