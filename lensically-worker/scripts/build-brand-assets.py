@@ -1,8 +1,10 @@
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "lensically-web" / "public" / "lensically-logo-white-with-black-bg.png"
+APP_ICON_192 = ROOT / "lensically-web" / "public" / "lensically-icon-192.png"
+APP_ICON_512 = ROOT / "lensically-web" / "public" / "lensically-icon-512.png"
 PUBLIC = ROOT / "lensically-worker" / "public"
 OUT = PUBLIC / "brand"
 OUT.mkdir(parents=True, exist_ok=True)
