@@ -1,12 +1,27 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-11
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: ai-reference-manual-20260811
+active_checkpoint: harden-then-build-validate-release
+
+## ACTIVE P1 INTERRUPT — Continuation Generic Patch Ceiling Recurrence
+
+incident_id: `66780301-fbaf-48c4-8a1e-e7a567e20cb3`
+state: repairing
+root_cause: The model again used `operateGitHubRepositories.patch_file` on the >100 KB canonical continuation ledger despite the existing operating rule, and the generic handler still enforced a hard 100 KB post-patch content ceiling. Documentation-only prevention was insufficient because the server route itself remained capable of repeating the failure.
+durable_fix_in_source: SHA `9e0311a84df9fc62135f9875705cfe2ae730d971` raises only exact `patch_file` mutations of `ENGINEERING_CONTINUATION.md` to a 500 KB server-side ceiling while preserving the 100 KB limit for every other path and for whole-file upserts. Focused regression coverage was added in `operatorRepositoryPatchSafety.spec.ts`.
+current_action: Validate and release the server-side ceiling repair, prove the formerly failing generic continuation patch succeeds on the deployed runtime, close this P1, then continue the AI reference manual objective.
+
+## ACTIVE — AI Reference Manual and Freshness
+
+job_id: `ai-reference-manual-20260811`
+objective: Replace the sales-like /ai brief with a long-form AI technical and commercial reference that exposes product architecture, ownership, operating model, extensibility, installation, controls, limitations and evaluation criteria without publishing reconstruction-level trade secrets; preserve the clean canonical /ai URL and make evaluator freshness explicit without query parameters.
+progress: The long-form reference revision `2026-08-11.3` has been written at `lensically-worker/public/ai/index.html` in source. It is not yet production-verified.
+next_after_interrupt: Restore clean evaluator prompts, add no-cache/noarchive static-asset headers, update live regressions, validate the exact head, release it, prove live /ai revision 2026-08-11.3 and clean evaluator URLs, then close the job.
 
 ## ACTIVE — AI Evaluator Freshness
 
