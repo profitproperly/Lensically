@@ -1,0 +1,41 @@
+name: Lensically Brand Assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow==11.3.0
+
+      - name: Build deterministic brand assets
+        run: python lensically-worker/scripts/build-brand-assets.py
+
+      - name: Commit generated assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- lensically-worker/public/brand; then
+            echo 'brand-assets=unchanged'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lensically-worker/public/brand
+          git commit -m 'Build Lensically production brand assets'
+          git push origin HEAD:main
