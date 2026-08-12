@@ -1,20 +1,32 @@
 # Lensically Continuation Ledger
 
-status: active
-updated_at: 2026-08-11
+status: completed
+updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: brand-identity-surfaces-20260811
-active_checkpoint: build-validate-release-live-proof
+active_job_id: none
+active_checkpoint: none
 
-## ACTIVE — Brand Identity Surfaces
+## COMPLETED — Brand Identity Surfaces
 
 job_id: `brand-identity-surfaces-20260811`
-objective: Standardize Lensically brand presentation across the website body, browser/favicon surfaces, Apple touch/share surfaces, manifests, and link previews using deterministic derivatives of the existing Lensically artwork; remove excess blank perimeter, self-host production assets, use platform-native masking rather than baked rounded corners, and add durable metadata/regression coverage.
-owner_direction: Proceed with a professional implementation in all places the Lensically logo lives. Website presentation may use rounded styling; browser, Apple, and social assets must use platform-appropriate square/rectangular masters without baked corner masks. No image generation is permitted.
-current_action: Build deterministic brand assets from the existing repository logo, wire self-hosted favicon/apple-touch/manifest/Open Graph/Twitter metadata and visible website logo references, add production validation, release the exact SHA, and verify live behavior.
-previous_active_job: `ai-reference-manual-20260811` completed live proof on production SHA `7a873502b1656faa87459fc35560961894075791` via workflow run `31559510274`; preserve its completed source and proof while executing this owner-prioritized brand job.
+objective: Route the existing Lensically artwork correctly by surface without changing the already-correct `app.lensically.com` tab treatment or the visible `lensically.com` website logo.
+owner_direction: Use the flat/full-bleed square where the consuming platform applies its own crop or mask, use the rounded-edge variant where the browser tab itself should show rounded corners, and use the actual first fold of the sales page for Messages/social link previews. No image generation is permitted.
+current_action: None. Brand identity surface work is complete and live-verified; do not resume unless new owner evidence identifies a specific regression.
+completion_evidence:
+- `app.lensically.com` and the visible Lensically logo on `lensically.com` were left unchanged.
+- `lensically.com` now advertises rounded 32x32 and 16x16 browser-tab icons from `/brand/lensically-tab-rounded-*.png`.
+- The root `/favicon.ico` is a deterministic full-bleed square fallback so circular/source renderers do not expose transparent corner padding.
+- Apple/share surfaces use the deterministic full-bleed `/brand/lensically-flat-180.png`; the manifest uses the local flat 192x192 and 512x512 variants.
+- Messages/Open Graph/Twitter now use `/brand/lensically-sales-preview-1200x630.png`, captured deterministically from the real first fold of the sales page at 1200x630.
+- Deterministic asset build workflow `31561506577` succeeded after permanent validation fixes for antialias tolerance and first-time untracked asset detection.
+- Final runtime source validation passed in `31561868334`.
+- Exact production SHA `82479d980b15d5eb7b851d14e38ce167c9c1d978` released successfully in `31562040173`.
+- Updated commercial live smoke `31562145952` passed all brand metadata, manifest, asset MIME, $97 sales-page, AI-reference, app-root, Stripe embedded-checkout, CORS, and live-session checks.
+- The smoke workflow permanently rejects regression to the old app-domain sales-page icon routing, missing 1200x630 social preview metadata, wrong rounded/flat asset assignments, invalid manifest routing, missing brand assets, or invalid favicon MIME handling.
+previous_active_job: `ai-reference-manual-20260811` completed live proof on production SHA `7a873502b1656faa87459fc35560961894075791` via workflow run `31559510274`.
+
 
 ## Resolved P1 Interrupt — Continuation Generic Patch Ceiling Recurrence
 
