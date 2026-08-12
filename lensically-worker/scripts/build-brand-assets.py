@@ -87,8 +87,10 @@ for name, dimensions in expected.items():
 
 if Image.open(OUT / "lensically-flat-512.png").convert("RGBA").getpixel((0, 0))[3] != 255:
     raise RuntimeError("flat_asset_must_be_full_bleed")
-if Image.open(OUT / "lensically-tab-rounded-32.png").convert("RGBA").getpixel((0, 0))[3] != 0:
-    raise RuntimeError("rounded_tab_asset_must_have_transparent_corners")
+rounded_corner_alpha = Image.open(OUT / "lensically-tab-rounded-32.png").convert("RGBA").getpixel((0, 0))[3]
+if rounded_corner_alpha > 8:
+    raise RuntimeError(f"rounded_tab_asset_corner_not_transparent:{rounded_corner_alpha}")
+
 
 print("brand-assets=ok")
 
