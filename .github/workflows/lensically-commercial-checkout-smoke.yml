@@ -120,8 +120,11 @@ jobs:
             exit 31
           fi
 
-          if grep -Fq 'raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png' <<<"$sales_root"; then
-            echo 'sales-root-remote-github-logo-regression=present'
+                    if grep -Fq '<div class="seller"><img class="seller-logo" src="https://raw.githubusercontent.com/profitproperly/Lensically/main/lensically-web/public/lensically-logo-white-with-black-bg.png" alt=""><span>Lensically</span></div>' <<<"$sales_root" \
+            && grep -Fq '.seller-logo { width:28px; height:28px; display:block; object-fit:contain; }' <<<"$sales_root"; then
+            echo 'sales-root-visible-logo-restored=ok'
+          else
+            echo 'sales-root-visible-logo-restored=missing'
             exit 32
           fi
           brand_manifest="$(curl --fail --silent --show-error https://lensically.com/site.webmanifest)"
