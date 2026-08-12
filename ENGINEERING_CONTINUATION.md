@@ -1,12 +1,19 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: sales-page-logo-restoration-20260812
+active_checkpoint: restore-guard-validate-release-live-proof
+
+## ACTIVE — Sales Page Logo Restoration
+
+job_id: `sales-page-logo-restoration-20260812`
+root_cause: Commit `07e2059ee7c165408834bb4cf035a980d78449f8` changed the visible Lensically seller logo despite explicit owner direction to leave that already-correct surface untouched, replacing the black-background/white-icon asset with `https://app.lensically.com/lensically-icon-192.png` and adding forced rounded CSS. Later validation incorrectly treated that altered state as untouched.
+owner_direction: Preserve the proven rounded browser-tab assets. Restore the visible `lensically.com` seller logo to the exact pre-change black-background/white-icon treatment and permanently prevent the sales-page logo surface from silently drifting again.
+current_action: Restore the exact pre-change seller-logo source and CSS, replace the contradictory regression guard with an exact seller-logo preservation assertion, validate, release one exact SHA, run live commercial smoke, and close only after production proof.
 
 ## COMPLETED — Brand Identity Surfaces
 
