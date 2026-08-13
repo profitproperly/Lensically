@@ -1,12 +1,22 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: manifest-scheduled-row-disappearance-p1-20260812
+active_checkpoint: root-cause-investigation
+
+## ACTIVE P1 — Manifest Scheduled Row Disappearance
+
+job_id: `manifest-scheduled-row-disappearance-p1-20260812`
+incident_id: `897a8b29-ac9d-47c4-bb81-c01f9aea5b00`
+severity: P1
+objective: Find and permanently prevent the disappearance of an accepted future Manifest scheduled row during the same autonomous cycle, restore the exact locked 2026-08-13T05:00 slot, verify schedule integrity, then resume and complete cycle `aa4f6ca3-d48c-43d7-aca7-8639532edbcb`.
+verified_evidence: `persist_manifest_autonomous_batch` accepted slot `2026-08-13T05:00` as scheduled post `1090` with complete lineage. Later authoritative cycle reconciliation omitted `1090` and reported that exact future slot missing. `auditScheduledPost(1090)` returned `scheduled_post_not_found` and opened hardening incident `897a8b29-ac9d-47c4-bb81-c01f9aea5b00`.
+deferred_work: The active Manifest cycle is durably preserved with 41 occupied slots and six closing locked plan items not yet persisted. Do not resume content generation until this P1 is repaired, regression-tested, released, live-verified, and the missing locked slot is restored.
+current_action: Trace every code path capable of deleting or retiring future `scheduled_posts` rows during Main Cycle persistence/reconciliation, identify the exact cause of row `1090` disappearing between occupied-count 40 and the later reconciliation, implement source-level prevention and focused regression coverage, release the exact tested SHA, restore the locked slot, verify 48/48 authoritative coverage, then mark this job completed and resume the deferred cycle.
 
 ## COMPLETED — Brand Surface Color + Scale Correction
 
