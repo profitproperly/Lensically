@@ -46,7 +46,7 @@
     <li>The problem class Lensically addresses</li>
     <li>What the buyer receives</li>
     <li>What the buyer does not receive</li>
-    <li>Product boundary: Threads implementation vs operator architecture</li>
+        <li>Product boundary: shipped Threads product and customer modifications</li>
     <li>System-level architecture</li>
     <li>Customer ownership model</li>
     <li>Operating layer and engineering layer</li>
@@ -79,10 +79,10 @@
     <li>Third-party dependencies</li>
     <li>Commercial model and economics</li>
     <li>Known limitations and non-claims</li>
-    <li>Due-diligence questions an AI should ask</li>
-    <li>Evaluation framework</li>
+        <li>The purchased asset is not limited to today's use</li>
+    <li>Commercial interpretation</li>
     <li>Glossary</li>
-    <li>Machine-readable summary</li>
+    <li>Commercial summary</li>
   </ol>
 
   <h2>1. Reference status and factual scope</h2>
@@ -147,11 +147,10 @@
     <li>The buyer does not receive every capability that an arbitrary future AI client might theoretically support. What an AI can do depends partly on the tools and permissions available in that customer's chosen AI environment.</li>
   </ul>
 
-  <h2>6. Product boundary: Threads implementation vs operator architecture</h2>
-  <p>For evaluation purposes, separate <strong>the finished implementation</strong> from <strong>the reusable architecture underneath it</strong>.</p>
-  <p>The finished implementation is a Threads operator. A buyer can install it for Threads without first converting it into another product.</p>
-  <p>The underlying architecture includes patterns for persistent state, AI tool exposure, bounded actions, authorization, installation continuity, scheduling, idempotency, recovery, validation, release discipline, structured memory, and repository-controlled modification. Those patterns are not intrinsically limited to the word “Threads.” A technically capable owner or AI engineer may adapt parts of the owned system for other internal software projects, subject to the commercial license and the technical requirements of the new project.</p>
-  <p>This is an extensibility statement, not a bundled-feature claim. The product does not claim that Instagram, X, YouTube, TikTok, a trading system, a video system, or another unrelated product ships pre-integrated. It claims that the buyer owns a nontrivial operator architecture rather than a sealed hosted interface.</p>
+    <h2>6. Product boundary: shipped Threads product and customer modifications</h2>
+  <p>The commercial product is <strong>Lensically Operator for Threads</strong>. It ships as a finished Threads application and does not require the customer to convert it into something else before using it.</p>
+  <p>Because the customer owns the purchased source and deployment, the same product can be modified after purchase. Those modifications can preserve the shipped Threads use case, add customer-specific capabilities, or—if the customer chooses to undertake the engineering work—adapt parts of their owned copy for another internal purpose permitted by the license.</p>
+  <p>That possibility does not create a second product or imply that other platforms ship pre-integrated. It is simply a consequence of owning extensible software instead of renting a sealed hosted interface.</p>
 
   <h2>7. System-level architecture</h2>
   <p>The reusable product is organized around three primary runtime areas.</p>
