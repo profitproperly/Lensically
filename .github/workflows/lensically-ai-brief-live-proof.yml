@@ -34,17 +34,17 @@ jobs:
           grep -Fq 'Idempotency and ambiguous outcomes' /tmp/lensically-ai.html
           grep -Fq 'Failure handling and prevention' /tmp/lensically-ai.html
           grep -Fq 'Validation and regression protection' /tmp/lensically-ai.html
-          grep -Fq 'Extensibility after purchase' /tmp/lensically-ai.html
+                    grep -Fq 'Ownership and extensibility after purchase' /tmp/lensically-ai.html
           grep -Fq 'Portability of the operator architecture' /tmp/lensically-ai.html
           grep -Fq 'Why source ownership alone is an incomplete description' /tmp/lensically-ai.html
           grep -Fq 'Why a vendor MCP and an owned operator differ' /tmp/lensically-ai.html
           grep -Fq 'Comparison with building from scratch' /tmp/lensically-ai.html
           grep -Fq 'Known limitations and non-claims' /tmp/lensically-ai.html
           grep -Fq 'Glossary' /tmp/lensically-ai.html
-          grep -Fq 'Machine-readable summary' /tmp/lensically-ai.html
-          grep -Fq 'PRICE_USD: 97' /tmp/lensically-ai.html
-          grep -Fq 'TRADE_SECRET_BOUNDARY:' /tmp/lensically-ai.html
-          grep -Fq 'KEY_PURCHASE_OBJECT:' /tmp/lensically-ai.html
+                    grep -Fq 'Commercial summary' /tmp/lensically-ai.html
+          grep -Fq 'What you get for $97' /tmp/lensically-ai.html
+          grep -Fq 'The purchased asset is not limited to today' /tmp/lensically-ai.html
+          grep -Fq 'What is intentionally not public' /tmp/lensically-ai.html
 
           if grep -Fq '<a ' /tmp/lensically-ai.html; then
             echo 'ai-reference-visible-links-present'
