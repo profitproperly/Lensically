@@ -952,10 +952,11 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     phase?: "full" | "semantic_signatures" | "maturity_comparables" | "maturity_evaluations" | "comparable_analyses" | "learning_observations" | "portfolio_experiments";
     comparable_offset?: number;
   comparable_limit?: number;
-  learning_offset?: number;
+    learning_offset?: number;
   learning_limit?: number;
+  skip_table_ensure?: boolean;
 } = {}): Promise<JsonRecord> {
-  await ensureManifestIntelligenceEngineTables(db);
+  if (options.skip_table_ensure !== true) await ensureManifestIntelligenceEngineTables(db);
   const phase = options.phase ?? "full";
   const runSemantic = phase === "full" || phase === "semantic_signatures";
     const runMaturityEvaluations = phase === "full" || phase === "maturity_comparables" || phase === "maturity_evaluations";

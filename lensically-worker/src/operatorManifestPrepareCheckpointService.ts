@@ -309,7 +309,7 @@ export async function handleOperatorManifestPrepareCheckpoint(
     }
 
     if (String(checkpoint.phase ?? "") === "manifest_intelligence_maturity") {
-      const maturity = await dependencies.refreshIntelligenceEngine({ phase: "maturity_evaluations" });
+            const maturity = await dependencies.refreshIntelligenceEngine({ phase: "maturity_evaluations", skip_table_ensure: true });
       const maturitySummary = dependencies.compactPayloadValue(
         maturity,
         "manifest_intelligence.maturity",
@@ -343,9 +343,10 @@ export async function handleOperatorManifestPrepareCheckpoint(
         if (String(checkpoint.phase ?? "") === "manifest_intelligence_comparables") {
       const comparableOffset = Math.max(0, Math.trunc(Number(state.comparable_offset ?? 0)));
       const comparables = await dependencies.refreshIntelligenceEngine({
-        phase: "comparable_analyses",
+                phase: "comparable_analyses",
         comparable_offset: comparableOffset,
-                comparable_limit: 48,
+        comparable_limit: 48,
+        skip_table_ensure: true,
       });
       const comparableSummary = dependencies.compactPayloadValue(
         comparables,
@@ -388,9 +389,10 @@ export async function handleOperatorManifestPrepareCheckpoint(
     if (String(checkpoint.phase ?? "") === "manifest_intelligence_learning") {
       const learningOffset = Math.max(0, Math.trunc(Number(state.learning_offset ?? 0)));
       const learning = await dependencies.refreshIntelligenceEngine({
-        phase: "learning_observations",
+                phase: "learning_observations",
         learning_offset: learningOffset,
-                                learning_limit: 180,
+        learning_limit: 180,
+        skip_table_ensure: true,
       });
       const learningSummary = dependencies.compactPayloadValue(
         learning,
@@ -432,7 +434,7 @@ export async function handleOperatorManifestPrepareCheckpoint(
     }
 
     if (String(checkpoint.phase ?? "") === "manifest_intelligence_portfolio") {
-      const portfolio = await dependencies.refreshIntelligenceEngine({ phase: "portfolio_experiments" });
+            const portfolio = await dependencies.refreshIntelligenceEngine({ phase: "portfolio_experiments", skip_table_ensure: true });
       const portfolioSummary = dependencies.compactPayloadValue(
         portfolio,
         "manifest_intelligence.portfolio",

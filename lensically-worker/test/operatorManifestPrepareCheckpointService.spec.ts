@@ -130,9 +130,10 @@ describe("Operator Manifest prepare checkpoint service", () => {
     });
     const result = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
     expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
-      phase: "comparable_analyses",
+            phase: "comparable_analyses",
       comparable_offset: 96,
-            comparable_limit: 48,
+      comparable_limit: 48,
+      skip_table_ensure: true,
     });
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
       phase: "manifest_intelligence_comparables",
@@ -188,9 +189,10 @@ describe("Operator Manifest prepare checkpoint service", () => {
     });
     const result = await handleOperatorManifestPrepareCheckpoint(input, dependencies);
     expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
-      phase: "learning_observations",
+            phase: "learning_observations",
       learning_offset: 180,
-                        learning_limit: 180,
+      learning_limit: 180,
+      skip_table_ensure: true,
     });
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({
       phase: "manifest_intelligence_learning",
