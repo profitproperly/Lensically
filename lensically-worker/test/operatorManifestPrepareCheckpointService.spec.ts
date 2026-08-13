@@ -132,7 +132,7 @@ describe("Operator Manifest prepare checkpoint service", () => {
     expect(mocks.refreshIntelligenceEngine).toHaveBeenCalledWith({
             phase: "comparable_analyses",
       comparable_offset: 96,
-      comparable_limit: 48,
+            comparable_limit: 24,
       skip_table_ensure: true,
     });
     expect(mocks.writeCheckpoint).toHaveBeenCalledWith(expect.objectContaining({

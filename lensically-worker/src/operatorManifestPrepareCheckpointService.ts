@@ -345,7 +345,7 @@ export async function handleOperatorManifestPrepareCheckpoint(
       const comparables = await dependencies.refreshIntelligenceEngine({
                 phase: "comparable_analyses",
         comparable_offset: comparableOffset,
-        comparable_limit: 48,
+                comparable_limit: 24,
         skip_table_ensure: true,
       });
       const comparableSummary = dependencies.compactPayloadValue(
