@@ -1049,7 +1049,9 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       s.rates_json, s.velocity_json, s.scores_json, s.distribution_state,
       f.fingerprint_json, sig.signature_json, c.family_id, fam.source_identity_key,
       l.family_key AS autonomous_family_key, l.generation_mode, l.slot_time, a.post_text, a.post_timestamp
-    FROM operator_post_performance_scores s
+        FROM operator_post_performance_scores s
+    LEFT JOIN operator_manifest_maturity_evaluations e ON e.brand_key = s.brand_key
+      AND e.published_post_id = s.published_post_id AND e.checkpoint_hours = s.checkpoint_hours
     JOIN operator_post_fingerprints f ON f.brand_key = s.brand_key AND f.published_post_id = s.published_post_id
     LEFT JOIN operator_manifest_semantic_signatures sig ON sig.brand_key = s.brand_key
       AND sig.content_type = 'published' AND sig.content_id = s.published_post_id
