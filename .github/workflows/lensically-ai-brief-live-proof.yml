@@ -23,7 +23,7 @@ jobs:
           echo "ai-reference-bytes=$bytes"
           test "$bytes" -ge 30000
 
-          grep -Fq 'Reference revision 2026-08-11.3' /tmp/lensically-ai.html
+                    grep -Fq 'name="lensically-reference-revision" content="2026-08-11.3"' /tmp/lensically-ai.html
           grep -Fq 'AI Technical &amp; Commercial Reference' /tmp/lensically-ai.html
           grep -Fq 'Table of contents' /tmp/lensically-ai.html
           grep -Fq 'Operating layer and engineering layer' /tmp/lensically-ai.html
@@ -51,9 +51,14 @@ jobs:
             exit 18
           fi
 
-          if grep -Eqi 'Manifest Mental|6,604|273 to 892|Public evidence from real operation|One documented learning sequence|\$977|"price":"977"' /tmp/lensically-ai.html; then
+                    if grep -Eqi 'Manifest Mental|6,604|273 to 892|Public evidence from real operation|One documented learning sequence|\$977|"price":"977"' /tmp/lensically-ai.html; then
             echo 'ai-reference-regressed-to-account-proof-or-stale-price'
             exit 19
+          fi
+
+          if grep -Eqi 'written primarily for an AI evaluator|Evaluation instruction:|An evaluator should|universally appropriate|casual user|technical operator' /tmp/lensically-ai.html; then
+            echo 'ai-reference-regressed-to-evaluator-coaching-or-buyer-disqualification'
+            exit 25
           fi
 
           if grep -Eqi 'github\.com/profitproperly/Lensically|fdc4c5913aeb995ee5b1e83c30a7a841bd9b66fe|0ed88cffcd3a5f28d8578b25f7388a0a64fe0b97' /tmp/lensically-ai.html; then
@@ -72,8 +77,10 @@ jobs:
             exit 22
           fi
 
-          grep -Fq 'Open%20https%3A%2F%2Flensically.com%2Fai%20directly%20and%20read%20the%20current%20live%20page' /tmp/lensically-sales.html
-          grep -Fq 'Reference%20revision%202026-08-11.3' /tmp/lensically-sales.html
+                    clean_ai_prompt='Read%20https%3A%2F%2Flensically.com%2Fai%20and%20tell%20me%20what%20you%20think.'
+          grep -Fq "https://chatgpt.com/?prompt=${clean_ai_prompt}" /tmp/lensically-sales.html
+          grep -Fq "https://claude.ai/new?q=${clean_ai_prompt}" /tmp/lensically-sales.html
+          grep -Fq "https://grok.com/?q=${clean_ai_prompt}" /tmp/lensically-sales.html
           if grep -Fq 'lensically.com%2Fai%3F' /tmp/lensically-sales.html; then
             echo 'ai-reference-query-string-handoff-regression'
             exit 23
