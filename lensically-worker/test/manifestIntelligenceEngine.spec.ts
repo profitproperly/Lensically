@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  executeManifestD1WriteBatches,
+    executeManifestD1WriteBatches,
+  resolveManifestMaturityEvaluation,
       persistManifestLearningObservationBatch,
   persistManifestPortfolioStateBatch,
   persistManifestSemanticSignatureBatch,
