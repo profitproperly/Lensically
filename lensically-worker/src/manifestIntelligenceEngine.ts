@@ -369,6 +369,30 @@ export function buildManifestMaturityEvaluation(input: {
   };
 }
 
+export function resolveManifestMaturityEvaluation(input: {
+  prefer_persisted: boolean;
+  persisted_maturity_json?: unknown;
+  checkpoint_hours: unknown;
+  metrics_json?: unknown;
+  rates_json?: unknown;
+  velocity_json?: unknown;
+  scores_json?: unknown;
+  distribution_state?: unknown;
+}): ManifestMaturityEvaluation {
+  if (input.prefer_persisted) {
+    const persisted = parseJson(input.persisted_maturity_json, null) as ManifestMaturityEvaluation | null;
+    if (persisted && Number(persisted.checkpoint_hours) === number(input.checkpoint_hours)) return persisted;
+  }
+  return buildManifestMaturityEvaluation({
+    checkpoint_hours: number(input.checkpoint_hours),
+    metrics: record(parseJson(input.metrics_json, {})),
+    rates: record(parseJson(input.rates_json, {})),
+    velocity: record(parseJson(input.velocity_json, {})),
+    scores: record(parseJson(input.scores_json, {})),
+    distribution_state: text(input.distribution_state, 80),
+  });
+}
+
 export function buildManifestComparableAnalysis(
   target: ManifestComparableCandidate,
   candidates: ManifestComparableCandidate[],
