@@ -1044,7 +1044,8 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
       continuation_required: false,
     };
   }
-  const scoreRows = await db.prepare(`SELECT s.published_post_id, s.checkpoint_hours, s.metrics_json,
+    const scoreRows = await db.prepare(`SELECT s.published_post_id, s.checkpoint_hours, s.metrics_json,
+      e.evaluation_json AS persisted_maturity_json,
       s.rates_json, s.velocity_json, s.scores_json, s.distribution_state,
       f.fingerprint_json, sig.signature_json, c.family_id, fam.source_identity_key,
       l.family_key AS autonomous_family_key, l.generation_mode, l.slot_time, a.post_text, a.post_timestamp
