@@ -35180,8 +35180,38 @@ async function auditScheduledPost(
     scheduledPostId,
     WORKSPACE_APP_USER_ID,
     brand.profile.threads_user_id,
+    ).first<Record<string, unknown>>();
+  if (row) {
+    return { ...row, lifecycle_state: "scheduled", deleted: false };
+  }
+  if (!await doesTableExist(env, "scheduled_post_deletions")) {
+    return null;
+  }
+  const deletedRow = await env.DB.prepare(
+    `SELECT * FROM scheduled_post_deletions
+     WHERE scheduled_post_id = ? AND user_id = ? AND threads_user_id = ?
+     ORDER BY datetime(created_at) DESC
+     LIMIT 1`,
+  ).bind(
+    scheduledPostId,
+    WORKSPACE_APP_USER_ID,
+    brand.profile.threads_user_id,
   ).first<Record<string, unknown>>();
-  return row ?? null;
+  if (!deletedRow) {
+    return null;
+  }
+  const deletion = mapScheduledPostDeletionRow(deletedRow);
+  return {
+    id: scheduledPostId,
+    user_id: WORKSPACE_APP_USER_ID,
+    threads_user_id: brand.profile.threads_user_id,
+    post_text: deletion.post_text,
+    status: "deleted",
+    scheduled_time: deletion.scheduled_time_utc,
+    lifecycle_state: "deleted",
+    deleted: true,
+    deletion,
+  };
 }
 
 async function recordCronSchedulerHeartbeat(

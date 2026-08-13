@@ -7773,7 +7773,30 @@ active_checkpoint: none
         const remainingFixtureRows = await env.DB.prepare(
       `SELECT COUNT(*) AS total FROM scheduled_posts WHERE id IN (${recoveryPostIds.map(() => "?").join(", ")})`,
     ).bind(...recoveryPostIds).first<{ total: number | string }>();
-    expect(Number(remainingFixtureRows?.total ?? 0)).toBe(0);
+        expect(Number(remainingFixtureRows?.total ?? 0)).toBe(0);
+
+    const deletedAudit = await mcpTool<{
+      ok: boolean;
+      scheduled_post: {
+        status: string;
+        lifecycle_state: string;
+        deleted: boolean;
+        deletion: { scheduled_post_id: number; reason_code: string; deleted_by: string; deletion_source: string };
+      };
+    }>("auditScheduledPost", {
+      brand_key: BRAND_KEY,
+      scheduled_post_id: recoveryPostIds[0],
+    });
+    expect(deletedAudit.ok).toBe(true);
+    expect(deletedAudit.scheduled_post.status).toBe("deleted");
+    expect(deletedAudit.scheduled_post.lifecycle_state).toBe("deleted");
+    expect(deletedAudit.scheduled_post.deleted).toBe(true);
+    expect(deletedAudit.scheduled_post.deletion).toEqual(expect.objectContaining({
+      scheduled_post_id: recoveryPostIds[0],
+      reason_code: "owner_emergency_withdrawal",
+      deleted_by: "model",
+      deletion_source: "mcp",
+    }));
 
     const additionalFixture = await env.DB.prepare(
       `INSERT INTO scheduled_posts (user_id, threads_user_id, post_text, status, scheduled_time)
