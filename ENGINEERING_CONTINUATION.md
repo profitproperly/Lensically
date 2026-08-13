@@ -1,14 +1,14 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-12
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: manifest-scheduled-row-disappearance-p1-20260812
-active_checkpoint: root-cause-investigation
+active_job_id: none
+active_checkpoint: none
 
-## ACTIVE P1 — Manifest Scheduled Row Disappearance
+## COMPLETED — Manifest Scheduled Row Disappearance False Alarm
 
 job_id: `manifest-scheduled-row-disappearance-p1-20260812`
 incident_id: `897a8b29-ac9d-47c4-bb81-c01f9aea5b00`
