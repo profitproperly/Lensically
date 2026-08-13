@@ -1069,13 +1069,15 @@ export async function refreshManifestIntelligenceEngine(db: D1Database, input: {
     const fingerprint = record(parseJson(row.fingerprint_json, {}));
     const signature = parseJson(row.signature_json, null) as ManifestSemanticSignature | null
       ?? buildManifestSemanticSignature({ text: text(row.post_text, 20000), metadata: fingerprint });
-    const maturity = buildManifestMaturityEvaluation({
-      checkpoint_hours: number(row.checkpoint_hours),
-      metrics: record(parseJson(row.metrics_json, {})),
-      rates: record(parseJson(row.rates_json, {})),
-      velocity: record(parseJson(row.velocity_json, {})),
-      scores: record(parseJson(row.scores_json, {})),
-      distribution_state: text(row.distribution_state, 80),
+        const maturity = resolveManifestMaturityEvaluation({
+      prefer_persisted: !runMaturityEvaluations,
+      persisted_maturity_json: row.persisted_maturity_json,
+      checkpoint_hours: row.checkpoint_hours,
+      metrics_json: row.metrics_json,
+      rates_json: row.rates_json,
+      velocity_json: row.velocity_json,
+      scores_json: row.scores_json,
+      distribution_state: row.distribution_state,
     });
                 if (runMaturityEvaluations) {
       maturityWriteStatements.push(db.prepare(`INSERT INTO operator_manifest_maturity_evaluations (
