@@ -8,6 +8,32 @@ import {
 } from "../src/manifestIntelligenceEngine";
 
 describe("Manifest D1 write batching", () => {
+  it("reuses persisted maturity evaluations instead of rebuilding them on later intelligence phases", () => {
+    const persisted = {
+      version: "manifest-maturity-evaluation-v1",
+      checkpoint_hours: 24,
+      maturity_state: "authoritative",
+      learning_weight: 1,
+      structural_change_allowed: true,
+      performance_band: "breakout",
+      overall_score: 91,
+      distribution_state: "healthy",
+      metrics: { likes: 100 },
+      rates: {},
+      velocity: {},
+    };
+
+    const resolved = resolveManifestMaturityEvaluation({
+      prefer_persisted: true,
+      persisted_maturity_json: JSON.stringify(persisted),
+      checkpoint_hours: 24,
+      scores_json: JSON.stringify({ overall: 1 }),
+      distribution_state: "weak",
+    });
+
+    expect(resolved).toEqual(persisted);
+  });
+
   it("keeps large intelligence persistence within bounded D1 batch calls", async () => {
     const observedBatchSizes: number[] = [];
     const db = {
