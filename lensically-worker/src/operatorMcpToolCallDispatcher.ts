@@ -111,7 +111,9 @@ export interface OperatorMcpToolCallDependencies {
   publicProfileIdForToolName(toolName: string): unknown;
   executionFingerprint(toolName: string, args: JsonRecord): Promise<string>;
   toolMutatesState(toolName: string): boolean;
-  buildActionClosure(toolName: string, result: JsonRecord): Promise<unknown>;
+    buildActionClosure(toolName: string, result: JsonRecord): Promise<unknown>;
+  verifyLifecycleExecutionToken(token: unknown): Promise<{ ok: boolean; error?: string; payload?: JsonRecord }>;
+  issueActionExecutionToken(input: { profileId: string | null; toolName: string; result: JsonRecord; liveStatePayload: JsonRecord }): Promise<string>;
 }
 
 function asRecord(value: unknown): JsonRecord | null {
@@ -162,7 +164,7 @@ export async function dispatchOperatorMcpToolCall(
     }, "Lensically accepts only advertised direct typed Main tools.", true);
   }
 
-    let toolName = requestedToolName;
+      let toolName = requestedToolName;
   let rawArgs: JsonRecord = directPublicEntry
     ? {
         ...governedRequestedArgs,
@@ -170,9 +172,24 @@ export async function dispatchOperatorMcpToolCall(
       }
     : governedRequestedArgs;
   let routedGatewayMetadata: JsonRecord | null = null;
+  let lifecycleLiveStatePayload: JsonRecord | null = null;
 
   if (requestedToolName === dependencies.routedExecutionGateway) {
-    const compiledProfile = dependencies.compilePublicProfileRequest(governedRequestedArgs);
+    const lifecycleCheck = await dependencies.verifyLifecycleExecutionToken(governedRequestedArgs.live_state_token);
+    if (!lifecycleCheck.ok || !lifecycleCheck.payload) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: lifecycleCheck.error ?? "operator_live_state_token_required",
+        required_stage: "getOperatorLiveState",
+        required_tool: "getOperatorLiveState",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
+    }
+    lifecycleLiveStatePayload = lifecycleCheck.payload;
+    const gatewayLifecycleArgs = { ...governedRequestedArgs };
+    delete gatewayLifecycleArgs.live_state_token;
+    const compiledProfile = dependencies.compilePublicProfileRequest(gatewayLifecycleArgs);
     if (!compiledProfile.ok) {
       return mcpToolResultResponse(id, {
         ...compiledProfile,
@@ -627,7 +644,23 @@ export async function dispatchOperatorMcpToolCall(
     resultPayload.normal_work_blocked = automaticIncident.normal_work_blocked;
   }
 
-  resultPayload.operator_action_closure = await dependencies.buildActionClosure(toolName, resultPayload);
+    if (routedGatewayMetadata && lifecycleLiveStatePayload) {
+    resultPayload.action_execution_token = await dependencies.issueActionExecutionToken({
+      profileId: typeof routedGatewayMetadata.profile_id === "string" ? routedGatewayMetadata.profile_id : null,
+      toolName,
+      result: resultPayload,
+      liveStatePayload: lifecycleLiveStatePayload,
+    });
+    resultPayload.operator_action_closure = {
+      version: "operator-action-closure-v1",
+      status: "pending_explicit_close",
+      lifecycle_stage: 4,
+      required_tool: "closeOperatorAction",
+      rule: "Execution is not lifecycle-closed until closeOperatorAction verifies evidence and records the next checkpoint.",
+    };
+  } else {
+    resultPayload.operator_action_closure = await dependencies.buildActionClosure(toolName, resultPayload);
+  }
   resultPayload = dependencies.enforcePayloadBudget(resultPayload);
   if (!sourceDefinedStaticRoute) {
     await dependencies.recordExecutionDecision(

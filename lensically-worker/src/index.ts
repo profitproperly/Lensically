@@ -22106,7 +22106,21 @@ async function handleOperatorMcpToolCall(
     publicProfileIdForToolName: operatorPublicProfileIdForToolName,
     executionFingerprint: operatorExecutionFingerprint,
     toolMutatesState: operatorToolMutatesState,
-    buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
+        buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
+    verifyLifecycleExecutionToken: async (token) => {
+      const check = await verifyOperatorLifecycleToken(env, token, 3);
+      return check.ok ? { ok: true, payload: check.payload } : { ok: false, error: check.error };
+    },
+    issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
+      action_execution_version: OPERATOR_ACTION_EXECUTION_VERSION,
+      profile_id: profileId,
+      executed_tool: toolName,
+      result_ok: result.ok !== false,
+      result_error: normalizeOperatorMachineKey(result.error ?? result.error_code, "") || null,
+      live_state_scopes: liveStatePayload.scopes ?? [],
+      brand_key: liveStatePayload.brand_key ?? null,
+      executed_at: new Date().toISOString(),
+    }),
   });
 }
 
