@@ -534,69 +534,51 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       && ["invalid_mcp_session", "stale_mcp_deployment_session"].includes(String(staleSessionData?.reason ?? ""))
       && Boolean(staleSession.headers.mcp_session_id)
       && staleSession.headers.mcp_session_id !== invalidSession;
-    const engineeringAccessSucceeded = engineeringAccess.status === 200 && engineeringAccessContent?.ok === true;
-    const schedulerState = schedulerContent?.scheduler && typeof schedulerContent.scheduler === "object" && !Array.isArray(schedulerContent.scheduler)
-      ? schedulerContent.scheduler as Record<string, unknown>
+    const lifecycle = sessionMapContent?.lifecycle && typeof sessionMapContent.lifecycle === "object" && !Array.isArray(sessionMapContent.lifecycle)
+      ? sessionMapContent.lifecycle as Record<string, unknown>
       : null;
-    const schedulerSucceeded = scheduler.status === 200
-      && schedulerContent?.ok === true
-      && schedulerState?.healthy === true
-      && schedulerState?.operational === true
-      && schedulerState?.heartbeat_fresh === true;
-    const campaignReport = campaignContent?.campaign && typeof campaignContent.campaign === "object" && !Array.isArray(campaignContent.campaign)
-      ? campaignContent.campaign as Record<string, unknown>
+    const sessionIdentity = sessionMapContent?.session_identity && typeof sessionMapContent.session_identity === "object" && !Array.isArray(sessionMapContent.session_identity)
+      ? sessionMapContent.session_identity as Record<string, unknown>
       : null;
-    const campaignSucceeded = campaign.status === 200
-      && campaignContent?.ok === true
-      && campaignReport?.failed === 0
-      && campaignReport?.mutations_executed === 0;
-    const inventorySucceeded = scheduledToday.status === 200
-      && scheduledTodayContent?.ok === true
-      && scheduledTomorrow.status === 200
-      && scheduledTomorrowContent?.ok === true;
-    const executionKernel = startupContent?.execution_kernel && typeof startupContent.execution_kernel === "object" && !Array.isArray(startupContent.execution_kernel)
-      ? startupContent.execution_kernel as Record<string, unknown>
+    const initialSequence = Array.isArray(lifecycle?.initial_sequence) ? lifecycle.initial_sequence.map(String) : [];
+    const liveScopes = Array.isArray(liveStateContent?.scopes) ? liveStateContent.scopes.map(String) : [];
+    const initializeServerInfo = initialize.body?.result && typeof initialize.body.result === "object" && !Array.isArray(initialize.body.result)
+      ? (initialize.body.result as Record<string, unknown>).serverInfo
       : null;
-    const executionKernelSucceeded = executionKernel?.name === "Execution Kernel"
-      && executionKernel?.version === "lensically-execution-kernel-v1"
-      && executionKernel?.public_contract === "direct_typed_tools_v1"
-      && executionKernel?.deployment_fresh_sessions === true;
-    const mapSummary = startupContent?.mandatory_execution_map as Record<string, unknown> | undefined;
-    const executionLifecycle = executionKernel?.lifecycle && typeof executionKernel.lifecycle === "object" && !Array.isArray(executionKernel.lifecycle)
-      ? executionKernel.lifecycle as Record<string, unknown>
+    const serverInfo = initializeServerInfo && typeof initializeServerInfo === "object" && !Array.isArray(initializeServerInfo)
+      ? initializeServerInfo as Record<string, unknown>
       : null;
-    const startupPolicySucceeded = executionLifecycle?.version === "static-execution-router-v1"
-      && executionLifecycle?.map_state === "source_defined_route_completed"
-      && executionLifecycle?.route_mode === "source_defined_static_route"
-      && executionLifecycle?.mandatory_path_followed === true
-      && executionLifecycle?.d1_execution_library_bypassed === true
-      && executionLifecycle?.discovery_allowed === false
-      && executionLifecycle?.model_tool_choice_allowed === false;
-    const accountKeySucceeded = accountKey.status === 200
-      && accountKeyContent?.ok === true
-      && accountKeyContent?.selected_key === "manifest_mental"
-      && accountKeyContent?.account_data_loaded === false
-      && accountKeyContent?.proceed_required === true
-      && accountKeyContent?.next_tool === "confirmOperatorProceed";
+    const identitySucceeded = sessionIdentity?.mcp_version === serverInfo?.version
+      && sessionIdentity?.commit_sha === initialize.headers.commit_sha
+      && sessionIdentity?.deployment_identity === initialize.headers.deployment_id;
+    const lifecycleSucceeded = sessionMap.status === 200
+      && sessionMapContent?.ok === true
+      && lifecycle?.version === "operator-lifecycle-v1"
+      && initialSequence.length === requiredLifecycleTools.length
+      && initialSequence.every((name, index) => name === requiredLifecycleTools[index])
+      && knowledge.status === 200
+      && knowledgeContent?.ok === true
+      && liveState.status === 200
+      && liveStateContent?.ok === true
+      && liveScopes.length === 1
+      && liveScopes[0] === "runtime"
+      && execution.status === 200
+      && executionContent?.ok === true
+      && closure.status === 200
+      && closureContent?.ok === true
+      && closureContent?.lifecycle_stage === 5;
     return {
       ok: initialize.status === 200
         && listed.status === 200
-        && startup.status === 200
-        && startupContent?.ok === true
-        && accountKeySucceeded
-        && directSurface
+        && publicContractSucceeded
         && sessionIssued
         && staleSessionRejected
-        && executionKernelSucceeded
-        && engineeringAccessSucceeded
-        && schedulerSucceeded
-        && campaignSucceeded
-        && inventorySucceeded
-        && startupPolicySucceeded,
+        && identitySucceeded
+        && lifecycleSucceeded,
       oauth: { authorize: authorize.status, token: tokenResponse.status },
       initialize: {
         status: initialize.status,
-        server_info: (initialize.body?.result as Record<string, unknown> | undefined)?.serverInfo ?? null,
+        server_info: serverInfo,
         deployment_id: initialize.headers.deployment_id,
         commit_sha: initialize.headers.commit_sha,
         execution_kernel: initialize.headers.execution_kernel,
@@ -608,7 +590,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         unique_count: new Set(toolNames).size,
         names: toolNames,
         public_contract_enforced: publicContractSucceeded,
-        direct_typed_tools: directSurface,
+        lifecycle_contract: "operator-lifecycle-v1",
         generic_gateway_retired: !toolNames.includes("executeLensicallyIntent"),
         closed_schema_count: tools.filter((tool) => {
           const schema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
@@ -616,40 +598,31 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
             : null;
           return schema?.type === "object" && schema.additionalProperties === false;
         }).length,
-        required_direct_tools: requiredDirectTools,
+        required_lifecycle_tools: requiredLifecycleTools,
       },
       session_freshness: {
-        version: "deployment-scoped-mcp-session-v1",
+        version: "deployment-scoped-mcp-session-v2",
         issued: sessionIssued,
         stale_or_invalid_session_rejected_before_routing: staleSessionRejected,
         rejection_status: staleSession.status,
         rejection_reason: staleSessionData?.reason ?? null,
         replacement_session_issued: Boolean(staleSession.headers.mcp_session_id),
       },
-      startup: {
-        status: startup.status,
-        ok: startupContent?.ok === true,
-        execution_kernel: executionKernel,
-        mandatory_execution_map: mapSummary ?? null,
-        client_safety: startupContent?.client_safety ?? null,
-        system_directory: startupContent?.system_directory ?? null,
-        tool_surface: startupContent?.tool_surface ?? null,
-        repository: startupContent?.repository ?? null,
-        runtime: startupContent?.runtime ?? null,
+      lifecycle_smoke: {
+        ok: lifecycleSucceeded,
+        lifecycle_version: lifecycle?.version ?? null,
+        initial_sequence: initialSequence,
+        session_identity: sessionIdentity,
+        knowledge_stage_ok: knowledgeContent?.ok === true,
+        live_state_stage_ok: liveStateContent?.ok === true,
+        live_state_scopes: liveScopes,
+        execution_stage_ok: executionContent?.ok === true,
+        closure_stage_ok: closureContent?.ok === true,
+        executed_profile: executionContent?.profile_id ?? null,
+        executed_tool: executionContent?.executed_tool ?? null,
+        result_ok: executionContent?.result_ok ?? executionContent?.ok ?? null,
       },
-      account_key_lifecycle: {
-        status: accountKey.status,
-        ok: accountKeySucceeded,
-        selected_key: accountKeyContent?.selected_key ?? null,
-        account_data_loaded: accountKeyContent?.account_data_loaded ?? null,
-        proceed_required: accountKeyContent?.proceed_required ?? null,
-        next_tool: accountKeyContent?.next_tool ?? null,
-      },
-      direct_engineering_call: { status: engineeringAccess.status, ok: engineeringAccessSucceeded, content: engineeringAccessContent },
-      generic_gateway_retirement: { ok: !toolNames.includes("executeLensicallyIntent") },
-      capability_campaign: { status: campaign.status, ok: campaignContent?.ok ?? null, report: campaignContent?.campaign ?? null },
-      scheduler_state: { status: scheduler.status, content: schedulerContent },
-      scheduled_inventory: { today: { status: scheduledToday.status, content: scheduledTodayContent }, tomorrow: { status: scheduledTomorrow.status, content: scheduledTomorrowContent } },
+      identity_match: identitySucceeded,
     };
   }
   return { ok: false, error: "unknown_recovery_tool" };
