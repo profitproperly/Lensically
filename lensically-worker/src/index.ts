@@ -15552,6 +15552,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   const actionGateway = tools.find((tool) => tool.name === "executeOperatorAction");
   if (!actionGateway) return tools;
 
+    const actionCapabilityIds = new Set<string>();
   const actionBranches = tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
@@ -15566,7 +15567,11 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       const sourceRequired = Array.isArray(sourceSchema.required)
         ? (sourceSchema.required as string[]).filter((field) => field !== "governing_standards_ack")
         : [];
-      const capability = operatorActionCapabilityIdForToolName(tool.name);
+            const capability = operatorActionCapabilityIdForToolName(tool.name);
+      if (actionCapabilityIds.has(capability)) {
+        throw new Error(`operator_action_capability_collision:${capability}`);
+      }
+      actionCapabilityIds.add(capability);
       return {
         type: "object",
         properties: {
@@ -16260,7 +16265,7 @@ export const EXECUTION_KERNEL_NAME = "Execution Kernel";
 export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1";
 
 const OPERATOR_REGISTRY_GENERATION = "static-execution-router-v2";
-const OPERATOR_MCP_SESSION_VERSION = "deployment-scoped-mcp-session-v1";
+const OPERATOR_MCP_SESSION_VERSION = "deployment-scoped-mcp-session-v2";
 const OPERATOR_MCP_SESSION_TTL_SECONDS = 60 * 60 * 12;
 
 function currentOperatorDeploymentIdentity(env: Env): string {
@@ -16275,8 +16280,8 @@ function operatorExecutionKernelMetadata(env: Env): Record<string, unknown> {
     version: EXECUTION_KERNEL_VERSION,
     deployment_id: env.CF_VERSION_METADATA?.id ?? null,
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
-    public_gateway: "direct_typed_tools",
-        public_contract: "direct_typed_tools_v2",
+        public_gateway: "operator_lifecycle",
+        public_contract: OPERATOR_LIFECYCLE_VERSION,
         deployment_fresh_sessions: true,
     router_version: OPERATOR_REGISTRY_GENERATION,
     components: [
@@ -16514,7 +16519,7 @@ async function issueOperatorLifecycleToken(
     deployment_identity: currentOperatorDeploymentIdentity(env),
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 6),
+        exp: Math.floor(Date.now() / 1000) + (stage === 3 ? 15 * 60 : stage === 2 || stage === 4 ? 60 * 60 : OPERATOR_MCP_SESSION_TTL_SECONDS),
     ...claims,
   });
 }
@@ -16814,7 +16819,7 @@ function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
   }
   if (/ScheduledPostScheduler|auditScheduledPost|recoverOverdueScheduledPosts|runApprovedPostCanary|scheduled_post|hourly_coverage|production_board/i.test(toolName)) scopes.add("scheduler");
   if (isOperatorStripeToolName(toolName) || /CommercialDelivery|Stripe/i.test(toolName)) scopes.add("commerce");
-  if (toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && !isOperatorMcpEngineeringToolName(toolName) && !isOperatorStripeToolName(toolName)) scopes.add("account");
+    if (toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && toolName !== "list_accounts" && !isOperatorMcpEngineeringToolName(toolName) && !isOperatorStripeToolName(toolName)) scopes.add("account");
   if (/GrowthMission/i.test(toolName)) scopes.add("growth_mission");
   if (/manifest|source|draft|gate|performance|content_focus|post_results|monthly_growth/i.test(toolName)) scopes.add("manifest_intelligence");
   return [...scopes];

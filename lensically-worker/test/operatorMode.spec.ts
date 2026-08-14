@@ -145,14 +145,16 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
   }
   const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
   if (step1.isError) return step1 as unknown as { structuredContent: T; isError?: boolean };
+    const plannedAction = testCapabilityId(toolName);
   const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
     session_map_token: step1.structuredContent.session_map_token,
-    node_ids: ["governance"],
+    planned_action: plannedAction,
   });
   if (step2.isError) return step2 as unknown as { structuredContent: T; isError?: boolean };
+  const requestedBrand = testRequestedBrandKey(toolName, args);
   const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
     knowledge_token: step2.structuredContent.knowledge_token,
-    scopes: ["runtime"],
+    ...(requestedBrand ? { brand_key: requestedBrand } : {}),
   });
   if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
   const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>("executeOperatorAction", {
@@ -3835,15 +3837,14 @@ describe("operator mode MCP endpoint", () => {
     expect(step1).not.toHaveProperty("startup_authority");
     expect(step1).not.toHaveProperty("canonical_continuation");
     expect(step1).not.toHaveProperty("tool_surface");
-    const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
+        const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      node_ids: ["governance"],
+      planned_action: "list_accounts",
     });
     expect(step2.nodes[0]?.node_id).toBe("governance");
     expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v7" });
-    const step3 = await mcpTool<{ live_state_token: string; state: { runtime: Record<string, unknown> } }>("getOperatorLiveState", {
+        const step3 = await mcpTool<{ live_state_token: string; state: { runtime: Record<string, unknown> } }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
-      scopes: ["runtime"],
     });
     expect(step3.live_state_token).toBeTruthy();
     expect(step3.state.runtime).toBeTruthy();
@@ -3930,13 +3931,12 @@ active_checkpoint: none
 
   it("enforces the normalized Operator lifecycle from session map through explicit closure", async () => {
     const step1 = await mcpTool<{ session_map_token: string }>("getOperatorSessionMap");
-    const step2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+        const step2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      node_ids: ["governance"],
+      planned_action: "list_accounts",
     });
     const step3 = await mcpTool<{ live_state_token: string }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
-      scopes: ["runtime"],
     });
     const step4 = await mcpTool<{
       ok: boolean;

@@ -6,8 +6,8 @@ purpose: Canonical durable shop knowledge owned by Step 2 of the normalized Oper
 ## Lifecycle and loading contract
 - Step 0 MCP initialize contains only the two mandatory governing display lines plus the pointer to `getOperatorSessionMap`; no handbook content belongs there.
 - Step 1 `getOperatorSessionMap` contains only the recursive node skeleton, traversal pointers, session identity, and signed Step-1 proof; no durable knowledge or mutable state belongs there.
-- Step 2 `getOperatorKnowledge` resolves requested canonical nodes from this handbook server-side. The model does not search/read this file directly for routine competency loading.
-- Step 3 `getOperatorLiveState` loads current mutable truth. Step 4 `executeOperatorAction` executes one internal strongly typed capability. Step 5 `closeOperatorAction` verifies evidence and checkpoints.
+- Step 2 `getOperatorKnowledge` accepts the planned typed action, resolves that action to exactly one internal capability, derives mandatory canonical knowledge nodes server-side, and may add only explicitly requested extra nodes. The model does not search/read this file directly for routine competency loading.
+- Step 3 `getOperatorLiveState` derives mandatory current-state scopes from the action bound by Step 2 and may add explicit extra scopes. Step 4 `executeOperatorAction` rejects a different action or changed account target. Step 5 `closeOperatorAction` verifies evidence and checkpoints.
 - Initial boot is Steps 1-5. Every later meaningful task re-enters at Steps 2-5, with Step 2 reusing already-current knowledge only when its exact node version remains valid.
 - New tools, procedures, hazards, providers, and product details update the relevant node here or the canonical internal capability registry. They do not expand initialize or Step 1 and never require unrelated knowledge to be shed.
 - If a genuinely new operating domain appears, fit it under an existing branch when semantically correct. Add a new Step-1 branch only when the operating model itself gains a fundamentally new plane.
