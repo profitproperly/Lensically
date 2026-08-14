@@ -6471,7 +6471,8 @@ active_checkpoint: none
         d1_autonomy_bypassed: boolean;
       };
             status_kind?: string;
-            startup_authority?: { version: string; exact_owner_approved_text: string; exact_spec_execution_rule: string; prevention_closure_rule: string; standards: Array<{ key: string }>; governing_rule: string };
+                        startup_authority?: { version: string; authority: string; per_action_acknowledgment: string; governing_rule: string };
+            session_competency?: { version: string; startup_tool: string; rule: string };
       missing_inputs?: string[];
     }>("executeLensicallyIntent", {
       profile_id: "engineering_precheck",
@@ -6480,14 +6481,17 @@ active_checkpoint: none
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
-                                expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v7" });
-        expect(status.structuredContent.startup_authority?.discovery_execution_rule).toContain("never authorize execution");
-    expect(status.structuredContent.startup_authority?.public_schema_refresh_rule).toContain("CONTEXT PORT — PASTE INTO NEW CHAT");
-    expect(status.structuredContent.startup_authority?.public_schema_refresh_rule).toContain("SURVIVING CONSTRAINTS");
-    expect(status.structuredContent.startup_authority?.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
-    expect(status.structuredContent.startup_authority?.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
-    expect(status.structuredContent.startup_authority?.prevention_closure_rule).toContain("may not end with analysis");
-    expect(status.structuredContent.startup_authority?.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
+                                                                expect(status.structuredContent.startup_authority).toMatchObject({
+      version: "operator-governing-standards-v7",
+      authority: "highest_lensically_operating_authority",
+    });
+    expect(status.structuredContent.startup_authority?.governing_rule).toContain("fastest complete route");
+    expect(status.structuredContent.startup_authority).not.toHaveProperty("exact_owner_approved_text");
+    expect(status.structuredContent.session_competency).toMatchObject({
+      version: "operator-session-competency-v1",
+      startup_tool: "getOperatorStartupContext",
+    });
+    expect(status.structuredContent.session_competency?.rule).toContain("does not repeat the full startup payload");
     expect(status.structuredContent.mandatory_execution_map).toMatchObject({
       map_state: "source_defined_direct_completed",
       d1_execution_library_bypassed: true,
