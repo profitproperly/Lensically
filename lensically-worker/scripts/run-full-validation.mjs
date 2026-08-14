@@ -184,6 +184,7 @@ function validatePlan() {
         process_count: completeTestGroups.length + 2,
     complete_test_batch_count: completeTestGroups.length,
         complete_test_batch_size: COMPLETE_TEST_BATCH_SIZE,
+    complete_test_min_workers: COMPLETE_TEST_MIN_WORKERS,
     complete_test_max_workers: COMPLETE_TEST_MAX_WORKERS,
   };
 }
