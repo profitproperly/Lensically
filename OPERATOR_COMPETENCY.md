@@ -1,15 +1,16 @@
 # Lensically Operator Competency Handbook
 
-handbook_version: operator-competency-handbook-v1
-purpose: Canonical on-demand shop knowledge for fresh models after the constant-size session boot.
+handbook_version: operator-competency-handbook-v2
+purpose: Canonical durable shop knowledge owned by Step 2 of the normalized Operator lifecycle.
 
-## Loading contract
-- Startup must not copy this handbook into `getOperatorStartupContext`.
-- Startup carries only fixed domain pointers and the rule for when to load them.
-- For a task, identify the relevant domain key from startup, search this exact file for the domain marker, then read only the bounded section needed.
-- New tools, procedures, hazards, providers, and product details update the relevant domain section here. They do not expand initialize instructions or startup payloads.
-- Do not raise startup payload ceilings to accommodate knowledge growth. Do not delete unrelated startup competence merely to make room for new knowledge.
-- If a genuinely new operating domain appears, fit it under an existing broad domain whenever semantically correct. Add a new startup domain pointer only when the operating model itself gains a fundamentally new plane.
+## Lifecycle and loading contract
+- Step 0 MCP initialize contains only the two mandatory governing display lines plus the pointer to `getOperatorSessionMap`; no handbook content belongs there.
+- Step 1 `getOperatorSessionMap` contains only the recursive node skeleton, traversal pointers, session identity, and signed Step-1 proof; no durable knowledge or mutable state belongs there.
+- Step 2 `getOperatorKnowledge` resolves requested canonical nodes from this handbook server-side. The model does not search/read this file directly for routine competency loading.
+- Step 3 `getOperatorLiveState` loads current mutable truth. Step 4 `executeOperatorAction` executes one internal strongly typed capability. Step 5 `closeOperatorAction` verifies evidence and checkpoints.
+- Initial boot is Steps 1-5. Every later meaningful task re-enters at Steps 2-5, with Step 2 reusing already-current knowledge only when its exact node version remains valid.
+- New tools, procedures, hazards, providers, and product details update the relevant node here or the canonical internal capability registry. They do not expand initialize or Step 1 and never require unrelated knowledge to be shed.
+- If a genuinely new operating domain appears, fit it under an existing branch when semantically correct. Add a new Step-1 branch only when the operating model itself gains a fundamentally new plane.
 
 ## DOMAIN repository_engineering
 Load for repository inspection/mutation, Worker/backend work, private web-app work, public-site work, MCP implementation, schema/tool work, source-location questions, or engineering continuation.
@@ -33,14 +34,14 @@ Load for repository inspection/mutation, Worker/backend work, private web-app wo
 - Repository/head state: `getRepoStatus`.
 
 ### MCP/schema procedure
-- Advertised direct typed schemas are the invocation contract.
-- Discovery returns candidates only. Verify declared purpose, side effects, and schema before invocation.
-- No wrapper routing, profile IDs, generic envelopes, internal handlers, or failed speculative calls as a learning method.
-- After a public MCP tool addition/schema change is deployed and live-verified, use the mandatory refresh/context-port handoff before testing the changed client surface.
+- The public invocation contract is the five-stage lifecycle. `executeOperatorAction` exposes a generated closed discriminated union whose branches are derived from the internal typed capability schemas; no public generic `profile_id` or generic `inputs` envelope is allowed.
+- Internal capability names listed in this handbook describe canonical server capabilities, not independently callable public tools. Step 4 is the only model-facing operational execution choke point.
+- Discovery returns candidates only. Verify declared purpose, side effects, and exact typed branch before Step-4 invocation.
+- After a public lifecycle schema change is deployed and live-verified, use the mandatory refresh/context-port handoff before testing the changed client surface.
 
 ### Continuation
 - `ENGINEERING_CONTINUATION.md` is the sole accepted-job, precedence, active-job, and current-action authority.
-- Call `getEngineeringContinuation` before deciding what engineering work to resume.
+- Step 3 `getOperatorLiveState` with scope `engineering_continuation` is the model-facing continuation read; the server reads the canonical ledger behind that scope.
 - Chat memory, D1 work state, Growth Mission records, and action-closure receipts are evidence/telemetry only.
 
 ### Engineering efficiency
@@ -169,4 +170,4 @@ Load for Lensically public product surfaces, checkout/delivery/license/refund/pr
 - Public-site or download changes follow repository validation and the correct release path for the owning surface.
 
 ## Handbook maintenance rule
-This handbook may grow without forcing startup growth because it is never loaded wholesale by the startup tool. Update the smallest relevant domain section. Keep domain markers stable so a fresh model can locate the section with an exact-file search. Historical/superseded procedures belong in Git history or engineering audit, not in active competency text.
+This handbook may grow without forcing Step 0 or Step 1 growth because `getOperatorKnowledge` resolves only requested nodes server-side. Update the smallest relevant domain section and keep domain markers stable as canonical node anchors. Historical or superseded procedures belong in Git history or engineering audit, not active competency text.
