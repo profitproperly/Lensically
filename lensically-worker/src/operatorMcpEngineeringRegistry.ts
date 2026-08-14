@@ -69,19 +69,20 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     name: "getOperatorKnowledge",
     title: "Get operator knowledge",
     description: "Step 2 of the canonical Operator lifecycle. Resolve one or more canonical durable-knowledge nodes from the Step-1 map and issue a signed knowledge token. Durable knowledge lives here; live task state does not.",
-    inputSchema: {
+        inputSchema: {
       type: "object",
       properties: {
         session_map_token: { type: "string", minLength: 16 },
+        planned_action: { type: "string", minLength: 1, maxLength: 160, pattern: "^[a-z0-9_]+$", description: "Capability discriminator selected from executeOperatorAction's generated typed action schema. It mechanically determines mandatory knowledge nodes." },
         node_ids: {
           type: "array",
-          minItems: 1,
           maxItems: 7,
           uniqueItems: true,
+          description: "Optional additional durable-knowledge nodes. Mandatory nodes are added server-side from planned_action.",
           items: { type: "string", enum: ["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"] },
         },
       },
-      required: ["session_map_token", "node_ids"],
+      required: ["session_map_token", "planned_action"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -94,16 +95,16 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
       type: "object",
       properties: {
         knowledge_token: { type: "string", minLength: 16 },
-        scopes: {
+                scopes: {
           type: "array",
-          minItems: 1,
           maxItems: 8,
           uniqueItems: true,
+          description: "Optional additional live-state scopes. Mandatory scopes are derived server-side from the planned action bound into the knowledge token.",
           items: { type: "string", enum: ["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"] },
         },
         brand_key: BRAND_KEY_SCHEMA,
       },
-      required: ["knowledge_token", "scopes"],
+      required: ["knowledge_token"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },

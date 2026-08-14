@@ -16784,6 +16784,42 @@ function operatorActionCapabilityIdForToolName(toolName: string): string {
   return OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(toolName) ?? operatorPublicProfileIdForToolName(toolName);
 }
 
+function resolveOperatorInternalActionCapability(capability: string): { toolName: string; capability: string } | null {
+  const normalized = normalizeOperatorMachineKey(capability, "");
+  if (!normalized) return null;
+  const matches = buildComposedOperatorMcpTools(false)
+    .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
+    .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
+    .filter((tool) => operatorActionCapabilityIdForToolName(tool.name) === normalized);
+  if (matches.length !== 1) return null;
+  return { toolName: matches[0].name, capability: normalized };
+}
+
+function requiredOperatorKnowledgeNodesForTool(toolName: string): string[] {
+  const nodes = new Set<string>(["governance"]);
+  if (isOperatorMcpEngineeringToolName(toolName)) nodes.add("repository_engineering");
+  if (/GitHub|Cloudflare|Workflow|Deploy|deployment|verifyDeployed|RepoStatus/i.test(toolName)) nodes.add("release_infrastructure");
+  if (/Hardening|OperationalObservation|OperatorWork|EngineeringAudit|Precheck/i.test(toolName)) nodes.add("hardening_safety");
+  if (isOperatorStripeToolName(toolName) || /CommercialDelivery|Stripe/i.test(toolName)) nodes.add("commercial_product");
+  if (isOperatorMcpAdminToolName(toolName) || !isOperatorMcpEngineeringToolName(toolName)) nodes.add("account_runtime");
+  if (/manifest|source|draft|gate|scheduled|content|performance|growth|post_results|hourly_coverage|production_board/i.test(toolName)) nodes.add("manifest_content");
+  return [...nodes];
+}
+
+function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
+  const scopes = new Set<string>(["runtime"]);
+  if (isOperatorMcpEngineeringToolName(toolName)) {
+    scopes.add("repository");
+    scopes.add("engineering_continuation");
+  }
+  if (/ScheduledPostScheduler|auditScheduledPost|recoverOverdueScheduledPosts|runApprovedPostCanary|scheduled_post|hourly_coverage|production_board/i.test(toolName)) scopes.add("scheduler");
+  if (isOperatorStripeToolName(toolName) || /CommercialDelivery|Stripe/i.test(toolName)) scopes.add("commerce");
+  if (toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed" && !isOperatorMcpEngineeringToolName(toolName) && !isOperatorStripeToolName(toolName)) scopes.add("account");
+  if (/GrowthMission/i.test(toolName)) scopes.add("growth_mission");
+  if (/manifest|source|draft|gate|performance|content_focus|post_results|monthly_growth/i.test(toolName)) scopes.add("manifest_intelligence");
+  return [...scopes];
+}
+
 function operatorPublicIntentForToolName(toolName: string): string {
     if (toolName === "getOperatorSessionMap") return "startup";
   return operatorPublicProfileIdForToolName(toolName).replace(/_/g, " ");
@@ -20604,11 +20640,17 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "getOperatorKnowledge") {
         const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorSessionMap" };
-    const allowedNodes = new Set(["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"]);
-    const nodeIds = [...new Set((Array.isArray(args.node_ids) ? args.node_ids : []).map(String))];
-    if (!nodeIds.length || nodeIds.some((nodeId) => !allowedNodes.has(nodeId))) {
+        const allowedNodes = new Set(["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"]);
+    const plannedAction = normalizeOperatorMachineKey(args.planned_action, "");
+    const resolvedAction = resolveOperatorInternalActionCapability(plannedAction);
+    if (!resolvedAction) {
+      return { ok: false, error: "operator_planned_action_unknown", planned_action: plannedAction || null };
+    }
+    const requestedNodeIds = (Array.isArray(args.node_ids) ? args.node_ids : []).map(String);
+    if (requestedNodeIds.some((nodeId) => !allowedNodes.has(nodeId))) {
       return { ok: false, error: "operator_knowledge_nodes_invalid", allowed_node_ids: [...allowedNodes] };
     }
+    const nodeIds = [...new Set([...requiredOperatorKnowledgeNodesForTool(resolvedAction.toolName), ...requestedNodeIds])];
     const handbook = nodeIds.some((nodeId) => nodeId !== "governance")
       ? await getGithubFile(env, "OPERATOR_COMPETENCY.md")
       : null;
@@ -20634,16 +20676,20 @@ async function handleOperatorMcpEngineeringTool(
     if (nodes.some((node) => node.content === null)) {
       return { ok: false, error: "operator_knowledge_node_missing", requested_node_ids: nodeIds };
     }
-        const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
+            const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
       knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
       mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
+      planned_action: resolvedAction.capability,
+      resolved_tool_name: resolvedAction.toolName,
       node_ids: nodeIds,
       handbook_sha: handbook?.sha ?? null,
     });
     return {
       ok: true,
       lifecycle_stage: 2,
-      knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
+            knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
+      planned_action: resolvedAction.capability,
+      resolved_tool_name: resolvedAction.toolName,
       node_ids: nodeIds,
       nodes,
       knowledge_token: knowledgeToken,
@@ -20654,13 +20700,19 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "getOperatorLiveState") {
         const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
-    const allowedScopes = new Set(["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"]);
-    const scopes = [...new Set((Array.isArray(args.scopes) ? args.scopes : []).map(String))];
-    if (!scopes.length || scopes.some((scope) => !allowedScopes.has(scope))) {
+        const allowedScopes = new Set(["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"]);
+    const plannedAction = normalizeOperatorMachineKey(tokenCheck.payload.planned_action, "");
+    const resolvedToolName = normalizeOperatorText(tokenCheck.payload.resolved_tool_name, 200, true);
+    if (!plannedAction || !resolvedToolName) {
+      return { ok: false, error: "operator_knowledge_action_binding_missing" };
+    }
+    const requestedScopes = (Array.isArray(args.scopes) ? args.scopes : []).map(String);
+    if (requestedScopes.some((scope) => !allowedScopes.has(scope))) {
       return { ok: false, error: "operator_live_state_scopes_invalid", allowed_scopes: [...allowedScopes] };
     }
+    const scopes = [...new Set([...requiredOperatorLiveStateScopesForTool(resolvedToolName), ...requestedScopes])];
     const brandKey = normalizeGptBrandKey(args.brand_key);
-        const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
+            const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
     if (accountScopes.length && !brandKey) {
       return { ok: false, error: "brand_key_required_for_live_state", scopes: accountScopes };
     }
@@ -20721,9 +20773,11 @@ async function handleOperatorMcpEngineeringTool(
     }
     const failedScope = Object.entries(state).find(([, value]) => value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).ok === false);
     if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
-        const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
+            const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
       mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
+      planned_action: plannedAction,
+      resolved_tool_name: resolvedToolName,
       knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
       scopes,
       brand_key: brandKey,
@@ -20732,7 +20786,9 @@ async function handleOperatorMcpEngineeringTool(
     return {
       ok: true,
       lifecycle_stage: 3,
-      live_state_version: OPERATOR_LIVE_STATE_VERSION,
+            live_state_version: OPERATOR_LIVE_STATE_VERSION,
+      planned_action: plannedAction,
+      resolved_tool_name: resolvedToolName,
       scopes,
       brand_key: brandKey,
       state,

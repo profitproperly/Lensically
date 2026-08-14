@@ -187,7 +187,7 @@ export async function dispatchOperatorMcpToolCall(
       }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
     }
         lifecycleLiveStatePayload = lifecycleCheck.payload;
-    const action = asRecord(governedRequestedArgs.action);
+        const action = asRecord(governedRequestedArgs.action);
     const capability = typeof action?.capability === "string" ? action.capability.trim() : "";
     const actionArguments = asRecord(action?.arguments);
     if (!capability || !actionArguments) {
@@ -198,6 +198,31 @@ export async function dispatchOperatorMcpToolCall(
         execution_started: false,
         account_data_loaded: gatewayAccountDataLoaded,
       }, "Lensically blocked Step 4 because the generated strongly typed action contract was not satisfied.", true);
+    }
+        const plannedAction = typeof lifecycleCheck.payload.planned_action === "string" ? lifecycleCheck.payload.planned_action : "";
+    if (!plannedAction || capability !== plannedAction) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_action_changed_after_live_state",
+        planned_action: plannedAction || null,
+        requested_action: capability,
+        required_stage: "getOperatorKnowledge",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the action changed after Steps 2-3 prepared knowledge and live state.", true);
+    }
+    const preparedBrandKey = typeof lifecycleCheck.payload.brand_key === "string" ? lifecycleCheck.payload.brand_key : "";
+    const requestedBrandKey = typeof actionArguments.brand_key === "string" ? actionArguments.brand_key.trim().toLowerCase().replace(/-/g, "_") : "";
+    if (preparedBrandKey && requestedBrandKey && preparedBrandKey !== requestedBrandKey) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_action_brand_changed_after_live_state",
+        prepared_brand_key: preparedBrandKey,
+        requested_brand_key: requestedBrandKey,
+        required_stage: "getOperatorLiveState",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the account target changed after live state was loaded.", true);
     }
     const compiledProfile = dependencies.compilePublicProfileRequest({
       profile_id: capability,
