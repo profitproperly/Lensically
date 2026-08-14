@@ -6713,7 +6713,7 @@ active_checkpoint: none
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
                                                                 expect(status.structuredContent.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v7",
+      version: "operator-governing-standards-v8",
       authority: "highest_lensically_operating_authority",
     });
     expect(status.structuredContent.startup_authority?.governing_rule).toContain("fastest complete route");
