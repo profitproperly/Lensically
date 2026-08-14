@@ -13,7 +13,7 @@ function baseDependencies(
   overrides: Partial<OperatorMcpToolCallDependencies> = {},
 ): OperatorMcpToolCallDependencies {
   const dependencies: OperatorMcpToolCallDependencies = {
-    routedExecutionGateway: "executeLensicallyIntent",
+        routedExecutionGateway: "executeOperatorAction",
     mandatoryExecutionMapVersion: "map-v1",
     preCallRoutingVersion: "pre-call-v1",
     executionPolicyVersion: "execution-v1",
@@ -84,10 +84,12 @@ function baseDependencies(
     publicProfileIdForToolName: vi.fn((toolName) => toolName),
     executionFingerprint: vi.fn(async () => "request-fingerprint"),
     toolMutatesState: vi.fn(() => false),
-    buildActionClosure: vi.fn(async () => ({
+        buildActionClosure: vi.fn(async () => ({
       next_action: "continue",
       checkpoint: "resume",
     })),
+    verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, scopes: ["runtime"] } })),
+    issueActionExecutionToken: vi.fn(async () => "action-token"),
     ...overrides,
   };
   return dependencies;
@@ -157,7 +159,28 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(dependencies.gatewayAccountDataLoaded).not.toHaveBeenCalled();
   });
 
-  it("preserves registered gateway compilation failures", async () => {
+    it("blocks Step 4 before profile compilation without valid Step-3 proof", async () => {
+    const compilePublicProfileRequest = vi.fn();
+    const dependencies = baseDependencies({
+      isPublicDirectToolName: vi.fn(() => false),
+      compilePublicProfileRequest,
+      verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: false, error: "operator_lifecycle_token_invalid_or_expired" })),
+    });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 2,
+      params: { name: "executeOperatorAction", arguments: {} },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "operator_lifecycle_token_invalid_or_expired",
+      required_tool: "getOperatorLiveState",
+      execution_started: false,
+    });
+    expect(compilePublicProfileRequest).not.toHaveBeenCalled();
+  });
+
+  it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
     const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
       compilePublicProfileRequest: vi.fn(() => ({
@@ -168,18 +191,18 @@ describe("Operator MCP tool-call dispatcher", () => {
     });
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
-      id: 2,
-      params: { name: "executeLensicallyIntent", arguments: {} },
+      id: 21,
+      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
       error: "unknown_profile",
-      required_tool: "executeLensicallyIntent",
+      required_tool: "executeOperatorAction",
       freehand_gateway_payload_allowed: false,
     });
   });
 
-  it("preserves proven pre-call redirects before execution", async () => {
+    it("preserves proven pre-call redirects before execution", async () => {
     const executeAccountTool = vi.fn(async () => ({ ok: true }));
     const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
@@ -198,7 +221,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 3,
-      params: { name: "executeLensicallyIntent", arguments: {} },
+      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,

@@ -27,6 +27,7 @@ Load for repository inspection/mutation, Worker/backend work, private web-app wo
 - Unknown-location/free-text repository discovery: Recovery. Never probe Main with directory prefixes or speculative paths.
 - One isolated exact replacement: `applyRepoTextPatch`.
 - Related multi-file/multi-replacement work: `applyRepoPatchSet` so one coherent commit advances main.
+- Every exact replacement in a patch set must identify exactly one location. If the same literal appears multiple times, include enough enclosing semantic context (for example the test name or surrounding contract block) to make the replacement unique before mutation; never retry the same ambiguous find string.
 - Large whole-file replacement: `startRepoFileWrite` -> `appendRepoFileChunk` -> `commitRepoFileWrite`.
 - New small file: `createRepoFile`.
 - Repository/head state: `getRepoStatus`.

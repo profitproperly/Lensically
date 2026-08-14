@@ -5,11 +5,11 @@ import {
 } from "../src/operatorMcpEngineeringRegistry";
 
 describe("Operator MCP engineering registry", () => {
-    it("preserves the exact 34-tool engineering registry without duplicates", () => {
-    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(34);
-    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(34);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(34);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(34);
+        it("preserves the exact 37-tool engineering registry without duplicates", () => {
+    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(37);
+    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(37);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(37);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(37);
     expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name))).toEqual(
       new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES),
     );
@@ -24,10 +24,11 @@ describe("Operator MCP engineering registry", () => {
         column_names: { maxItems: 50 },
       },
     });
-    expect(byName.get("executeLensicallyIntent")?.inputSchema).toMatchObject({
-      required: ["profile_id", "inputs"],
-      additionalProperties: false,
-    });
+        expect(byName.get("getOperatorSessionMap")?.annotations).toMatchObject({ readOnlyHint: true });
+    expect(byName.get("getOperatorKnowledge")?.inputSchema).toMatchObject({ required: ["session_map_token", "node_ids"], additionalProperties: false });
+    expect(byName.get("getOperatorLiveState")?.inputSchema).toMatchObject({ required: ["knowledge_token", "scopes"], additionalProperties: false });
+    expect(byName.get("executeOperatorAction")?.inputSchema).toMatchObject({ required: ["live_state_token", "profile_id", "inputs"], additionalProperties: false });
+    expect(byName.get("closeOperatorAction")?.inputSchema).toMatchObject({ required: ["action_execution_token", "verification"], additionalProperties: false });
     expect(byName.get("applyRepoPatchSet")?.inputSchema).toMatchObject({
       required: ["patches", "message"],
       properties: { patches: { minItems: 1, maxItems: 20 } },
