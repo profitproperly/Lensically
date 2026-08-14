@@ -194,6 +194,9 @@ jobs:
               lensically-worker/test/*.spec.ts|lensically-worker/*.test.ts)
                 tests+=("${path#lensically-worker/}")
                 ;;
+              lensically-worker/src/systemDirectory/*.ts)
+                tests+=("test/systemDirectory.spec.ts")
+                ;;
               lensically-worker/src/*.ts)
                 stem="$(basename "${path}" .ts)"
                 candidate="test/${stem}.spec.ts"
