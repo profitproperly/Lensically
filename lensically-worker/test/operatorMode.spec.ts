@@ -7841,15 +7841,15 @@ active_checkpoint: none
     ).run();
     const scheduledPostId = Number(inserted.meta?.last_row_id ?? 0);
 
-    const missingReason = await mcpToolRaw<{ error?: string; allowed_reason_codes?: string[] }>("delete_scheduled_post", {
+    const missingReason = await mcpToolRaw<{ error?: string; execution_started?: boolean }>("delete_scheduled_post", {
       brand_key: BRAND_KEY,
       scheduled_post_id: scheduledPostId,
       proceed_confirmed: true,
     });
     expect(missingReason.isError).toBe(true);
         expect(missingReason.structuredContent).toMatchObject({
-      error: "scheduled_post_deletion_reason_code_required",
-      allowed_reason_codes: expect.arrayContaining(["technical_corruption", "exact_duplicate"]),
+      error: "operator_planned_action_arguments_invalid",
+      execution_started: false,
     });
 
         const memoryCountBefore = await env.DB.prepare(
