@@ -7536,9 +7536,7 @@ active_checkpoint: none
       total_tools: number;
       tools: Array<{ name: string }>;
       definition_intent: string;
-    }>("listMcpTools", {
-      include_disabled: true,
-    });
+    }>("listMcpTools");
     expect(listed.tools.length).toBeGreaterThan(0);
     expect(listed.total_tools).toBe(listed.tools.length);
     expect(new Set(listed.tools.map((tool) => tool.name)).size).toBe(listed.tools.length);
