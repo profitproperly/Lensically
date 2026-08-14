@@ -3732,6 +3732,15 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
+if (!workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"')
+    || !workflow.includes('.execution_kernel.public_contract == "operator-lifecycle-v1"')
+    || !workflow.includes('(.live_tool_count == 5)')) {
+  errors.push("release_workflow_normalized_lifecycle_runtime_gate_missing");
+}
+if (workflow.includes('.execution_kernel.public_gateway == "direct_typed_tools"')
+    || workflow.includes('(.live_tool_count >= 60)')) {
+  errors.push("release_workflow_retired_public_surface_gate_present");
+}
 
 
 
