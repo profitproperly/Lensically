@@ -19335,10 +19335,14 @@ async function getOperatorMcpBoundaryBlock(
     authority: releaseAuthority,
   });
   if (!releaseGate.allowed) {
-        return {
+    const publicLifecycleRefreshRequired = OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(toolName);
+    return {
       ok: false,
-      retryable: true,
-      required_next_action: "Retry this tool only after the executing Worker reaches the shared released production SHA. Release-repair engineering tools remain available while rollout converges or is repaired.",
+      retryable: publicLifecycleRefreshRequired ? false : true,
+      client_refresh_required: publicLifecycleRefreshRequired,
+      required_next_action: publicLifecycleRefreshRequired
+        ? "refresh the lensically operator mode mcp now. Start a new chat and resume from getOperatorSessionMap."
+        : "Retry this repair-control tool only after the executing Worker reaches the shared released production SHA.",
       ...releaseGate,
     };
   }
