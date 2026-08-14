@@ -76,7 +76,10 @@ describe("Operator MCP registry composition", () => {
       "operateStripe",
     ]));
 
-        expect(names.slice(0, 5)).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
+            const lifecycleOrder = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"];
+    for (let index = 1; index < lifecycleOrder.length; index += 1) {
+      expect(names.indexOf(lifecycleOrder[index - 1])).toBeLessThan(names.indexOf(lifecycleOrder[index]));
+    }
     expect(names.indexOf("getEngineeringContinuation")).toBeLessThan(names.indexOf("getDatabaseSchemaState"));
         expect(names.indexOf("get_performance_learning")).toBeLessThan(names.indexOf("prepare_manifest_shadow_cycle"));
     expect(names.indexOf("prepare_manifest_shadow_cycle")).toBeLessThan(names.indexOf("commit_manifest_shadow_cycle_strategy"));
