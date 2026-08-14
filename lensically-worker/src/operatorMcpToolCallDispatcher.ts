@@ -605,9 +605,7 @@ export async function dispatchOperatorMcpToolCall(
       lifecycle: mapLifecycle,
       policy: executionPolicy,
     };
-    if (sourceDefinedDirectEngineering && routedGatewayMetadata.profile_id === "engineering_precheck") {
-      resultPayload.mandatory_execution_map = mapLifecycle;
-    }
+    
     resultPayload.routed_execution = routedGatewayMetadata;
     resultPayload.execution_guard_enforcement = {
       version: dependencies.executionGuardVersion,
