@@ -149,6 +149,7 @@ export const OPERATOR_GOVERNING_STANDARDS = {
     per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
   per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
     failure_repair_rule: OPERATOR_FAILURE_REPAIR_RULE,
+  public_schema_refresh_rule: OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
   redundant_inspection_rule: "Once the exact specification, target file, and integration point are known, repeated search or read calls for the same settled evidence are forbidden unless a concrete contradiction or failed replacement requires them.",
