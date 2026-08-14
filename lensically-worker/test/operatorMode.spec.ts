@@ -5329,27 +5329,35 @@ active_checkpoint: none
       no_account_sections_present: boolean;
             tool_surface: { public_tool_count: number; categories: { engineering: number; admin: number; operator: number } };
       runtime: { mcp_version: string; registry_generation: string };
-            source_documents: Array<{ path: string; ok: boolean; status: number; size: number }>;
+                        source_documents: Array<{ path: string; role: string; load: string }>;
             canonical_continuation: { authority: string; path: string; tool: string; contract: string | null; active_job_id: string | null; active_checkpoint: string | null };
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
-                                expect(startup.bootstrap_version).toBe("operator-startup-v7");
+                                                                expect(startup.bootstrap_version).toBe("operator-startup-v8");
         const competencyBoot = (startup as unknown as {
       session_competency_boot: {
         version: string;
+        architecture: string;
         fresh_model_assumption: string;
-        shop_map: { repository_and_source: { hard_boundary: string }; failures_prevention_and_learning: { recurrence: string } };
-        capability_index: { engineering: string[]; admin_and_control: string[]; account_and_operator: string[] };
+        handbook_path: string;
+        domain_load_protocol: string;
+        domain_routes: Array<{ key: string; marker: string; load_when: string }>;
+        knowledge_growth_rule: string;
+        payload_policy: { initialize_ceiling_chars: number; startup_transport_ceiling_bytes: number; startup_regression_target_chars: number; rule: string };
       };
     }).session_competency_boot;
     expect(competencyBoot).toMatchObject({
-      version: "operator-session-competency-v1",
+      version: "operator-session-competency-v2",
+      architecture: "constant_size_router_v1",
       fresh_model_assumption: "zero_retained_lensically_knowledge",
+      handbook_path: "OPERATOR_COMPETENCY.md",
     });
-    expect(competencyBoot.shop_map.repository_and_source.hard_boundary).toContain("one known exact file only");
-    expect(competencyBoot.shop_map.failures_prevention_and_learning.recurrence).toContain("prevention regression");
-    expect(competencyBoot.capability_index.engineering).toContain("readRepoFile");
-    expect(competencyBoot.capability_index.account_and_operator).toContain("prepare_manifest_autonomous_cycle");
+    expect(competencyBoot.domain_routes.map((route) => route.key)).toEqual([
+      "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product",
+    ]);
+    expect(competencyBoot.domain_load_protocol).toContain("Never load the whole handbook");
+    expect(competencyBoot.knowledge_growth_rule).toContain("must not enlarge initialize instructions or startup payloads");
+    expect(competencyBoot.payload_policy).toMatchObject({ initialize_ceiling_chars: 6500, startup_transport_ceiling_bytes: 24000, startup_regression_target_chars: 16000 });
                 expect(startup.startup_authority).toMatchObject({
             version: "operator-governing-standards-v7",
       authority: "highest_lensically_operating_authority",
@@ -5374,7 +5382,8 @@ active_checkpoint: none
     expect(startup.no_account_sections_present).toBe(true);
         expect(startup.tool_surface.public_tool_count).toBe(registry.tools.length);
         expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v2" });
-        expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", "ENGINEERING_CONTINUATION.md"]);
+                expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", "OPERATOR_COMPETENCY.md", "ENGINEERING_CONTINUATION.md"]);
+    expect(startup.source_documents.find((document) => document.path === "OPERATOR_COMPETENCY.md")).toMatchObject({ role: "domain_competency_handbook", load: "bounded_domain_on_demand" });
         expect(startup.canonical_continuation).toMatchObject({
       authority: "sole_canonical_repository_ledger",
       path: "ENGINEERING_CONTINUATION.md",
@@ -5394,8 +5403,11 @@ active_checkpoint: none
     expect(serialized).not.toContain("growth_mission_contract");
     expect(serialized).not.toContain("mandatory_fallback_execution_routes");
     expect(serialized).not.toContain("operator_work_state");
-    expect(serialized).not.toContain("atomic_write_reconciliation");
-    expect(serialized.length).toBeLessThan(25000);
+        expect(serialized).not.toContain("atomic_write_reconciliation");
+    expect(serialized).not.toContain("capability_index");
+    expect(serialized).not.toContain("shop_map");
+    expect(JSON.stringify((startup as unknown as { session_competency_boot: unknown }).session_competency_boot).length).toBeLessThan(4000);
+    expect(serialized.length).toBeLessThan(16000);
   }, 30000);
 
     it("classifies a repeated resolved failure as a prevention regression", async () => {

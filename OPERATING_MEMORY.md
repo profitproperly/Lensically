@@ -12,7 +12,8 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Execution Architecture
 
-- Fresh ChatGPT Operator sessions assume zero retained Lensically knowledge. Pay the one-time session competency startup tax before non-startup work: load the governing authority, canonical shop map, capability locations, hazards, continuation authority, and operating procedures; then load only task-specific live state. Known Lensically structure must never be rediscovered by trial and error mid-workflow.
+- Fresh ChatGPT Operator sessions assume zero retained Lensically knowledge. Startup is permanently **constant-size**: governing authority + a fixed domain router only. Root `OPERATOR_COMPETENCY.md` holds detailed shop competence and is loaded by bounded domain section only when the task needs it. New knowledge updates that handbook; it does not expand initialize/startup, raise payload ceilings, or force unrelated knowledge to be shed.
+- The startup router has six broad domains: repository engineering, release infrastructure, account runtime, Manifest content, hardening/safety, and commercial product. These are routing categories, not per-tool inventories; future capabilities inherit a domain instead of appending themselves to boot.
 - Repository routing is explicit: `readRepoFile` and `searchRepoFiles` are for known exact files, with `searchRepoFiles` requiring one exact file path. Unknown-location or free-text repository discovery belongs to Recovery. Never probe Main with directory prefixes or speculative file paths.
 
 

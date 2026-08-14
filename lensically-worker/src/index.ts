@@ -16105,80 +16105,46 @@ export function parseCanonicalContinuationMetadata(content: string | null): {
 }
 
 
-function buildOperatorSessionCompetencyBoot(input: {
-  engineeringTools: string[];
-  adminTools: string[];
-  accountTools: string[];
-}): Record<string, unknown> {
+function buildOperatorSessionCompetencyBoot(): Record<string, unknown> {
   return {
     version: OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
+    architecture: "constant_size_router_v1",
     fresh_model_assumption: "zero_retained_lensically_knowledge",
     governing_rule: OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
-    completion_rule: "Do not begin repository, deployment, workflow, account, content, scheduling, or engineering work until this boot is loaded and the requested task is classified against the shop map.",
+    handbook_path: "OPERATOR_COMPETENCY.md",
     startup_sequence: [
       "Load and obey the governing authority.",
-      "Internalize the shop map, capability index, hazards, and canonical source locations.",
-      "Read canonical continuation before deciding what engineering work to resume.",
-      "Classify the requested task into one or more operating areas before choosing a tool.",
-      "Load only the live task/account state required by those areas; never substitute chat memory for canonical state.",
+      "Classify the task against one fixed competency domain.",
+      "Load only that bounded handbook domain, then task-specific live state.",
+      "For engineering continuation, read getEngineeringContinuation before choosing work.",
       "Execute through the canonical typed route, verify, record durable learning when needed, and checkpoint.",
+    ],
+    domain_load_protocol: "Use searchRepoFiles on exact file OPERATOR_COMPETENCY.md with the selected domain marker, then readRepoFile around the returned line. Never load the whole handbook merely because the session is fresh.",
+    domain_routes: [
+      { key: "repository_engineering", marker: "## DOMAIN repository_engineering", load_when: "repository, code, MCP/schema, web surface, engineering continuation" },
+      { key: "release_infrastructure", marker: "## DOMAIN release_infrastructure", load_when: "GitHub Actions, Cloudflare, deployment, release verification, Recovery" },
+      { key: "account_runtime", marker: "## DOMAIN account_runtime", load_when: "account state, Proceed, scheduling, analytics, account mutation" },
+      { key: "manifest_content", marker: "## DOMAIN manifest_content", load_when: "Manifest strategy, cycles, source cards, generation, gates, lineage, performance" },
+      { key: "hardening_safety", marker: "## DOMAIN hardening_safety", load_when: "failure, blocker, recurrence, prevention, transport ambiguity, efficiency incident" },
+      { key: "commercial_product", marker: "## DOMAIN commercial_product", load_when: "public product, Stripe, checkout, delivery, license, legal/customer surfaces" },
     ],
     canonical_sources: {
       operating_rules: "AGENTS.md",
       live_architecture: "CURRENT_STATE.md",
-      reusable_traps_and_winning_procedures: "OPERATING_MEMORY.md",
+      reusable_rules: "OPERATING_MEMORY.md",
+      competency_handbook: "OPERATOR_COMPETENCY.md",
       engineering_continuation: "ENGINEERING_CONTINUATION.md via getEngineeringContinuation",
       live_account_truth: "server-side persisted Lensically state after the applicable account boundary",
       invocation_contracts: "advertised direct typed tool schemas",
-      runtime_truth: "deployed Worker metadata and live verification",
     },
-    shop_map: {
-      repository_and_source: {
-        locations: ["lensically-worker/ = production backend + Operator MCP", "lensically-web/ = private operational web app", "lensically-recovery-worker/ = independent break-glass repair plane", "lensically-worker/public/ = public sales/download/legal surfaces"],
-        normal_reads: ["getRepoStatus", "readRepoFile", "searchRepoFiles"],
-        normal_mutations: ["applyRepoTextPatch = one isolated exact replacement", "applyRepoPatchSet = related atomic replacements", "startRepoFileWrite + appendRepoFileChunk + commitRepoFileWrite = large whole-file replacement"],
-        hard_boundary: "searchRepoFiles searches one known exact file only. Unknown-location/free-text repository discovery belongs to Recovery; never probe Main with directory prefixes or speculative paths.",
-      },
-      mcp_and_schema: {
-        contract: "Use advertised direct typed tools only; no wrapper routing, profile IDs, generic input envelopes, or internal handler names.",
-        definitions: "Tool schemas are the exact invocation contract. Know the capability location before work and verify the declared schema before invocation; never learn a tool through failed speculative calls.",
-        schema_change: "After a public tool addition or schema change is deployed and live-verified, stop and use the mandatory refresh/context-port handoff before testing the changed surface.",
-      },
-      github_cloudflare_and_release: {
-        repository: "profitproperly/Lensically main is authoritative.",
-        cloudflare: "Use the Profit Properly Lensically estate. Pages work uses the dedicated Pages tools; Worker production releases use the exact-SHA validated release workflow.",
-        release_sequence: ["bounded inspection", "one coherent change set", "focused validation", "exact-SHA release", "live runtime verification", "scheduler safety verification when publishing behavior changed"],
-        recovery_boundary: "Recovery is break-glass only when Main or its deployment plane cannot receive or complete the repair; return to Main immediately afterward.",
-      },
-      web_surfaces: {
-        private_app: "lensically-web/ -> app.lensically.com",
-        public_site: "lensically-worker/public/ -> lensically.com public sales, download, license, refund, privacy, terms, and data-deletion routes",
-        rule: "Identify the owning surface before editing; do not infer frontend ownership from the domain alone.",
-      },
-      continuation_and_state: {
-        engineering: "ENGINEERING_CONTINUATION.md is the sole job/precedence/current-action authority; call getEngineeringContinuation before any continuation decision.",
-        account: "Backend persistence is authoritative. Guided workflows use key selection + explicit Proceed before account state; autonomous Manifest cycle tools execute under their direct autonomous contract.",
-        chat_memory: "Evidence only; never continuation or live-state authority.",
-      },
-      failures_prevention_and_learning: {
-        failure: "A real tool failure interrupts the affected objective. Diagnose the exact cause, repair it, generalize it, add durable prevention/regression, validate, release when required, live-verify, then resume the interrupted step.",
-        recurrence: "Every new hardening incident is checked against prior closed incidents and promoted winning paths. A repeat of a resolved failure is a prevention regression, not a new bug, and must investigate why the prior prevention failed.",
-        expected_controls: "Fail-closed guard responses are operating boundaries, not permission to route around the control.",
-        efficiency: "Eliminate repeated searches, duplicate calls, avoidable waits, redundant validation, and rediscovery without reducing correctness or evidence quality.",
-      },
-      payload_idempotency_and_safety: {
-        bounded_payloads: "Use server-bounded reads and compact receipts. Never echo whole large files, patch bodies, logs, or database payloads through the client.",
-        client_block: "If a payload is blocked before Lensically receives it, do not resend the same payload; reduce or split it.",
-        uncertain_transport: "Reuse the same operation_id only to reconcile whether an uncertain mutating request executed; do not create a second operation identity.",
-        exact_files: "Known files use bounded line reads/searches; large mutations use the large-file path instead of oversized exact-patch payloads.",
-      },
+    capability_rule: "Do not enumerate tool names in startup. The advertised tool surface and exact schemas are the live capability inventory; domain knowledge belongs in OPERATOR_COMPETENCY.md.",
+    knowledge_growth_rule: "New tools, providers, procedures, hazards, product details, and winning paths update the relevant handbook domain. They must not enlarge initialize instructions or startup payloads. Do not shed unrelated competency to make room.",
+    payload_policy: {
+      initialize_ceiling_chars: 6500,
+      startup_transport_ceiling_bytes: 24000,
+      startup_regression_target_chars: 16000,
+      rule: "Ceilings are fail-closed guardrails, not storage targets. Never raise a ceiling to accommodate knowledge growth; move domain knowledge behind the fixed router instead.",
     },
-    capability_index: {
-      engineering: input.engineeringTools,
-      admin_and_control: input.adminTools,
-      account_and_operator: input.accountTools,
-    },
-    anti_ambiguity_rule: "Before each action, the operating area and canonical capability must already be known from this map or the task-specific live state. Discovery is for genuinely unknown terrain, never for rediscovering known Lensically structure.",
   };
 }
 
@@ -16208,11 +16174,15 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
     ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
     : undefined;
-    const continuationPath = "ENGINEERING_CONTINUATION.md";
-  const sourcePaths = ["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", continuationPath];
-  const docFiles = await Promise.all(sourcePaths.map((path) => getGithubFile(env, path)));
-  const sourceDocuments = sourcePaths.map((path, index) => compactStartupDocument(path, docFiles[index]));
-    const continuationFile = docFiles[3];
+      const continuationPath = "ENGINEERING_CONTINUATION.md";
+  const continuationFile = await getGithubFile(env, continuationPath);
+  const sourceDocuments = [
+    { path: "AGENTS.md", role: "operating_rules", load: "on_demand" },
+    { path: "CURRENT_STATE.md", role: "live_architecture", load: "on_demand" },
+    { path: "OPERATING_MEMORY.md", role: "reusable_rules", load: "on_demand" },
+    { path: "OPERATOR_COMPETENCY.md", role: "domain_competency_handbook", load: "bounded_domain_on_demand" },
+    { path: continuationPath, role: "engineering_continuation", load: "startup_metadata_from_canonical_read" },
+  ];
   const continuationMetadata = parseCanonicalContinuationMetadata(continuationFile.content);
   const canonicalContinuation = {
     ok: continuationFile.ok && continuationFile.content !== null,
@@ -16230,12 +16200,8 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
     return {
     ok: true,
         startup_authority: OPERATOR_GOVERNING_STANDARDS,
-        bootstrap_version: "operator-startup-v7",
-    session_competency_boot: buildOperatorSessionCompetencyBoot({
-      engineeringTools: activeEngineeringTools,
-      adminTools: activeAdminTools,
-      accountTools: operatorTools,
-    }),
+                bootstrap_version: "operator-startup-v8",
+    session_competency_boot: buildOperatorSessionCompetencyBoot(),
     operating_contract: {
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
