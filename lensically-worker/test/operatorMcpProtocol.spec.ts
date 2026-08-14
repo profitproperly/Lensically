@@ -132,11 +132,12 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_GOVERNING_STANDARDS.conversational_problem_intake_rule).toBe(OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE);
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
     expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("short opaque continuation references");
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("remain server-side");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("byte-for-byte");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("Never decode, reconstruct, transcribe, normalize, trim, edit");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("copy-only atomic value");
-    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("stop before making the next lifecycle call");
-    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("never retry the corrupted token");
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("never retry the corrupted reference");
     expect(OPERATOR_GOVERNING_STANDARDS.opaque_lifecycle_token_rule).toBe(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE);
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("before it reaches Lensically");
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("fresh MCP/client transport");
