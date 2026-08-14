@@ -20521,6 +20521,188 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
+                  if (toolName === "getOperatorSessionMap") {
+    return buildOperatorSessionMap(request, env);
+  }
+
+  if (toolName === "getOperatorKnowledge") {
+    const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1);
+    if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorSessionMap" };
+    const allowedNodes = new Set(["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"]);
+    const nodeIds = [...new Set((Array.isArray(args.node_ids) ? args.node_ids : []).map(String))];
+    if (!nodeIds.length || nodeIds.some((nodeId) => !allowedNodes.has(nodeId))) {
+      return { ok: false, error: "operator_knowledge_nodes_invalid", allowed_node_ids: [...allowedNodes] };
+    }
+    const handbook = nodeIds.some((nodeId) => nodeId !== "governance")
+      ? await getGithubFile(env, "OPERATOR_COMPETENCY.md")
+      : null;
+    if (handbook && (!handbook.ok || handbook.content === null)) {
+      return { ok: false, error: "operator_competency_handbook_unavailable", status: handbook.status };
+    }
+    const nodes = nodeIds.map((nodeId) => {
+      if (nodeId === "governance") {
+        return {
+          node_id: nodeId,
+          source: "operatorMcpProtocol.ts",
+          version: OPERATOR_GOVERNING_STANDARDS.version,
+          content: OPERATOR_GOVERNING_STANDARDS,
+        };
+      }
+      return {
+        node_id: nodeId,
+        source: "OPERATOR_COMPETENCY.md",
+        source_sha: handbook?.sha ?? null,
+        content: handbook?.content ? extractOperatorKnowledgeSection(handbook.content, nodeId) : null,
+      };
+    });
+    if (nodes.some((node) => node.content === null)) {
+      return { ok: false, error: "operator_knowledge_node_missing", requested_node_ids: nodeIds };
+    }
+    const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
+      knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
+      node_ids: nodeIds,
+      handbook_sha: handbook?.sha ?? null,
+    });
+    return {
+      ok: true,
+      lifecycle_stage: 2,
+      knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
+      node_ids: nodeIds,
+      nodes,
+      knowledge_token: knowledgeToken,
+      live_state_loaded: false,
+    };
+  }
+
+  if (toolName === "getOperatorLiveState") {
+    const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2);
+    if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
+    const allowedScopes = new Set(["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"]);
+    const scopes = [...new Set((Array.isArray(args.scopes) ? args.scopes : []).map(String))];
+    if (!scopes.length || scopes.some((scope) => !allowedScopes.has(scope))) {
+      return { ok: false, error: "operator_live_state_scopes_invalid", allowed_scopes: [...allowedScopes] };
+    }
+    const brandKey = normalizeGptBrandKey(args.brand_key);
+    const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
+    if (accountScopes.length && !brandKey) {
+      return { ok: false, error: "brand_key_required_for_live_state", scopes: accountScopes };
+    }
+    if (accountScopes.length && args.proceed_confirmed !== true) {
+      return { ok: false, error: "explicit_proceed_required", scopes: accountScopes, required_stage: "confirmOperatorProceed" };
+    }
+    const state: Record<string, unknown> = {};
+    if (scopes.includes("runtime")) state.runtime = operatorRuntimeMetadata(env);
+    if (scopes.includes("repository")) {
+      const config = githubRepoConfig(env);
+      const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
+      const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
+        ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
+        : undefined;
+      state.repository = {
+        owner: config.owner,
+        repo: config.repo,
+        branch: config.branch,
+        latest_sha: commit?.sha ?? null,
+        github_status: branch.status,
+        github_available: branch.ok,
+      };
+    }
+    if (scopes.includes("engineering_continuation")) {
+      const path = "ENGINEERING_CONTINUATION.md";
+      const file = await getGithubFile(env, path);
+      if (!file.ok || file.content === null) return { ok: false, error: "canonical_continuation_unavailable", status: file.status, path };
+      const metadata = parseCanonicalContinuationMetadata(file.content);
+      state.engineering_continuation = {
+        authority: "sole_canonical_repository_ledger",
+        path,
+        status: metadata.status,
+        contract: metadata.contract,
+        active_job_id: metadata.active_job_id,
+        active_checkpoint: metadata.active_checkpoint,
+        file_sha: file.sha,
+        size: file.size,
+        active_excerpt: extractActiveContinuationExcerpt(file.content, metadata.active_job_id),
+      };
+    }
+    if (scopes.includes("scheduler")) {
+      state.scheduler = await handleOperatorMcpAdminTool(request, env, "getScheduledPostSchedulerState", {}, true);
+    }
+    if (scopes.includes("commerce")) {
+      state.commerce = await handleOperatorMcpAdminTool(request, env, "getStripeAccountState", {}, true);
+    }
+    if (brandKey && scopes.includes("account")) {
+      state.account = await callOperatorToolForMcp(request, env, "get_account_state", { brand_key: brandKey, proceed_confirmed: true });
+    }
+    if (brandKey && scopes.includes("growth_mission")) {
+      state.growth_mission = await handleOperatorMcpAdminTool(request, env, "getGrowthMission", { brand_key: brandKey, proceed_confirmed: true }, true);
+    }
+    if (brandKey && scopes.includes("manifest_intelligence")) {
+      state.manifest_intelligence = await callOperatorToolForMcp(request, env, "get_manifest_intelligence_foundation", { brand_key: brandKey, proceed_confirmed: true });
+    }
+    const failedScope = Object.entries(state).find(([, value]) => value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).ok === false);
+    if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
+    const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
+      live_state_version: OPERATOR_LIVE_STATE_VERSION,
+      knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
+      scopes,
+      brand_key: brandKey,
+      captured_at: new Date().toISOString(),
+    });
+    return {
+      ok: true,
+      lifecycle_stage: 3,
+      live_state_version: OPERATOR_LIVE_STATE_VERSION,
+      scopes,
+      brand_key: brandKey,
+      state,
+      live_state_token: liveStateToken,
+    };
+  }
+
+  if (toolName === "closeOperatorAction") {
+    const tokenCheck = await verifyOperatorLifecycleToken(env, args.action_execution_token, 4);
+    if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "executeOperatorAction" };
+    const verification = args.verification && typeof args.verification === "object" && !Array.isArray(args.verification)
+      ? args.verification as Record<string, unknown>
+      : {};
+    const evidence = Array.isArray(verification.evidence) ? verification.evidence.map(String).filter(Boolean).slice(0, 20) : [];
+    const nextAction = normalizeOperatorText(verification.next_action, 2000, true);
+    if (verification.verified !== true || !evidence.length || !nextAction) {
+      return { ok: false, error: "operator_action_closure_verification_required", execution: tokenCheck.payload };
+    }
+    if (tokenCheck.payload.result_ok === false && verification.prevention_required !== false) {
+      return {
+        ok: false,
+        error: "operator_action_closure_prevention_incomplete",
+        rule: "A failed action cannot close until repair and durable prevention are verified.",
+        execution: tokenCheck.payload,
+      };
+    }
+    const closureToken = await issueOperatorLifecycleToken(env, 5, {
+      closure_version: OPERATOR_ACTION_CLOSURE_VERSION,
+      executed_tool: tokenCheck.payload.executed_tool ?? null,
+      profile_id: tokenCheck.payload.profile_id ?? null,
+      result_ok: tokenCheck.payload.result_ok ?? null,
+      closed_at: new Date().toISOString(),
+    });
+    return {
+      ok: true,
+      lifecycle_stage: 5,
+      closure_version: OPERATOR_ACTION_CLOSURE_VERSION,
+      executed_tool: tokenCheck.payload.executed_tool ?? null,
+      profile_id: tokenCheck.payload.profile_id ?? null,
+      verification: {
+        verified: true,
+        evidence,
+        next_action: nextAction,
+        durable_learning: normalizeOperatorText(verification.durable_learning, 4000, true),
+        prevention_required: verification.prevention_required === true,
+      },
+      closure_token: closureToken,
+      next_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
+    };
+  }
+
                 if (toolName === "getDatabaseSchemaState") {
     const tableName = typeof args.table_name === "string" ? args.table_name.trim() : "";
     const rawColumns = Array.isArray(args.column_names) ? args.column_names : [];
@@ -20590,9 +20772,7 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-        if (toolName === "getOperatorStartupContext") {
-        return buildOperatorStartupContext(request, env);
-  }
+        
   if (toolName === "recordHardeningIncident") return recordHardeningIncident(env, args);
   if (toolName === "getHardeningStatus") return getHardeningStatus(env, args);
   if (toolName === "advanceHardeningIncident") return advanceHardeningIncident(env, args);
