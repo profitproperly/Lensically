@@ -5390,7 +5390,9 @@ active_checkpoint: none
     const serialized = JSON.stringify(startup);
     expect(serialized).not.toContain("collaboration_contract");
     expect(serialized).not.toContain("open_implementation_backlog");
-        expect(serialized).not.toContain("active_runtime_config_deployment");
+            expect(serialized).not.toContain("active_runtime_config_deployment");
+    expect(serialized).not.toContain("growth_mission_contract");
+    expect(serialized).not.toContain("mandatory_fallback_execution_routes");
     expect(serialized).not.toContain("operator_work_state");
     expect(serialized).not.toContain("atomic_write_reconciliation");
     expect(serialized.length).toBeLessThan(25000);

@@ -16267,20 +16267,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       ],
       after_explicit_proceed: "confirmOperatorProceed restores canonical account state, produces the current Growth Mission Brief, and opens an owner-model planning discussion. It does not authorize account mutations. Later account calls send proceed_confirmed=true; the approved persistent mission and continuity are verified from server-side state.",
     },
-                canonical_continuation: canonicalContinuation,
-    growth_mission_contract: {
-      version: OPERATOR_GROWTH_MISSION_VERSION,
-      permanent_mission: MANIFEST_AUTONOMY_OBJECTIVE,
-      active_execution_mode: MANIFEST_GUIDED_EXECUTION_MODE,
-      proceed_opens_discussion: true,
-      model_preemptively_diagnoses_and_recommends: true,
-      owner_discusses_revises_and_approves: true,
-      account_mutation_requires_approved_plan: true,
-      routine_engineering_remains_autonomous: true,
-      full_auto_requires_explicit_owner_mode_change: true,
-      read_tool: "getGrowthMission",
-      update_tool: "updateGrowthMission",
-    },
+                                canonical_continuation: canonicalContinuation,
         tool_surface: {
       public_tool_count: tools.length,
       categories: {
@@ -16299,10 +16286,7 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
       github_available: branch.ok,
     },
     runtime: operatorRuntimeMetadata(env),
-    source_documents: sourceDocuments,
-    mandatory_fallback_execution_routes: operatorStartupFallbackRoutes(),
-    implementation_scope_rule: "Infrastructure, gateway, schema, workflow, continuity, idempotency, release, and regression-prevention fixes default to universal unless a real account-specific reason exists.",
-    completion_recording_rule: "Completed fixes are source-controlled, covered by focused tests, documented only when active architecture changes, and recorded once in the engineering audit.",
+        source_documents: sourceDocuments,
         payload_limits: {
       source_documents: "metadata only",
       durable_work_items: "summary only",
