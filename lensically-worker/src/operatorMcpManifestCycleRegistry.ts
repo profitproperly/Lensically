@@ -128,8 +128,8 @@ export const OPERATOR_MCP_MANIFEST_CYCLE_TOOLS: OperatorMcpToolDefinition[] = [
         decision_bundle_hash: { type: "string" },
                         account_conclusion: {
           type: "object",
-          description: "Content-performance conclusions only. Include published_post_ids with mature snapshot citations. Do not include follower totals, velocity, projections, follower_context, or any follower-shaped key.",
-          properties: { published_post_ids: { type: "array", minItems: 1, items: { type: "string" } } },
+          description: "Content-performance conclusions only. Include published_post_ids; leave it empty only when the snapshot has no mature posts, otherwise cite mature snapshot post IDs. Do not include follower totals, velocity, projections, follower_context, or any follower-shaped key.",
+          properties: { published_post_ids: { type: "array", items: { type: "string" } } },
           required: ["published_post_ids"],
           additionalProperties: true,
         },
