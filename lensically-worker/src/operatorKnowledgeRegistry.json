@@ -1,0 +1,171 @@
+{
+  "version": "operator-knowledge-registry-v1",
+  "lifecycle_contract": "operator-lifecycle-v1",
+  "purpose": "Deployment-local durable knowledge loaded only by Step 2. Step 0 and Step 1 contain pointers, never this content.",
+  "nodes": {
+    "repository_engineering": {
+      "version": "repository-engineering-v1",
+      "load_when": "Repository inspection or mutation, Worker/backend work, private web-app work, public-site work, MCP/schema/tool work, source-location questions, or engineering continuation.",
+      "shop_ownership": [
+        "lensically-worker/ is the production backend and Operator MCP.",
+        "lensically-web/ is the private operational app at app.lensically.com.",
+        "lensically-worker/public/ owns public Lensically sales, download, license, refund, privacy, terms, and data-deletion surfaces.",
+        "lensically-recovery-worker/ is the independent break-glass repair plane, not normal engineering.",
+        "profitproperly/Lensically main is the authoritative repository and branch unless live source control proves otherwise."
+      ],
+      "repository_procedures": [
+        "Known exact file reads use internal readRepoFile with bounded lines when practical.",
+        "Known exact file searches use internal searchRepoFiles against one exact file only.",
+        "Unknown-location or free-text repository discovery belongs to Recovery. Never probe the Main plane with directory prefixes or speculative paths.",
+        "One isolated exact replacement uses internal applyRepoTextPatch.",
+        "Related multi-file or multi-replacement work uses internal applyRepoPatchSet so one coherent commit advances main.",
+        "Every exact replacement must identify exactly one location. If a literal repeats, include enough enclosing semantic context to make the replacement unique before mutation.",
+        "Large whole-file writes use startRepoFileWrite then appendRepoFileChunk then commitRepoFileWrite.",
+        "New small files use createRepoFile. Repository and head state uses getRepoStatus."
+      ],
+      "mcp_schema_procedure": [
+        "The public invocation contract is the five-stage lifecycle. Step 4 exposes a generated closed discriminated union derived from internal typed capability schemas.",
+        "Public generic profile_id, generic inputs envelopes, freehand routing text, wrappers, and internal handler names are forbidden.",
+        "Internal capability names describe server capabilities, not independently callable public tools. Step 4 is the only model-facing operational execution choke point.",
+        "Discovery returns candidates only. Verify declared purpose, side effects, and exact typed branch before Step-4 invocation.",
+        "After a public lifecycle schema change is deployed and live verified, use the mandatory refresh and context-port handoff before testing the changed client surface."
+      ],
+      "continuation": [
+        "ENGINEERING_CONTINUATION.md is the sole accepted-job, precedence, active-job, and current-action authority.",
+        "Step 3 getOperatorLiveState with engineering_continuation is the model-facing continuation read; the server reads the canonical ledger behind that scope.",
+        "Chat memory, D1 work state, Growth Mission records, and action-closure receipts are evidence or telemetry only."
+      ],
+      "efficiency": [
+        "Use bounded inspection, coherent change set, focused validation, exact-SHA release when production changes, live verification, then checkpoint.",
+        "Once exact specification, target, and integration point are known, do not repeat settled searches or reads without a contradiction.",
+        "Never echo whole large files, patch bodies, logs, or database payloads through the client when a bounded route exists.",
+        "If a client blocks a payload before Lensically receives it, reduce or split it; do not resend the same oversized payload."
+      ]
+    },
+    "release_infrastructure": {
+      "version": "release-infrastructure-v1",
+      "load_when": "GitHub Actions, Cloudflare Worker or Pages deployment, release identity, production verification, scheduler-sensitive release work, or Recovery boundaries.",
+      "release_authority": [
+        "Production Worker releases use one explicit exact-SHA release workflow.",
+        "Release only a head that has passed the required validation for that exact SHA.",
+        "Never deploy a moving head when the tested SHA is already known.",
+        "Verify deployed commit identity, MCP version, release authority, and relevant runtime boundaries after deployment."
+      ],
+      "github": [
+        "getRepoStatus is current head and check state.",
+        "listGitHubWorkflowRuns is recent compact workflow runs.",
+        "getGitHubWorkflowRun is one run and failed-step evidence.",
+        "runGitHubWorkflow is the configured validation task or exact-SHA Worker release.",
+        "Failed validation blocks release. Diagnose the actual failed assertion or step; do not weaken a valid regression solely to get green."
+      ],
+      "cloudflare": [
+        "Worker production release uses the validated release workflow.",
+        "Pages project creation and deployment use dedicated Pages capabilities.",
+        "Use the Profit Properly Lensically estate unless authoritative runtime configuration proves otherwise.",
+        "Publishing or scheduler behavior changes require scheduler safety verification in the release path."
+      ],
+      "recovery_boundary": [
+        "Recovery is break-glass only when Main or its deployment plane cannot receive or complete the repair.",
+        "Return normal work to Main immediately after the break-glass condition is repaired."
+      ]
+    },
+    "account_runtime": {
+      "version": "account-runtime-v1",
+      "load_when": "Account selection, Proceed boundaries, persisted account state, scheduling, dashboard or analytics reads, Growth Mission state, or account-scoped mutations.",
+      "state_authority": [
+        "Backend persistence is authoritative for accounts, workflow state, schedules, presets, strategy memory, source lineage, performance snapshots, and continuity.",
+        "Browser state and chat memory are never account truth.",
+        "Guided workflows use key selection plus explicit Proceed before protected account state loads.",
+        "Autonomous Manifest cycle capabilities execute under their autonomous contract and do not require the guided interactive Proceed handshake."
+      ],
+      "account_controls": [
+        "Preserve selected brand, server-side continuity, idempotency, authorization, content gates, ownership checks, and scheduler safety.",
+        "Reconcile live schedule and delivery state before acting on stale summaries.",
+        "Reuse the same operation_id only to reconcile uncertain execution state; never create a second identity for the same uncertain mutation."
+      ],
+      "common_reads": [
+        "get_account_state is the current workflow, session, draft, schedule, and gate snapshot.",
+        "read_lensically_ui_surface is authoritative Dashboard, Followers, Insights, Post Archive, or Saved Patterns data.",
+        "list_scheduled_posts, auditScheduledPost, and getScheduledPostSchedulerState cover schedule and delivery state.",
+        "getGrowthMission is the persistent mission contract when task relevant."
+      ],
+      "protected_changes": [
+        "Spending, credentials or ownership, irreversible deletion, fundamental mission changes, disabling critical infrastructure, and material account or project danger remain owner-ratified.",
+        "Routine reversible account operations do not invent approval requirements beyond the source-defined contract."
+      ]
+    },
+    "manifest_content": {
+      "version": "manifest-content-v1",
+      "load_when": "Manifest Mental strategy, source cards, generation, gates, scheduling, cycle receipts, Saved Patterns, performance learning, lineage, or content-family decisions.",
+      "mission_execution": [
+        "Manifest's permanent mission is account growth while protecting audience trust, content quality, account safety, and brand identity.",
+        "The Operator owns routine strategy, generation, scheduling, evaluation, recovery, and evidence-triggered engineering under the active execution mode.",
+        "Owner review is optional and non-blocking unless a protected decision is actually reached."
+      ],
+      "cycle_architecture": [
+        "Use canonical cycle prepare, strategy, persist, and receipt capabilities; do not invent parallel cycle state in chat.",
+        "Preserve exact rolling runway semantics and existing valid scheduled posts; fill only authoritative missing slots.",
+        "Source selection, source cards, hypotheses, generation runs, drafts, gates, schedule records, revisions, publication lineage, and maturity evaluation remain reconstructable from backend state.",
+        "Main and Innovation or Shadow persistence remain physically isolated according to their source-defined contracts."
+      ],
+      "evidence_learning": [
+        "Mature content evidence drives strategy; follower totals are account-level trajectory context and are never attributed to individual posts or posting periods.",
+        "Saved Patterns provide source evidence under the active selection contract; do not silently substitute external popularity for in-account performance when current policy forbids it.",
+        "Owner edits and deletions are evidence and lineage events; preserve them rather than hiding them from future learning.",
+        "Questions, banned families, franchise rules, preservation rules, exploration policy, current style constraints, and other active content directives belong in canonical account strategy or state, not startup."
+      ],
+      "capability_families": [
+        "Foundation and performance include get_manifest_intelligence_foundation, get_performance_learning, and get_content_focus.",
+        "Cycle evidence includes get_manifest_cycle_receipt, get_manifest_cycle_analysis_page, and get_manifest_locked_lineup_page.",
+        "Strategy, preparation, and persistence use commit_manifest_cycle_strategy, prepare_manifest_autonomous_cycle, and current persist routes.",
+        "Source and generation cover source candidates, source cards, generation runs, gates, candidate drafts, and rejection memory.",
+        "Scheduling and results cover scheduled-post reads, edits, deletions, hourly coverage, post results, and published-lineage audit or recovery."
+      ]
+    },
+    "hardening_safety": {
+      "version": "hardening-safety-v1",
+      "load_when": "Failures, blockers, regressions, repeat incidents, prevention design, idempotency ambiguity, payload failures, validation defects, or efficiency degradation.",
+      "failure_law": [
+        "A real unexpected tool failure interrupts the affected objective.",
+        "Diagnose exact cause, repair it, generalize the lesson, add durable prevention and regression, validate, release when required, live verify, then resume the interrupted step.",
+        "A workaround, retry, alternate target, sibling business tool, or chat note is not a fix.",
+        "Expected fail-closed control responses are boundaries to satisfy, not excuses to route around the control."
+      ],
+      "recurrence": [
+        "New hardening incidents are checked against prior closed incidents and promoted winning paths.",
+        "A repeat of a resolved failure is a prevention regression, not a fresh bug.",
+        "Prevention-regression handling starts from the prior incident, root cause, prevention, and regressions and asks why that prevention failed; strengthen or replace it before closure.",
+        "First occurrence earns investigation and permanent prevention. Recurrence indicts the prevention mechanism."
+      ],
+      "efficiency_incidents": [
+        "Repeated fingerprints, excessive call count, or execution-duration degradation without progress can become efficiency incidents.",
+        "Efficiency means fastest complete and correct route, not fewer calls at the expense of diagnosis, validation, or durability.",
+        "Do not duplicate validations, searches, or polling when one authoritative run or read is already in progress."
+      ],
+      "transport_idempotency": [
+        "An uncertain mutating transport result may be reconciled with the same stable operation identity only to establish whether execution occurred.",
+        "Never create a second operation identity merely because a response was interrupted.",
+        "Client-side schema or payload rejection means Lensically did not receive the requested operation unless tool evidence says otherwise."
+      ]
+    },
+    "commercial_product": {
+      "version": "commercial-product-v1",
+      "load_when": "Lensically public product surfaces, checkout, delivery, license, refund, privacy, terms, data deletion, Stripe operations, product packaging, customer delivery, or public-site ownership questions.",
+      "product_surfaces": [
+        "Public customer-facing routes are owned by lensically-worker/public/ and served from lensically.com.",
+        "The private operational application is separate at app.lensically.com under lensically-web/.",
+        "Identify the owning surface before editing; never infer ownership from the domain name alone."
+      ],
+      "commerce": [
+        "Stripe reads and mutations use internal typed Stripe capabilities and their source-defined protection boundaries.",
+        "Protected financial or account-ownership actions require applicable owner ratification; ordinary read-only commercial inspection does not invent approval.",
+        "Customer delivery, license, refund, privacy, and terms behavior must remain consistent with source-controlled product contracts and production verification."
+      ],
+      "product_architecture": [
+        "Customer-facing copy may evolve; operator and runtime truth must still come from deployed code, canonical knowledge, and server state rather than marketing prose.",
+        "Public-site or download changes follow repository validation and the correct release path for the owning surface."
+      ]
+    }
+  },
+  "maintenance_rule": "Grow the smallest relevant node. New capabilities, procedures, hazards, providers, and product details update their node or the internal typed capability registry; they never enlarge Step 0 or Step 1 and never require unrelated knowledge to be shed."
+}
