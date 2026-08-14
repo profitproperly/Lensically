@@ -622,7 +622,8 @@ export async function dispatchOperatorMcpToolCall(
         workflow_session_id: dependencies.normalizeText(args.workflow_session_id, 120, true),
       },
     });
-    resultPayload.hardening_incident = automaticIncident.incident;
+        resultPayload.hardening_incident = automaticIncident.incident;
+    if (automaticIncident.recurrence) resultPayload.hardening_recurrence = automaticIncident.recurrence;
     resultPayload.normal_work_blocked = automaticIncident.normal_work_blocked;
   }
 

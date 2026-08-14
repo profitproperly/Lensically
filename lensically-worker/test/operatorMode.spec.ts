@@ -3884,7 +3884,9 @@ active_checkpoint: none
       deployment_fresh_sessions: true,
     });
         expect(initialized.instructions).toContain("advertised direct typed tool");
-            expect(initialized.instructions).toContain("Discovery returns candidates, not authorization");
+                        expect(initialized.instructions).toContain("Discovery returns candidates, not authorization");
+    expect(initialized.instructions).toContain("Assume zero retained Lensically knowledge");
+    expect(initialized.instructions).toContain("session startup tax");
     expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
         expect(initialized.instructions.length).toBeLessThan(6500);
@@ -5331,7 +5333,23 @@ active_checkpoint: none
             canonical_continuation: { authority: string; path: string; tool: string; contract: string | null; active_job_id: string | null; active_checkpoint: string | null };
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
-                expect(startup.bootstrap_version).toBe("operator-startup-v6");
+                                expect(startup.bootstrap_version).toBe("operator-startup-v7");
+        const competencyBoot = (startup as unknown as {
+      session_competency_boot: {
+        version: string;
+        fresh_model_assumption: string;
+        shop_map: { repository_and_source: { hard_boundary: string }; failures_prevention_and_learning: { recurrence: string } };
+        capability_index: { engineering: string[]; admin_and_control: string[]; account_and_operator: string[] };
+      };
+    }).session_competency_boot;
+    expect(competencyBoot).toMatchObject({
+      version: "operator-session-competency-v1",
+      fresh_model_assumption: "zero_retained_lensically_knowledge",
+    });
+    expect(competencyBoot.shop_map.repository_and_source.hard_boundary).toContain("one known exact file only");
+    expect(competencyBoot.shop_map.failures_prevention_and_learning.recurrence).toContain("prevention regression");
+    expect(competencyBoot.capability_index.engineering).toContain("readRepoFile");
+    expect(competencyBoot.capability_index.account_and_operator).toContain("prepare_manifest_autonomous_cycle");
                 expect(startup.startup_authority).toMatchObject({
             version: "operator-governing-standards-v7",
       authority: "highest_lensically_operating_authority",
@@ -5376,6 +5394,44 @@ active_checkpoint: none
     expect(serialized).not.toContain("operator_work_state");
     expect(serialized).not.toContain("atomic_write_reconciliation");
     expect(serialized.length).toBeLessThan(25000);
+  }, 30000);
+
+    it("classifies a repeated resolved failure as a prevention regression", async () => {
+    const first = await mcpTool<{
+      ok: boolean;
+      hardening_incident?: { id: string; classification: string };
+      hardening_recurrence?: { status: string };
+    }>("getDatabaseSchemaState", { table_name: "invalid-schema-name-a", column_names: [] });
+    expect(first.ok).toBe(false);
+    expect(first.hardening_incident?.classification).toBe("novel_failure");
+    const firstIncidentId = first.hardening_incident?.id;
+    expect(firstIncidentId).toBeTruthy();
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET
+        state = 'closed', root_cause = 'fixture root cause', generalized_cause = 'fixture generalized cause',
+        prevention_rule_id = 'fixture_prevention_rule', regression_test_ids_json = '["fixture-regression"]',
+        tested_sha = 'fixture-tested-sha', deployment_id = 'fixture-deployment',
+        closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(firstIncidentId).run();
+
+    const second = await mcpTool<{
+      ok: boolean;
+      hardening_incident?: { id: string; classification: string; severity: string };
+      hardening_recurrence?: { status: string; prior_incident_id: string; prior_prevention_rule_id: string };
+      normal_work_blocked?: boolean;
+    }>("getDatabaseSchemaState", { table_name: "invalid-schema-name-b", column_names: [] });
+    expect(second.ok).toBe(false);
+    expect(second.hardening_incident).toMatchObject({ classification: "prevention_breach", severity: "P0" });
+    expect(second.hardening_recurrence).toMatchObject({
+      status: "prevention_regression",
+      prior_incident_id: firstIncidentId,
+      prior_prevention_rule_id: "fixture_prevention_rule",
+    });
+    expect(second.normal_work_blocked).toBe(true);
+    if (second.hardening_incident?.id) {
+      await env.DB.prepare(`UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(second.hardening_incident.id).run();
+    }
   }, 30000);
 
   it.skip("retired: historical startup contract payload", async () => {

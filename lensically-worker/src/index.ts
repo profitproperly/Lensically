@@ -67,8 +67,10 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 
 import {
-    OPERATOR_GOVERNING_STANDARDS,
+        OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
+  OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
+  OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   evaluateOperatorDeploymentCommitIdentity,
@@ -16103,6 +16105,83 @@ export function parseCanonicalContinuationMetadata(content: string | null): {
 }
 
 
+function buildOperatorSessionCompetencyBoot(input: {
+  engineeringTools: string[];
+  adminTools: string[];
+  accountTools: string[];
+}): Record<string, unknown> {
+  return {
+    version: OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
+    fresh_model_assumption: "zero_retained_lensically_knowledge",
+    governing_rule: OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
+    completion_rule: "Do not begin repository, deployment, workflow, account, content, scheduling, or engineering work until this boot is loaded and the requested task is classified against the shop map.",
+    startup_sequence: [
+      "Load and obey the governing authority.",
+      "Internalize the shop map, capability index, hazards, and canonical source locations.",
+      "Read canonical continuation before deciding what engineering work to resume.",
+      "Classify the requested task into one or more operating areas before choosing a tool.",
+      "Load only the live task/account state required by those areas; never substitute chat memory for canonical state.",
+      "Execute through the canonical typed route, verify, record durable learning when needed, and checkpoint.",
+    ],
+    canonical_sources: {
+      operating_rules: "AGENTS.md",
+      live_architecture: "CURRENT_STATE.md",
+      reusable_traps_and_winning_procedures: "OPERATING_MEMORY.md",
+      engineering_continuation: "ENGINEERING_CONTINUATION.md via getEngineeringContinuation",
+      live_account_truth: "server-side persisted Lensically state after the applicable account boundary",
+      invocation_contracts: "advertised direct typed tool schemas",
+      runtime_truth: "deployed Worker metadata and live verification",
+    },
+    shop_map: {
+      repository_and_source: {
+        locations: ["lensically-worker/ = production backend + Operator MCP", "lensically-web/ = private operational web app", "lensically-recovery-worker/ = independent break-glass repair plane", "lensically-worker/public/ = public sales/download/legal surfaces"],
+        normal_reads: ["getRepoStatus", "readRepoFile", "searchRepoFiles"],
+        normal_mutations: ["applyRepoTextPatch = one isolated exact replacement", "applyRepoPatchSet = related atomic replacements", "startRepoFileWrite + appendRepoFileChunk + commitRepoFileWrite = large whole-file replacement"],
+        hard_boundary: "searchRepoFiles searches one known exact file only. Unknown-location/free-text repository discovery belongs to Recovery; never probe Main with directory prefixes or speculative paths.",
+      },
+      mcp_and_schema: {
+        contract: "Use advertised direct typed tools only; no wrapper routing, profile IDs, generic input envelopes, or internal handler names.",
+        definitions: "Tool schemas are the exact invocation contract. Know the capability location before work and verify the declared schema before invocation; never learn a tool through failed speculative calls.",
+        schema_change: "After a public tool addition or schema change is deployed and live-verified, stop and use the mandatory refresh/context-port handoff before testing the changed surface.",
+      },
+      github_cloudflare_and_release: {
+        repository: "profitproperly/Lensically main is authoritative.",
+        cloudflare: "Use the Profit Properly Lensically estate. Pages work uses the dedicated Pages tools; Worker production releases use the exact-SHA validated release workflow.",
+        release_sequence: ["bounded inspection", "one coherent change set", "focused validation", "exact-SHA release", "live runtime verification", "scheduler safety verification when publishing behavior changed"],
+        recovery_boundary: "Recovery is break-glass only when Main or its deployment plane cannot receive or complete the repair; return to Main immediately afterward.",
+      },
+      web_surfaces: {
+        private_app: "lensically-web/ -> app.lensically.com",
+        public_site: "lensically-worker/public/ -> lensically.com public sales, download, license, refund, privacy, terms, and data-deletion routes",
+        rule: "Identify the owning surface before editing; do not infer frontend ownership from the domain alone.",
+      },
+      continuation_and_state: {
+        engineering: "ENGINEERING_CONTINUATION.md is the sole job/precedence/current-action authority; call getEngineeringContinuation before any continuation decision.",
+        account: "Backend persistence is authoritative. Guided workflows use key selection + explicit Proceed before account state; autonomous Manifest cycle tools execute under their direct autonomous contract.",
+        chat_memory: "Evidence only; never continuation or live-state authority.",
+      },
+      failures_prevention_and_learning: {
+        failure: "A real tool failure interrupts the affected objective. Diagnose the exact cause, repair it, generalize it, add durable prevention/regression, validate, release when required, live-verify, then resume the interrupted step.",
+        recurrence: "Every new hardening incident is checked against prior closed incidents and promoted winning paths. A repeat of a resolved failure is a prevention regression, not a new bug, and must investigate why the prior prevention failed.",
+        expected_controls: "Fail-closed guard responses are operating boundaries, not permission to route around the control.",
+        efficiency: "Eliminate repeated searches, duplicate calls, avoidable waits, redundant validation, and rediscovery without reducing correctness or evidence quality.",
+      },
+      payload_idempotency_and_safety: {
+        bounded_payloads: "Use server-bounded reads and compact receipts. Never echo whole large files, patch bodies, logs, or database payloads through the client.",
+        client_block: "If a payload is blocked before Lensically receives it, do not resend the same payload; reduce or split it.",
+        uncertain_transport: "Reuse the same operation_id only to reconcile whether an uncertain mutating request executed; do not create a second operation identity.",
+        exact_files: "Known files use bounded line reads/searches; large mutations use the large-file path instead of oversized exact-patch payloads.",
+      },
+    },
+    capability_index: {
+      engineering: input.engineeringTools,
+      admin_and_control: input.adminTools,
+      account_and_operator: input.accountTools,
+    },
+    anti_ambiguity_rule: "Before each action, the operating area and canonical capability must already be known from this map or the task-specific live state. Discovery is for genuinely unknown terrain, never for rediscovering known Lensically structure.",
+  };
+}
+
 function operatorStartupFallbackRoutes(): string[] {
   return [
     "Call one advertised direct typed Main tool for each external operation; do not use profile IDs, generic inputs envelopes, or wrapper routing.",
@@ -16150,8 +16229,13 @@ async function buildOperatorStartupContext(request: Request, env: Env): Promise<
   };
     return {
     ok: true,
-    startup_authority: OPERATOR_GOVERNING_STANDARDS,
-        bootstrap_version: "operator-startup-v6",
+        startup_authority: OPERATOR_GOVERNING_STANDARDS,
+        bootstrap_version: "operator-startup-v7",
+    session_competency_boot: buildOperatorSessionCompetencyBoot({
+      engineeringTools: activeEngineeringTools,
+      adminTools: activeAdminTools,
+      accountTools: operatorTools,
+    }),
     operating_contract: {
       public_gateway: "direct_typed_tools",
       router: "direct_handler_dispatch_v1",
@@ -17739,8 +17823,6 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const fingerprint = normalizeOperatorText(args.request_fingerprint, 200, true);
   const observed = normalizeOperatorText(args.observed_outcome, 1000, true) ?? category;
   const rule = resolvePromotedWinningPath(category.replace(/_/g, " "), observed, { blocked_profile_id: profile });
-  const classification: HardeningClassification = rule ? "prevention_breach" : "novel_failure";
-  const severity: HardeningSeverity = boundary === "efficiency" ? "P2" : rule ? "P0" : "P1";
   const signature = await sha256OperatorText(JSON.stringify({ boundary, profile, category, fingerprint }));
     const existing = await env.DB.prepare(
     `SELECT * FROM operator_hardening_incidents WHERE signature = ? AND state <> 'closed' LIMIT 1`,
@@ -17748,6 +17830,40 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   if (existing) {
     return { ok: true, created: false, incident: serializeHardeningIncident(existing), normal_work_blocked: ["P0", "P1"].includes(String(existing.severity)) };
   }
+  const priorClosed = await env.DB.prepare(
+    `SELECT i.* FROM operator_hardening_incidents i
+     JOIN operator_hardening_incident_events e ON e.incident_id = i.id
+     WHERE i.state = 'closed'
+       AND i.boundary = ?
+       AND COALESCE(i.blocked_profile_id, '') = ?
+       AND COALESCE(i.blocked_tool_name, '') = ?
+       AND e.from_state IS NULL
+       AND e.to_state = 'detected'
+       AND json_extract(e.evidence_json, '$.error_category') = ?
+     ORDER BY datetime(COALESCE(i.closed_at, i.updated_at)) DESC
+     LIMIT 1`,
+  ).bind(boundary, profile, blockedTool ?? "", category).first<Record<string, unknown>>();
+  const priorIncident = priorClosed ? serializeHardeningIncident(priorClosed) : null;
+  const preventionRegression = Boolean(priorIncident);
+  const classification: HardeningClassification = (rule || preventionRegression) ? "prevention_breach" : "novel_failure";
+  const severity: HardeningSeverity = boundary === "efficiency"
+    ? preventionRegression ? "P1" : "P2"
+    : (rule || preventionRegression) ? "P0" : "P1";
+  const recurrence = priorIncident
+    ? {
+        status: "prevention_regression",
+        prior_incident_id: priorIncident.id,
+        prior_root_cause: priorIncident.root_cause,
+        prior_generalized_cause: priorIncident.generalized_cause,
+        prior_prevention_rule_id: priorIncident.prevention_rule_id,
+        prior_regression_test_ids: priorIncident.regression_test_ids,
+        prior_tested_sha: priorIncident.tested_sha,
+        prior_deployment_id: priorIncident.deployment_id,
+        required_response: "Investigate why the prior prevention failed, strengthen or replace it, validate the stronger prevention, then resume the interrupted objective.",
+      }
+    : rule
+      ? { status: "known_prevention_breach", promoted_rule_id: rule.id, required_response: "Repair the breach of the promoted winning path before resuming." }
+      : { status: "first_occurrence", required_response: "Root-cause, repair, generalize, and create durable prevention before resuming." };
   const id = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO operator_hardening_incidents (
@@ -17765,7 +17881,7 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
      VALUES (?, ?, NULL, 'detected', ?)`,
   ).bind(
     crypto.randomUUID(), id,
-    normalizeOperatorJson({ error_category: category, promoted_rule_id: rule?.id ?? null }, {}),
+    normalizeOperatorJson({ error_category: category, promoted_rule_id: rule?.id ?? null, recurrence_status: recurrence.status, prior_incident_id: priorIncident?.id ?? null }, {}),
   ).run();
   const row = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   return {
@@ -17773,6 +17889,7 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
     created: true,
     incident: row ? serializeHardeningIncident(row) : { id },
     normal_work_blocked: severity === "P0" || severity === "P1",
+    recurrence,
     required_next_state: "contained",
   };
 }
@@ -20561,14 +20678,24 @@ async function handleOperatorMcpEngineeringTool(
   if (toolName === "advanceOperatorWork") return advanceOperatorWork(env, args);
   
 
-  if (toolName === "engineeringPrecheck") {
+    if (toolName === "engineeringPrecheck") {
     const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
       ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
       : undefined;
         return {
       ok: true,
-      startup_authority: OPERATOR_GOVERNING_STANDARDS,
+      startup_authority: {
+        version: OPERATOR_GOVERNING_STANDARDS.version,
+        authority: OPERATOR_GOVERNING_STANDARDS.authority,
+        per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS.per_action_acknowledgment,
+        governing_rule: OPERATOR_GOVERNING_STANDARDS.governing_rule,
+      },
+      session_competency: {
+        version: OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
+        startup_tool: "getOperatorStartupContext",
+        rule: "Fresh sessions complete the competency boot once before routine engineering; this precheck does not repeat the full startup payload.",
+      },
       status_kind: "compact_engineering_precheck",
       runtime: operatorRuntimeMetadata(env),
       access: { github_token_status: config.token ? "exists" : "missing", repo: `${config.owner}/${config.repo}`, branch: config.branch },
@@ -20587,7 +20714,7 @@ async function handleOperatorMcpEngineeringTool(
         admin_public_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
             tool_block_prevention: [
-                "Use getOperatorStartupContext only for deliberate non-account bootstrap; engineeringPrecheck is sufficient for routine engineering.",
+                "Fresh session: call getOperatorStartupContext once and complete the session competency boot before non-startup work; engineeringPrecheck is the compact routine engineering precheck after that boot.",
                 "Call getEngineeringContinuation before any continuation decision. ENGINEERING_CONTINUATION.md is the sole authority for all Lensically jobs; D1 work state, action-closure receipts, Growth Mission records, and chat memory are telemetry or evidence only.",
         "Call one advertised direct typed Main tool for each external operation.",
         "Use readRepoFile with line bounds for known files.",
@@ -20605,7 +20732,7 @@ async function handleOperatorMcpEngineeringTool(
         model_tool_choice_allowed: false,
       },
             payload_limits: {
-        full_startup_context: "not returned by engineeringPrecheck; use getOperatorStartupContext only for deliberate bootstrap",
+        full_startup_context: "not repeated by engineeringPrecheck; fresh sessions load getOperatorStartupContext once, then use this compact precheck for routine engineering",
       },
     };
   }

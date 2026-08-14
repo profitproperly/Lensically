@@ -1,4 +1,4 @@
-export const OPERATOR_MCP_VERSION = "1.42.3";
+export const OPERATOR_MCP_VERSION = "1.43.0";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
@@ -8,6 +8,8 @@ export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Preventio
 export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "After deploying and live-verifying any public MCP tool addition or schema change, do not test the new schema from a chat initialized against the previous deployment. Treat that as the normal client-refresh boundary, not a product defect; do not add compatibility or Recovery workarounds for the stale chat. The refresh handoff is incomplete unless it contains the exact standalone line: refresh the lensically operator mode mcp now. Immediately after that line, render exactly one fenced plaintext code block whose first line is CONTEXT PORT — PASTE INTO NEW CHAT. The model must author this port from verified current state; never require the owner to infer continuation, summarize from memory, copy prior prose, or paste the whole previous response. The context port must be self-contained and include these labeled fields: FIRST ACTION, RESUME OBJECTIVE, COMPLETED / VERIFIED, CURRENT STATE, NEXT ACTION, SURVIVING CONSTRAINTS, and DEPLOYMENT IDENTITY. Include only the information required to resume without ambiguity.";
 export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
+export const OPERATOR_SESSION_COMPETENCY_BOOT_VERSION = "operator-session-competency-v1";
+export const OPERATOR_SESSION_COMPETENCY_BOOT_RULE = "Assume zero retained Lensically knowledge at every fresh model session. Before the first non-startup Lensically action, call getOperatorStartupContext, internalize its session_competency_boot, classify the task against that map, and load only the task-specific live state required for execution. Do not learn the shop by trial and error during production work.";
 
 export function evaluateOperatorDeploymentCommitIdentity(
   currentCommit: unknown,
@@ -169,7 +171,9 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     return [
     ...buildOperatorGoverningStandardsStartupLines(),
     "",
-        "Use Lensically Operator Mode as the source of truth.",
+                "Use Lensically Operator Mode as the source of truth.",
+    OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
+    "The competency boot is the session startup tax: know the shop map, operating procedures, hazards, continuation authority, and capability locations before work; exact live account/task state remains on-demand.",
     `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
     "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",

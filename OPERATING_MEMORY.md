@@ -12,6 +12,10 @@ Read after `AGENTS.md`. Keep this file limited to active, reusable rules. Histor
 
 ## Execution Architecture
 
+- Fresh ChatGPT Operator sessions assume zero retained Lensically knowledge. Pay the one-time session competency startup tax before non-startup work: load the governing authority, canonical shop map, capability locations, hazards, continuation authority, and operating procedures; then load only task-specific live state. Known Lensically structure must never be rediscovered by trial and error mid-workflow.
+- Repository routing is explicit: `readRepoFile` and `searchRepoFiles` are for known exact files, with `searchRepoFiles` requiring one exact file path. Unknown-location or free-text repository discovery belongs to Recovery. Never probe Main with directory prefixes or speculative file paths.
+
+
 - Main MCP advertises curated direct typed tools with closed bounded schemas. The generic `executeLensicallyIntent` transport, `profile_id`, generic `inputs`, objective/intent routing text, wrappers, and internal handler names are not public. Internal capabilities may change behind stable direct tool contracts; any real public schema change requires an app refresh.
 - When deployment changes a public MCP schema and the current chat still holds the previous closed schema, treat that state as the normal client-refresh boundary—not a product blocker or unresolved engineering defect. Do not create server workarounds, compatibility bridges, Recovery detours, or additional investigation to make the stale chat call the new schema. Finish the handoff with the exact deployed SHA/version and verification evidence, stop, and use the exact terminal line `refresh the lensically operator mode mcp now`.
 - The canonical architecture is the **Execution Kernel** (`lensically-execution-kernel-v1`). It resolves the capability directory, payload contract, source-defined route, pre-call policy, continuity and authorization, execution receipt, blocker prevention, continuous hardening, durable work state, and action closure before one typed handler executes.
