@@ -156,6 +156,8 @@ export const OPERATOR_GOVERNING_STANDARDS = {
     per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
   per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
         failure_repair_rule: OPERATOR_FAILURE_REPAIR_RULE,
+  opaque_lifecycle_token_rule: OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE,
+  client_predispatch_block_rule: OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE,
   discovery_execution_rule: OPERATOR_DISCOVERY_EXECUTION_RULE,
   public_schema_refresh_rule: OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
