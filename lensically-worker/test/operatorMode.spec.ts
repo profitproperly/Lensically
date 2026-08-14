@@ -165,7 +165,7 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
     live_state_token: step3.structuredContent.live_state_token,
     action: {
       capability,
-      arguments: args,
+      arguments: normalizedArgs,
     },
   });
   if (step4.isError || !step4.structuredContent.action_execution_token) return step4;
