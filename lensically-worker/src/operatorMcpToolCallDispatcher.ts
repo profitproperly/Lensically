@@ -592,8 +592,7 @@ export async function dispatchOperatorMcpToolCall(
       replayed: false,
       request_fingerprint: receiptFingerprint,
     };
-    await dependencies.completeOperationReceipt(idempotencyKey, resultPayload);
-  }
+      }
 
   const isError = resultPayload.ok === false;
   const resultError = dependencies.normalizeMachineKey(
@@ -662,13 +661,16 @@ export async function dispatchOperatorMcpToolCall(
     resultPayload.operator_action_closure = await dependencies.buildActionClosure(toolName, resultPayload);
   }
   resultPayload = dependencies.enforcePayloadBudget(resultPayload);
-  if (!sourceDefinedStaticRoute) {
+    if (!sourceDefinedStaticRoute) {
     await dependencies.recordExecutionDecision(
       toolName,
       args,
       executionPolicy,
       isError ? "failed" : "completed",
     );
+  }
+  if (idempotencyKey) {
+    await dependencies.completeOperationReceipt(idempotencyKey, resultPayload);
   }
   return mcpToolCompletionResponse(id, toolName, resultPayload, isError);
 }
