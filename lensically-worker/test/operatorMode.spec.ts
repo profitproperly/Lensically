@@ -5096,10 +5096,8 @@ active_checkpoint: none
       proceed_confirmed: true,
     });
     expect(rejected.isError).toBe(true);
-    expect(rejected.structuredContent).toMatchObject({
-      error: "public_direct_tool_required",
-      requested_tool: "review_manifest_scheduled_post",
-      account_data_loaded: false,
+        expect(rejected.structuredContent).toMatchObject({
+      error: "operator_planned_action_capability_unknown",
     });
   });
 
