@@ -22342,7 +22342,10 @@ async function handleOperatorMcpToolCall(
     requiredLiveStateScopes: (toolName) => requiredOperatorLiveStateScopesForTool(toolName),
     issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
       action_execution_version: OPERATOR_ACTION_EXECUTION_VERSION,
-      mcp_session_id: liveStatePayload.mcp_session_id ?? null,
+      mcp_session_id: resolveOperatorLifecycleSessionBinding(
+        liveStatePayload.mcp_session_id,
+        request.headers.get("mcp-session-id")?.trim() || null,
+      ),
       profile_id: profileId,
       executed_tool: toolName,
       result_ok: result.ok !== false,
