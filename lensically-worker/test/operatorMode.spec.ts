@@ -5279,6 +5279,8 @@ active_checkpoint: none
       "operator_lifecycle_stage_incomplete",
       "operator_lifecycle_deployment_changed",
       "operator_lifecycle_session_changed",
+      "operator_planned_action_capability_unknown",
+      "operator_planned_action_arguments_invalid",
       "operator_action_closure_verification_required",
       "operator_action_closure_prevention_incomplete",
     ]) {
