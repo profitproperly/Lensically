@@ -16200,9 +16200,11 @@ function operatorStartupFallbackRoutes(): string[] {
   ];
 }
 
-async function buildOperatorSessionMap(_request: Request, env: Env): Promise<Record<string, unknown>> {
+async function buildOperatorSessionMap(request: Request, env: Env): Promise<Record<string, unknown>> {
+  const mcpSessionId = request.headers.get("mcp-session-id")?.trim() || null;
   const sessionMapToken = await issueOperatorLifecycleToken(env, 1, {
     session_map_version: OPERATOR_SESSION_MAP_VERSION,
+    mcp_session_id: mcpSessionId,
   });
   return {
     ok: true,
@@ -16223,7 +16225,8 @@ async function buildOperatorSessionMap(_request: Request, env: Env): Promise<Rec
       canonical_knowledge_source: "OPERATOR_COMPETENCY.md",
       rule: "Pointers live in the map; durable knowledge and mutable state do not.",
     },
-    session_identity: {
+        session_identity: {
+      mcp_session_id: mcpSessionId,
       mcp_version: OPERATOR_MCP_VERSION,
       deployment_identity: currentOperatorDeploymentIdentity(env),
       commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
@@ -16520,6 +16523,7 @@ async function verifyOperatorLifecycleToken(
   env: Env,
   token: unknown,
   minimumStage: 1 | 2 | 3 | 4 | 5,
+  expectedSessionId: string | null = null,
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
   const payload = await verifySignedOperatorEnvelope(env, token);
   if (!payload) return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
@@ -16529,8 +16533,11 @@ async function verifyOperatorLifecycleToken(
   if (Number(payload.stage ?? 0) < minimumStage) {
     return { ok: false, error: "operator_lifecycle_stage_incomplete" };
   }
-  if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
+    if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
     return { ok: false, error: "operator_lifecycle_deployment_changed" };
+  }
+  if (expectedSessionId && payload.mcp_session_id !== expectedSessionId) {
+    return { ok: false, error: "operator_lifecycle_session_changed" };
   }
   return { ok: true, payload };
 }
@@ -20595,7 +20602,7 @@ async function handleOperatorMcpEngineeringTool(
   }
 
   if (toolName === "getOperatorKnowledge") {
-    const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1);
+        const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorSessionMap" };
     const allowedNodes = new Set(["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"]);
     const nodeIds = [...new Set((Array.isArray(args.node_ids) ? args.node_ids : []).map(String))];
@@ -20627,8 +20634,9 @@ async function handleOperatorMcpEngineeringTool(
     if (nodes.some((node) => node.content === null)) {
       return { ok: false, error: "operator_knowledge_node_missing", requested_node_ids: nodeIds };
     }
-    const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
+        const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
       knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
+      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
       node_ids: nodeIds,
       handbook_sha: handbook?.sha ?? null,
     });
@@ -20644,7 +20652,7 @@ async function handleOperatorMcpEngineeringTool(
   }
 
   if (toolName === "getOperatorLiveState") {
-    const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2);
+        const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
     const allowedScopes = new Set(["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"]);
     const scopes = [...new Set((Array.isArray(args.scopes) ? args.scopes : []).map(String))];
@@ -20713,8 +20721,9 @@ async function handleOperatorMcpEngineeringTool(
     }
     const failedScope = Object.entries(state).find(([, value]) => value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).ok === false);
     if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
-    const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
+        const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
+      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
       knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
       scopes,
       brand_key: brandKey,
@@ -20732,7 +20741,7 @@ async function handleOperatorMcpEngineeringTool(
   }
 
   if (toolName === "closeOperatorAction") {
-    const tokenCheck = await verifyOperatorLifecycleToken(env, args.action_execution_token, 4);
+        const tokenCheck = await verifyOperatorLifecycleToken(env, args.action_execution_token, 4, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "executeOperatorAction" };
     const verification = args.verification && typeof args.verification === "object" && !Array.isArray(args.verification)
       ? args.verification as Record<string, unknown>
@@ -20750,8 +20759,9 @@ async function handleOperatorMcpEngineeringTool(
         execution: tokenCheck.payload,
       };
     }
-    const closureToken = await issueOperatorLifecycleToken(env, 5, {
+        const closureToken = await issueOperatorLifecycleToken(env, 5, {
       closure_version: OPERATOR_ACTION_CLOSURE_VERSION,
+      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
       executed_tool: tokenCheck.payload.executed_tool ?? null,
       profile_id: tokenCheck.payload.profile_id ?? null,
       result_ok: tokenCheck.payload.result_ok ?? null,
@@ -22180,12 +22190,13 @@ async function handleOperatorMcpToolCall(
     executionFingerprint: operatorExecutionFingerprint,
     toolMutatesState: operatorToolMutatesState,
         buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
-    verifyLifecycleExecutionToken: async (token) => {
-      const check = await verifyOperatorLifecycleToken(env, token, 3);
+        verifyLifecycleExecutionToken: async (token) => {
+      const check = await verifyOperatorLifecycleToken(env, token, 3, request.headers.get("mcp-session-id")?.trim() || null);
       return check.ok ? { ok: true, payload: check.payload } : { ok: false, error: check.error };
     },
-    issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
+        issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
       action_execution_version: OPERATOR_ACTION_EXECUTION_VERSION,
+      mcp_session_id: liveStatePayload.mcp_session_id ?? null,
       profile_id: profileId,
       executed_tool: toolName,
       result_ok: result.ok !== false,
