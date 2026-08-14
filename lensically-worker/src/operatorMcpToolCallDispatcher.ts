@@ -186,10 +186,23 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
     }
-    lifecycleLiveStatePayload = lifecycleCheck.payload;
-    const gatewayLifecycleArgs = { ...governedRequestedArgs };
-    delete gatewayLifecycleArgs.live_state_token;
-    const compiledProfile = dependencies.compilePublicProfileRequest(gatewayLifecycleArgs);
+        lifecycleLiveStatePayload = lifecycleCheck.payload;
+    const action = asRecord(governedRequestedArgs.action);
+    const capability = typeof action?.capability === "string" ? action.capability.trim() : "";
+    const actionArguments = asRecord(action?.arguments);
+    if (!capability || !actionArguments) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_typed_action_required",
+        required_tool: dependencies.routedExecutionGateway,
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the generated strongly typed action contract was not satisfied.", true);
+    }
+    const compiledProfile = dependencies.compilePublicProfileRequest({
+      profile_id: capability,
+      inputs: actionArguments,
+    });
     if (!compiledProfile.ok) {
       return mcpToolResultResponse(id, {
         ...compiledProfile,
