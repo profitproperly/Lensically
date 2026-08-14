@@ -1,23 +1,32 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-14
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: operator-lifecycle-architecture-refactor-20260814
-active_checkpoint: repair-live-lifecycle-verification-defects
+active_job_id: none
+active_checkpoint: none
 
-## ACTIVE — Operator Lifecycle Architecture Refactor
+## COMPLETED — Operator Lifecycle Architecture Refactor
 
 job_id: `operator-lifecycle-architecture-refactor-20260814`
-owner_direction: Refactor Lensically Operator Mode into one normalized 0-5 lifecycle and continue until implementation, regression coverage, exact-SHA validation, production deployment, and live verification are finished.
-architecture_contract: Step 0 MCP initialize is only the two mandatory governing display lines plus a hard pointer to Step 1. Step 1 `getOperatorSessionMap` is one-time per fresh session and returns only recursive topology/pointers, traversal rules, session identity, and signed Step-1 proof. Step 2 `getOperatorKnowledge` loads task-relevant durable knowledge nodes. Step 3 `getOperatorLiveState` loads task-relevant current mutable truth. Step 4 `executeOperatorAction` selects the exact strongly typed action only after Step 3, then fails closed before execution unless the selected action's required Step-2 knowledge and Step-3 state were loaded. Step 5 `closeOperatorAction` independently verifies evidence, preserves prevention obligations, checkpoints, and closes. Initial session path is 1-5; subsequent meaningful tasks re-enter at 2-5.
-non_negotiable_constraints: No stuffed routing layers; no duplicate policy ownership; no public generic `profile_id` or generic `inputs`; old operational capabilities become internal strongly typed Step-4 branches; Step 2 durable knowledge must be deployment-local/versioned rather than runtime-dependent on mutable GitHub; live state must be able to change the exact Step-4 action; do not bind the final action in Step 2; no compatibility workaround that preserves bypass around the lifecycle; no unrelated competence shedding to satisfy payload ceilings.
-active_interrupt_id: `dfa3d5ea-51d2-45ab-b81c-34ef1284a8ce`
-live_verification_findings: Refreshed production exposed and repaired the original normalized-lifecycle verifier/session/control-flow defects. Exact SHA `504cf6c50f1d98fb4f3191e2fbb881d6d5d36e2e` passed full push `31808538771`, focused Operator 8/8 `31808557597`, and typecheck/lifecycle `31808570745`; Recovery release `31808809283` deployed MCP 1.45.1 and the exact five-tool lifecycle successfully. Final live `verify_deployed_mcp_version` then correctly failed closed on `operator_release_authority_mismatch`: durable authority still named c589 because Recovery dispatch bypassed Main's client-side authority publication. A canonical Main `worker-deploy` action was then blocked by OpenAI before Lensically received it, proving release authority cannot depend on the dispatching client path. Root repair moved pending release-authority publication into the exact-SHA release workflow itself and removed dispatcher-side ownership so Main and break-glass dispatches share one authoritative release transition. Repair head `a87c311f246181144479a01d0d077146310af1dd` passed focused Operator 8/8 run `31810093162` and fast/typecheck run `31810110487`. Exact-SHA release run `31810232432` correctly forced the complete release gate before authority publication or deployment and stopped there: complete inventory batch 2 reported all 109 tests passed, then the long-lived Vitest worker failed only while reporting results with `[vitest-worker]: Timeout calling "onTaskUpdate"`; authority publication and deploy steps were skipped, so production remained unchanged. This is a validation-harness reliability defect rather than a product/test failure.
-current_action: Harden complete validation by shortening each Vitest process to at most six files and pinning one worker while preserving the complete test inventory, then self-check that batching cannot exceed the safe ceiling; validate the new exact head, release it through the workflow-owned authority path, verify production MCP/version/five-tool boundary and release-authority match with a harmless Steps 1-5 `verify_deployed_mcp_version` smoke, close the hardening interruption and record durable completion, then close this lifecycle normalization job.
-completion_evidence_required: exact five public lifecycle tools; tiny Step-0 instructions; Step-1 pointer-only response; deployment-local Step-2 knowledge; task-scoped Step-3 state; Step-4 typed union with machine-readable prerequisite contract and fail-closed enforcement; Step-5 explicit evidence closure; focused live-defect regressions green; full validation green; exact-SHA production release; live MCP version and tool count verified; harmless refreshed-session Steps 1-5 smoke closes successfully.
+status: completed
+completed_at: 2026-08-14
+architecture_contract: Lensically Operator Mode is normalized around the five public lifecycle tools `getOperatorSessionMap`, `getOperatorKnowledge`, `getOperatorLiveState`, `executeOperatorAction`, and `closeOperatorAction`; Step 0 remains tiny initialization only, durable knowledge is deployment-local, mutable state is server-derived from the prepared action, Step 4 is the typed execution choke point, and Step 5 owns explicit verification closure.
+resolved_interrupt_id: `dfa3d5ea-51d2-45ab-b81c-34ef1284a8ce`
+root_repairs: Migrated deployed-version verification and release gates to the exact five-tool lifecycle; repaired first-session binding without weakening mismatch rejection; classified expected lifecycle controls correctly; made Step 2 advertise the same typed action union as Step 4; aligned zero-history typed contracts; migrated stale regressions away from retired direct/generic forms; moved release-authority publication into the exact-SHA release workflow so dispatch plane cannot change authority semantics; hardened complete validation into bounded six-file serial Vitest processes and made release preflight enforce the same harness contract.
+completion_evidence:
+- Production MCP version: `1.45.1`.
+- Final production Worker SHA: `cba0193f832aae34d225dcd9267c33e1f1dbd674`.
+- Full push validation: `31811841174` — success.
+- Focused Operator validation: `31811876451` — 8/8 shards success.
+- Fast/typecheck validation: `31811866783` — success.
+- Final exact-SHA release: `31812191282` — success, including workflow-owned release-authority publication, exact Worker deployment, and production verification.
+- Final live Steps 1→5 `verify_deployed_mcp_version` smoke closed successfully on deployment identity `437b1456-4948-4775-8b5c-2e292a67b83e`; Step 4 returned `ok:true`, exact five advertised lifecycle tools, `release_authority_match:true`, active expected release SHA equal to production, and `account_state_mutated:false`.
+- Original hardening incident is closed and `normal_work_blocked:false`.
+prevention_locked: Release authority is owned by the release workflow rather than the caller; validation process size is bounded and serial; release preflight enforces the same validation contract; retired public/generic architecture remains regression-blocked.
+current_action: None. Lifecycle normalization is closed. Future Lensically engineering work must begin from a newly accepted canonical job rather than resuming this completed refactor.
 
 ## COMPLETED — Manifest Scheduled Row Disappearance False Alarm
 
