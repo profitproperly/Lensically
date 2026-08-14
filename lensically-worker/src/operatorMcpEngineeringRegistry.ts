@@ -260,21 +260,17 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-    {
+      {
     name: "executeOperatorAction",
     title: "Execute operator action",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute one registered capability through the existing Execution Kernel after a valid Step-3 live-state token proves the required knowledge and live-state preparation occurred.`,
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute exactly one strongly typed internal capability through the existing Execution Kernel after valid Step-3 live-state proof. The public schema is generated from the canonical internal capability contracts; generic profile_id and generic inputs are not exposed.`,
     inputSchema: {
       type: "object",
       properties: {
         live_state_token: { type: "string", minLength: 16 },
-        profile_id: { type: "string", minLength: 1, maxLength: 160, pattern: "^[a-z0-9_]+$", description: "Registered semantic request profile. Objective, intent, routing, and handler selection are compiled server-side." },
-        inputs: { type: "object", description: "Bounded variable fields allowed by the registered profile.", additionalProperties: true },
-        continuation_id: { type: "string" },
-        incident_id: { type: "string" },
-        permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
+        action: { type: "object", description: "Generated discriminated action contract; runtime composition replaces this placeholder with closed one-of capability branches." },
       },
-      required: ["live_state_token", "profile_id", "inputs"],
+      required: ["live_state_token", "action"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

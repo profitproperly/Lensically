@@ -67,7 +67,8 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 
 import {
-                OPERATOR_GOVERNING_STANDARDS,
+                                OPERATOR_GOVERNING_STANDARDS,
+  OPERATOR_GOVERNING_STANDARDS_ACK,
   OPERATOR_MCP_VERSION,
   OPERATOR_LIFECYCLE_VERSION,
   OPERATOR_SESSION_MAP_VERSION,
@@ -15547,7 +15548,60 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
-  return buildComposedOperatorMcpTools(includeScopedWrappers);
+  const tools = buildComposedOperatorMcpTools(includeScopedWrappers);
+  const actionGateway = tools.find((tool) => tool.name === "executeOperatorAction");
+  if (!actionGateway) return tools;
+
+  const actionBranches = tools
+    .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
+    .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
+    .map((tool) => {
+      const sourceSchema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
+        ? tool.inputSchema as Record<string, unknown>
+        : {};
+      const sourceProperties = sourceSchema.properties && typeof sourceSchema.properties === "object" && !Array.isArray(sourceSchema.properties)
+        ? { ...(sourceSchema.properties as Record<string, unknown>) }
+        : {};
+      delete sourceProperties.governing_standards_ack;
+      const sourceRequired = Array.isArray(sourceSchema.required)
+        ? (sourceSchema.required as string[]).filter((field) => field !== "governing_standards_ack")
+        : [];
+      const capability = operatorActionCapabilityIdForToolName(tool.name);
+      return {
+        type: "object",
+        properties: {
+          capability: { type: "string", const: capability },
+          arguments: {
+            ...sourceSchema,
+            type: "object",
+            properties: sourceProperties,
+            required: sourceRequired,
+            additionalProperties: false,
+          },
+        },
+        required: ["capability", "arguments"],
+        additionalProperties: false,
+      };
+    });
+
+  actionGateway.inputSchema = {
+    type: "object",
+    properties: {
+      live_state_token: { type: "string", minLength: 16 },
+      action: {
+        oneOf: actionBranches,
+        description: "Exactly one registered internal capability with its closed typed argument schema.",
+      },
+      governing_standards_ack: {
+        type: "string",
+        const: OPERATOR_GOVERNING_STANDARDS_ACK,
+        description: "Mandatory pre-action acknowledgment.",
+      },
+    },
+    required: ["live_state_token", "action", "governing_standards_ack"],
+    additionalProperties: false,
+  };
+  return tools;
 }
 
 
@@ -16506,6 +16560,13 @@ function extractActiveContinuationExcerpt(content: string, activeJobId: string |
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
 const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeOperatorAction";
+const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
+  "getOperatorSessionMap",
+  "getOperatorKnowledge",
+  "getOperatorLiveState",
+  "executeOperatorAction",
+  "closeOperatorAction",
+]);
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
   "getOperatorSessionMap",
@@ -16710,6 +16771,10 @@ function operatorPublicProfileIdForToolName(toolName: string): string {
     .replace(/[^A-Za-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .toLowerCase();
+}
+
+function operatorActionCapabilityIdForToolName(toolName: string): string {
+  return OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(toolName) ?? operatorPublicProfileIdForToolName(toolName);
 }
 
 function operatorPublicIntentForToolName(toolName: string): string {
@@ -20587,12 +20652,15 @@ async function handleOperatorMcpEngineeringTool(
       return { ok: false, error: "operator_live_state_scopes_invalid", allowed_scopes: [...allowedScopes] };
     }
     const brandKey = normalizeGptBrandKey(args.brand_key);
-    const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
+        const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
     if (accountScopes.length && !brandKey) {
       return { ok: false, error: "brand_key_required_for_live_state", scopes: accountScopes };
     }
-    if (accountScopes.length && args.proceed_confirmed !== true) {
-      return { ok: false, error: "explicit_proceed_required", scopes: accountScopes, required_stage: "confirmOperatorProceed" };
+    if (accountScopes.length && brandKey) {
+      const boundary = await getOperatorMcpBoundaryBlock(request, env, "get_account_state", { brand_key: brandKey });
+      if (boundary) {
+        return { ...boundary, lifecycle_stage: 3, scopes: accountScopes, required_stage: "confirmOperatorProceed" };
+      }
     }
     const state: Record<string, unknown> = {};
     if (scopes.includes("runtime")) state.runtime = operatorRuntimeMetadata(env);
