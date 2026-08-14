@@ -7476,13 +7476,16 @@ active_checkpoint: none
     const listed = await mcpRequest<{ tools: Array<{ name: string; inputSchema?: { additionalProperties?: boolean } }> }>("tools/list");
     const names = listed.tools.map((tool) => tool.name);
     expect(initialized.serverInfo.version).toBe(OPERATOR_MCP_VERSION);
-    expect(names).toEqual(expect.arrayContaining([
-      "getOperatorStartupContext",
-      "selectOperatorKey",
-            "confirmOperatorProceed",
-      "get_content_focus",
-      "getRepoStatus",
-    ]));
+        expect(names).toEqual([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+    ]);
+    expect(names).not.toContain("getOperatorStartupContext");
+    expect(names).not.toContain("selectOperatorKey");
+    expect(names).not.toContain("getRepoStatus");
     expect(names).not.toContain("start_workflow_session");
     expect(names).not.toContain("executeLensicallyIntent");
     expect(new Set(names).size).toBe(names.length);
