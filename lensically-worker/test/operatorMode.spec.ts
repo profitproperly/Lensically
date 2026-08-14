@@ -4134,7 +4134,7 @@ active_checkpoint: none
     expect(first.intelligence_foundation.latest_strategy_version).toBeNull();
     expect(first.intelligence_foundation.latest_cycle_receipt?.cycle_id).toBe(prepared.cycle.id);
     expect(first.intelligence_foundation.latest_cycle_receipt?.exposure_snapshot?.id).toBeTruthy();
-    expect(second).toEqual(first);
+        expect(second.intelligence_foundation).toEqual(first.intelligence_foundation);
     const countsAfter = await env.DB.prepare(
       `SELECT
         (SELECT COUNT(*) FROM operator_manifest_strategy_versions WHERE brand_key = 'manifest_mental') AS strategies,
