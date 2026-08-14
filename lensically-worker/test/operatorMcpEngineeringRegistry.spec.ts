@@ -25,8 +25,11 @@ describe("Operator MCP engineering registry", () => {
       },
     });
         expect(byName.get("getOperatorSessionMap")?.annotations).toMatchObject({ readOnlyHint: true });
-            expect(byName.get("getOperatorKnowledge")?.inputSchema).toMatchObject({ required: ["session_map_token", "node_ids"], additionalProperties: false });
-    expect(byName.get("getOperatorLiveState")?.inputSchema).toMatchObject({ required: ["knowledge_token", "scopes"], additionalProperties: false });
+                expect(byName.get("getOperatorKnowledge")?.inputSchema).toMatchObject({ required: ["session_map_token", "planned_action"], additionalProperties: false });
+    expect(byName.get("getOperatorKnowledge")?.inputSchema?.properties).not.toHaveProperty("node_ids");
+    expect(byName.get("getOperatorLiveState")?.inputSchema).toMatchObject({ required: ["knowledge_token"], additionalProperties: false });
+    expect(byName.get("getOperatorLiveState")?.inputSchema?.properties).not.toHaveProperty("scopes");
+    expect(byName.get("getOperatorLiveState")?.inputSchema?.properties).not.toHaveProperty("brand_key");
         expect(byName.get("executeOperatorAction")?.inputSchema).toMatchObject({ required: ["live_state_token", "action"], additionalProperties: false });
     expect(byName.get("executeOperatorAction")?.description).toContain("generic profile_id and generic inputs are not exposed");
     expect(byName.get("closeOperatorAction")?.inputSchema).toMatchObject({ required: ["action_execution_token", "verification"], additionalProperties: false });
