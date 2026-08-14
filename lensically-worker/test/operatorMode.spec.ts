@@ -5541,100 +5541,56 @@ active_checkpoint: none
     expect(accounts.accounts.map((account) => account.brand_key)).toEqual(expect.arrayContaining(["manifest_mental", "opmg_deadman", "vectrix"]));
   }, 30000);
 
-  it("loads a compact source-defined startup bootstrap", async () => {
+  it("loads a compact source-defined session map", async () => {
     const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
-    const startup = await mcpTool<{
-            bootstrap_version: string;
-            startup_authority: { version: string; authority: string; startup_display_required: boolean; exact_owner_approved_text: string; exact_spec_execution_rule: string; prevention_closure_rule: string; standards: Array<{ key: string; title: string }>; governing_rule: string };
-      operating_contract: {
-        public_gateway: string;
-        router: string;
-        model_tool_choice_allowed: boolean;
-        d1_route_lookup_required: boolean;
-        recovery_role: string;
-      };
-      account_data_loaded: boolean;
-      no_account_sections_present: boolean;
-            tool_surface: { public_tool_count: number; categories: { engineering: number; admin: number; operator: number } };
-      runtime: { mcp_version: string; registry_generation: string };
-                        source_documents: Array<{ path: string; role: string; load: string }>;
-            canonical_continuation: { authority: string; path: string; tool: string; contract: string | null; active_job_id: string | null; active_checkpoint: string | null };
-      boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
-    }>("getOperatorStartupContext");
-                                                                expect(startup.bootstrap_version).toBe("operator-startup-v8");
-        const competencyBoot = (startup as unknown as {
-      session_competency_boot: {
+    expect(registry.tools.map((tool) => tool.name)).toEqual([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+    ]);
+    const step1 = await mcpToolCallRaw<{
+      ok: boolean;
+      lifecycle: { version: string; initial_sequence: string[]; recurring_sequence: string[] };
+      session_map: {
         version: string;
         architecture: string;
-        fresh_model_assumption: string;
-        handbook_path: string;
-        domain_load_protocol: string;
-        domain_routes: Array<{ key: string; marker: string; load_when: string }>;
-        knowledge_growth_rule: string;
-        payload_policy: { initialize_ceiling_chars: number; startup_transport_ceiling_bytes: number; startup_regression_target_chars: number; rule: string };
+        root: Record<string, unknown>;
+        durable_knowledge_loader: string;
+        live_state_loader: string;
+        action_executor: string;
+        action_closer: string;
       };
-    }).session_competency_boot;
-    expect(competencyBoot).toMatchObject({
-      version: "operator-session-competency-v2",
-      architecture: "constant_size_router_v1",
-      fresh_model_assumption: "zero_retained_lensically_knowledge",
-      handbook_path: "OPERATOR_COMPETENCY.md",
+      session_identity: { mcp_version: string; deployment_identity: string; commit_sha: string | null };
+      session_map_token: string;
+      account_data_loaded: boolean;
+    }>("getOperatorSessionMap");
+    expect(step1.isError).not.toBe(true);
+    const sessionMap = step1.structuredContent;
+    expect(sessionMap.lifecycle).toMatchObject({
+      version: "operator-lifecycle-v1",
+      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
     });
-    expect(competencyBoot.domain_routes.map((route) => route.key)).toEqual([
-      "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product",
-    ]);
-    expect(competencyBoot.domain_load_protocol).toContain("Never load the whole handbook");
-    expect(competencyBoot.knowledge_growth_rule).toContain("must not enlarge initialize instructions or startup payloads");
-    expect(competencyBoot.payload_policy).toMatchObject({ initialize_ceiling_chars: 6500, startup_transport_ceiling_bytes: 24000, startup_regression_target_chars: 16000 });
-                expect(startup.startup_authority).toMatchObject({
-            version: "operator-governing-standards-v7",
-      authority: "highest_lensically_operating_authority",
-      startup_display_required: true,
+    expect(sessionMap.session_map).toMatchObject({
+      architecture: "recursive_pointer_tree_v1",
+      durable_knowledge_loader: "getOperatorKnowledge",
+      live_state_loader: "getOperatorLiveState",
+      action_executor: "executeOperatorAction",
+      action_closer: "closeOperatorAction",
     });
-        expect(startup.startup_authority.discovery_execution_rule).toContain("never authorize execution");
-    expect(startup.startup_authority.public_schema_refresh_rule).toContain("CONTEXT PORT — PASTE INTO NEW CHAT");
-    expect(startup.startup_authority.public_schema_refresh_rule).toContain("NEXT ACTION");
-    expect(startup.startup_authority.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
-    expect(startup.startup_authority.exact_owner_approved_text).toContain("Resume the original objective only after prevention is locked in.");
-    expect(startup.startup_authority.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
-    expect(startup.startup_authority.prevention_closure_rule).toContain("may not end with analysis");
-    expect(startup.startup_authority.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
-    expect(startup.operating_contract).toMatchObject({
-      public_gateway: "direct_typed_tools",
-      router: "direct_handler_dispatch_v1",
-      model_tool_choice_allowed: true,
-      d1_route_lookup_required: false,
-      recovery_role: "independent_break_glass_only",
-    });
-    expect(startup.account_data_loaded).toBe(false);
-    expect(startup.no_account_sections_present).toBe(true);
-        expect(startup.tool_surface.public_tool_count).toBe(registry.tools.length);
-        expect(startup.runtime).toMatchObject({ mcp_version: OPERATOR_MCP_VERSION, registry_generation: "static-execution-router-v2" });
-                expect(startup.source_documents.map((document) => document.path)).toEqual(["AGENTS.md", "CURRENT_STATE.md", "OPERATING_MEMORY.md", "OPERATOR_COMPETENCY.md", "ENGINEERING_CONTINUATION.md"]);
-    expect(startup.source_documents.find((document) => document.path === "OPERATOR_COMPETENCY.md")).toMatchObject({ role: "domain_competency_handbook", load: "bounded_domain_on_demand" });
-        expect(startup.canonical_continuation).toMatchObject({
-      authority: "sole_canonical_repository_ledger",
-      path: "ENGINEERING_CONTINUATION.md",
-      tool: "getEngineeringContinuation",
-    });
-        expect(startup.source_documents.every((document) => !Object.prototype.hasOwnProperty.call(document, "excerpt"))).toBe(true);
-        expect(startup.boundary.first_key_response_template).toHaveLength(6);
-    expect(startup.boundary.first_key_response_template.slice(0, 2)).toEqual([
-      "Governing standards: Autonomy. Efficiency. Prevention.",
-      "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
-    ]);
-    expect(startup.boundary.before_proceed_forbidden).toContain("account_state");
-    const serialized = JSON.stringify(startup);
-    expect(serialized).not.toContain("collaboration_contract");
-    expect(serialized).not.toContain("open_implementation_backlog");
-            expect(serialized).not.toContain("active_runtime_config_deployment");
-    expect(serialized).not.toContain("growth_mission_contract");
-    expect(serialized).not.toContain("mandatory_fallback_execution_routes");
-    expect(serialized).not.toContain("operator_work_state");
-        expect(serialized).not.toContain("atomic_write_reconciliation");
-    expect(serialized).not.toContain("capability_index");
-    expect(serialized).not.toContain("shop_map");
-    expect(JSON.stringify((startup as unknown as { session_competency_boot: unknown }).session_competency_boot).length).toBeLessThan(4000);
+    expect(sessionMap.session_map.root).toBeTruthy();
+    expect(sessionMap.session_identity.mcp_version).toBe(OPERATOR_MCP_VERSION);
+    expect(sessionMap.session_identity.deployment_identity).toBeTruthy();
+    expect(sessionMap.session_map_token).toBeTruthy();
+    expect(sessionMap.account_data_loaded).toBe(false);
+    const serialized = JSON.stringify(sessionMap);
+    expect(serialized).not.toContain("startup_authority");
+    expect(serialized).not.toContain("source_documents");
+    expect(serialized).not.toContain("canonical_continuation");
+    expect(serialized).not.toContain("tool_surface");
+    expect(serialized).not.toContain("session_competency_boot");
     expect(serialized.length).toBeLessThan(16000);
   }, 30000);
 
