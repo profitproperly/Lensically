@@ -21,6 +21,7 @@ const OPERATOR_MCP_AUTONOMOUS_EXECUTION_BASE_TOOLS: OperatorMcpToolDefinition[] 
         brand_key: BRAND_KEY_SCHEMA,
         timezone: { type: "string", default: "America/New_York" },
                 horizon_hours: { type: "integer", minimum: 1, maximum: 48, default: 48 },
+        operation_id: { type: "string", minLength: 1, maxLength: 240, description: "Stable durable preparation identity. Reuse the same value to resume the same checkpointed Main Cycle preparation." },
       },
       required: ["brand_key"],
       additionalProperties: false,
