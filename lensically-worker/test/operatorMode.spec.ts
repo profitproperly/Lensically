@@ -3793,7 +3793,7 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
-  it("advertises the curated direct typed Main surface and concise instructions", async () => {
+    it("advertises only the normalized five-stage lifecycle and tiny Step-0 instructions", async () => {
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
@@ -3802,61 +3802,51 @@ describe("operator mode MCP endpoint", () => {
         const listed = await mcpRequest<{ tools: Array<{ name: string; description?: string; inputSchema?: { additionalProperties?: boolean; properties?: Record<string, unknown> } }> }>("tools/list");
         const names = listed.tools.map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
-        expect(names).toEqual(expect.arrayContaining([
-      "getOperatorStartupContext",
-            "getEngineeringContinuation",
-      "getDatabaseSchemaState",
-      "selectOperatorKey",
-      "confirmOperatorProceed",
-      "getGrowthMission",
-      "get_performance_learning",
-      "get_content_focus",
-      "get_manifest_intelligence_foundation",
-      "get_manifest_cycle_receipt",
-      "get_manifest_cycle_analysis_page",
-      "commit_manifest_cycle_strategy",
-      "prepare_manifest_autonomous_cycle",
-      "persist_manifest_autonomous_post",
-      "create_source_card",
-      "create_generation_run",
-      "getScheduledPostSchedulerState",
-      "getRepoStatus",
-      "readRepoFile",
-      "searchRepoFiles",
-      "applyRepoPatchSet",
-      "verifyDeployedMcpVersion",
-    ]));
-    expect(names).not.toEqual(expect.arrayContaining([
-      "executeLensicallyIntent",
-      "getWorkflowStatus",
-      "get_manifest_review_batch",
-      "review_manifest_scheduled_post",
-      "approve_draft",
-      "reject_draft",
-      "schedule_approved_draft",
-      "save_strategy_memory",
-      "listMcpTools",
-      "readMcpToolDefinition",
-      "recordHardeningIncident",
-      "runEngineeringTool",
-      "recordOpsMemory",
-      "listOpsMemory",
-    ]));
+                expect(names).toEqual([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+    ]);
+    expect(names).not.toContain("getOperatorStartupContext");
+    expect(names).not.toContain("executeLensicallyIntent");
+    expect(names).not.toContain("getRepoStatus");
+    expect(names).not.toContain("searchRepoFiles");
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
-        expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
-        const engineeringContinuationTool = listed.tools.find((tool) => tool.name === "getEngineeringContinuation");
-    const databaseSchemaTool = listed.tools.find((tool) => tool.name === "getDatabaseSchemaState");
-            expect(databaseSchemaTool?.description).toContain("expected D1 table");
-    expect(databaseSchemaTool?.inputSchema?.required).toContain("table_name");
-        expect(engineeringContinuationTool?.description).toContain("ENGINEERING_CONTINUATION.md");
-        expect(engineeringContinuationTool?.description).toContain("sole canonical");
-    expect(engineeringContinuationTool?.inputSchema?.properties).toMatchObject({
-      governing_standards_ack: {
-        type: "string",
-        const: "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.",
-      },
+    expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
+    const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
+    const actionSchema = actionTool?.inputSchema?.properties?.action as { oneOf?: unknown[] } | undefined;
+    expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    expect(JSON.stringify(actionTool?.inputSchema)).not.toContain("profile_id");
+    expect(JSON.stringify(actionTool?.inputSchema)).not.toContain('"inputs"');
+    expect(initialized.instructions.split("\n")).toEqual([
+      "Governing standards: Autonomy. Efficiency. Prevention.",
+      "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
+      "Call getOperatorSessionMap before any other Lensically Operator Mode tool.",
+    ]);
+    expect(initialized.instructions.length).toBeLessThan(1000);
+    const step1 = await mcpTool<{ session_map_token: string; lifecycle: { initial_sequence: string[]; recurring_sequence: string[] }; session_map: { architecture: string }; account_data_loaded: boolean }>("getOperatorSessionMap");
+    expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.session_map.architecture).toBe("recursive_pointer_tree_v1");
+    expect(step1.account_data_loaded).toBe(false);
+    expect(step1.session_map_token).toBeTruthy();
+    expect(step1).not.toHaveProperty("startup_authority");
+    expect(step1).not.toHaveProperty("canonical_continuation");
+    expect(step1).not.toHaveProperty("tool_surface");
+    const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
+      session_map_token: step1.session_map_token,
+      node_ids: ["governance"],
     });
-    expect(engineeringContinuationTool?.inputSchema?.required).toContain("governing_standards_ack");
+    expect(step2.nodes[0]?.node_id).toBe("governance");
+    expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v7" });
+    const step3 = await mcpTool<{ live_state_token: string; state: { runtime: Record<string, unknown> } }>("getOperatorLiveState", {
+      knowledge_token: step2.knowledge_token,
+      scopes: ["runtime"],
+    });
+    expect(step3.live_state_token).toBeTruthy();
+    expect(step3.state.runtime).toBeTruthy();
         const parsedContinuation = parseCanonicalContinuationMetadata(`status: active
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
@@ -3935,30 +3925,7 @@ active_checkpoint: none
     expect(new TextEncoder().encode(JSON.stringify(compactShadow)).byteLength).toBeLessThanOrEqual(24000);
     expect(JSON.stringify(compactShadow)).not.toContain("oversized_diagnostic");
 
-    const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
-    const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
-        expect(autonomousPrepareTool?.description).toContain("only when the owner explicitly requests the Main Cycle or canonical cycle continuation requires it");
-    expect(autonomousPrepareTool?.description).not.toMatch(/tool discovery|schema loading|\bRefresh\b/i);
-    expect(autonomousPersistTool?.inputSchema?.properties?.post).toBeTruthy();
-    expect(autonomousPersistTool?.inputSchema?.properties?.posts).toBeUndefined();
-    expect(names).not.toContain("commit_manifest_autonomous_runway");
-    const startup = await mcpTool<{
-      runtime?: { execution_kernel?: { name?: string; version?: string; public_contract?: string; deployment_fresh_sessions?: boolean } };
-    }>("getOperatorStartupContext");
-    expect(startup.runtime?.execution_kernel).toMatchObject({
-      name: "Execution Kernel",
-      version: "lensically-execution-kernel-v1",
-            public_contract: "direct_typed_tools_v2",
-      deployment_fresh_sessions: true,
-    });
-        expect(initialized.instructions).toContain("advertised direct typed tool");
-                        expect(initialized.instructions).toContain("Discovery returns candidates, not authorization");
-    expect(initialized.instructions).toContain("Assume zero retained Lensically knowledge");
-        expect(initialized.instructions).toContain("constant-size competency router");
-    expect(initialized.instructions).toContain("Startup ceilings are guardrails, never storage budgets");
-    expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
-    expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
-        expect(initialized.instructions.length).toBeLessThan(6500);
+        expect(names).not.toContain("commit_manifest_autonomous_runway");
   }, 30000);
 
                 it.skip("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
