@@ -120,15 +120,8 @@ A problem is not resolved until the root cause is repaired and recurrence is per
 
 # MANDATORY FAILURE REPAIR RULE
 
-If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it.
+A tool failure interrupts the affected business task. Do not route around it to finish the action. Use engineering, diagnostic, validation, and Recovery tools to fix the root cause, add regression and prevention, validate, deploy, then resume the interrupted step.
 
-Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained.
-
-Switch into diagnosis and repair instead. Use whatever engineering, diagnostic, validation, and Recovery tools are necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step.
-
-Alternate tools are required when they are part of root-cause repair. They are forbidden only when they substitute for repairing the failed operation.
-
-An uncertain transport result may be reconciled with the same operation_id only to determine execution state.
 
 
 # MANDATORY STARTUP DISPLAY
