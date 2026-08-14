@@ -16559,6 +16559,18 @@ async function verifyOperatorLifecycleToken(
 
 
 
+function extractOperatorKnowledgeSection(content: string, nodeId: string): string | null {
+  const marker = `## DOMAIN ${nodeId}`;
+  const start = content.indexOf(marker);
+  if (start < 0) return null;
+  const remainder = content.slice(start + marker.length);
+  const nextDomain = remainder.search(/\n## DOMAIN /);
+  const maintenance = remainder.search(/\n## Handbook maintenance rule/);
+  const boundaries = [nextDomain, maintenance].filter((value) => value >= 0);
+  const end = boundaries.length ? Math.min(...boundaries) : remainder.length;
+  return `${marker}${remainder.slice(0, end)}`.trim();
+}
+
 function extractActiveContinuationExcerpt(content: string, activeJobId: string | null): string | null {
   if (!activeJobId) return null;
   const lines = content.split(/\r?\n/);
@@ -16569,8 +16581,38 @@ function extractActiveContinuationExcerpt(content: string, activeJobId: string |
   return lines.slice(start, end).join("\n");
 }
 
+type OperatorCompetencyHandbookCache = {
+  deployment_identity: string;
+  sha: string | null;
+  content: string;
+  size: number;
+};
 
+let operatorCompetencyHandbookCache: OperatorCompetencyHandbookCache | null = null;
 
+async function getCachedOperatorCompetencyHandbook(env: Env): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number; cache_hit: boolean }> {
+  const deploymentIdentity = currentOperatorDeploymentIdentity(env);
+  if (operatorCompetencyHandbookCache?.deployment_identity === deploymentIdentity) {
+    return {
+      ok: true,
+      status: 200,
+      sha: operatorCompetencyHandbookCache.sha,
+      content: operatorCompetencyHandbookCache.content,
+      size: operatorCompetencyHandbookCache.size,
+      cache_hit: true,
+    };
+  }
+  const handbook = await getGithubFile(env, "OPERATOR_COMPETENCY.md");
+  if (handbook.ok && handbook.content !== null) {
+    operatorCompetencyHandbookCache = {
+      deployment_identity: deploymentIdentity,
+      sha: handbook.sha,
+      content: handbook.content,
+      size: handbook.size,
+    };
+  }
+  return { ...handbook, cache_hit: false };
+}
 
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
@@ -16823,8 +16865,40 @@ function resolveOperatorInternalActionCapability(capability: string): { toolName
   return { toolName: matches[0].name, capability: normalized, tool: matches[0] };
 }
 
-
-
+async function resolveOperatorPlannedAction(value: unknown): Promise<{
+  ok: true;
+  capability: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  fingerprint: string;
+  brandKey: GptBrandKey | null;
+} | {
+  ok: false;
+  error: string;
+  validation_errors?: OperatorGuardError[];
+}> {
+  const action = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  const capability = normalizeOperatorMachineKey(action?.capability, "");
+  const actionArguments = action?.arguments && typeof action.arguments === "object" && !Array.isArray(action.arguments)
+    ? action.arguments as Record<string, unknown>
+    : null;
+  if (!capability || !actionArguments) return { ok: false, error: "operator_typed_planned_action_required" };
+  const resolved = resolveOperatorInternalActionCapability(capability);
+  if (!resolved) return { ok: false, error: "operator_planned_action_capability_unknown" };
+  const validation = normalizeOperatorGuardValue(actionArguments, operatorInternalActionArgumentSchema(resolved.tool), "$.planned_action.arguments");
+  if (validation.errors.length) {
+    return { ok: false, error: "operator_planned_action_arguments_invalid", validation_errors: validation.errors };
+  }
+  const brandKey = normalizeGptBrandKey(actionArguments.brand_key);
+  return {
+    ok: true,
+    capability: resolved.capability,
+    toolName: resolved.toolName,
+    arguments: actionArguments,
+    fingerprint: await operatorExecutionFingerprint(resolved.toolName, actionArguments),
+    brandKey,
+  };
+}
 
 function requiredOperatorKnowledgeNodesForTool(toolName: string): string[] {
   const nodes = new Set<string>(["governance"]);
