@@ -13,6 +13,7 @@ export type ClientSafetyLegacyMigration = { id: string; status: "migrated"; form
 
 const FORBIDDEN_PUBLIC_INPUT_KEYS = new Set(["tool_name", "mapped_tool", "handler", "action_key", "execution_guard", "release_sha", "release_id"]);
 const INTERNAL_HANDLER_IDENTIFIER = /^[a-z][a-z0-9]*(?:[A-Z][A-Za-z0-9]*){2,}$/;
+const PUBLIC_OPERATOR_LIFECYCLE_STAGES = new Set(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
 const INTERNAL_ACTION_KEY = /^(?:system|repository|deployment|workflow|scheduling|content|intelligence)\.[a-z0-9_]+$/;
 const TYPED_ONLY_ACCOUNT_IDENTIFIERS = ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"] as const;
 const GATEWAY_INTERNAL_FREE_TEXT = ["internal handler", "internal capability", "camelcase tool", "action key", "execution guard", "public gateway schema"] as const;
