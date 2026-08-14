@@ -22129,7 +22129,14 @@ async function handleOperatorMcpEngineeringTool(
         && boundaryTest.model_evaluation_required
         && boundaryTest.no_internal_multi_post_contract,
             status: response.status,
-      error: deploymentIdentity.error ?? (releaseAuthorityMatch ? null : "operator_release_authority_mismatch"),
+      error: deploymentIdentity.error
+        ?? (!releaseAuthorityMatch
+          ? "operator_release_authority_mismatch"
+          : !boundaryTest.lifecycle_surface_exact
+            ? "operator_public_lifecycle_surface_mismatch"
+            : !boundaryTest.legacy_persist_hidden || !boundaryTest.retired_commit_hidden
+              ? "retired_public_operational_tool_advertised"
+              : null),
       required_next_action: deploymentIdentity.session_refresh_required
         ? "Refresh the Lensically Operator Mode connector session before accepting any post-deploy live verification."
         : !releaseAuthorityMatch
