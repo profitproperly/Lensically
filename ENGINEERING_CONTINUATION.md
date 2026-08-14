@@ -1,12 +1,21 @@
 # Lensically Continuation Ledger
 
-status: completed
-updated_at: 2026-08-12
+status: active
+updated_at: 2026-08-14
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: operator-lifecycle-architecture-refactor-20260814
+active_checkpoint: normalize-five-stage-lifecycle
+
+## ACTIVE — Operator Lifecycle Architecture Refactor
+
+job_id: `operator-lifecycle-architecture-refactor-20260814`
+owner_direction: Refactor Lensically Operator Mode into one normalized 0-5 lifecycle and continue until implementation, regression coverage, exact-SHA validation, production deployment, and live verification are finished.
+architecture_contract: Step 0 MCP initialize is only the two mandatory governing display lines plus a hard pointer to Step 1. Step 1 `getOperatorSessionMap` is one-time per fresh session and returns only recursive topology/pointers, traversal rules, session identity, and signed Step-1 proof. Step 2 `getOperatorKnowledge` loads task-relevant durable knowledge nodes. Step 3 `getOperatorLiveState` loads task-relevant current mutable truth. Step 4 `executeOperatorAction` selects the exact strongly typed action only after Step 3, then fails closed before execution unless the selected action's required Step-2 knowledge and Step-3 state were loaded. Step 5 `closeOperatorAction` independently verifies evidence, preserves prevention obligations, checkpoints, and closes. Initial session path is 1-5; subsequent meaningful tasks re-enter at 2-5.
+non_negotiable_constraints: No stuffed routing layers; no duplicate policy ownership; no public generic `profile_id` or generic `inputs`; old operational capabilities become internal strongly typed Step-4 branches; Step 2 durable knowledge must be deployment-local/versioned rather than runtime-dependent on mutable GitHub; live state must be able to change the exact Step-4 action; do not bind the final action in Step 2; no compatibility workaround that preserves bypass around the lifecycle; no unrelated competence shedding to satisfy payload ceilings.
+current_action: Stop conflicting recursive source mutations by making this ledger authoritative, migrate Step-2 knowledge to the deployment-local `operatorKnowledgeRegistry`, remove planned-action binding from Steps 2-3, enforce action-specific prerequisites at Step 4, align all tests/docs/release gates, run full validation on one exact head, release that exact SHA, verify production MCP version/tool count, then close this job.
+completion_evidence_required: exact five public lifecycle tools; tiny Step-0 instructions; Step-1 pointer-only response; deployment-local Step-2 knowledge; task-scoped Step-3 state; Step-4 typed union with machine-readable prerequisite contract and fail-closed enforcement; Step-5 explicit evidence closure; full validation green; exact-SHA production release; live MCP version and tool count verified.
 
 ## COMPLETED — Manifest Scheduled Row Disappearance False Alarm
 
