@@ -6623,18 +6623,25 @@ active_checkpoint: none
     expect(audit.structuredContent.routed_execution.executed_tool).toBe("listEngineeringAudit");
     expect(audit.structuredContent.routed_execution.executed_tool).not.toBe("inspectMcpFailure");
 
+        const negativeStep1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    expect(negativeStep1.isError).not.toBe(true);
     const repair = await mcpToolCallRaw<{
-      tool_name: string;
       error: string;
       validation_errors?: Array<{ path: string }>;
-        }>("applyRepoPatchSet", {
-      dry_run: true,
-      message: "Dry-run gateway repair route",
-      patches: [],
+    }>("getOperatorKnowledge", {
+      session_map_token: negativeStep1.structuredContent.session_map_token,
+      planned_action: {
+        capability: "repository_patch_set",
+        arguments: {
+          dry_run: true,
+          message: "Dry-run gateway repair route",
+          patches: [],
+        },
+      },
     });
     expect(repair.isError).toBe(true);
-    expect(repair.structuredContent.error).toBe("routed_gateway_payload_invalid");
-    expect(repair.structuredContent.tool_name).toBe("applyRepoPatchSet");
+    expect(repair.structuredContent.error).toBe("operator_planned_action_arguments_invalid");
+    expect(repair.structuredContent.validation_errors?.some((error) => error.path.includes("patches"))).toBe(true);
     expect(JSON.stringify(repair.structuredContent)).not.toContain("submit_candidate_draft");
   }, 30000);
 
