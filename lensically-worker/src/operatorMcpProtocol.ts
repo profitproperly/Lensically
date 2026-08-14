@@ -23,8 +23,7 @@ export function buildOperatorLifecycleReferenceId(uuid: string): string {
 
 export function normalizeOperatorLifecycleReference(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase();
-  return /^olr_[a-f0-9]{32}$/.test(normalized) ? normalized : null;
+  return /^olr_[a-f0-9]{32}$/.test(value) ? value : null;
 }
 export const OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE = "When a client or provider rejects an Operator call before it reaches Lensically, do not infer a Lensically server defect and do not mutate Lensically server behavior solely from that rejection. Record the client block, prove the pre-dispatch boundary with server-receipt or telemetry evidence when available, preserve the exact prepared action, and require a fresh MCP/client transport before any exact replay. Do not retry or reshape the blocked request in the same connection. A Lensically server repair requires server-side evidence; repeated blocking on a fresh transport is a client/platform compatibility recurrence to escalate without guessing at a server-side cause.";
 export const OPERATOR_LIFECYCLE_VERSION = "operator-lifecycle-v1";
