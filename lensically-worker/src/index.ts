@@ -15548,11 +15548,12 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
-  const tools = buildComposedOperatorMcpTools(includeScopedWrappers);
+    const tools = buildComposedOperatorMcpTools(includeScopedWrappers);
   const actionGateway = tools.find((tool) => tool.name === "executeOperatorAction");
-  if (!actionGateway) return tools;
+  const knowledgeTool = tools.find((tool) => tool.name === "getOperatorKnowledge");
+  if (!actionGateway || !knowledgeTool) return tools;
 
-    const actionCapabilityIds = new Set<string>();
+  const actionCapabilityIds = new Set<string>();
   const actionBranches = tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
@@ -15596,14 +15597,29 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       };
     });
 
+    const typedActionSchema = {
+    oneOf: actionBranches,
+    description: "Exactly one registered internal capability with its closed typed argument schema.",
+  };
+  knowledgeTool.inputSchema = {
+    type: "object",
+    properties: {
+      session_map_token: { type: "string", minLength: 16 },
+      planned_action: typedActionSchema,
+      governing_standards_ack: {
+        type: "string",
+        const: OPERATOR_GOVERNING_STANDARDS_ACK,
+        description: "Mandatory pre-action acknowledgment.",
+      },
+    },
+    required: ["session_map_token", "planned_action", "governing_standards_ack"],
+    additionalProperties: false,
+  };
   actionGateway.inputSchema = {
     type: "object",
     properties: {
       live_state_token: { type: "string", minLength: 16 },
-      action: {
-        oneOf: actionBranches,
-        description: "Exactly one registered internal capability with its closed typed argument schema.",
-      },
+      action: typedActionSchema,
       governing_standards_ack: {
         type: "string",
         const: OPERATOR_GOVERNING_STANDARDS_ACK,
