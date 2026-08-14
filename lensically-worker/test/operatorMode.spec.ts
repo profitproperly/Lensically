@@ -3926,6 +3926,50 @@ active_checkpoint: none
     expect(JSON.stringify(compactShadow)).not.toContain("oversized_diagnostic");
 
         expect(names).not.toContain("commit_manifest_autonomous_runway");
+    }, 30000);
+
+  it("enforces the normalized Operator lifecycle from session map through explicit closure", async () => {
+    const step1 = await mcpTool<{ session_map_token: string }>("getOperatorSessionMap");
+    const step2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.session_map_token,
+      node_ids: ["governance"],
+    });
+    const step3 = await mcpTool<{ live_state_token: string }>("getOperatorLiveState", {
+      knowledge_token: step2.knowledge_token,
+      scopes: ["runtime"],
+    });
+    const step4 = await mcpTool<{
+      ok: boolean;
+      action_execution_token: string;
+      operator_action_closure: { status: string; lifecycle_stage: number; required_tool: string };
+    }>("executeOperatorAction", {
+      live_state_token: step3.live_state_token,
+      action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(step4.ok).not.toBe(false);
+    expect(step4.action_execution_token).toBeTruthy();
+    expect(step4.operator_action_closure).toMatchObject({
+      status: "pending_explicit_close",
+      lifecycle_stage: 4,
+      required_tool: "closeOperatorAction",
+    });
+    const step5 = await mcpTool<{
+      ok: boolean;
+      lifecycle_stage: number;
+      closure_token: string;
+      next_sequence: string[];
+    }>("closeOperatorAction", {
+      action_execution_token: step4.action_execution_token,
+      verification: {
+        verified: true,
+        evidence: ["Step-4 list_accounts action returned a verified result in the isolated lifecycle regression."],
+        next_action: "Return to Step 2 for the next meaningful task.",
+        prevention_required: false,
+      },
+    });
+    expect(step5).toMatchObject({ ok: true, lifecycle_stage: 5 });
+    expect(step5.closure_token).toBeTruthy();
+    expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
   }, 30000);
 
                 it.skip("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
