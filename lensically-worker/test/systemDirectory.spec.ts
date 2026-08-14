@@ -1317,6 +1317,12 @@ describe("System Directory foundation", () => {
       intent: "search repository symbol",
       inputs: { path: "lensically-worker/src/index.ts", symbol: "executeLensicallyIntent", limit: 5 },
     });
+    expect(buildClientSafeGatewayRequest("client_block_intake", { resume_capsule: { interrupted_stage: "executeOperatorAction" } })).toMatchObject({
+      intent: "record hardening incident",
+      inputs: { resume_capsule: { interrupted_stage: "executeOperatorAction" } },
+    });
+    expect(() => buildClientSafeGatewayRequest("client_block_intake", { resume_capsule: { interrupted_stage: "executeInternalHandler" } })).toThrow(/internal_handler_identifier:inputs\.resume_capsule\.interrupted_stage/);
+    expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toContain("client_block_intake_public_lifecycle_stage_false_positive");
   });
 
   it("defines the autonomous business operator as a durable runtime contract", () => {
