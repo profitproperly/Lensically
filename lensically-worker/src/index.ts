@@ -16553,7 +16553,7 @@ async function issueOperatorLifecycleToken(
   logWorkerEvent("OPERATOR_LIFECYCLE_TOKEN_ISSUED", {
     stage,
     ...(await buildOperatorOpaqueLifecycleTokenTelemetry(token)),
-    session_bound: typeof claims.mcp_session_id === "string" && claims.mcp_session_id.trim().length > 0,
+    binding_present: typeof claims.mcp_session_id === "string" && claims.mcp_session_id.trim().length > 0,
   });
   return token;
 }
