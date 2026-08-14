@@ -149,13 +149,12 @@ export async function dispatchOperatorMcpToolCall(
   }
   const governedRequestedArgs = { ...requestedArgs };
   delete governedRequestedArgs.governing_standards_ack;
-  const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName);
-  const legacyGatewayEntry = requestedToolName === dependencies.routedExecutionGateway;
-  const gatewayAccountDataLoaded = directPublicEntry || legacyGatewayEntry
+    const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName);
+  const gatewayAccountDataLoaded = directPublicEntry
     ? await dependencies.gatewayAccountDataLoaded(governedRequestedArgs)
     : false;
 
-  if (!directPublicEntry && !legacyGatewayEntry) {
+  if (!directPublicEntry) {
     return mcpToolResultResponse(id, {
       ok: false,
       error: "public_direct_tool_required",
@@ -293,10 +292,14 @@ export async function dispatchOperatorMcpToolCall(
 
   let args: JsonRecord = { ...rawArgs };
   delete args.execution_guard;
-  const routedMapExecution = asRecord(routedGatewayMetadata?.map_execution);
-  const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;
-  const sourceDefinedDirectEngineering = (directPublicEntry && dependencies.isEngineeringToolName(toolName))
-    || routedMapExecution?.mode === "source_defined_direct_engineering";
+    const routedMapExecution = asRecord(routedGatewayMetadata?.map_execution);
+  const lifecycleGatewayExecution = routedGatewayMetadata !== null;
+  const sourceDefinedStaticRoute = lifecycleGatewayExecution
+    ? routedMapExecution?.d1_execution_library_bypassed === true
+    : directPublicEntry;
+  const sourceDefinedDirectEngineering = lifecycleGatewayExecution
+    ? routedMapExecution?.mode === "source_defined_direct_engineering"
+    : directPublicEntry && dependencies.isEngineeringToolName(toolName);
   const sourceDefinedProtectedOperation = sourceDefinedDirectEngineering
     && dependencies.protectedTools.has(dependencies.canonicalAutonomyToolName(toolName));
   const preCallRouting: PreCallRoutingResult = sourceDefinedStaticRoute

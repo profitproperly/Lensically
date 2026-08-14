@@ -3397,9 +3397,9 @@ if (!router.includes('AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-op
     || !systemDirectoryTests.includes("defers noncritical scope while allowing only mandatory interruptions")
     || !systemDirectoryTests.includes("blocks operational closure without a selected next action and dependency retirement path")
     || !systemDirectoryTests.includes("registers the durable operator work capabilities")
-        || !agentRules.includes("Lensically Autonomous Business Operator")
-    || !agentRules.includes("This handoff is mandatory and omission is a closure failure")
-    || !agentRules.includes("MANDATORY NEXT STEP: Refresh the Lensically Operator Mode MCP and start a new chat.")
+                || !agentRules.includes("Lensically Autonomous Business Operator")
+    || !agentRules.includes("refresh the lensically operator mode mcp now.")
+    || !agentRules.includes("CONTEXT PORT — PASTE INTO NEW CHAT")
     || !currentState.includes("single-active-outcome-v1")
     || !operatingMemory.includes("operator_work_ledger")) {
   errors.push("autonomous_business_operator_contract_missing");
@@ -3444,16 +3444,17 @@ if (!source.includes("const RETIRED_EXECUTION_TABLES")
   errors.push("legacy_execution_storage_retirement_missing");
 }
 
-const directMainContractChecks = [
-    ["public_allowlist", operatorMcpToolDirectory.includes("export const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")],
+const lifecycleMainContractChecks = [
+  ["public_allowlist", operatorMcpToolDirectory.includes("export const OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")],
   ["public_tool_builder", source.includes("buildOperatorPublicMcpTools")],
-    ["direct_contract_metadata", source.includes('public_contract: "direct_typed_tools_v2"')],
-  ["direct_discovery", source.includes("const tools = await buildOperatorPublicMcpTools(env)")],
-    ["direct_entry_gate", operatorMcpToolCallDispatcher.includes("const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName)")],
-  ["legacy_gateway_hidden", operatorMcpToolCallDispatcher.includes("const legacyGatewayEntry = requestedToolName === dependencies.routedExecutionGateway")],
-    ["direct_server_guard", operatorMcpToolCallDispatcher.includes("execution_guard: await dependencies.createExecutionGuard(requestedToolName, governedRequestedArgs)")],
-  ["generic_gateway_not_advertised", tests.includes('expect(names).not.toEqual(expect.arrayContaining([\n      "executeLensicallyIntent"')],
+  ["lifecycle_contract_metadata", source.includes("public_contract: OPERATOR_LIFECYCLE_VERSION")],
+  ["lifecycle_discovery", source.includes("listTools: () => buildOperatorPublicMcpTools(env)")],
+  ["public_entry_gate", operatorMcpToolCallDispatcher.includes("const directPublicEntry = dependencies.isPublicDirectToolName(requestedToolName)")],
+  ["legacy_gateway_bypass_absent", !operatorMcpToolCallDispatcher.includes("legacyGatewayEntry")],
+  ["execution_guard", operatorMcpToolCallDispatcher.includes("execution_guard: await dependencies.createExecutionGuard(requestedToolName, governedRequestedArgs)")],
+  ["retired_gateway_not_advertised", tests.includes('expect(names).not.toContain("executeLensicallyIntent")')],
   ["closed_public_schemas", tests.includes("tool.inputSchema?.additionalProperties === false")],
+  ["typed_step4_union", source.includes("oneOf: actionBranches") && source.includes("operator_action_capability_collision")],
   ["server_side_proceed", source.includes("Later direct account calls use server-side continuity and do not send a Proceed flag")],
   ["execution_kernel_name", source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')],
   ["execution_kernel_version", source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')],
@@ -3461,14 +3462,15 @@ const directMainContractChecks = [
   ["session_verification", source.includes("verifyOperatorMcpSession")],
   ["stale_session_rejection", source.includes("stale_mcp_deployment_session")],
 ];
-for (const [checkId, present] of directMainContractChecks) {
-  if (!present) errors.push(`direct_main_contract_missing:${checkId}`);
+for (const [checkId, present] of lifecycleMainContractChecks) {
+  if (!present) errors.push(`lifecycle_main_contract_missing:${checkId}`);
 }
 
-if (!operatorMcpToolCallDispatcher.includes("const sourceDefinedStaticRoute = directPublicEntry || routedMapExecution?.d1_execution_library_bypassed === true;")
+if (!operatorMcpToolCallDispatcher.includes("const lifecycleGatewayExecution = routedGatewayMetadata !== null;")
+    || !operatorMcpToolCallDispatcher.includes("routedMapExecution?.d1_execution_library_bypassed === true")
     || !operatorMcpToolCallDispatcher.includes("const preCallRouting: PreCallRoutingResult = sourceDefinedStaticRoute")
     || !operatorMcpToolCallDispatcher.includes("if (!sourceDefinedStaticRoute) {\n    await dependencies.recordExecutionDecision")) {
-  errors.push("direct_static_route_runtime_bypass_missing");
+  errors.push("lifecycle_internal_route_runtime_contract_missing");
 }
 
 if (!workflow.includes("run-name: Lensically ${{ inputs.task || 'push-validation' }} · ${{ inputs.release_id || github.sha }}")
@@ -3715,11 +3717,12 @@ if (!operatorManifestCycleConstructionService.includes("pending_horizon_reconcil
     || !sourceFamilySelection.includes("DELETE FROM operator_source_selection_receipts")) {
   errors.push("manifest_locked_source_plan_horizon_reconciliation_missing");
 }
-if (source.includes('callDirectLiveTool("getOperatorStartupContext"')) {
+if (source.includes('callDirectLiveTool("getOperatorStartupContext"')
+    || source.includes('callDirectLiveTool("getOperatorSessionMap"')) {
   errors.push("self_referential_live_startup_probe_forbidden");
 }
-if (!source.includes("startup_tool_advertised: startupTool !== null")) {
-  errors.push("live_startup_tool_advertisement_check_missing");
+if (!source.includes("session_map_tool_advertised: sessionMapTool !== null")) {
+  errors.push("live_session_map_tool_advertisement_check_missing");
 }
 
 
