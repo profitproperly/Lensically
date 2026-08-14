@@ -3994,7 +3994,7 @@ active_checkpoint: none
     expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
   }, 30000);
 
-  it("adopts the first valid MCP session for an unbound lifecycle and rejects a later different session", async () => {
+  it("adopts the first valid MCP session for an unbound lifecycle and carries the binding forward", async () => {
     const initializeSession = async (): Promise<string> => {
       const response = await fetchFromWorker("/api/operator/mcp", {
         method: "POST",
