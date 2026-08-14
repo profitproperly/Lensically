@@ -5939,14 +5939,15 @@ active_checkpoint: none
     expect(selected.structuredContent.selected_key).toBe(BRAND_KEY);
     expect(selected.structuredContent.account_data_loaded).toBe(false);
 
-        const blocked = await mcpToolRaw<{ error: string; requested_tool: string; account_data_loaded: boolean }>("getWorkflowStatus", {
+        const blocked = await mcpToolRaw<{ error: string; selected_key: string; account_data_loaded: boolean; required_next_tool: string }>("get_account_state", {
       brand_key: BRAND_KEY,
     });
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({
-      error: "public_direct_tool_required",
-      requested_tool: "getWorkflowStatus",
+      error: "explicit_proceed_required",
+      selected_key: BRAND_KEY,
       account_data_loaded: false,
+      required_next_tool: "confirmOperatorProceed",
     });
 
                                                 const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string }; next_call_requirement: { brand_key: string; proceed_confirmed: boolean; continuity_loaded?: unknown } }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
