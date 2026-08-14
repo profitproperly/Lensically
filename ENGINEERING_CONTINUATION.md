@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: operator-lifecycle-architecture-refactor-20260814
-active_checkpoint: fresh-openai-token-fingerprint-boundary-verification
+active_checkpoint: fresh-openai-post-prevention-runtime-verification
 
 ## ACTIVE — Operator Lifecycle Architecture Refactor
 
