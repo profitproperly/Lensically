@@ -7542,14 +7542,11 @@ active_checkpoint: none
       scheduler?: { control: { mode: string; allowed_post_ids: number[] } };
       result?: { scheduler: { control: { mode: string; allowed_post_ids: number[] } } };
       autonomy_decision: { governed: boolean; decision_id: string };
-        }>("executeLensicallyIntent", {
-      profile_id: "run_approved_post_canary",
-      inputs: {
-        brand_key: "manifest_mental",
-        scheduled_post_id: 987654,
-        reason: "Protected-operation owner-ratification regression fixture.",
-        owner_response: "Proceed",
-      },
+        }>("runApprovedPostCanary", {
+      brand_key: "manifest_mental",
+      scheduled_post_id: 987654,
+      reason: "Protected-operation owner-ratification regression fixture.",
+      owner_response: "Proceed",
     });
     expect(canary.isError).not.toBe(true);
     expect(canary.structuredContent.ok).toBe(true);
