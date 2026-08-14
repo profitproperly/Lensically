@@ -16538,27 +16538,46 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
         return payload as Record<string, unknown>;
 }
 
+const OPERATOR_LIFECYCLE_REFERENCE_KIND = "lifecycle_state";
+
 async function issueOperatorLifecycleToken(
   env: Env,
   stage: 1 | 2 | 3 | 4 | 5,
   claims: Record<string, unknown> = {},
 ): Promise<string> {
-  const token = await createSignedOperatorEnvelope(env, {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + (stage === 3 ? 15 * 60 : stage === 2 || stage === 4 ? 60 * 60 : OPERATOR_MCP_SESSION_TTL_SECONDS);
+  const payload = {
     kind: "operator_lifecycle",
     lifecycle_version: OPERATOR_LIFECYCLE_VERSION,
+    lifecycle_reference_version: OPERATOR_LIFECYCLE_REFERENCE_VERSION,
     stage,
     deployment_identity: currentOperatorDeploymentIdentity(env),
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
-    iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (stage === 3 ? 15 * 60 : stage === 2 || stage === 4 ? 60 * 60 : OPERATOR_MCP_SESSION_TTL_SECONDS),
+    iat: now,
+    exp: expiresAt,
     ...claims,
-  });
+  };
+  const reference = buildOperatorLifecycleReferenceId(crypto.randomUUID());
+  await env.DB.prepare(
+    `INSERT INTO operator_continuity_refs (
+      id, kind, brand_key, workflow_session_id, continuation_choice, payload_json, expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    reference,
+    OPERATOR_LIFECYCLE_REFERENCE_KIND,
+    normalizeGptBrandKey(claims.planned_brand_key),
+    null,
+    null,
+    normalizeOperatorJson(payload, {}),
+    expiresAt,
+  ).run();
   logWorkerEvent("OPERATOR_LIFECYCLE_TOKEN_ISSUED", {
     stage,
-    ...(await buildOperatorOpaqueLifecycleTokenTelemetry(token)),
+    ...(await buildOperatorOpaqueLifecycleTokenTelemetry(reference)),
     binding_present: typeof claims.mcp_session_id === "string" && claims.mcp_session_id.trim().length > 0,
   });
-  return token;
+  return reference;
 }
 
 function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, requestSessionId: string | null): string | null {
