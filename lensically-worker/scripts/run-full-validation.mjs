@@ -229,9 +229,7 @@ for (const [index, testFiles] of completeTestGroups.entries()) {
     vitestCli,
     "--run",
         ...testFiles,
-    "--no-file-parallelism",
-    `--minWorkers=${COMPLETE_TEST_MIN_WORKERS}`,
-    `--maxWorkers=${COMPLETE_TEST_MAX_WORKERS}`,
+    COMPLETE_TEST_FILE_PARALLELISM ? "--fileParallelism" : "--no-file-parallelism",
     "--reporter=dot",
     "--bail=1",
   ]));
