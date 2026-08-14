@@ -22122,11 +22122,9 @@ async function handleOperatorMcpEngineeringTool(
                         && listed.status < 400
         && deploymentIdentity.verification_ready
         && releaseAuthorityMatch
-                && boundaryTest.session_map_tool_advertised
-        && boundaryTest.persist_tool_advertised
+        && boundaryTest.lifecycle_surface_exact
+        && boundaryTest.legacy_persist_hidden
         && boundaryTest.retired_commit_hidden
-        && boundaryTest.one_post_per_call
-        && boundaryTest.model_evaluation_required
         && boundaryTest.no_internal_multi_post_contract,
             status: response.status,
       error: deploymentIdentity.error
