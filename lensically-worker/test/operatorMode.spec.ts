@@ -5880,7 +5880,7 @@ active_checkpoint: none
       throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
     });
 
-    const routed = await mcpToolCallRaw<{
+        const routed = await mcpToolRaw<{
       ok: boolean;
       query: string;
       path: string;
