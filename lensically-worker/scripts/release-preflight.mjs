@@ -3734,6 +3734,20 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
+if (!source.includes("let operatorPublicMcpToolsCache: OperatorMcpToolDefinition[] | null = null;")
+    || !source.includes("let operatorInternalActionDirectoryCache: OperatorInternalActionDirectory | null = null;")
+    || !source.includes("requiredOperatorLiveStateScopesForTool(tool.name, tool)")
+    || !source.includes("requiredOperatorLiveStateScopesForTool(plannedTool, resolvedPlanned.tool)")
+    || source.includes("const tool = buildComposedOperatorMcpTools(false).find((item) => item.name === toolName);")
+    || !source.includes("toolExists: async (toolName) => isOperatorPublicDirectToolName(toolName)")
+    || !source.includes("[] as MandatoryExecutionToolDefinition[],")) {
+  errors.push("lifecycle_cpu_hot_path_prevention_missing");
+}
+if (!tests.includes('capability: "repository_file_read"')
+    || !tests.includes('expect(readStep3.scopes).toEqual(["runtime"])')
+    || !tests.includes('expect(Object.keys(readStep3.state)).toEqual(["runtime"])')) {
+  errors.push("lifecycle_read_only_step3_cpu_regression_missing");
+}
 if (!workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"')
     || !workflow.includes('.execution_kernel.public_contract == "operator-lifecycle-v1"')
     || !workflow.includes('(.live_tool_count == 5)')) {
