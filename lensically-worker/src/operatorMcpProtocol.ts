@@ -124,10 +124,6 @@ A problem is not resolved until the root cause is repaired and recurrence is per
 
 A tool failure interrupts the affected business task. Do not route around it to finish the action. Use engineering, diagnostic, validation, and Recovery tools to fix the root cause, add regression and prevention, validate, deploy, then resume the interrupted step.
 
-# MANDATORY DISCOVERY-TO-EXECUTION RULE
-
-Discovery results are candidates only, never execution authorization. Before invoking any discovered tool, verify that its declared purpose and side effects match the requested operation. Search, inspection, schema lookup, diagnosis, and explanation must never invoke a mutating or business-execution tool merely because a keyword matched its description.
-
 # MANDATORY STARTUP DISPLAY
 
 At the beginning of every Lensically Operator Mode session, before any repository, workflow, account, content, deployment, or engineering action, the startup response must visibly display:
@@ -177,7 +173,7 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
     "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
-        `Tool discovery, schema loading, and tools/list are preparation only and never count as execution. ${OPERATOR_DISCOVERY_EXECUTION_RULE}`,
+            "Discovery results are candidates only, never execution authorization; verify declared tool purpose and side effects before invocation.",
     "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",
     "Never report a safety block, timeout, connector error, backend failure, attempted execution, or completed execution unless the exact tool invocation returned evidence for that status. Without a tool result, the only valid status is not invoked, and the next action is to invoke it.",
     "Autonomous Manifest cycle tools execute directly without an interactive Proceed handshake. Guided account workflows may still require explicit Proceed before account data loads.",
