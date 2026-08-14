@@ -16593,7 +16593,19 @@ async function verifyOperatorLifecycleToken(
   minimumStage: 1 | 2 | 3 | 4 | 5,
   expectedSessionId: string | null = null,
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
-  const payload = await verifySignedOperatorEnvelope(env, token);
+  const reference = normalizeOperatorLifecycleReference(token);
+  const now = Math.floor(Date.now() / 1000);
+  const row = reference
+    ? await env.DB.prepare(
+      `SELECT payload_json, expires_at FROM operator_continuity_refs
+       WHERE id = ? AND kind = ? AND expires_at >= ?
+       LIMIT 1`,
+    ).bind(reference, OPERATOR_LIFECYCLE_REFERENCE_KIND, now).first<Record<string, unknown>>()
+    : null;
+  const decodedPayload = row ? safeParseJsonString(String(row.payload_json ?? "{}")) : null;
+  const payload = decodedPayload && typeof decodedPayload === "object" && !Array.isArray(decodedPayload)
+    ? decodedPayload as Record<string, unknown>
+    : null;
   if (!payload) {
     logWorkerEvent("OPERATOR_LIFECYCLE_TOKEN_VERIFY_FAILED", {
       minimum_stage: minimumStage,
@@ -16602,7 +16614,9 @@ async function verifyOperatorLifecycleToken(
     }, "error");
     return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
   }
-  if (payload.kind !== "operator_lifecycle" || payload.lifecycle_version !== OPERATOR_LIFECYCLE_VERSION) {
+  if (payload.kind !== "operator_lifecycle"
+    || payload.lifecycle_version !== OPERATOR_LIFECYCLE_VERSION
+    || payload.lifecycle_reference_version !== OPERATOR_LIFECYCLE_REFERENCE_VERSION) {
     return { ok: false, error: "operator_lifecycle_token_contract_mismatch" };
   }
   if (Number(payload.stage ?? 0) < minimumStage) {
