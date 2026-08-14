@@ -394,9 +394,7 @@ export async function dispatchOperatorMcpToolCall(
     }, `Lensically blocked protected operation ${toolName} until explicit owner ratification is supplied.`, true);
   }
 
-  const boundaryBlock = sourceDefinedDirectEngineering
-    ? null
-    : await dependencies.getBoundaryBlock(request, toolName, args);
+  const boundaryBlock = await dependencies.getBoundaryBlock(request, toolName, args);
   if (boundaryBlock) {
     return mcpToolResultResponse(
       id,
