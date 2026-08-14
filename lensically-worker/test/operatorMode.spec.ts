@@ -13,6 +13,7 @@ import worker, {
     classifyManifestAutonomousFamilyRole,
   classifyOperatorContentFocusFamily,
   evaluateThreadsPostMetricsForLearning,
+  evaluateOperatorPublicLifecycleBoundary,
     finalizeScheduledPostPublished,
     getScheduledPostPublishLineageStatus,
   isExpectedHardeningControlResult,
