@@ -507,26 +507,18 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const closureContent = structured(closure);
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
-    const requiredDirectTools = ["getOperatorStartupContext", "selectOperatorKey", "getEngineeringAccessState", "getScheduledPostSchedulerState", "runMcpTests", "list_scheduled_posts"];
+    const requiredLifecycleTools = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"];
     const schemasClosed = tools.every((tool) => {
       const schema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
         ? tool.inputSchema as Record<string, unknown>
         : null;
       return schema?.type === "object" && schema.additionalProperties === false;
     });
-    const publicContractSucceeded = tools.length === 84
-      && new Set(toolNames).size === 84
-      && requiredDirectTools.every((toolName) => toolNames.includes(toolName))
-      && !toolNames.includes("executeLensicallyIntent")
+    const publicContractSucceeded = tools.length === requiredLifecycleTools.length
+      && new Set(toolNames).size === requiredLifecycleTools.length
+      && requiredLifecycleTools.every((toolName) => toolNames.includes(toolName))
+      && toolNames.every((toolName) => requiredLifecycleTools.includes(toolName))
       && schemasClosed;
-    const startupContent = ((startup.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const accountKeyContent = ((accountKey.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const engineeringAccessContent = ((engineeringAccess.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const schedulerContent = ((scheduler.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const campaignContent = ((campaign.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const scheduledTodayContent = ((scheduledToday.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const scheduledTomorrowContent = ((scheduledTomorrow.body?.result as Record<string, unknown> | undefined)?.structuredContent as Record<string, unknown> | undefined) ?? null;
-    const directSurface = publicContractSucceeded;
     const staleSessionError = staleSession.body?.error && typeof staleSession.body.error === "object" && !Array.isArray(staleSession.body.error)
       ? staleSession.body.error as Record<string, unknown>
       : null;
