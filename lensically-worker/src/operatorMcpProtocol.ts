@@ -19,26 +19,26 @@ export const OPERATOR_ACTION_EXECUTION_VERSION = "operator-action-execution-v1";
 export const OPERATOR_ACTION_CLOSURE_VERSION = "operator-action-closure-v1";
 
 export async function buildOperatorOpaqueLifecycleTokenTelemetry(token: unknown): Promise<{
-  token_sha256: string | null;
-  token_length: number;
-  token_segment_count: number;
+  opaque_sha256: string | null;
+  opaque_length: number;
+  opaque_segment_count: number;
 }> {
   const value = typeof token === "string" ? token : "";
   if (!value) {
     return {
-      token_sha256: null,
-      token_length: 0,
-      token_segment_count: 0,
+      opaque_sha256: null,
+      opaque_length: 0,
+      opaque_segment_count: 0,
     };
   }
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  const tokenSha256 = Array.from(new Uint8Array(digest))
+  const opaqueSha256 = Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
   return {
-    token_sha256: tokenSha256,
-    token_length: value.length,
-    token_segment_count: value.split(".").length,
+    opaque_sha256: opaqueSha256,
+    opaque_length: value.length,
+    opaque_segment_count: value.split(".").length,
   };
 }
 
