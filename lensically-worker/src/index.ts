@@ -16534,6 +16534,13 @@ async function issueOperatorLifecycleToken(
   });
 }
 
+function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, requestSessionId: string | null): string | null {
+  const boundSessionId = typeof payloadSessionId === "string" && payloadSessionId.trim()
+    ? payloadSessionId.trim()
+    : null;
+  return boundSessionId ?? requestSessionId;
+}
+
 async function verifyOperatorLifecycleToken(
   env: Env,
   token: unknown,
@@ -16551,7 +16558,8 @@ async function verifyOperatorLifecycleToken(
     if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
     return { ok: false, error: "operator_lifecycle_deployment_changed" };
   }
-  if (expectedSessionId && payload.mcp_session_id !== expectedSessionId) {
+  const boundSessionId = resolveOperatorLifecycleSessionBinding(payload.mcp_session_id, null);
+  if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId) {
     return { ok: false, error: "operator_lifecycle_session_changed" };
   }
   return { ok: true, payload };
