@@ -16587,6 +16587,27 @@ const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
   "executeOperatorAction",
   "closeOperatorAction",
 ]);
+
+export function evaluateOperatorPublicLifecycleBoundary(listedToolNames: string[]): Record<string, unknown> {
+  const expectedLifecycleToolNames = [...OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES];
+  const expectedLifecycleToolNameSet = new Set(expectedLifecycleToolNames);
+  const missingLifecycleTools = expectedLifecycleToolNames.filter((name) => !listedToolNames.includes(name));
+  const unexpectedPublicTools = listedToolNames.filter((name) => !expectedLifecycleToolNameSet.has(name));
+  return {
+    lifecycle_surface_exact: listedToolNames.length === expectedLifecycleToolNames.length
+      && missingLifecycleTools.length === 0
+      && unexpectedPublicTools.length === 0,
+    expected_lifecycle_tools: expectedLifecycleToolNames,
+    advertised_tool_names: listedToolNames,
+    missing_lifecycle_tools: missingLifecycleTools,
+    unexpected_public_tools: unexpectedPublicTools,
+    legacy_persist_hidden: !listedToolNames.includes("persist_manifest_autonomous_post"),
+    retired_commit_hidden: !listedToolNames.includes("commit_manifest_autonomous_runway"),
+    no_internal_multi_post_contract: MANIFEST_AUTONOMOUS_COMMIT_LIMIT === 1,
+    account_state_mutated: false,
+  };
+}
+
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
   "getOperatorSessionMap",
