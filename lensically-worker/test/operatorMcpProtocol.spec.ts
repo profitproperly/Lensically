@@ -31,7 +31,7 @@ describe("Operator MCP protocol contract", () => {
     });
   });
 
-  it("fingerprints opaque lifecycle tokens without exposing or normalizing them", async () => {
+  it("fingerprints opaque lifecycle values without exposing them and survives log sanitization", async () => {
     const original = "opaque.payload.signature";
     const mutated = "opaque.payloae.signature";
     const originalTelemetry = await buildOperatorOpaqueLifecycleTokenTelemetry(original);
@@ -39,16 +39,17 @@ describe("Operator MCP protocol contract", () => {
     const mutatedTelemetry = await buildOperatorOpaqueLifecycleTokenTelemetry(mutated);
 
     expect(originalTelemetry).toEqual(repeatedTelemetry);
-    expect(originalTelemetry.token_sha256).toMatch(/^[a-f0-9]{64}$/);
-    expect(originalTelemetry.token_length).toBe(original.length);
-    expect(originalTelemetry.token_segment_count).toBe(3);
-    expect(mutatedTelemetry.token_sha256).not.toBe(originalTelemetry.token_sha256);
+    expect(originalTelemetry.opaque_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(originalTelemetry.opaque_length).toBe(original.length);
+    expect(originalTelemetry.opaque_segment_count).toBe(3);
+    expect(mutatedTelemetry.opaque_sha256).not.toBe(originalTelemetry.opaque_sha256);
     expect(originalTelemetry).not.toHaveProperty("token");
     expect(originalTelemetry).not.toHaveProperty("raw_token");
+    expect(sanitizeForLog(originalTelemetry)).toEqual(originalTelemetry);
     expect(await buildOperatorOpaqueLifecycleTokenTelemetry(null)).toEqual({
-      token_sha256: null,
-      token_length: 0,
-      token_segment_count: 0,
+      opaque_sha256: null,
+      opaque_length: 0,
+      opaque_segment_count: 0,
     });
   });
 
