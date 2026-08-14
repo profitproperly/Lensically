@@ -4953,6 +4953,7 @@ active_checkpoint: none
         const rejected = await mcpToolRaw<{
       success: boolean;
       error: string;
+      execution_started?: boolean;
       hardening_incident?: unknown;
       normal_work_blocked?: boolean;
     }>("commit_manifest_cycle_strategy", invalidStrategy);
