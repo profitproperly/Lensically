@@ -80,7 +80,7 @@ describe("Operator MCP tool-definition construction", () => {
       "om_get_account_state",
       "vx_get_account_state",
     ]);
-        expect(tools.find((tool) => tool.name === "get_account_state")?.inputSchema.properties).toHaveProperty("proceed_confirmed");
+        expect(tools.find((tool) => tool.name === "get_account_state")?.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
     expect(tools.find((tool) => tool.name === "engineeringPrecheck")?.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
     for (const tool of tools) {
       expect(tool.inputSchema.properties).toMatchObject({
