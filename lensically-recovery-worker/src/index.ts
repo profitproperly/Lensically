@@ -321,7 +321,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const requestedRef = clientSafeRelease ? "" : rawRequestedRef;
     let dispatchRef = requestedRef || config.branch;
     let verifiedHeadSha: string | null = null;
-    if (workflowTask === "worker-deploy") {
+    const exactRequestedRef = /^[a-f0-9]{40}$/i.test(requestedRef);
+    if (workflowTask === "worker-deploy" || exactRequestedRef) {
       const branchRef = await github(env, `/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(config.branch)}`);
       const branchData = branchRef.data && typeof branchRef.data === "object" && !Array.isArray(branchRef.data)
         ? branchRef.data as Record<string, unknown>
@@ -333,14 +334,17 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       if (!branchRef.ok || !verifiedHeadSha) {
         return { ok: false, error: "current_branch_head_unavailable", branch: config.branch, status: branchRef.status };
       }
-      if (/^[a-f0-9]{40}$/i.test(requestedRef) && requestedRef !== verifiedHeadSha) {
+      if (exactRequestedRef && requestedRef !== verifiedHeadSha) {
         return { ok: false, error: "exact_sha_not_current_branch_head", requested_ref: requestedRef, branch: config.branch, current_head_sha: verifiedHeadSha, status: branchRef.status };
       }
       dispatchRef = config.branch;
     }
+    const exactValidation = workflowTask !== "worker-deploy" && exactRequestedRef;
     const inputs = workflowTask === "worker-deploy"
       ? { task: workflowTask, release_id: verifiedHeadSha!.slice(0, 12), release_sha: verifiedHeadSha }
-      : { task: workflowTask };
+      : exactValidation
+        ? { task: workflowTask, release_id: verifiedHeadSha!.slice(0, 12), release_sha: verifiedHeadSha }
+        : { task: workflowTask };
     const result = await github(env, `/repos/${config.owner}/${config.repo}/actions/workflows/lensically-engineering.yml/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: dispatchRef, inputs }) });
     return { ok: result.ok, status: result.status, task: publicTask, workflow_task: workflowTask, dispatched: result.status === 204, requested_ref: requestedRef, dispatch_ref: dispatchRef, verified_head_sha: verifiedHeadSha };
   }
