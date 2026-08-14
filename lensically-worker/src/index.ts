@@ -1950,7 +1950,7 @@ const OPERATOR_ENGINEERING_AUTHORITY_CONTRACT = {
     authorization_boundary: "Authority is outcome-bound to Lensically engineering and infrastructure. It does not authorize spending, credential or ownership changes, irreversible deletion, fundamental mission changes, repository file deletion, runtime rollback, tool disabling, or actions presenting material account/project danger. Routine content production and publication are autonomous under an owner-authorized autonomous account profile.",
   numerical_tool_budgets: false,
   owner_ratification_required: false,
-        known_path_rule: "After startup, the model can call only executeLensicallyIntent for operational work. Direct operational names are absent from discovery and rejected before lookup. The Mandatory Execution Map selects the active verified procedure from the action intent, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
+                known_path_rule: "After Steps 1-3 establish the session map, durable knowledge, and current live state, model-facing operational execution enters only through executeOperatorAction. The Execution Kernel selects the active verified procedure from the registered profile, permits discovery only for signed unknown or stale incidents, and promotes the verified replacement before the interrupted objective resumes.",
   recursive_improvement_rule: "When a novel blocker is solved, stop the active engineering sequence, promote the fix into mandatory policy and regression coverage, verify it, then resume the original objective.",
   owner_reporting_rule: "Keep routine client, alias, payload, and routing friction in telemetry and audit history. Surface only completed outcomes, meaningful risk, or a blocker that genuinely requires owner action.",
         protected_operations: ["deleteRepoFile", "rollbackMcpChanges", "disableMcpTool", "setScheduledPostSchedulerMode", "recoverOverdueScheduledPosts", "credential_or_account_ownership_change", "spending_or_fund_commitment", "fundamental_mission_change", "material_account_or_project_danger"],
@@ -1997,10 +1997,14 @@ const OPERATOR_CONTINUITY_CONTRACT = {
   version: OPERATOR_CONTINUITY_CONTRACT_VERSION,
   scope: "universal",
   source_of_truth: "canonical database state plus server-side continuity state",
-  required_sequence: [
-    "getOperatorStartupContext",
-    "selectOperatorKey",
-    "confirmOperatorProceed_and_auto_resolve_canonical_continuity",
+    required_sequence: [
+    "getOperatorSessionMap",
+    "getOperatorKnowledge",
+    "getOperatorLiveState",
+    "selectOperatorKey_when_guided_account_scope_requires_it",
+    "confirmOperatorProceed_and_auto_resolve_canonical_continuity_when_required",
+    "executeOperatorAction",
+    "closeOperatorAction",
     "server-side continuity verification on every later account-scoped call",
   ],
     capsule_sections: [
@@ -17650,7 +17654,7 @@ export function isExpectedHardeningControlResult(
 }
 
 const HARDENING_REPAIR_TOOLS = new Set<string>([
-      "getOperatorStartupContext", "getEngineeringContinuation", "getDatabaseSchemaState", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
+      "getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "closeOperatorAction", "getEngineeringContinuation", "getDatabaseSchemaState", "recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation",
   "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork",
             "listRepoFiles", "readRepoFile", "searchRepoFiles", "getRepoStatus", "applyRepoTextPatch", "applyRepoPatchSet", "startRepoFileWrite", "appendRepoFileChunk", "commitRepoFileWrite", "createRepoFile", "createGitHubRepository", "upsertGitHubRepositoryFile", "operateGitHubRepositories", "createCloudflarePagesProject", "deployCloudflarePagesProject", "deleteRepoFile",
   "runMcpTests", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "runGitHubWorkflow", "verifyDeployedMcpVersion", "listEngineeringAudit",
@@ -18368,7 +18372,7 @@ async function recordOperatorExecutionDecision(
 
 function operatorToolMutatesState(toolName: string): boolean {
   const readOnly = new Set([
-            "getOperatorStartupContext", "getEngineeringContinuation", "getDatabaseSchemaState", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
+                        "getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "getEngineeringContinuation", "getDatabaseSchemaState", "engineeringPrecheck", "getEngineeringAccessState", "getHardeningStatus", "getOperatorWorkState", "listRepoFiles", "readRepoFile",
         "searchRepoFiles", "getRepoStatus", "listGitHubWorkflowRuns", "getGitHubWorkflowRun", "verifyDeployedMcpVersion",
     "listEngineeringAudit", "listOpsMemory", "readOpsMemory", "searchOpsMemory", "listPreCallRoutes", "selectOperatorKey", "getGrowthMission", "getStripeAccountState", "readStripeObjects",
                         "planOperatorExecution", "getMcpAdminState", "getOperatorDecisionState", "getScheduledPostSchedulerState", "auditScheduledPost", "inspectMcpFailure", "listMcpTools", "readMcpToolDefinition", "runMcpTests", "listImplementationBacklogItems", "getWorkflowStatus",
@@ -19603,8 +19607,8 @@ async function handleOperatorMcpAdminTool(
     };
     const campaignSegment = campaignSegmentAliases[rawCampaignSegment] ?? rawCampaignSegment;
     const liveReadSegments: Record<string, Set<string>> = {
-            engineering_reads: new Set([
-        "getOperatorStartupContext",
+                        engineering_reads: new Set([
+        "getOperatorSessionMap",
                 "getEngineeringContinuation",
         "getDatabaseSchemaState",
         "engineeringPrecheck",
@@ -19991,8 +19995,8 @@ async function handleOperatorMcpAdminTool(
       [campaignBrandKey],
     );
     const accountBase = { brand_key: campaignBrandKey, proceed_confirmed: true };
-        const readFixtures: Record<string, Record<string, unknown> | null> = {
-      getOperatorStartupContext: {},
+                const readFixtures: Record<string, Record<string, unknown> | null> = {
+      getOperatorSessionMap: {},
             getEngineeringContinuation: {},
                         getDatabaseSchemaState: null,
       engineeringPrecheck: {},
@@ -20000,7 +20004,7 @@ async function handleOperatorMcpAdminTool(
       getHardeningStatus: {},
       getOperatorWorkState: {},
       listRepoFiles: { prefix: "lensically-worker/src", limit: 1 },
-      searchRepoFiles: { query: "executeLensicallyIntent", prefix: "lensically-worker/src/index.ts", limit: 1 },
+            searchRepoFiles: { query: "executeOperatorAction", prefix: "lensically-worker/src/index.ts", limit: 1 },
       readRepoFile: { path: "AGENTS.md", start_line: 1, max_lines: 1 },
       getRepoStatus: {},
       listGitHubWorkflowRuns: { limit: 1 },
@@ -20795,10 +20799,11 @@ async function handleOperatorMcpEngineeringTool(
         per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS.per_action_acknowledgment,
         governing_rule: OPERATOR_GOVERNING_STANDARDS.governing_rule,
       },
-      session_competency: {
-        version: OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
-        startup_tool: "getOperatorStartupContext",
-        rule: "Fresh sessions complete the competency boot once before routine engineering; this precheck does not repeat the full startup payload.",
+            session_lifecycle: {
+        version: OPERATOR_LIFECYCLE_VERSION,
+        session_map_tool: "getOperatorSessionMap",
+        recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
+        rule: "Step 0 initializes and Step 1 maps once per fresh session; Steps 2-5 are the recurring meaningful-task lifecycle.",
       },
       status_kind: "compact_engineering_precheck",
       runtime: operatorRuntimeMetadata(env),
@@ -20818,9 +20823,9 @@ async function handleOperatorMcpEngineeringTool(
         admin_public_tools: OPERATOR_MCP_ADMIN_TOOL_NAMES.length,
       },
             tool_block_prevention: [
-                "Fresh session: call getOperatorStartupContext once and complete the session competency boot before non-startup work; engineeringPrecheck is the compact routine engineering precheck after that boot.",
+                                "Fresh session: call getOperatorSessionMap once. For each meaningful task, load the required durable knowledge and live state before executeOperatorAction, then closeOperatorAction with verification evidence.",
                 "Call getEngineeringContinuation before any continuation decision. ENGINEERING_CONTINUATION.md is the sole authority for all Lensically jobs; D1 work state, action-closure receipts, Growth Mission records, and chat memory are telemetry or evidence only.",
-        "Call one advertised direct typed Main tool for each external operation.",
+                "Use executeOperatorAction as the model-facing Step-4 gateway; exact registered capabilities remain strongly typed and server-routed beneath it.",
         "Use readRepoFile with line bounds for known files.",
         "Use applyRepoTextPatch only for one isolated replacement.",
         "Use applyRepoPatchSet for related multi-file or multi-replacement work so one commit advances main.",
@@ -20835,8 +20840,8 @@ async function handleOperatorMcpEngineeringTool(
         d1_policy_lookup_required: false,
         model_tool_choice_allowed: false,
       },
-            payload_limits: {
-        full_startup_context: "not repeated by engineeringPrecheck; fresh sessions load getOperatorStartupContext once, then use this compact precheck for routine engineering",
+                        payload_limits: {
+        session_map: "not repeated by engineeringPrecheck; Step 1 is pointer-only and Steps 2-5 load only task-relevant knowledge, live state, execution, and closure evidence",
       },
     };
   }
@@ -21869,7 +21874,7 @@ async function handleOperatorMcpEngineeringTool(
         const listedToolRows = Array.isArray(listedTools)
       ? listedTools.filter((tool): tool is Record<string, unknown> => Boolean(tool) && typeof tool === "object" && !Array.isArray(tool))
       : [];
-    const startupTool = listedToolRows.find((tool) => tool.name === "getOperatorStartupContext") ?? null;
+        const sessionMapTool = listedToolRows.find((tool) => tool.name === "getOperatorSessionMap") ?? null;
         const autonomousPersistTool = listedToolRows.find((tool) => tool.name === "persist_manifest_autonomous_post") ?? null;
     const retiredCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
     const autonomousPersistSchema = autonomousPersistTool?.inputSchema && typeof autonomousPersistTool.inputSchema === "object" && !Array.isArray(autonomousPersistTool.inputSchema)
@@ -21879,7 +21884,7 @@ async function handleOperatorMcpEngineeringTool(
       ? autonomousPersistSchema.properties as Record<string, unknown>
       : {};
         const boundaryTest = {
-      startup_tool_advertised: startupTool !== null,
+            session_map_tool_advertised: sessionMapTool !== null,
       persist_tool_advertised: autonomousPersistTool !== null,
       retired_commit_hidden: retiredCommitTool === null,
       one_post_per_call: Boolean(autonomousPersistProperties.post) && !autonomousPersistProperties.posts,
@@ -21894,7 +21899,7 @@ async function handleOperatorMcpEngineeringTool(
                         && listed.status < 400
         && deploymentIdentity.verification_ready
         && releaseAuthorityMatch
-        && boundaryTest.startup_tool_advertised
+                && boundaryTest.session_map_tool_advertised
         && boundaryTest.persist_tool_advertised
         && boundaryTest.retired_commit_hidden
         && boundaryTest.one_post_per_call
