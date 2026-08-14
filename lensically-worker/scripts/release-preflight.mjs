@@ -3737,6 +3737,15 @@ if (!workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"
     || !workflow.includes('(.live_tool_count == 5)')) {
   errors.push("release_workflow_normalized_lifecycle_runtime_gate_missing");
 }
+if (!workflow.includes("- name: Publish exact release authority target")
+    || !workflow.includes("'pending', 'exact_sha_release_workflow'")
+    || !workflow.includes("npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json --file /tmp/lensically-release-authority.sql")) {
+  errors.push("release_workflow_authority_publication_missing");
+}
+if (source.includes("publishOperatorReleaseTarget(env.DB")
+    || source.includes("restoreOperatorReleaseAuthority(env.DB")) {
+  errors.push("dispatcher_owned_release_authority_forbidden");
+}
 if (workflow.includes('.execution_kernel.public_gateway == "direct_typed_tools"')
     || workflow.includes('(.live_tool_count >= 60)')) {
   errors.push("release_workflow_retired_public_surface_gate_present");
