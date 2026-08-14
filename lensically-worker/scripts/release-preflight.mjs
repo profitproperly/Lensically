@@ -1528,6 +1528,8 @@ if (!operatorMcpToolCallDispatcher.includes("export async function dispatchOpera
     || !operatorMcpToolCallDispatcher.includes("const idempotencyKey = sourceDefinedDirectEngineering")
     || !operatorMcpToolCallDispatcher.includes("const autonomyAuthorization: OperatorMcpAutonomyAuthorization")
     || !operatorMcpToolCallDispatcher.includes("dependencies.classifyHandler(toolName)")
+    || !operatorMcpToolCallDispatcher.includes("const boundaryBlock = await dependencies.getBoundaryBlock(request, toolName, args);")
+    || operatorMcpToolCallDispatcher.includes("const boundaryBlock = sourceDefinedDirectEngineering")
     || !operatorMcpToolCallDispatcher.includes("resultPayload.operator_action_closure")
     || !operatorMcpToolCallDispatcher.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")) {
   lifecycleErrors.push("operator_mcp_tool_call_dispatcher_module_incomplete");
