@@ -21869,13 +21869,6 @@ async function handleOperatorMcpEngineeringTool(
     if (task === "worker-deploy" && (!releaseSha || !/^[a-fA-F0-9]{40}$/.test(releaseSha))) {
       return { ok: false, error: "exact_release_sha_required" };
     }
-    const previousReleaseAuthority = task === "worker-deploy" && releaseSha
-      ? await publishOperatorReleaseTarget(env.DB, {
-          releaseSha,
-          currentSha: env.LENSICALLY_COMMIT_SHA,
-          releaseId: releaseId || null,
-        })
-      : null;
     const workflowId = "lensically-engineering.yml";
     const ref = config.branch;
     const inputs: Record<string, string> = { task };
