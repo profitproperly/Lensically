@@ -3829,7 +3829,12 @@ describe("operator mode MCP endpoint", () => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "search_repo_files";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
-    expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
+        expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
+    const mcpCampaignBranch = actionSchema?.oneOf?.find((item) => {
+      const branch = item as { properties?: { capability?: { const?: string } } };
+      return branch.properties?.capability?.const === "run_mcp_tests";
+    }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
+    expect(mcpCampaignBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
     expect(JSON.stringify(knowledgeTool?.inputSchema)).not.toContain("node_ids");
     expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("scopes");
     expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("brand_key");

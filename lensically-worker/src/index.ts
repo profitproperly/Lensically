@@ -16875,7 +16875,11 @@ function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
     && !Array.isArray((tool.inputSchema as Record<string, unknown>).properties)
     ? (tool.inputSchema as Record<string, unknown>).properties as Record<string, unknown>
     : {};
-  const brandScoped = Object.prototype.hasOwnProperty.call(schemaProperties, "brand_key");
+    const requiredFields = tool?.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
+    && Array.isArray((tool.inputSchema as Record<string, unknown>).required)
+    ? ((tool.inputSchema as Record<string, unknown>).required as unknown[]).map(String)
+    : [];
+  const brandScoped = requiredFields.includes("brand_key");
   const mutates = operatorToolMutatesState(toolName);
     const repositoryRelevant = /Repo|GitHub|Cloudflare|Workflow|repository|McpVersion|McpTool|RepoFile|EngineeringRelease|deployBackend/i.test(toolName);
   if (mutates && repositoryRelevant) scopes.add("repository");
