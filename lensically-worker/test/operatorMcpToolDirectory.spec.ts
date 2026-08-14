@@ -12,6 +12,16 @@ import type { OperatorMcpToolDefinition } from "../src/operatorMcpToolDefinition
 
 const tools: OperatorMcpToolDefinition[] = [
   {
+    name: "getOperatorSessionMap",
+    title: "Get Operator Session Map",
+    description: "Load the lifecycle session map.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
     name: "engineeringPrecheck",
     title: "Engineering Precheck",
     description: "Read compact engineering state.",
@@ -58,21 +68,21 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-                                it("preserves the exact 86-tool public surface and required Main Cycle dependencies", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(86);
-    expect(isOperatorPublicDirectToolName("operateGitHubRepositories")).toBe(true);
-    expect(isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")).toBe(true);
-    expect(isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")).toBe(true);
-    expect(isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")).toBe(true);
-    expect(isOperatorPublicDirectToolName("persist_manifest_shadow_batch")).toBe(true);
-    expect(isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")).toBe(true);
-        expect(isOperatorPublicDirectToolName("prepare_manifest_autonomous_cycle")).toBe(true);
-    expect(isOperatorPublicDirectToolName("persist_manifest_autonomous_batch")).toBe(true);
-        expect(isOperatorPublicDirectToolName("engineeringPrecheck")).toBe(true);
-    expect(isOperatorPublicDirectToolName("getStripeAccountState")).toBe(true);
-    expect(isOperatorPublicDirectToolName("readStripeObjects")).toBe(true);
-        expect(isOperatorPublicDirectToolName("operateStripe")).toBe(true);
-    expect(isOperatorPublicDirectToolName("set_source_family_bench")).toBe(true);
+                                                                it("preserves the exact five-tool public lifecycle surface while keeping capabilities internal", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(5);
+    expect([...OPERATOR_PUBLIC_DIRECT_TOOL_NAMES]).toEqual([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+    ]);
+    expect(isOperatorPublicDirectToolName("getOperatorSessionMap")).toBe(true);
+    expect(isOperatorPublicDirectToolName("executeOperatorAction")).toBe(true);
+    expect(isOperatorPublicDirectToolName("getRepoStatus")).toBe(false);
+    expect(isOperatorPublicDirectToolName("searchRepoFiles")).toBe(false);
+    expect(isOperatorPublicDirectToolName("operateStripe")).toBe(false);
+    expect(isOperatorPublicDirectToolName("prepare_manifest_autonomous_cycle")).toBe(false);
 
     expect(isOperatorPublicDirectToolName("start_workflow_session")).toBe(false);
     expect(RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has("start_workflow_session")).toBe(true);
@@ -83,12 +93,10 @@ describe("Operator MCP tool directory", () => {
   });
 
   it("filters public tools without changing their source order", () => {
-    expect(filterOperatorPublicMcpTools(tools).map((tool) => tool.name)).toEqual([
-      "engineeringPrecheck",
-      "getGrowthMission",
-      "get_account_state",
+        expect(filterOperatorPublicMcpTools(tools).map((tool) => tool.name)).toEqual([
+      "getOperatorSessionMap",
     ]);
-    expect(countOperatorPublicMcpTools(tools)).toBe(3);
+    expect(countOperatorPublicMcpTools(tools)).toBe(1);
   });
 
   it("shapes engineering, admin, and backend definitions with required fields", () => {

@@ -192,7 +192,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 21,
-      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
+            params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token", action: { capability: "unknown_profile", arguments: {} } } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
@@ -221,7 +221,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 3,
-      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
+            params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token", action: { capability: "repository_status", arguments: {} } } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
