@@ -112,7 +112,9 @@ export interface OperatorMcpToolCallDependencies {
   executionFingerprint(toolName: string, args: JsonRecord): Promise<string>;
   toolMutatesState(toolName: string): boolean;
     buildActionClosure(toolName: string, result: JsonRecord): Promise<unknown>;
-  verifyLifecycleExecutionToken(token: unknown): Promise<{ ok: boolean; error?: string; payload?: JsonRecord }>;
+    verifyLifecycleExecutionToken(token: unknown): Promise<{ ok: boolean; error?: string; payload?: JsonRecord }>;
+  requiredKnowledgeNodes(toolName: string): string[];
+  requiredLiveStateScopes(toolName: string): string[];
   issueActionExecutionToken(input: { profileId: string | null; toolName: string; result: JsonRecord; liveStatePayload: JsonRecord }): Promise<string>;
 }
 
@@ -198,19 +200,7 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, "Lensically blocked Step 4 because the generated strongly typed action contract was not satisfied.", true);
     }
-        const plannedAction = typeof lifecycleCheck.payload.planned_action === "string" ? lifecycleCheck.payload.planned_action : "";
-    if (!plannedAction || capability !== plannedAction) {
-      return mcpToolResultResponse(id, {
-        ok: false,
-        error: "operator_action_changed_after_live_state",
-        planned_action: plannedAction || null,
-        requested_action: capability,
-        required_stage: "getOperatorKnowledge",
-        execution_started: false,
-        account_data_loaded: gatewayAccountDataLoaded,
-      }, "Lensically blocked Step 4 because the action changed after Steps 2-3 prepared knowledge and live state.", true);
-    }
-    const preparedBrandKey = typeof lifecycleCheck.payload.brand_key === "string" ? lifecycleCheck.payload.brand_key : "";
+            const preparedBrandKey = typeof lifecycleCheck.payload.brand_key === "string" ? lifecycleCheck.payload.brand_key : "";
     const requestedBrandKey = typeof actionArguments.brand_key === "string" ? actionArguments.brand_key.trim().toLowerCase().replace(/-/g, "_") : "";
     if (preparedBrandKey && requestedBrandKey && preparedBrandKey !== requestedBrandKey) {
       return mcpToolResultResponse(id, {
@@ -251,7 +241,45 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
     }
-        toolName = prepared.tool_name;
+            toolName = prepared.tool_name;
+    const loadedKnowledge = Array.isArray(lifecycleCheck.payload.knowledge_node_ids)
+      ? lifecycleCheck.payload.knowledge_node_ids.map(String)
+      : [];
+    const loadedScopes = Array.isArray(lifecycleCheck.payload.scopes)
+      ? lifecycleCheck.payload.scopes.map(String)
+      : [];
+    const requiredKnowledge = dependencies.requiredKnowledgeNodes(toolName);
+    const requiredScopes = dependencies.requiredLiveStateScopes(toolName);
+    const missingKnowledge = requiredKnowledge.filter((nodeId) => !loadedKnowledge.includes(nodeId));
+    if (missingKnowledge.length) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_action_knowledge_prerequisites_missing",
+        requested_action: capability,
+        resolved_tool: toolName,
+        required_knowledge_nodes: requiredKnowledge,
+        loaded_knowledge_nodes: loadedKnowledge,
+        missing_knowledge_nodes: missingKnowledge,
+        required_stage: "getOperatorKnowledge",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the selected action requires durable knowledge that Step 2 did not load.", true);
+    }
+    const missingScopes = requiredScopes.filter((scope) => !loadedScopes.includes(scope));
+    if (missingScopes.length) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_action_live_state_prerequisites_missing",
+        requested_action: capability,
+        resolved_tool: toolName,
+        required_live_state_scopes: requiredScopes,
+        loaded_live_state_scopes: loadedScopes,
+        missing_live_state_scopes: missingScopes,
+        required_stage: "getOperatorLiveState",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the selected action requires current live state that Step 3 did not load.", true);
+    }
     const governedPreparedArguments = { ...prepared.arguments };
     delete governedPreparedArguments.governing_standards_ack;
     rawArgs = {

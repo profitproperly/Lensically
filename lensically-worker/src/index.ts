@@ -22242,11 +22242,13 @@ async function handleOperatorMcpToolCall(
     executionFingerprint: operatorExecutionFingerprint,
     toolMutatesState: operatorToolMutatesState,
         buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
-        verifyLifecycleExecutionToken: async (token) => {
+            verifyLifecycleExecutionToken: async (token) => {
       const check = await verifyOperatorLifecycleToken(env, token, 3, request.headers.get("mcp-session-id")?.trim() || null);
       return check.ok ? { ok: true, payload: check.payload } : { ok: false, error: check.error };
     },
-        issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
+    requiredKnowledgeNodes: (toolName) => requiredOperatorKnowledgeNodesForTool(toolName),
+    requiredLiveStateScopes: (toolName) => requiredOperatorLiveStateScopesForTool(toolName),
+    issueActionExecutionToken: ({ profileId, toolName, result, liveStatePayload }) => issueOperatorLifecycleToken(env, 4, {
       action_execution_version: OPERATOR_ACTION_EXECUTION_VERSION,
       mcp_session_id: liveStatePayload.mcp_session_id ?? null,
       profile_id: profileId,
