@@ -806,13 +806,10 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
 if (!operatorMcpToolDirectoryTests.includes("preserves the exact five-tool public lifecycle surface while keeping capabilities internal")
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("persist_manifest_shadow_batch")')
-        || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_shadow_cycle_receipt")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getStripeAccountState")')
-    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("readStripeObjects")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getOperatorSessionMap")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("executeOperatorAction")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getRepoStatus")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("searchRepoFiles")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("operateStripe")')
     || !operatorMcpToolDirectoryTests.includes("shapes engineering, admin, and backend definitions with required fields")) {
   lifecycleErrors.push("operator_mcp_tool_directory_tests_incomplete");
