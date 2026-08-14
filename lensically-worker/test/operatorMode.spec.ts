@@ -5332,8 +5332,8 @@ active_checkpoint: none
       boundary: { first_key_response_template: string[]; before_proceed_forbidden: string[] };
     }>("getOperatorStartupContext");
                 expect(startup.bootstrap_version).toBe("operator-startup-v6");
-    expect(startup.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v3",
+        expect(startup.startup_authority).toMatchObject({
+      version: "operator-governing-standards-v5",
       authority: "highest_lensically_operating_authority",
       startup_display_required: true,
     });
@@ -6421,7 +6421,7 @@ active_checkpoint: none
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
-        expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v3" });
+                expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v5" });
     expect(status.structuredContent.startup_authority?.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(status.structuredContent.startup_authority?.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
     expect(status.structuredContent.startup_authority?.prevention_closure_rule).toContain("may not end with analysis");

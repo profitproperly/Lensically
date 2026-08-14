@@ -57,14 +57,18 @@ describe("Operator MCP account foundation registry", () => {
   it("preserves source deletion, lineage recovery, and bounded backfill contracts", () => {
     const byName = new Map(OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS.map((tool) => [tool.name, tool]));
         expect(byName.get("delete_saved_pattern_source")?.annotations).toMatchObject({ destructiveHint: true });
-    expect(byName.get("set_source_family_bench")?.inputSchema).toMatchObject({
-      required: ["brand_key", "action", "target_type", "target"],
+        expect(byName.get("set_source_family_bench")?.inputSchema).toMatchObject({
+      required: ["brand_key", "action", "source_identity_key"],
       properties: {
         action: { enum: ["bench", "unbench"] },
-        target_type: { enum: ["source_card_family_id", "source_card_id", "source_identity_key"] },
-        target: { minLength: 1, maxLength: 500 },
+        source_identity_key: { minLength: 1, maxLength: 500, pattern: "^[A-Za-z0-9_.:-]+$" },
       },
     });
+    const benchProperties = byName.get("set_source_family_bench")?.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect(benchProperties).not.toHaveProperty("target");
+    expect(benchProperties).not.toHaveProperty("target_type");
+    expect(String(benchProperties.source_identity_key.description)).toContain("content-generation source family only");
+    expect(String(benchProperties.action.description)).toContain("Content-source eligibility only");
     expect(byName.get("set_source_family_bench")?.annotations).toMatchObject({ destructiveHint: false });
     expect(byName.get("recover_published_post_lineage")?.inputSchema).toMatchObject({
       required: ["brand_key", "workflow_session_id", "saved_pattern_id", "published_post_ids", "source_card"],

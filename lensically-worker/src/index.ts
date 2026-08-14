@@ -13824,14 +13824,17 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 
       const sourceLineageBackfillRuntimeDispatch = await dispatchOperatorKeyedRuntimeTool(toolName, {
         set_source_family_bench: async () => {
-            const action = String(payload.action ?? "").trim().toLowerCase();
-      const targetType = String(payload.target_type ?? "").trim().toLowerCase();
-      const target = normalizeOperatorText(payload.target, 500, true) ?? "";
+                        const action = String(payload.action ?? "").trim().toLowerCase();
+      const sourceIdentityKey = normalizeOperatorText(payload.source_identity_key, 500, true) ?? "";
+      const legacyTargetType = String(payload.target_type ?? "").trim().toLowerCase();
+      const legacyTarget = normalizeOperatorText(payload.target, 500, true) ?? "";
+      const targetType = sourceIdentityKey ? "source_identity_key" : legacyTargetType;
+      const target = sourceIdentityKey || legacyTarget;
       const reason = normalizeOperatorText(payload.reason, 500, true) ?? "owner_source_family_bench";
       if (!new Set(["bench", "unbench"]).has(action)
         || !new Set(["source_card_family_id", "source_card_id", "source_identity_key"]).has(targetType)
         || !target) {
-        return { body: { success: false, error: "action, target_type, and target are required" }, status: 400 };
+        return { body: { success: false, error: "action and source_identity_key are required" }, status: 400 };
       }
       const family = await env.DB.prepare(
         `SELECT id AS source_card_family_id, source_identity_key, current_source_card_id

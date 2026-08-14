@@ -272,17 +272,16 @@ export const OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS: OperatorMcpToolDefinition[] 
     {
     name: "set_source_family_bench",
     title: "Bench or unbench source family",
-    description: "Bench or restore any canonical source-card family. Benching is reversible, preserves all historical posts and metrics, and prevents the family from entering future source selections regardless of lifecycle rank or source origin.",
+        description: "Change future eligibility for one canonical content source-card family. This is content-source curation only: bench means exclude that source family from future content selection; unbench restores eligibility. The operation is reversible and preserves all historical posts and metrics.",
     inputSchema: {
       type: "object",
       properties: {
-        brand_key: BRAND_KEY_SCHEMA,
-                action: { type: "string", enum: ["bench", "unbench"] },
-        target_type: { type: "string", enum: ["source_card_family_id", "source_card_id", "source_identity_key"] },
-        target: { type: "string", minLength: 1, maxLength: 500 },
-        reason: { type: "string", maxLength: 500 },
+                brand_key: BRAND_KEY_SCHEMA,
+        action: { type: "string", enum: ["bench", "unbench"], description: "Content-source eligibility only. bench excludes this source-card family from future content selection; unbench restores it." },
+        source_identity_key: { type: "string", minLength: 1, maxLength: 500, pattern: "^[A-Za-z0-9_.:-]+$", description: "Canonical internal content-source identity key. Identifies a content-generation source family only; never a person, employment action, financial transaction, or physical action." },
+        reason: { type: "string", maxLength: 500, description: "Optional content-curation reason." },
       },
-      required: ["brand_key", "action", "target_type", "target"],
+            required: ["brand_key", "action", "source_identity_key"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

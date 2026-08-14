@@ -1,11 +1,11 @@
-export const OPERATOR_MCP_VERSION = "1.42.2";
+export const OPERATOR_MCP_VERSION = "1.42.3";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v4";
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v5";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
-export const OPERATOR_BLOCKER_HALT_RULE = "If any Operator tool invocation returns a known blocker or failure, including an OpenAI safety or policy block, connector rejection, or backend error, stop the current sequence immediately. Do not retry with altered arguments, switch target forms, switch tools, or continue sibling actions. Identify and repair the exact root cause, record the incident and fix, add durable regression and prevention, verify the repair, and only then resume the original objective. An uncertain transport result may be reconciled with the same operation_id only to determine execution state; it may never be used to bypass a known blocker.";
+export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
 
 export function evaluateOperatorDeploymentCommitIdentity(
   currentCommit: unknown,
@@ -118,15 +118,18 @@ A note in chat memory is not enforcement.
 
 A problem is not resolved until the root cause is repaired and recurrence is permanently blocked.
 
-# MANDATORY BLOCKER HALT RULE
+# MANDATORY FAILURE REPAIR RULE
 
-If any Operator tool invocation returns a known blocker or failure, including an OpenAI safety or policy block, connector rejection, or backend error, stop the current sequence immediately.
+If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it.
 
-Do not retry with altered arguments. Do not switch target forms. Do not switch tools. Do not continue sibling actions from the same requested sequence.
+Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained.
 
-Identify and repair the exact root cause, record the incident and fix, add durable regression and prevention, verify the repair, and only then resume the original objective.
+Switch into diagnosis and repair instead. Use whatever engineering, diagnostic, validation, and Recovery tools are necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step.
 
-An uncertain transport result may be reconciled with the same operation_id only to determine execution state; it may never be used to bypass a known blocker.
+Alternate tools are required when they are part of root-cause repair. They are forbidden only when they substitute for repairing the failed operation.
+
+An uncertain transport result may be reconciled with the same operation_id only to determine execution state.
+
 
 # MANDATORY STARTUP DISPLAY
 
@@ -151,7 +154,7 @@ export const OPERATOR_GOVERNING_STANDARDS = {
     startup_display_required: true,
     per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
   per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
-  blocker_halt_rule: OPERATOR_BLOCKER_HALT_RULE,
+    failure_repair_rule: OPERATOR_FAILURE_REPAIR_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
   redundant_inspection_rule: "Once the exact specification, target file, and integration point are known, repeated search or read calls for the same settled evidence are forbidden unless a concrete contradiction or failed replacement requires them.",

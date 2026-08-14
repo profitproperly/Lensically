@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
                 OPERATOR_GOVERNING_STANDARDS,
-  OPERATOR_BLOCKER_HALT_RULE,
+    OPERATOR_FAILURE_REPAIR_RULE,
   OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION,
   OPERATOR_MCP_VERSION,
   buildOperatorKeyHandshakeLines,
@@ -68,10 +68,11 @@ describe("Operator MCP protocol contract", () => {
         expect(String(result.instructions)).toContain("A note in chat memory is not enforcement.");
     expect(String(result.instructions)).toContain("Resume the original objective only after prevention is locked in.");
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
-                expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v4");
-    expect(String(result.instructions)).toContain("# MANDATORY BLOCKER HALT RULE");
-    expect(String(result.instructions)).toContain("Do not switch target forms.");
-    expect(OPERATOR_GOVERNING_STANDARDS.blocker_halt_rule).toBe(OPERATOR_BLOCKER_HALT_RULE);
+                                expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v5");
+    expect(String(result.instructions)).toContain("# MANDATORY FAILURE REPAIR RULE");
+    expect(String(result.instructions)).toContain("Switch into diagnosis and repair instead.");
+    expect(String(result.instructions)).toContain("Alternate tools are required when they are part of root-cause repair.");
+    expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
     expect(OPERATOR_GOVERNING_STANDARDS.per_action_enforcement).toContain("rejects missing or altered acknowledgment");
     expect(OPERATOR_GOVERNING_STANDARDS.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
                 expect(OPERATOR_GOVERNING_STANDARDS.prevention_closure_rule).toContain("may not end with analysis");
