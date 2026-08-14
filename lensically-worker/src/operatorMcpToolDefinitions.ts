@@ -84,10 +84,6 @@ export function addOperatorExecutionMetadataSchema(
                                 description: `Mandatory pre-action acknowledgment. Evaluate Autonomy, Efficiency, and Prevention before this call. ${OPERATOR_DISCOVERY_EXECUTION_RULE} ${OPERATOR_FAILURE_REPAIR_RULE}`,
   };
   if (includeMetadata) {
-    properties.proceed_confirmed = {
-      type: "boolean",
-      description: "Optional compatibility field for guided workflows. Autonomous Manifest cycle tools do not require a Proceed handshake.",
-    };
     properties.operation_id = {
       type: "string",
       description: "Stable operation identity for idempotent retries. Reuse the same value after a stream interruption or uncertain tool result.",
