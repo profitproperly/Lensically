@@ -65,10 +65,10 @@ describe("Operator MCP registry composition", () => {
     expect(operatorMcpToolNameRequiresProceed("readRepoFile")).toBe(false);
   });
 
-                it("builds the exact 125 direct tools with deterministic priority ordering", () => {
+                  it("builds the exact 128 internal typed tools with deterministic priority ordering", () => {
     const tools = buildComposedOperatorMcpTools(false);
     const names = tools.map((tool) => tool.name);
-    expect(tools).toHaveLength(125);
+    expect(tools).toHaveLength(128);
         expect(names).toContain("operateGitHubRepositories");
     expect(names).toEqual(expect.arrayContaining([
       "getStripeAccountState",

@@ -173,8 +173,7 @@ describe("Operator MCP tool-call dispatcher", () => {
 
     it("blocks Step 4 before profile compilation without valid Step-3 proof", async () => {
     const compilePublicProfileRequest = vi.fn();
-    const dependencies = baseDependencies({
-      isPublicDirectToolName: vi.fn(() => false),
+        const dependencies = baseDependencies({
       compilePublicProfileRequest,
       verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: false, error: "operator_lifecycle_token_invalid_or_expired" })),
     });
@@ -193,8 +192,7 @@ describe("Operator MCP tool-call dispatcher", () => {
   });
 
     it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
-    const dependencies = baseDependencies({
-      isPublicDirectToolName: vi.fn(() => false),
+        const dependencies = baseDependencies({
       verifyLifecycleExecutionToken: vi.fn(async () => ({
         ok: true,
         payload: {
@@ -227,8 +225,7 @@ describe("Operator MCP tool-call dispatcher", () => {
 
     it("preserves proven pre-call redirects before execution", async () => {
     const executeAccountTool = vi.fn(async () => ({ ok: true }));
-    const dependencies = baseDependencies({
-      isPublicDirectToolName: vi.fn(() => false),
+        const dependencies = baseDependencies({
       executeAccountTool,
       resolvePreCallRouting: vi.fn(async (_toolName, args) => ({
         arguments: args,
