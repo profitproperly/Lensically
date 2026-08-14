@@ -5971,7 +5971,8 @@ active_checkpoint: none
         mutation_preflights: { eligible: number; executed: number; passed: number; failed: number; failures: Array<Record<string, unknown>>; side_effects_executed: number };
         risk_groups: { read_only: number; mutation: number };
       };
-    }>("runMcpTests", { segment: "s0" });
+        }>("runMcpTests", { segment: "s0" });
+    expect(campaign.isError, JSON.stringify(campaign.structuredContent)).not.toBe(true);
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 total_internal_capabilities: 124,
