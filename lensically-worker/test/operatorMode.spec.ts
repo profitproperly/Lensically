@@ -105,9 +105,77 @@ async function mcpToolCallRaw<T = Record<string, unknown>>(toolName: string, arg
   });
 }
 
-async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
-  return mcpToolCallRaw<T>(toolName, args);
+const TEST_LIFECYCLE_TOOL_NAMES = new Set([
+  "getOperatorSessionMap",
+  "getOperatorKnowledge",
+  "getOperatorLiveState",
+  "executeOperatorAction",
+  "closeOperatorAction",
+]);
+
+const TEST_SAFE_CAPABILITY_BY_TOOL: Record<string, string> = {
+  listGitHubWorkflowRuns: "workflow_run_list",
+  getGitHubWorkflowRun: "workflow_run_status",
+  getRepoStatus: "repository_status",
+  getDatabaseSchemaState: "database_schema",
+  readRepoFile: "repository_file_read",
+  applyRepoPatchSet: "repository_patch_set",
+  readMcpToolDefinition: "capability_definition",
+  recordHardeningIncident: "client_block_intake",
+  getHardeningStatus: "hardening_status",
+  advanceHardeningIncident: "hardening_transition",
+  recordOperationalObservation: "operational_observation",
+  getOperatorWorkState: "operator_work_state",
+  intakeOperatorWork: "operator_work_intake",
+  advanceOperatorWork: "operator_work_transition",
+  auditScheduledPost: "scheduled_post_audit",
+  recoverOverdueScheduledPosts: "protected_scheduler_recovery",
+  selectOperatorKey: "account_key_selection",
+  confirmOperatorProceed: "account_proceed",
+};
+
+function testCapabilityId(toolName: string): string {
+  return TEST_SAFE_CAPABILITY_BY_TOOL[toolName]
+    ?? toolName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
 }
+
+async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
+  if (TEST_LIFECYCLE_TOOL_NAMES.has(toolName)) {
+    return mcpToolCallRaw<T>(toolName, args);
+  }
+  const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+  if (step1.isError) return step1 as unknown as { structuredContent: T; isError?: boolean };
+  const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+    session_map_token: step1.structuredContent.session_map_token,
+    node_ids: ["governance"],
+  });
+  if (step2.isError) return step2 as unknown as { structuredContent: T; isError?: boolean };
+  const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+    knowledge_token: step2.structuredContent.knowledge_token,
+    scopes: ["runtime"],
+  });
+  if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
+  const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>("executeOperatorAction", {
+    live_state_token: step3.structuredContent.live_state_token,
+    action: {
+      capability: testCapabilityId(toolName),
+      arguments: args,
+    },
+  });
+  if (step4.isError || !step4.structuredContent.action_execution_token) return step4;
+  const step5 = await mcpToolCallRaw("closeOperatorAction", {
+    action_execution_token: step4.structuredContent.action_execution_token,
+    verification: {
+      verified: true,
+      evidence: [`isolated regression completed ${toolName}`],
+      next_action: "Continue the isolated regression fixture.",
+      prevention_required: false,
+    },
+  });
+  if (step5.isError) return step5 as unknown as { structuredContent: T; isError?: boolean };
+  return step4;
+}
+
 
 
 function testRequestedBrandKey(toolName: string, args: Record<string, unknown>): CanonicalBrandKey | null {
