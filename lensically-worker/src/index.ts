@@ -16883,7 +16883,7 @@ function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
   if (brandScoped && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") scopes.add("account");
   if (mutates && /ScheduledPostScheduler|auditScheduledPost|recoverOverdueScheduledPosts|runApprovedPostCanary|scheduled_post|schedule_/i.test(toolName)) scopes.add("scheduler");
   if (mutates && (isOperatorStripeToolName(toolName) || /CommercialDelivery|Stripe/i.test(toolName))) scopes.add("commerce");
-  if (mutates && /GrowthMission/i.test(toolName)) scopes.add("growth_mission");
+  
   if (mutates && /manifest|source|draft|gate|performance|content_focus|post_results|monthly_growth/i.test(toolName)) scopes.add("manifest_intelligence");
   return [...scopes];
 }
