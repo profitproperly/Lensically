@@ -805,7 +805,7 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the exact 86-tool public surface and required Main Cycle dependencies")
+if (!operatorMcpToolDirectoryTests.includes("preserves the exact five-tool public lifecycle surface while keeping capabilities internal")
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("get_manifest_locked_lineup_page")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("prepare_manifest_shadow_cycle")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("commit_manifest_shadow_cycle_strategy")')
@@ -881,7 +881,7 @@ if (!operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEER
     || !operatorMcpEngineeringRegistry.includes("export const OPERATOR_MCP_ENGINEERING_TOOLS")) {
   lifecycleErrors.push("operator_mcp_engineering_registry_module_incomplete");
 }
-if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 34-tool engineering registry without duplicates")
+if (!operatorMcpEngineeringRegistryTests.includes("preserves the exact 37-tool engineering registry without duplicates")
     || !operatorMcpEngineeringRegistryTests.includes("preserves exact workflow and deployment controls")) {
   lifecycleErrors.push("operator_mcp_engineering_registry_tests_incomplete");
 }
@@ -1069,7 +1069,11 @@ if (source.includes("const OPERATOR_MCP_ACCOUNT_TOOLS:")
   lifecycleErrors.push("operator_mcp_registry_composition_returned_to_index");
 }
 if (!source.includes("assertClientSafetyRegistry();")
-    || !source.includes("return buildComposedOperatorMcpTools(includeScopedWrappers);")) {
+    || !source.includes("const tools = buildComposedOperatorMcpTools(includeScopedWrappers);")
+    || !source.includes("const actionGateway = tools.find((tool) => tool.name === \"executeOperatorAction\")")
+    || !source.includes("const actionBranches = tools")
+    || !source.includes("oneOf: actionBranches")
+    || !source.includes("OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES")) {
   lifecycleErrors.push("operator_mcp_registry_runtime_boundary_incomplete");
 }
 if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
@@ -1529,7 +1533,8 @@ if (!operatorMcpToolCallDispatcher.includes("export async function dispatchOpera
   lifecycleErrors.push("operator_mcp_tool_call_dispatcher_module_incomplete");
 }
 if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admission and rejects hidden routes")
-    || !operatorMcpToolCallDispatcherTests.includes("preserves registered gateway compilation failures")
+        || !operatorMcpToolCallDispatcherTests.includes("blocks Step 4 before profile compilation without valid Step-3 proof")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves registered Step-4 profile compilation failures after valid live-state proof")
     || !operatorMcpToolCallDispatcherTests.includes("preserves proven pre-call redirects before execution")
     || !operatorMcpToolCallDispatcherTests.includes("preserves completed idempotency replay without re-execution")
     || !operatorMcpToolCallDispatcherTests.includes("preserves autonomy blocking before handler execution")
@@ -3340,12 +3345,16 @@ if (/Operator MCP v\d+\.\d+\.\d+/.test(currentState)) {
   errors.push("current_state_manual_version_literal_forbidden");
 }
 
-// Fresh-chat acceptance requires startup documents to match the advertised direct typed Main schema.
+// Fresh-chat acceptance requires startup documents to match the normalized lifecycle rather than the retired direct-public surface.
 for (const [documentName, documentText] of [["AGENTS.md", agentRules], ["CURRENT_STATE.md", currentState], ["OPERATING_MEMORY.md", operatingMemory]]) {
-  if (!documentText.includes("direct typed")
-      || !documentText.includes("not advertised") && !documentText.includes("not public")
-      || !documentText.includes("`profile_id`")
-      || !documentText.includes("generic `inputs`")) {
+  if (!documentText.includes("getOperatorSessionMap")
+      || !documentText.includes("getOperatorKnowledge")
+      || !documentText.includes("getOperatorLiveState")
+      || !documentText.includes("executeOperatorAction")
+      || !documentText.includes("closeOperatorAction")
+      || !documentText.includes("five")
+      || !documentText.includes("internal")
+      || documentText.includes("`getOperatorStartupContext` is the model-facing startup tool")) {
     errors.push(`startup_public_contract_drift:${documentName}`);
   }
 }
