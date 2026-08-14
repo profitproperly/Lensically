@@ -6,6 +6,8 @@ import { performance } from "node:perf_hooks";
 
 const workerRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const vitestCli = resolve(workerRoot, "node_modules", "vitest", "vitest.mjs");
+const COMPLETE_TEST_BATCH_SIZE = 6;
+const COMPLETE_TEST_MAX_WORKERS = 1;
 
 const completeTestFiles = [
   "test/databaseMigrations.spec.ts",
