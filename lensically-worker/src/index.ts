@@ -20763,16 +20763,16 @@ async function handleOperatorMcpEngineeringTool(
     return buildOperatorSessionMap(request, env);
   }
 
-  if (toolName === "getOperatorKnowledge") {
-        const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1, request.headers.get("mcp-session-id")?.trim() || null);
+    if (toolName === "getOperatorKnowledge") {
+    const tokenCheck = await verifyOperatorLifecycleToken(env, args.session_map_token, 1, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorSessionMap" };
-            const allowedNodes = new Set(["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"]);
-    const nodeIds = [...new Set((Array.isArray(args.node_ids) ? args.node_ids : []).map(String))];
-    if (!nodeIds.length || nodeIds.some((nodeId) => !allowedNodes.has(nodeId))) {
-      return { ok: false, error: "operator_knowledge_nodes_invalid", allowed_node_ids: [...allowedNodes] };
+    const planned = await resolveOperatorPlannedAction(args.planned_action);
+    if (!planned.ok) {
+      return { ...planned, required_stage: "getOperatorKnowledge", execution_started: false };
     }
+    const nodeIds = requiredOperatorKnowledgeNodesForTool(planned.toolName);
     const handbook = nodeIds.some((nodeId) => nodeId !== "governance")
-      ? await getGithubFile(env, "OPERATOR_COMPETENCY.md")
+      ? await getCachedOperatorCompetencyHandbook(env)
       : null;
     if (handbook && (!handbook.ok || handbook.content === null)) {
       return { ok: false, error: "operator_competency_handbook_unavailable", status: handbook.status };
@@ -20796,11 +20796,15 @@ async function handleOperatorMcpEngineeringTool(
     if (nodes.some((node) => node.content === null)) {
       return { ok: false, error: "operator_knowledge_node_missing", requested_node_ids: nodeIds };
     }
-                const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
+    const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
       knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
       mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
       node_ids: nodeIds,
       handbook_sha: handbook?.sha ?? null,
+      planned_capability: planned.capability,
+      planned_tool: planned.toolName,
+      planned_action_fingerprint: planned.fingerprint,
+      planned_brand_key: planned.brandKey,
     });
     return {
       ok: true,
@@ -20808,24 +20812,36 @@ async function handleOperatorMcpEngineeringTool(
       knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
       node_ids: nodeIds,
       nodes,
+      action_binding: {
+        capability: planned.capability,
+        tool_name: planned.toolName,
+        fingerprint: planned.fingerprint,
+        brand_key: planned.brandKey,
+      },
+      handbook_cache_hit: handbook?.cache_hit ?? null,
       knowledge_token: knowledgeToken,
       live_state_loaded: false,
     };
   }
 
-  if (toolName === "getOperatorLiveState") {
-        const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2, request.headers.get("mcp-session-id")?.trim() || null);
+
+    if (toolName === "getOperatorLiveState") {
+    const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2, request.headers.get("mcp-session-id")?.trim() || null);
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
-            const allowedScopes = new Set(["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"]);
-    const scopes = [...new Set((Array.isArray(args.scopes) ? args.scopes : []).map(String))];
-    if (!scopes.length || scopes.some((scope) => !allowedScopes.has(scope))) {
-      return { ok: false, error: "operator_live_state_scopes_invalid", allowed_scopes: [...allowedScopes] };
+    const plannedCapability = normalizeOperatorMachineKey(tokenCheck.payload.planned_capability, "");
+    const plannedTool = normalizeOperatorText(tokenCheck.payload.planned_tool, 200, true);
+    const plannedFingerprint = normalizeOperatorText(tokenCheck.payload.planned_action_fingerprint, 200, true);
+    const resolvedPlanned = resolveOperatorInternalActionCapability(plannedCapability);
+    if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedFingerprint) {
+      return { ok: false, error: "operator_knowledge_action_binding_invalid", required_stage: "getOperatorKnowledge" };
     }
-    const brandKey = normalizeGptBrandKey(args.brand_key);
-            const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
+    const scopes = requiredOperatorLiveStateScopesForTool(plannedTool);
+    const brandKey = normalizeGptBrandKey(tokenCheck.payload.planned_brand_key);
+    const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
     if (accountScopes.length && !brandKey) {
-      return { ok: false, error: "brand_key_required_for_live_state", scopes: accountScopes };
+      return { ok: false, error: "brand_key_required_for_planned_live_state", scopes: accountScopes, planned_tool: plannedTool };
     }
+
     if (accountScopes.length && brandKey) {
       const boundary = await getOperatorMcpBoundaryBlock(request, env, "get_account_state", { brand_key: brandKey });
       if (boundary) {
@@ -20883,12 +20899,15 @@ async function handleOperatorMcpEngineeringTool(
     }
     const failedScope = Object.entries(state).find(([, value]) => value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).ok === false);
     if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
-                const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
+                    const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
       mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
       knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
       scopes,
       brand_key: brandKey,
+      planned_capability: plannedCapability,
+      planned_tool: plannedTool,
+      planned_action_fingerprint: plannedFingerprint,
       captured_at: new Date().toISOString(),
     });
     return {
@@ -20897,6 +20916,11 @@ async function handleOperatorMcpEngineeringTool(
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
       scopes,
       brand_key: brandKey,
+      action_binding: {
+        capability: plannedCapability,
+        tool_name: plannedTool,
+        fingerprint: plannedFingerprint,
+      },
       state,
       live_state_token: liveStateToken,
     };
