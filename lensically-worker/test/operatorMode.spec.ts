@@ -4952,8 +4952,8 @@ active_checkpoint: none
     }>("commit_manifest_cycle_strategy", invalidStrategy);
     expect(rejected.isError).toBe(true);
     expect(rejected.structuredContent).toMatchObject({
-      success: false,
-      error: "manifest_cycle_lineup_source_backed_only",
+      error: "operator_planned_action_arguments_invalid",
+      execution_started: false,
     });
     expect(rejected.structuredContent.hardening_incident).toBeUndefined();
     expect(rejected.structuredContent.normal_work_blocked).not.toBe(true);
