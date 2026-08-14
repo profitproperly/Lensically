@@ -65,38 +65,49 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-    {
+      {
     name: "getOperatorKnowledge",
     title: "Get operator knowledge",
-    description: "Step 2 of the canonical Operator lifecycle. Accept one typed planned action from the Step-1 map, derive exactly the durable knowledge that action requires, and issue a signed action-bound knowledge token. Callers do not choose knowledge nodes.",
+    description: "Step 2 of the canonical Operator lifecycle. Load the task-relevant durable knowledge nodes selected from the Step-1 session map and issue a signed knowledge token. The final exact action is not chosen until Step 4.",
     inputSchema: {
       type: "object",
       properties: {
         session_map_token: { type: "string", minLength: 16 },
-        planned_action: {
-          type: "object",
-          description: "Generated at runtime as the same closed typed action union used by Step 4.",
+        node_ids: {
+          type: "array",
+          minItems: 1,
+          maxItems: 7,
+          uniqueItems: true,
+          items: { type: "string", enum: ["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"] },
         },
       },
-      required: ["session_map_token", "planned_action"],
+      required: ["session_map_token", "node_ids"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  {
+    {
     name: "getOperatorLiveState",
     title: "Get operator live state",
-    description: "Step 3 of the canonical Operator lifecycle. Derive exactly the mutable live-state scopes required by the action already bound into Step 2, load them, and issue a signed action-bound live-state token. Callers do not choose scopes or account targets.",
+    description: "Step 3 of the canonical Operator lifecycle. Load task-relevant current mutable truth before the exact Step-4 action is chosen, then issue a signed live-state token. Step 4 independently verifies that its final action prerequisites were loaded.",
     inputSchema: {
       type: "object",
       properties: {
         knowledge_token: { type: "string", minLength: 16 },
+        scopes: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          uniqueItems: true,
+          items: { type: "string", enum: ["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"] },
+        },
+        brand_key: BRAND_KEY_SCHEMA,
       },
-      required: ["knowledge_token"],
+      required: ["knowledge_token", "scopes"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
-  },
+  }
   {
     name: "getEngineeringContinuation",
     title: "Get engineering continuation",
