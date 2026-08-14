@@ -28,7 +28,7 @@
         "Public generic profile_id, generic inputs envelopes, freehand routing text, wrappers, and internal handler names are forbidden.",
         "Internal capability names describe server capabilities, not independently callable public tools. Step 4 is the only model-facing operational execution choke point.",
         "Discovery returns candidates only. Verify declared purpose, side effects, and exact typed branch before Step-4 invocation.",
-        "After a public lifecycle schema change is deployed and live verified, use the mandatory refresh and context-port handoff before testing the changed client surface."
+        "After a public lifecycle schema change is deployed and live verified, first test the contract surfaced in the current chat. Use the refresh and context-port handoff only when that surfaced public schema is stale and the changed contract cannot be used; if the changed contract is already surfaced and usable, do not request refresh or a new chat."
       ],
       "continuation": [
         "ENGINEERING_CONTINUATION.md is the sole accepted-job, precedence, active-job, and current-action authority.",
