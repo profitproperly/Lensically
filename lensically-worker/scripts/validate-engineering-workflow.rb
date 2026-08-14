@@ -170,6 +170,8 @@ abort("push_full_history_checkout_missing") unless push_checkout.dig("with", "fe
 push_classification = step_run(jobs, "push-validation", "Classify pushed change")
 abort("push_production_relative_classification_missing") unless push_classification.include?("https://api.lensically.com/api/operator/health") && push_classification.include?("validation_scope=deployed_production")
 abort("push_classification_fallback_missing") unless push_classification.include?("validation_scope=event_before_fallback") && push_classification.include?("validation_scope=parent_fallback")
+push_fast_mapped = step_run(jobs, "push-validation", "Run fast mapped validation")
+abort("system_directory_fast_mapping_missing") unless push_fast_mapped.include?("lensically-worker/src/systemDirectory/*.ts") && push_fast_mapped.include?("test/systemDirectory.spec.ts")
 
 push_artifact_test = step_run(jobs, "push-validation", "Test validated web artifact contract")
 abort("push_web_artifact_test_missing") unless push_artifact_test.include?("npm run test:validated-artifact")
