@@ -100,7 +100,7 @@ describe("Operator MCP registry composition", () => {
       const wrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_post_results`);
       expect(wrapper).toBeDefined();
       expect(wrapper?.inputSchema.properties).not.toHaveProperty("brand_key");
-      expect(wrapper?.inputSchema.properties).toHaveProperty("proceed_confirmed");
+      expect(wrapper?.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
       expect(wrapper?.inputSchema.properties).toHaveProperty("operation_id");
             expect(wrapper?.annotations).toMatchObject({ readOnlyHint: true });
 
