@@ -16438,7 +16438,65 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
   if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
     return null;
   }
-    return payload as Record<string, unknown>;
+        return payload as Record<string, unknown>;
+}
+
+async function issueOperatorLifecycleToken(
+  env: Env,
+  stage: 1 | 2 | 3 | 4 | 5,
+  claims: Record<string, unknown> = {},
+): Promise<string> {
+  return createSignedOperatorEnvelope(env, {
+    kind: "operator_lifecycle",
+    lifecycle_version: OPERATOR_LIFECYCLE_VERSION,
+    stage,
+    deployment_identity: currentOperatorDeploymentIdentity(env),
+    commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 6),
+    ...claims,
+  });
+}
+
+async function verifyOperatorLifecycleToken(
+  env: Env,
+  token: unknown,
+  minimumStage: 1 | 2 | 3 | 4 | 5,
+): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
+  const payload = await verifySignedOperatorEnvelope(env, token);
+  if (!payload) return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
+  if (payload.kind !== "operator_lifecycle" || payload.lifecycle_version !== OPERATOR_LIFECYCLE_VERSION) {
+    return { ok: false, error: "operator_lifecycle_token_contract_mismatch" };
+  }
+  if (Number(payload.stage ?? 0) < minimumStage) {
+    return { ok: false, error: "operator_lifecycle_stage_incomplete" };
+  }
+  if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
+    return { ok: false, error: "operator_lifecycle_deployment_changed" };
+  }
+  return { ok: true, payload };
+}
+
+function extractOperatorKnowledgeSection(content: string, nodeId: string): string | null {
+  const marker = `## DOMAIN ${nodeId}`;
+  const start = content.indexOf(marker);
+  if (start < 0) return null;
+  const remainder = content.slice(start + marker.length);
+  const nextDomain = remainder.search(/\n## DOMAIN /);
+  const maintenance = remainder.search(/\n## Handbook maintenance rule/);
+  const boundaries = [nextDomain, maintenance].filter((value) => value >= 0);
+  const end = boundaries.length ? Math.min(...boundaries) : remainder.length;
+  return `${marker}${remainder.slice(0, end)}`.trim();
+}
+
+function extractActiveContinuationExcerpt(content: string, activeJobId: string | null): string | null {
+  if (!activeJobId) return null;
+  const lines = content.split(/\r?\n/);
+  const index = lines.findIndex((line) => line.includes(activeJobId));
+  if (index < 0) return null;
+  const start = Math.max(0, index - 20);
+  const end = Math.min(lines.length, index + 100);
+  return lines.slice(start, end).join("\n");
 }
 
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
