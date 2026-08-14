@@ -3818,9 +3818,16 @@ describe("operator mode MCP endpoint", () => {
     expect(names).not.toContain("searchRepoFiles");
     expect(names.some((name) => /^(mm|om|vx)_/.test(name))).toBe(false);
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
+        const knowledgeTool = listed.tools.find((tool) => tool.name === "getOperatorKnowledge");
+    const liveStateTool = listed.tools.find((tool) => tool.name === "getOperatorLiveState");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
+    const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
     const actionSchema = actionTool?.inputSchema?.properties?.action as { oneOf?: unknown[] } | undefined;
-        expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    expect(plannedActionSchema?.oneOf).toEqual(actionSchema?.oneOf);
+    expect(JSON.stringify(knowledgeTool?.inputSchema)).not.toContain("node_ids");
+    expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("scopes");
+    expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("brand_key");
     const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
     expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
@@ -3841,9 +3848,9 @@ describe("operator mode MCP endpoint", () => {
     expect(step1).not.toHaveProperty("startup_authority");
     expect(step1).not.toHaveProperty("canonical_continuation");
     expect(step1).not.toHaveProperty("tool_surface");
-        const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
+            const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      planned_action: "list_accounts",
+      planned_action: { capability: "list_accounts", arguments: {} },
     });
     expect(step2.nodes[0]?.node_id).toBe("governance");
     expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v7" });
@@ -3935,9 +3942,9 @@ active_checkpoint: none
 
   it("enforces the normalized Operator lifecycle from session map through explicit closure", async () => {
     const step1 = await mcpTool<{ session_map_token: string }>("getOperatorSessionMap");
-        const step2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+            const step2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      planned_action: "list_accounts",
+      planned_action: { capability: "list_accounts", arguments: {} },
     });
     const step3 = await mcpTool<{ live_state_token: string }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
