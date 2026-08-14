@@ -3886,7 +3886,8 @@ active_checkpoint: none
         expect(initialized.instructions).toContain("advertised direct typed tool");
                         expect(initialized.instructions).toContain("Discovery returns candidates, not authorization");
     expect(initialized.instructions).toContain("Assume zero retained Lensically knowledge");
-    expect(initialized.instructions).toContain("session startup tax");
+        expect(initialized.instructions).toContain("constant-size competency router");
+    expect(initialized.instructions).toContain("Startup ceilings are guardrails, never storage budgets");
     expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
         expect(initialized.instructions.length).toBeLessThan(6500);
