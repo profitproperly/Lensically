@@ -3872,7 +3872,7 @@ describe("operator mode MCP endpoint", () => {
       planned_action: { capability: "list_accounts", arguments: {} },
     });
     expect(step2.nodes[0]?.node_id).toBe("governance");
-    expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v7" });
+    expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v8" });
         const step3 = await mcpTool<{ live_state_token: string; state: { runtime: Record<string, unknown> } }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
     });
