@@ -203,7 +203,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
       "release_scope": "operator-engineering",
-            "live_verification": "The deployed Step-2 tool rejects missing Step-1 proof, accepts the same closed typed planned-action contract used by Step 4, derives exactly that action's durable knowledge, uses deployment-scoped handbook caching, and issues an action-bound knowledge token with no mutable live state.",
+            "live_verification": "The deployed Step-2 tool rejects missing Step-1 proof, accepts the same closed typed planned-action contract used by Step 4, derives exactly that action's durable knowledge, reads deployment-local operatorKnowledgeRegistry.json without runtime repository I/O, and issues an action-bound knowledge token with no mutable live state.",
       "compatibility_bridge": false
     },
     {

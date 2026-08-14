@@ -16559,18 +16559,6 @@ async function verifyOperatorLifecycleToken(
 
 
 
-function extractOperatorKnowledgeSection(content: string, nodeId: string): string | null {
-  const marker = `## DOMAIN ${nodeId}`;
-  const start = content.indexOf(marker);
-  if (start < 0) return null;
-  const remainder = content.slice(start + marker.length);
-  const nextDomain = remainder.search(/\n## DOMAIN /);
-  const maintenance = remainder.search(/\n## Handbook maintenance rule/);
-  const boundaries = [nextDomain, maintenance].filter((value) => value >= 0);
-  const end = boundaries.length ? Math.min(...boundaries) : remainder.length;
-  return `${marker}${remainder.slice(0, end)}`.trim();
-}
-
 function extractActiveContinuationExcerpt(content: string, activeJobId: string | null): string | null {
   if (!activeJobId) return null;
   const lines = content.split(/\r?\n/);
@@ -16579,39 +16567,6 @@ function extractActiveContinuationExcerpt(content: string, activeJobId: string |
   const start = Math.max(0, index - 20);
   const end = Math.min(lines.length, index + 100);
   return lines.slice(start, end).join("\n");
-}
-
-type OperatorCompetencyHandbookCache = {
-  deployment_identity: string;
-  sha: string | null;
-  content: string;
-  size: number;
-};
-
-let operatorCompetencyHandbookCache: OperatorCompetencyHandbookCache | null = null;
-
-async function getCachedOperatorCompetencyHandbook(env: Env): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number; cache_hit: boolean }> {
-  const deploymentIdentity = currentOperatorDeploymentIdentity(env);
-  if (operatorCompetencyHandbookCache?.deployment_identity === deploymentIdentity) {
-    return {
-      ok: true,
-      status: 200,
-      sha: operatorCompetencyHandbookCache.sha,
-      content: operatorCompetencyHandbookCache.content,
-      size: operatorCompetencyHandbookCache.size,
-      cache_hit: true,
-    };
-  }
-  const handbook = await getGithubFile(env, "OPERATOR_COMPETENCY.md");
-  if (handbook.ok && handbook.content !== null) {
-    operatorCompetencyHandbookCache = {
-      deployment_identity: deploymentIdentity,
-      sha: handbook.sha,
-      content: handbook.content,
-      size: handbook.size,
-    };
-  }
-  return { ...handbook, cache_hit: false };
 }
 
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
