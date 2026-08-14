@@ -3722,8 +3722,15 @@ if (source.includes('callDirectLiveTool("getOperatorStartupContext"')
     || source.includes('callDirectLiveTool("getOperatorSessionMap"')) {
   errors.push("self_referential_live_startup_probe_forbidden");
 }
-if (!source.includes("session_map_tool_advertised: sessionMapTool !== null")) {
-  errors.push("live_session_map_tool_advertisement_check_missing");
+if (!source.includes("const boundaryTest = evaluateOperatorPublicLifecycleBoundary(listedToolNames);")
+    || !source.includes("&& boundaryTest.lifecycle_surface_exact")
+    || !source.includes("&& boundaryTest.legacy_persist_hidden")
+    || !source.includes("&& boundaryTest.retired_commit_hidden")) {
+  errors.push("live_normalized_lifecycle_boundary_check_missing");
+}
+if (!source.includes("resolveOperatorLifecycleSessionBinding")
+    || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
+  errors.push("lifecycle_session_binding_guard_missing");
 }
 
 
