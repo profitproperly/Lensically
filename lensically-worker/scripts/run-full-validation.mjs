@@ -232,6 +232,7 @@ for (const [index, testFiles] of completeTestGroups.entries()) {
     "--run",
         ...testFiles,
     "--no-file-parallelism",
+    `--minWorkers=${COMPLETE_TEST_MIN_WORKERS}`,
     `--maxWorkers=${COMPLETE_TEST_MAX_WORKERS}`,
     "--reporter=dot",
     "--bail=1",
