@@ -5941,7 +5941,7 @@ active_checkpoint: none
       }
       throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
     });
-    const directoryPath = await mcpToolCallRaw<Record<string, unknown>>("searchRepoFiles", {
+        const directoryPath = await mcpToolRaw<Record<string, unknown>>("searchRepoFiles", {
       prefix: "lensically-worker/src",
       query: "executeLensicallyIntent",
       limit: 1,
@@ -5958,7 +5958,7 @@ active_checkpoint: none
   }, 30000);
 
     it("validates complete Execution Kernel routes without mutations", async () => {
-    const campaign = await mcpToolCallRaw<{
+        const campaign = await mcpToolRaw<{
       campaign: {
         segment: string;
         total_internal_capabilities: number;
@@ -6033,8 +6033,8 @@ active_checkpoint: none
     ] as const;
     let eligibleReads = 0;
     let failedReads = 0;
-    for (const [transportSegment, canonicalSegment] of readSegments) {
-      const result = await mcpToolCallRaw<{
+        for (const [transportSegment, canonicalSegment] of readSegments) {
+      const result = await mcpToolRaw<{
         campaign: {
           segment: string;
           route_only: boolean;
@@ -6058,7 +6058,7 @@ active_checkpoint: none
 
     it("keeps mutation preflight source-defined after the legacy route table is retired", async () => {
     await env.DB.prepare("DROP TABLE IF EXISTS operator_pre_call_routes").run();
-    const result = await mcpToolCallRaw<{
+        const result = await mcpToolRaw<{
       campaign: {
         mutations_executed: number;
         mutation_preflights: {
@@ -6087,8 +6087,8 @@ active_checkpoint: none
         let eligibleMutations = 0;
     let expectedMutationCapabilities: number | null = null;
     let failedMutationPreflights = 0;
-    for (const [transportSegment, canonicalSegment] of mutationSegments) {
-      const result = await mcpToolCallRaw<{
+        for (const [transportSegment, canonicalSegment] of mutationSegments) {
+      const result = await mcpToolRaw<{
         campaign: {
           segment: string;
           mutations_executed: number;
