@@ -3878,6 +3878,19 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(step3.live_state_token).toBeTruthy();
     expect(step3.state.runtime).toBeTruthy();
+    const readStep2 = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.session_map_token,
+      planned_action: {
+        capability: "repository_file_read",
+        arguments: { path: "ENGINEERING_CONTINUATION.md", start_line: 1, max_lines: 4 },
+      },
+    });
+    const readStep3 = await mcpTool<{ live_state_token: string; scopes: string[]; state: Record<string, unknown> }>("getOperatorLiveState", {
+      knowledge_token: readStep2.knowledge_token,
+    });
+    expect(readStep3.live_state_token).toBeTruthy();
+    expect(readStep3.scopes).toEqual(["runtime"]);
+    expect(Object.keys(readStep3.state)).toEqual(["runtime"]);
         const parsedContinuation = parseCanonicalContinuationMetadata(`status: active
 continuation_contract: canonical-continuation-v1
 active_job_id: worker-monolith-refactor
