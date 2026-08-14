@@ -6502,7 +6502,7 @@ active_checkpoint: none
     expect(status.structuredContent.startup_authority?.governing_rule).toContain("fastest complete route");
     expect(status.structuredContent.startup_authority).not.toHaveProperty("exact_owner_approved_text");
     expect(status.structuredContent.session_competency).toMatchObject({
-      version: "operator-session-competency-v1",
+            version: "operator-session-competency-v2",
       startup_tool: "getOperatorStartupContext",
     });
     expect(status.structuredContent.session_competency?.rule).toContain("does not repeat the full startup payload");
