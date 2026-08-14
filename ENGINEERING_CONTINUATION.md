@@ -8,11 +8,11 @@ continuation_contract: canonical-continuation-v1
 active_job_id: operator-lifecycle-architecture-refactor-20260814
 active_checkpoint: repair-live-state-cpu-exhaustion
 
-## COMPLETED — Operator Lifecycle Architecture Refactor
+## ACTIVE — Operator Lifecycle Architecture Refactor
 
 job_id: `operator-lifecycle-architecture-refactor-20260814`
-status: completed
-completed_at: 2026-08-14
+status: active
+reopened_at: 2026-08-14
 architecture_contract: Lensically Operator Mode is normalized around the five public lifecycle tools `getOperatorSessionMap`, `getOperatorKnowledge`, `getOperatorLiveState`, `executeOperatorAction`, and `closeOperatorAction`; Step 0 remains tiny initialization only, durable knowledge is deployment-local, mutable state is server-derived from the prepared action, Step 4 is the typed execution choke point, and Step 5 owns explicit verification closure.
 resolved_interrupt_id: `dfa3d5ea-51d2-45ab-b81c-34ef1284a8ce`
 root_repairs: Migrated deployed-version verification and release gates to the exact five-tool lifecycle; repaired first-session binding without weakening mismatch rejection; classified expected lifecycle controls correctly; made Step 2 advertise the same typed action union as Step 4; aligned zero-history typed contracts; migrated stale regressions away from retired direct/generic forms; moved release-authority publication into the exact-SHA release workflow so dispatch plane cannot change authority semantics; hardened complete validation into bounded six-file serial Vitest processes and made release preflight enforce the same harness contract.
