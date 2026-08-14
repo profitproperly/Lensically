@@ -149,7 +149,9 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
   const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
   if (step1.isError) return step1 as unknown as { structuredContent: T; isError?: boolean };
     const capability = testCapabilityId(toolName);
-  const plannedAction = { capability, arguments: args };
+  const normalizedArgs = { ...args };
+  delete normalizedArgs.proceed_confirmed;
+  const plannedAction = { capability, arguments: normalizedArgs };
   const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
     session_map_token: step1.structuredContent.session_map_token,
     planned_action: plannedAction,
