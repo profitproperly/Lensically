@@ -22121,25 +22121,7 @@ async function handleOperatorMcpEngineeringTool(
       ? listedTools.filter((tool): tool is Record<string, unknown> => Boolean(tool) && typeof tool === "object" && !Array.isArray(tool))
       : [];
         const listedToolNames = listedToolRows.map((tool) => String(tool.name ?? "")).filter(Boolean);
-    const expectedLifecycleToolNames = [...OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES];
-    const expectedLifecycleToolNameSet = new Set(expectedLifecycleToolNames);
-    const missingLifecycleTools = expectedLifecycleToolNames.filter((name) => !listedToolNames.includes(name));
-    const unexpectedPublicTools = listedToolNames.filter((name) => !expectedLifecycleToolNameSet.has(name));
-    const autonomousPersistTool = listedToolRows.find((tool) => tool.name === "persist_manifest_autonomous_post") ?? null;
-    const retiredCommitTool = listedToolRows.find((tool) => tool.name === "commit_manifest_autonomous_runway") ?? null;
-        const boundaryTest = {
-      lifecycle_surface_exact: listedToolNames.length === expectedLifecycleToolNames.length
-        && missingLifecycleTools.length === 0
-        && unexpectedPublicTools.length === 0,
-      expected_lifecycle_tools: expectedLifecycleToolNames,
-      advertised_tool_names: listedToolNames,
-      missing_lifecycle_tools: missingLifecycleTools,
-      unexpected_public_tools: unexpectedPublicTools,
-      legacy_persist_hidden: autonomousPersistTool === null,
-      retired_commit_hidden: retiredCommitTool === null,
-      no_internal_multi_post_contract: MANIFEST_AUTONOMOUS_COMMIT_LIMIT === 1,
-      account_state_mutated: false,
-    };
+    const boundaryTest = evaluateOperatorPublicLifecycleBoundary(listedToolNames);
     return {
                         ok: response.ok
         && Boolean(liveSessionId)
