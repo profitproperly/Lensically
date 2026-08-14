@@ -106,8 +106,9 @@ if (result.error) {
   process.exit(1);
 }
 if ((result.status ?? 1) !== 0) {
-  const failureOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim().slice(-3000);
-  const annotation = failureOutput
+  const failureOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim().slice(-2200);
+  const diagnosticOutput = `${failureOutput}\nSHARD_SELECTED_TITLES=${JSON.stringify(selectedTitles)}`;
+  const annotation = diagnosticOutput
     .replace(/%/g, "%25")
     .replace(/\r/g, "%0D")
     .replace(/\n/g, "%0A");
