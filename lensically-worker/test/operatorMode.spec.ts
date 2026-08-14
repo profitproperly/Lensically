@@ -5919,8 +5919,8 @@ active_checkpoint: none
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-    const startup = await mcpTool<{ account_data_loaded: boolean }>("getOperatorStartupContext");
-    expect(startup.account_data_loaded).toBe(false);
+    const sessionMap = await mcpTool<{ account_data_loaded: boolean }>("getOperatorSessionMap");
+    expect(sessionMap.account_data_loaded).toBe(false);
 
     const selected = await mcpToolRaw<{ selected_key: CanonicalBrandKey; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: BRAND_KEY });
     expect(selected.isError).not.toBe(true);
