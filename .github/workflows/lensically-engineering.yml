@@ -615,6 +615,41 @@ jobs:
         working-directory: lensically-worker
         run: node scripts/cron-release.mjs --write-deploy-config --config wrangler.jsonc --output wrangler.release.generated.json
 
+      - name: Publish exact release authority target
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_SHA}" =~ ^[a-fA-F0-9]{40}$ ]]; then
+            echo "exact_release_sha_required" >&2
+            exit 1
+          fi
+          release_id="workflow-${GITHUB_RUN_ID}"
+          cat > /tmp/lensically-release-authority.sql <<SQL
+          INSERT INTO operator_release_authority (
+            authority_id, expected_release_sha, previous_release_sha, release_id, state, source, updated_at
+          ) VALUES (
+            'production', '${RELEASE_SHA}',
+            (SELECT expected_release_sha FROM operator_release_authority WHERE authority_id = 'production'),
+            '${release_id}', 'pending', 'exact_sha_release_workflow', CURRENT_TIMESTAMP
+          )
+          ON CONFLICT(authority_id) DO UPDATE SET
+            previous_release_sha = CASE
+              WHEN operator_release_authority.expected_release_sha = excluded.expected_release_sha
+                THEN operator_release_authority.previous_release_sha
+              ELSE operator_release_authority.expected_release_sha
+            END,
+            expected_release_sha = excluded.expected_release_sha,
+            release_id = excluded.release_id,
+            state = 'pending',
+            source = 'exact_sha_release_workflow',
+            updated_at = CURRENT_TIMESTAMP;
+          SQL
+          npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json --file /tmp/lensically-release-authority.sql
+
       - name: Provision, migrate, and bind isolated Shadow D1
         working-directory: lensically-worker
         env:
