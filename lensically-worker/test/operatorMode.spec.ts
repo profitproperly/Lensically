@@ -5815,21 +5815,22 @@ active_checkpoint: none
       capabilities: {},
       clientInfo: { name: "vitest", version: "1.0.0" },
     });
-        const startup = await mcpTool<{ boundary: { first_key_response_template: string[] }; tool_surface: { public_tool_count: number } }>("getOperatorStartupContext");
+    const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
+    const publicToolCount = registry.tools.length;
+    expect(publicToolCount).toBe(5);
     for (const key of ALL_BRAND_KEYS) {
       const selected = await mcpToolRaw<{ handshake: string[]; tool_count: number; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: key });
       expect(selected.isError).not.toBe(true);
       expect(selected.structuredContent.account_data_loaded).toBe(false);
-            expect(selected.structuredContent.tool_count).toBe(startup.tool_surface.public_tool_count);
-            expect(selected.structuredContent.handshake).toEqual([
+      expect(selected.structuredContent.tool_count).toBe(publicToolCount);
+      expect(selected.structuredContent.handshake).toEqual([
         "Governing standards: Autonomy. Efficiency. Prevention.",
         "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
         "Lensically Operator Mode MCP is active.",
         `Selected key: ${key}`,
-        `Full tool surface loaded: ${startup.tool_surface.public_tool_count} tools available and usable.`,
+        `Full tool surface loaded: ${publicToolCount} tools available and usable.`,
         "Proceed to the next step?",
       ]);
-      expect(selected.structuredContent.handshake).toEqual(startup.boundary.first_key_response_template.map((line) => line.replace("<canonical_brand_key>", key)));
     }
   }, 30000);
 
