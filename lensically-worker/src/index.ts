@@ -15639,12 +15639,17 @@ async function buildOperatorMcpTools(_env: Env, _includeDisabled = false, includ
   return buildOperatorMcpBaseTools(includeScopedWrappers);
 }
 
-async function buildOperatorPublicMcpTools(env: Env): Promise<OperatorMcpToolDefinition[]> {
-  return filterOperatorPublicMcpTools(await buildOperatorMcpTools(env, false, false));
+let operatorPublicMcpToolsCache: OperatorMcpToolDefinition[] | null = null;
+
+async function buildOperatorPublicMcpTools(_env: Env): Promise<OperatorMcpToolDefinition[]> {
+  if (!operatorPublicMcpToolsCache) {
+    operatorPublicMcpToolsCache = filterOperatorPublicMcpTools(buildOperatorMcpBaseTools(false));
+  }
+  return operatorPublicMcpToolsCache;
 }
 
 async function operatorPublicMcpToolCount(env: Env): Promise<number> {
-  return countOperatorPublicMcpTools(await buildOperatorMcpTools(env, false, false));
+  return countOperatorPublicMcpTools(await buildOperatorPublicMcpTools(env));
 }
 
 async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
