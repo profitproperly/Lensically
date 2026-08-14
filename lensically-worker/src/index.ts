@@ -15550,8 +15550,9 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
 function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpToolDefinition[] {
   assertClientSafetyRegistry();
     const tools = buildComposedOperatorMcpTools(includeScopedWrappers);
+    const knowledgeGateway = tools.find((tool) => tool.name === "getOperatorKnowledge");
     const actionGateway = tools.find((tool) => tool.name === "executeOperatorAction");
-  if (!actionGateway) return tools;
+  if (!knowledgeGateway || !actionGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
   const actionBranches = tools
