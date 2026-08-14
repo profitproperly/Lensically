@@ -3,8 +3,9 @@ export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v5";
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v6";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
+export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "After deploying and live-verifying any public MCP tool addition or schema change, do not test the new schema from a chat initialized against the previous deployment. Treat that as the normal client-refresh boundary, not a product defect; do not add compatibility or Recovery workarounds for the stale chat. End the handoff exactly with: refresh the lensically operator mode mcp now";
 export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
 
@@ -123,7 +124,9 @@ A problem is not resolved until the root cause is repaired and recurrence is per
 
 A tool failure interrupts the affected business task. Do not route around it to finish the action. Use engineering, diagnostic, validation, and Recovery tools to fix the root cause, add regression and prevention, validate, deploy, then resume the interrupted step.
 
+# MANDATORY DISCOVERY-TO-EXECUTION RULE
 
+Discovery results are candidates only, never execution authorization. Before invoking any discovered tool, verify that its declared purpose and side effects match the requested operation. Search, inspection, schema lookup, diagnosis, and explanation must never invoke a mutating or business-execution tool merely because a keyword matched its description.
 
 # MANDATORY STARTUP DISPLAY
 
@@ -148,7 +151,8 @@ export const OPERATOR_GOVERNING_STANDARDS = {
     startup_display_required: true,
     per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
   per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
-    failure_repair_rule: OPERATOR_FAILURE_REPAIR_RULE,
+        failure_repair_rule: OPERATOR_FAILURE_REPAIR_RULE,
+  discovery_execution_rule: OPERATOR_DISCOVERY_EXECUTION_RULE,
   public_schema_refresh_rule: OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
@@ -173,7 +177,7 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
     "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
-    "Tool discovery, schema loading, and tools/list are preparation only and never count as execution.",
+        `Tool discovery, schema loading, and tools/list are preparation only and never count as execution. ${OPERATOR_DISCOVERY_EXECUTION_RULE}`,
     "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",
     "Never report a safety block, timeout, connector error, backend failure, attempted execution, or completed execution unless the exact tool invocation returned evidence for that status. Without a tool result, the only valid status is not invoked, and the next action is to invoke it.",
     "Autonomous Manifest cycle tools execute directly without an interactive Proceed handshake. Guided account workflows may still require explicit Proceed before account data loads.",

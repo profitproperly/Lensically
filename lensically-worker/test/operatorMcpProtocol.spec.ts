@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-                OPERATOR_GOVERNING_STANDARDS,
+                                OPERATOR_GOVERNING_STANDARDS,
+    OPERATOR_DISCOVERY_EXECUTION_RULE,
     OPERATOR_FAILURE_REPAIR_RULE,
   OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION,
   OPERATOR_MCP_VERSION,
@@ -68,8 +69,12 @@ describe("Operator MCP protocol contract", () => {
         expect(String(result.instructions)).toContain("A note in chat memory is not enforcement.");
     expect(String(result.instructions)).toContain("Resume the original objective only after prevention is locked in.");
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
-                                expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v5");
+                                                                expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v6");
     expect(String(result.instructions)).toContain("# MANDATORY FAILURE REPAIR RULE");
+    expect(String(result.instructions)).toContain("# MANDATORY DISCOVERY-TO-EXECUTION RULE");
+    expect(String(result.instructions)).toContain("Discovery results are candidates only");
+    expect(OPERATOR_DISCOVERY_EXECUTION_RULE).toContain("never authorize execution");
+    expect(OPERATOR_GOVERNING_STANDARDS.discovery_execution_rule).toBe(OPERATOR_DISCOVERY_EXECUTION_RULE);
     expect(String(result.instructions)).toContain("Do not route around it to finish the action.");
     expect(String(result.instructions)).toContain("Use engineering, diagnostic, validation, and Recovery tools");
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
