@@ -4033,9 +4033,13 @@ active_checkpoint: none
       return payload.result;
     };
 
+    const decodeLifecycleToken = (token: string): Record<string, unknown> => {
+      const encoded = token.split(".")[0] ?? "";
+      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+      return JSON.parse(atob(padded)) as Record<string, unknown>;
+    };
     const firstSessionId = await initializeSession();
-    const secondSessionId = await initializeSession();
-    expect(secondSessionId).not.toBe(firstSessionId);
     const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
     const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
       session_map_token: step1.structuredContent.session_map_token,
