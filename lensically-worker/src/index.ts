@@ -16935,9 +16935,9 @@ function requiredOperatorKnowledgeNodesForTool(toolName: string): string[] {
   return [...nodes];
 }
 
-function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
+function requiredOperatorLiveStateScopesForTool(toolName: string, toolDefinition: OperatorMcpToolDefinition | null = null): string[] {
   const scopes = new Set<string>(["runtime"]);
-  const tool = buildComposedOperatorMcpTools(false).find((item) => item.name === toolName);
+  const tool = toolDefinition ?? resolveOperatorInternalActionToolByName(toolName);
   const schemaProperties = tool?.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
     && (tool.inputSchema as Record<string, unknown>).properties
     && typeof (tool.inputSchema as Record<string, unknown>).properties === "object"
