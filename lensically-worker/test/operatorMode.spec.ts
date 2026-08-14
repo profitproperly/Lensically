@@ -5861,9 +5861,16 @@ active_checkpoint: none
     });
 
         const repositorySource = "export async function executeLensicallyIntent(profileId: string) {\n  return profileId;\n}\n";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const request = new Request(input, init);
       const url = new URL(request.url);
+      if (
+        request.method === "GET"
+        && url.origin === "https://api.github.com"
+        && url.pathname === "/repos/profitproperly/Lensically/branches/main"
+      ) {
+        return new Response(JSON.stringify({ commit: { sha: "vitest-head-sha" } }), { status: 200, headers: { "content-type": "application/json" } });
+      }
       if (
         request.method === "GET"
         && url.origin === "https://api.github.com"
