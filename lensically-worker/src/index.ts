@@ -20852,7 +20852,7 @@ async function handleOperatorMcpEngineeringTool(
     if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedFingerprint) {
       return { ok: false, error: "operator_knowledge_action_binding_invalid", required_stage: "getOperatorKnowledge" };
     }
-    const scopes = requiredOperatorLiveStateScopesForTool(plannedTool);
+    const scopes = requiredOperatorLiveStateScopesForTool(plannedTool, resolvedPlanned.tool);
     const brandKey = normalizeGptBrandKey(tokenCheck.payload.planned_brand_key);
     const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
     if (accountScopes.length && !brandKey) {
