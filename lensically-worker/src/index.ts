@@ -15602,6 +15602,19 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     oneOf: actionBranches,
     description: "Exactly one registered internal capability with its closed typed argument schema.",
   };
+  const knowledgeInputSchema = knowledgeGateway.inputSchema && typeof knowledgeGateway.inputSchema === "object" && !Array.isArray(knowledgeGateway.inputSchema)
+    ? knowledgeGateway.inputSchema as Record<string, unknown>
+    : {};
+  const knowledgeInputProperties = knowledgeInputSchema.properties && typeof knowledgeInputSchema.properties === "object" && !Array.isArray(knowledgeInputSchema.properties)
+    ? knowledgeInputSchema.properties as Record<string, unknown>
+    : {};
+  knowledgeGateway.inputSchema = {
+    ...knowledgeInputSchema,
+    properties: {
+      ...knowledgeInputProperties,
+      planned_action: typedActionSchema,
+    },
+  };
   
   actionGateway.inputSchema = {
     type: "object",
