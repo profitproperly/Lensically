@@ -2150,7 +2150,7 @@ describe("operator mode backend spine", () => {
     expect(Number(scheduledCountAfterBypass?.total ?? 0)).toBe(Number(scheduledCountBeforeBypass?.total ?? 0));
 
     await ensureMcpAccountOpen("manifest_mental");
-    const auditBeforeCall = await mcpToolCallRaw<{
+        const auditBeforeCall = await mcpToolRaw<{
       audited_count: number;
       complete_count: number;
       incomplete_count: number;
