@@ -6556,25 +6556,14 @@ active_checkpoint: none
   }, 30000);
 
   it("routes operational status and engineering intents deterministically away from content procedures", async () => {
-    const status = await mcpToolCallRaw<{
+        const status = await mcpToolRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string };
-      mandatory_execution_map: { map_state: string; d1_execution_library_bypassed: boolean; discovery_allowed: boolean };
-      execution_guard_enforcement: {
-        mode: string;
-        d1_bootstrap_bypassed: boolean;
-        d1_pre_call_routing_bypassed: boolean;
-        d1_execution_events_bypassed: boolean;
-        d1_autonomy_bypassed: boolean;
-      };
-            status_kind?: string;
-                        startup_authority?: { version: string; authority: string; per_action_acknowledgment: string; governing_rule: string };
-            session_competency?: { version: string; startup_tool: string; rule: string };
+      status_kind?: string;
+      startup_authority?: { version: string; authority: string; per_action_acknowledgment: string; governing_rule: string };
+      session_lifecycle?: { session_map_tool: string; recurring_sequence: string[]; rule: string };
       missing_inputs?: string[];
-    }>("executeLensicallyIntent", {
-      profile_id: "engineering_precheck",
-      inputs: {},
-    });
+    }>("engineeringPrecheck");
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
@@ -6584,30 +6573,17 @@ active_checkpoint: none
     });
     expect(status.structuredContent.startup_authority?.governing_rule).toContain("fastest complete route");
     expect(status.structuredContent.startup_authority).not.toHaveProperty("exact_owner_approved_text");
-    expect(status.structuredContent.session_competency).toMatchObject({
-            version: "operator-session-competency-v2",
-      startup_tool: "getOperatorStartupContext",
+        expect(status.structuredContent.session_lifecycle).toMatchObject({
+      session_map_tool: "getOperatorSessionMap",
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
     });
-    expect(status.structuredContent.session_competency?.rule).toContain("does not repeat the full startup payload");
-    expect(status.structuredContent.mandatory_execution_map).toMatchObject({
-      map_state: "source_defined_direct_completed",
-      d1_execution_library_bypassed: true,
-      discovery_allowed: false,
-    });
-    expect(status.structuredContent.execution_guard_enforcement).toMatchObject({
-      mode: "source_defined_direct_engineering",
-      d1_bootstrap_bypassed: true,
-      d1_pre_call_routing_bypassed: true,
-      d1_execution_events_bypassed: true,
-      d1_autonomy_bypassed: true,
-    });
+    expect(status.structuredContent.session_lifecycle?.rule).toContain("Steps 2-5");
+    expect(status.structuredContent).not.toHaveProperty("mandatory_execution_map");
+    expect(status.structuredContent).not.toHaveProperty("execution_library");
     expect(status.structuredContent.routed_execution.executed_tool).not.toBe("submit_candidate_draft");
     expect(status.structuredContent.missing_inputs ?? []).not.toEqual(expect.arrayContaining(["brand_key", "run_id", "source_card_id"]));
 
-    const gatewayHealth = await mcpToolCallRaw<{ routed_execution: { executed_tool: string }; status_kind?: string }>("executeLensicallyIntent", {
-      profile_id: "engineering_precheck",
-      inputs: {},
-    });
+        const gatewayHealth = await mcpToolRaw<{ routed_execution: { executed_tool: string }; status_kind?: string }>("engineeringPrecheck");
     expect(gatewayHealth.isError).not.toBe(true);
     expect(gatewayHealth.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
     expect(gatewayHealth.structuredContent.status_kind).toBe("compact_engineering_precheck");
@@ -6629,18 +6605,12 @@ active_checkpoint: none
       }
       throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
     });
-    const alignment = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
-            profile_id: "repository_status",
-      inputs: {},
-    });
+        const alignment = await mcpToolRaw<{ routed_execution: { executed_tool: string } }>("getRepoStatus");
     repoStatusFetchSpy.mockRestore();
     expect(alignment.isError, JSON.stringify(alignment.structuredContent)).not.toBe(true);
     expect(alignment.structuredContent.routed_execution.executed_tool).toBe("getRepoStatus");
 
-    const audit = await mcpToolCallRaw<{ routed_execution: { executed_tool: string } }>("executeLensicallyIntent", {
-      profile_id: "list_engineering_audit",
-      inputs: { limit: 1 },
-    });
+        const audit = await mcpToolRaw<{ routed_execution: { executed_tool: string } }>("listEngineeringAudit", { limit: 1 });
     expect(audit.isError).not.toBe(true);
     expect(audit.structuredContent.routed_execution.executed_tool).toBe("listEngineeringAudit");
     expect(audit.structuredContent.routed_execution.executed_tool).not.toBe("inspectMcpFailure");
@@ -6649,13 +6619,10 @@ active_checkpoint: none
       tool_name: string;
       error: string;
       validation_errors?: Array<{ path: string }>;
-    }>("executeLensicallyIntent", {
-            profile_id: "repository_patch_set",
-      inputs: {
-        dry_run: true,
-        message: "Dry-run gateway repair route",
-        patches: [],
-      },
+        }>("applyRepoPatchSet", {
+      dry_run: true,
+      message: "Dry-run gateway repair route",
+      patches: [],
     });
     expect(repair.isError).toBe(true);
     expect(repair.structuredContent.error).toBe("routed_gateway_payload_invalid");
