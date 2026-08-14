@@ -76,6 +76,7 @@ import {
   OPERATOR_LIVE_STATE_VERSION,
   OPERATOR_ACTION_EXECUTION_VERSION,
   OPERATOR_ACTION_CLOSURE_VERSION,
+  buildOperatorOpaqueLifecycleTokenTelemetry,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   evaluateOperatorDeploymentCommitIdentity,
