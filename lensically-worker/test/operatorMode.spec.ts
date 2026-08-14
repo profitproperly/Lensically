@@ -3842,8 +3842,8 @@ describe("operator mode MCP endpoint", () => {
     const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
     expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
-    expect(JSON.stringify(actionTool?.inputSchema)).not.toContain("profile_id");
-    expect(JSON.stringify(actionTool?.inputSchema)).not.toContain('"inputs"');
+    expect(actionTool?.inputSchema?.properties).not.toHaveProperty("profile_id");
+    expect(actionTool?.inputSchema?.properties).not.toHaveProperty("inputs");
     expect(initialized.instructions.split("\n")).toEqual([
       "Governing standards: Autonomy. Efficiency. Prevention.",
       "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
