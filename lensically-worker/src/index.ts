@@ -16539,6 +16539,7 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
 }
 
 const OPERATOR_LIFECYCLE_REFERENCE_KIND = "lifecycle_state";
+const OPERATOR_LIFECYCLE_REFERENCE_NAMESPACE = "__operator_lifecycle__";
 
 async function issueOperatorLifecycleToken(
   env: Env,
