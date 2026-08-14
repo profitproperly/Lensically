@@ -153,6 +153,32 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(dependencies.createExecutionGuard).not.toHaveBeenCalled();
     expect(dependencies.executeAccountTool).not.toHaveBeenCalled();
   });
+  it("enforces the release boundary on direct-public lifecycle engineering calls", async () => {
+    const getBoundaryBlock = vi.fn(async () => ({
+      ok: false,
+      error: "stale_operator_runtime_release",
+      release_control_exempt: false,
+    }));
+    const executeEngineeringTool = vi.fn(async () => ({ ok: true }));
+    const dependencies = baseDependencies({
+      isEngineeringToolName: vi.fn(() => true),
+      getBoundaryBlock,
+      executeEngineeringTool,
+    });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 1,
+      params: { name: "getOperatorSessionMap", arguments: {} },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "stale_operator_runtime_release",
+      release_control_exempt: false,
+    });
+    expect(getBoundaryBlock).toHaveBeenCalledTimes(1);
+    expect(executeEngineeringTool).not.toHaveBeenCalled();
+  });
+
   it("preserves direct-public admission and rejects hidden routes", async () => {
     const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
