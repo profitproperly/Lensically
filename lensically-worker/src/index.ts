@@ -16540,7 +16540,7 @@ async function issueOperatorLifecycleToken(
   stage: 1 | 2 | 3 | 4 | 5,
   claims: Record<string, unknown> = {},
 ): Promise<string> {
-  return createSignedOperatorEnvelope(env, {
+  const token = await createSignedOperatorEnvelope(env, {
     kind: "operator_lifecycle",
     lifecycle_version: OPERATOR_LIFECYCLE_VERSION,
     stage,
@@ -16550,6 +16550,12 @@ async function issueOperatorLifecycleToken(
         exp: Math.floor(Date.now() / 1000) + (stage === 3 ? 15 * 60 : stage === 2 || stage === 4 ? 60 * 60 : OPERATOR_MCP_SESSION_TTL_SECONDS),
     ...claims,
   });
+  logWorkerEvent("OPERATOR_LIFECYCLE_TOKEN_ISSUED", {
+    stage,
+    ...(await buildOperatorOpaqueLifecycleTokenTelemetry(token)),
+    session_bound: typeof claims.mcp_session_id === "string" && claims.mcp_session_id.trim().length > 0,
+  });
+  return token;
 }
 
 function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, requestSessionId: string | null): string | null {
@@ -16566,7 +16572,14 @@ async function verifyOperatorLifecycleToken(
   expectedSessionId: string | null = null,
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
   const payload = await verifySignedOperatorEnvelope(env, token);
-  if (!payload) return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
+  if (!payload) {
+    logWorkerEvent("OPERATOR_LIFECYCLE_TOKEN_VERIFY_FAILED", {
+      minimum_stage: minimumStage,
+      ...(await buildOperatorOpaqueLifecycleTokenTelemetry(token)),
+      expected_session_present: Boolean(expectedSessionId),
+    }, "error");
+    return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
+  }
   if (payload.kind !== "operator_lifecycle" || payload.lifecycle_version !== OPERATOR_LIFECYCLE_VERSION) {
     return { ok: false, error: "operator_lifecycle_token_contract_mismatch" };
   }
