@@ -266,7 +266,7 @@ async function activateManifestAutonomyForTest(): Promise<void> {
     change_summary: "Activate autonomous growth engine in isolated test state.",
     proceed_confirmed: true,
   });
-  expect(activated.isError).not.toBe(true);
+    expect(activated.isError, JSON.stringify(activated.structuredContent)).not.toBe(true);
   expect(activated.structuredContent.full_auto_enabled).toBe(true);
 }
 
