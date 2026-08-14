@@ -60,7 +60,8 @@ describe("Operator MCP protocol contract", () => {
     expect(reference).toBe("olr_123e4567e89b12d3a456426614174000");
     expect(reference.length).toBe(36);
     expect(normalizeOperatorLifecycleReference(reference)).toBe(reference);
-    expect(normalizeOperatorLifecycleReference(reference.toUpperCase())).toBe(reference);
+    expect(normalizeOperatorLifecycleReference(reference.toUpperCase())).toBeNull();
+    expect(normalizeOperatorLifecycleReference(` ${reference}`)).toBeNull();
     expect(normalizeOperatorLifecycleReference(`${reference}x`)).toBeNull();
     expect(() => buildOperatorLifecycleReferenceId("not-a-uuid")).toThrow("operator_lifecycle_reference_uuid_invalid");
   });
