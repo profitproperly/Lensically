@@ -84,11 +84,21 @@ function baseDependencies(
     publicProfileIdForToolName: vi.fn((toolName) => toolName),
     executionFingerprint: vi.fn(async () => "request-fingerprint"),
     toolMutatesState: vi.fn(() => false),
-        buildActionClosure: vi.fn(async () => ({
+                buildActionClosure: vi.fn(async () => ({
       next_action: "continue",
       checkpoint: "resume",
     })),
-            verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, knowledge_node_ids: ["governance"], scopes: ["runtime"] } })),
+    verifyLifecycleExecutionToken: vi.fn(async () => ({
+      ok: true,
+      payload: {
+        stage: 3,
+        knowledge_node_ids: ["governance"],
+        scopes: ["runtime"],
+        planned_capability: "repository_status",
+        planned_tool: "getRepoStatus",
+        planned_action_fingerprint: "request-fingerprint",
+      },
+    })),
     requiredKnowledgeNodes: vi.fn(() => []),
     requiredLiveStateScopes: vi.fn(() => []),
     issueActionExecutionToken: vi.fn(async () => "action-token"),
@@ -182,10 +192,20 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(compilePublicProfileRequest).not.toHaveBeenCalled();
   });
 
-  it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
-        const dependencies = baseDependencies({
+    it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
+    const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
-            verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, knowledge_node_ids: ["governance"], scopes: ["runtime"] } })),
+      verifyLifecycleExecutionToken: vi.fn(async () => ({
+        ok: true,
+        payload: {
+          stage: 3,
+          knowledge_node_ids: ["governance"],
+          scopes: ["runtime"],
+          planned_capability: "unknown_profile",
+          planned_tool: "unknown",
+          planned_action_fingerprint: "request-fingerprint",
+        },
+      })),
       compilePublicProfileRequest: vi.fn(() => ({
         ok: false,
         error: "unknown_profile",
