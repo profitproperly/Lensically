@@ -57,7 +57,11 @@ export const RETIRED_HUMAN_GUIDANCE_TOOL_NAMES = new Set<string>([
 ]);
 
 const PUBLIC_DIRECT_TOOL_NAMES = [
-  "getOperatorStartupContext",
+    "getOperatorSessionMap",
+  "getOperatorKnowledge",
+  "getOperatorLiveState",
+  "executeOperatorAction",
+  "closeOperatorAction",
   "getEngineeringContinuation",
   "getDatabaseSchemaState",
   "engineeringPrecheck",

@@ -1,4 +1,4 @@
-export const OPERATOR_MCP_VERSION = "1.44.0";
+export const OPERATOR_MCP_VERSION = "1.45.0";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
@@ -8,8 +8,12 @@ export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Preventio
 export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "After deploying and live-verifying any public MCP tool addition or schema change, do not test the new schema from a chat initialized against the previous deployment. Treat that as the normal client-refresh boundary, not a product defect; do not add compatibility or Recovery workarounds for the stale chat. The refresh handoff is incomplete unless it contains the exact standalone line: refresh the lensically operator mode mcp now. Immediately after that line, render exactly one fenced plaintext code block whose first line is CONTEXT PORT — PASTE INTO NEW CHAT. The model must author this port from verified current state; never require the owner to infer continuation, summarize from memory, copy prior prose, or paste the whole previous response. The context port must be self-contained and include these labeled fields: FIRST ACTION, RESUME OBJECTIVE, COMPLETED / VERIFIED, CURRENT STATE, NEXT ACTION, SURVIVING CONSTRAINTS, and DEPLOYMENT IDENTITY. Include only the information required to resume without ambiguity.";
 export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
-export const OPERATOR_SESSION_COMPETENCY_BOOT_VERSION = "operator-session-competency-v2";
-export const OPERATOR_SESSION_COMPETENCY_BOOT_RULE = "Assume zero retained Lensically knowledge at every fresh session. Before non-startup work, call getOperatorStartupContext once, use its constant-size competency router to load only the relevant OPERATOR_COMPETENCY.md domain, then load task-specific live state. Startup ceilings are guardrails, never storage budgets.";
+export const OPERATOR_LIFECYCLE_VERSION = "operator-lifecycle-v1";
+export const OPERATOR_SESSION_MAP_VERSION = "operator-session-map-v1";
+export const OPERATOR_KNOWLEDGE_VERSION = "operator-knowledge-v1";
+export const OPERATOR_LIVE_STATE_VERSION = "operator-live-state-v1";
+export const OPERATOR_ACTION_EXECUTION_VERSION = "operator-action-execution-v1";
+export const OPERATOR_ACTION_CLOSURE_VERSION = "operator-action-closure-v1";
 
 export function evaluateOperatorDeploymentCommitIdentity(
   currentCommit: unknown,
@@ -167,30 +171,11 @@ export function buildOperatorGoverningStandardsStartupLines(): string[] {
   return OPERATOR_GOVERNING_STANDARDS_TEXT.split("\n");
 }
 
-export function buildOperatorMcpInstructions(toolCount: number): string {
-    return [
-    ...buildOperatorGoverningStandardsStartupLines(),
-    "",
-                                "Use Lensically Operator Mode as the source of truth.",
-    OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
-    `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
-    "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
-    "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
-                "Discovery returns candidates, not authorization; verify tool purpose and side effects before invoking.",
-    "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",
-    "Never report a safety block, timeout, connector error, backend failure, attempted execution, or completed execution unless the exact tool invocation returned evidence for that status. Without a tool result, the only valid status is not invoked, and the next action is to invoke it.",
-    "Autonomous Manifest cycle tools execute directly without an interactive Proceed handshake. Guided account workflows may still require explicit Proceed before account data loads.",
-        "After Proceed, reconcile live schedule, delivery, metrics, strategy, incidents, and durable cycle state, then resume the active autonomous outcome. Stale continuity summaries never override live state.",
-    "For guided account workflows only, use the exact four-line selected-key handshake returned by the server:",
-    "Lensically Operator Mode MCP is active.",
-    "Selected key: <selected_key>",
-    `Full tool surface loaded: ${toolCount} tools available and usable.`,
-    "Proceed to the next step?",
-    "Autonomous Manifest strategy, generation, scheduling, evaluation, receipts, and coverage execute directly under the active autonomous profile. After explicit Proceed for guided workflows, account calls include only their advertised typed fields.",
-    "Content generation preserves source lineage, passes every mandatory backend gate, and schedules only internally approved autonomous drafts into exact missing runway slots.",
-    "Owner review is optional and non-blocking. Spending, credential or ownership changes, irreversible deletion, fundamental mission changes, disabling critical infrastructure, and material account or project danger remain owner-ratified.",
-    "Scheduler safety and overdue recovery remain backend-enforced.",
-    "Follower totals are account-level trajectory data and are never attributed to a post or posting period.",
+export function buildOperatorMcpInstructions(_toolCount: number): string {
+  return [
+    "Governing standards: Autonomy. Efficiency. Prevention.",
+    "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
+    "Call getOperatorSessionMap before any other Lensically Operator Mode tool.",
   ].join("\n");
 }
 

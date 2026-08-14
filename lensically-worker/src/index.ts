@@ -67,10 +67,14 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 
 import {
-        OPERATOR_GOVERNING_STANDARDS,
+                OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_MCP_VERSION,
-  OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
-  OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
+  OPERATOR_LIFECYCLE_VERSION,
+  OPERATOR_SESSION_MAP_VERSION,
+  OPERATOR_KNOWLEDGE_VERSION,
+  OPERATOR_LIVE_STATE_VERSION,
+  OPERATOR_ACTION_EXECUTION_VERSION,
+  OPERATOR_ACTION_CLOSURE_VERSION,
   buildOperatorKeyHandshakeLines as operatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   evaluateOperatorDeploymentCommitIdentity,
@@ -16530,10 +16534,13 @@ async function verifySignedOperatorEnvelope(env: Env, token: unknown): Promise<R
 
 const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
-const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeLensicallyIntent";
+const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeOperatorAction";
 const OPERATOR_EXECUTION_GUARD_TTL_SECONDS = 300;
 const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
-    "getOperatorStartupContext",
+  "getOperatorSessionMap",
+  "getOperatorKnowledge",
+  "getOperatorLiveState",
+  "closeOperatorAction",
   "guardLensicallyCall",
   OPERATOR_ROUTED_EXECUTION_GATEWAY,
 ]);
@@ -16704,7 +16711,7 @@ type OperatorPublicProfileCompilation =
   | { ok: false; error: string; profile_id: string | null; required_profile_id?: string; available_profile_hint?: string };
 
 const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequestProfileId>([
-  ["getOperatorStartupContext", "startup"],
+    ["getOperatorSessionMap", "startup"],
   ["listGitHubWorkflowRuns", "workflow_run_list"],
   ["getGitHubWorkflowRun", "workflow_run_status"],
     ["getRepoStatus", "repository_status"],
@@ -16735,7 +16742,7 @@ function operatorPublicProfileIdForToolName(toolName: string): string {
 }
 
 function operatorPublicIntentForToolName(toolName: string): string {
-  if (toolName === "getOperatorStartupContext") return "startup";
+    if (toolName === "getOperatorSessionMap") return "startup";
   return operatorPublicProfileIdForToolName(toolName).replace(/_/g, " ");
 }
 

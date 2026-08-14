@@ -54,9 +54,13 @@ export const ACCOUNT_SCOPED_MCP_ADMIN_TOOLS = new Set<string>([
 ]);
 
 export const OPERATOR_MCP_DIRECT_PRIORITIES = new Map<string, number>([
-  ["getOperatorStartupContext", 0],
-  ["getEngineeringContinuation", 1],
-  ["getDatabaseSchemaState", 2],
+    ["getOperatorSessionMap", 0],
+  ["getOperatorKnowledge", 1],
+  ["getOperatorLiveState", 2],
+  ["executeOperatorAction", 3],
+  ["closeOperatorAction", 4],
+  ["getEngineeringContinuation", 10],
+  ["getDatabaseSchemaState", 11],
   ["selectOperatorKey", 1],
   ["confirmOperatorProceed", 2],
   ["getScheduledPostSchedulerState", 6],

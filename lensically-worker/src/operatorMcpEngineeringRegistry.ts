@@ -5,10 +5,13 @@ import {
 import type { OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
 
 export const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
-  "getOperatorStartupContext",
+    "getOperatorSessionMap",
+  "getOperatorKnowledge",
+  "getOperatorLiveState",
   "getEngineeringContinuation",
   "getDatabaseSchemaState",
-  "executeLensicallyIntent",
+  "executeOperatorAction",
+  "closeOperatorAction",
   "engineeringPrecheck",
   "getEngineeringAccessState",
   "recordHardeningIncident",
@@ -55,11 +58,54 @@ const REPO_PATH_SCHEMA = {
 };
 
 export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
-  {
-    name: "getOperatorStartupContext",
-    title: "Get operator startup context",
-    description: "Load the compact non-account Lensically startup bootstrap before engineering, admin, workflow, or account work. Does not load account state, workflow status, source cards, drafts, scheduled posts, gates, strategy memory, or metrics.",
+    {
+    name: "getOperatorSessionMap",
+    title: "Get operator session map",
+    description: "Step 1 of the canonical Operator lifecycle. Load only the compact recursive session map, canonical node pointers, lifecycle sequence, and signed session-map token. It does not load durable knowledge or live task state.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "getOperatorKnowledge",
+    title: "Get operator knowledge",
+    description: "Step 2 of the canonical Operator lifecycle. Resolve one or more canonical durable-knowledge nodes from the Step-1 map and issue a signed knowledge token. Durable knowledge lives here; live task state does not.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_map_token: { type: "string", minLength: 16 },
+        node_ids: {
+          type: "array",
+          minItems: 1,
+          maxItems: 7,
+          uniqueItems: true,
+          items: { type: "string", enum: ["governance", "repository_engineering", "release_infrastructure", "account_runtime", "manifest_content", "hardening_safety", "commercial_product"] },
+        },
+      },
+      required: ["session_map_token", "node_ids"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "getOperatorLiveState",
+    title: "Get operator live state",
+    description: "Step 3 of the canonical Operator lifecycle. Load the current authoritative mutable state needed for a task after durable knowledge has been loaded, and issue a signed live-state token for execution.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        knowledge_token: { type: "string", minLength: 16 },
+        scopes: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          uniqueItems: true,
+          items: { type: "string", enum: ["runtime", "repository", "engineering_continuation", "account", "scheduler", "growth_mission", "manifest_intelligence", "commerce"] },
+        },
+        brand_key: BRAND_KEY_SCHEMA,
+      },
+      required: ["knowledge_token", "scopes"],
+      additionalProperties: false,
+    },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
@@ -214,20 +260,47 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
-  {
-    name: "executeLensicallyIntent",
-    title: "Execute Lensically intent",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Submit one registered profile ID and bounded variable inputs. Lensically compiles the canonical objective and intent server-side, then the Execution Kernel applies routing, safety, continuity, and execution controls.`,
+    {
+    name: "executeOperatorAction",
+    title: "Execute operator action",
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute one registered capability through the existing Execution Kernel after a valid Step-3 live-state token proves the required knowledge and live-state preparation occurred.`,
     inputSchema: {
       type: "object",
       properties: {
+        live_state_token: { type: "string", minLength: 16 },
         profile_id: { type: "string", minLength: 1, maxLength: 160, pattern: "^[a-z0-9_]+$", description: "Registered semantic request profile. Objective, intent, routing, and handler selection are compiled server-side." },
         inputs: { type: "object", description: "Bounded variable fields allowed by the registered profile.", additionalProperties: true },
         continuation_id: { type: "string" },
         incident_id: { type: "string" },
         permit: { type: "string", description: "Signed permit returned only for unknown or stale terrain." },
       },
-      required: ["profile_id", "inputs"],
+      required: ["live_state_token", "profile_id", "inputs"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "closeOperatorAction",
+    title: "Close operator action",
+    description: "Step 5 of the canonical Operator lifecycle. Consume a signed Step-4 execution token, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before the action can be closed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action_execution_token: { type: "string", minLength: 16 },
+        verification: {
+          type: "object",
+          properties: {
+            verified: { type: "boolean" },
+            evidence: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", minLength: 1, maxLength: 1000 } },
+            next_action: { type: "string", minLength: 1, maxLength: 2000 },
+            durable_learning: { type: "string", maxLength: 4000 },
+            prevention_required: { type: "boolean" },
+          },
+          required: ["verified", "evidence", "next_action"],
+          additionalProperties: false,
+        },
+      },
+      required: ["action_execution_token", "verification"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
