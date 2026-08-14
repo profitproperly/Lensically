@@ -1534,7 +1534,8 @@ if (!operatorMcpToolCallDispatcher.includes("export async function dispatchOpera
     || !operatorMcpToolCallDispatcher.includes("return mcpToolCompletionResponse(id, toolName, resultPayload, isError);")) {
   lifecycleErrors.push("operator_mcp_tool_call_dispatcher_module_incomplete");
 }
-if (!operatorMcpToolCallDispatcherTests.includes("preserves direct-public admission and rejects hidden routes")
+if (!operatorMcpToolCallDispatcherTests.includes("enforces the release boundary on direct-public lifecycle engineering calls")
+    || !operatorMcpToolCallDispatcherTests.includes("preserves direct-public admission and rejects hidden routes")
         || !operatorMcpToolCallDispatcherTests.includes("blocks Step 4 before profile compilation without valid Step-3 proof")
     || !operatorMcpToolCallDispatcherTests.includes("preserves registered Step-4 profile compilation failures after valid live-state proof")
     || !operatorMcpToolCallDispatcherTests.includes("preserves proven pre-call redirects before execution")
