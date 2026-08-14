@@ -20902,7 +20902,10 @@ async function handleOperatorMcpEngineeringTool(
     }
         const closureToken = await issueOperatorLifecycleToken(env, 5, {
       closure_version: OPERATOR_ACTION_CLOSURE_VERSION,
-      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
+      mcp_session_id: resolveOperatorLifecycleSessionBinding(
+        tokenCheck.payload.mcp_session_id,
+        request.headers.get("mcp-session-id")?.trim() || null,
+      ),
       executed_tool: tokenCheck.payload.executed_tool ?? null,
       profile_id: tokenCheck.payload.profile_id ?? null,
       result_ok: tokenCheck.payload.result_ok ?? null,
