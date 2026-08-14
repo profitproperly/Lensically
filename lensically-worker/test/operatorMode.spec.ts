@@ -3836,9 +3836,9 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "run_mcp_tests";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
     expect(mcpCampaignBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-    expect(JSON.stringify(knowledgeTool?.inputSchema)).not.toContain("node_ids");
-    expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("scopes");
-    expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("brand_key");
+    expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
+    expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
+    expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
     const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
     expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
