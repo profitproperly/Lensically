@@ -1,12 +1,12 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-14
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
+active_job_id: operator-lifecycle-architecture-refactor-20260814
+active_checkpoint: repair-live-state-cpu-exhaustion
 
 ## COMPLETED — Operator Lifecycle Architecture Refactor
 
