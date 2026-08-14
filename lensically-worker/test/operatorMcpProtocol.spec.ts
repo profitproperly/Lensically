@@ -76,6 +76,8 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_GOVERNING_STANDARDS.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(OPERATOR_DISCOVERY_EXECUTION_RULE).toContain("never authorize execution");
     expect(OPERATOR_GOVERNING_STANDARDS.discovery_execution_rule).toBe(OPERATOR_DISCOVERY_EXECUTION_RULE);
+    expect(OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE).toContain("Operator MCP runtime-behavior change");
+    expect(OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE).toContain("mandatory client-refresh boundary");
     expect(OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE).toContain("CONTEXT PORT — PASTE INTO NEW CHAT");
     expect(OPERATOR_GOVERNING_STANDARDS.public_schema_refresh_rule).toBe(OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE);
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
