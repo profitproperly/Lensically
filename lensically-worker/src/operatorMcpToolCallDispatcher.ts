@@ -242,23 +242,7 @@ export async function dispatchOperatorMcpToolCall(
       }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
     }
                 toolName = prepared.tool_name;
-    const preparedCapability = typeof lifecycleCheck.payload.planned_capability === "string" ? lifecycleCheck.payload.planned_capability : "";
-    const preparedToolName = typeof lifecycleCheck.payload.planned_tool === "string" ? lifecycleCheck.payload.planned_tool : "";
-    const preparedFingerprint = typeof lifecycleCheck.payload.planned_action_fingerprint === "string" ? lifecycleCheck.payload.planned_action_fingerprint : "";
-    const submittedFingerprint = await dependencies.executionFingerprint(toolName, actionArguments);
-    if (!preparedCapability || preparedCapability !== capability || !preparedToolName || preparedToolName !== toolName || !preparedFingerprint || preparedFingerprint !== submittedFingerprint) {
-      return mcpToolResultResponse(id, {
-        ok: false,
-        error: "operator_action_changed_after_preparation",
-        prepared_capability: preparedCapability || null,
-        requested_capability: capability,
-        prepared_tool: preparedToolName || null,
-        resolved_tool: toolName,
-        required_stage: "getOperatorKnowledge",
-        execution_started: false,
-        account_data_loaded: gatewayAccountDataLoaded,
-      }, "Lensically blocked Step 4 because the typed action changed after Steps 2 and 3 prepared its knowledge and live state.", true);
-    }
+    
     const loadedKnowledge = Array.isArray(lifecycleCheck.payload.knowledge_node_ids)
       ? lifecycleCheck.payload.knowledge_node_ids.map(String)
       : [];
