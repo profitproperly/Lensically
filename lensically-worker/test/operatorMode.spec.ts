@@ -5333,11 +5333,13 @@ active_checkpoint: none
     }>("getOperatorStartupContext");
                 expect(startup.bootstrap_version).toBe("operator-startup-v6");
                 expect(startup.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v6",
+            version: "operator-governing-standards-v7",
       authority: "highest_lensically_operating_authority",
       startup_display_required: true,
     });
-    expect(startup.startup_authority.discovery_execution_rule).toContain("never authorize execution");
+        expect(startup.startup_authority.discovery_execution_rule).toContain("never authorize execution");
+    expect(startup.startup_authority.public_schema_refresh_rule).toContain("CONTEXT PORT — PASTE INTO NEW CHAT");
+    expect(startup.startup_authority.public_schema_refresh_rule).toContain("NEXT ACTION");
     expect(startup.startup_authority.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(startup.startup_authority.exact_owner_approved_text).toContain("Resume the original objective only after prevention is locked in.");
     expect(startup.startup_authority.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
@@ -6422,8 +6424,10 @@ active_checkpoint: none
     if (status.isError) throw new Error(JSON.stringify(status.structuredContent));
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
-                                expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v6" });
-    expect(status.structuredContent.startup_authority?.discovery_execution_rule).toContain("never authorize execution");
+                                expect(status.structuredContent.startup_authority).toMatchObject({ version: "operator-governing-standards-v7" });
+        expect(status.structuredContent.startup_authority?.discovery_execution_rule).toContain("never authorize execution");
+    expect(status.structuredContent.startup_authority?.public_schema_refresh_rule).toContain("CONTEXT PORT — PASTE INTO NEW CHAT");
+    expect(status.structuredContent.startup_authority?.public_schema_refresh_rule).toContain("SURVIVING CONSTRAINTS");
     expect(status.structuredContent.startup_authority?.exact_owner_approved_text).toContain("A note in chat memory is not enforcement.");
     expect(status.structuredContent.startup_authority?.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
     expect(status.structuredContent.startup_authority?.prevention_closure_rule).toContain("may not end with analysis");
