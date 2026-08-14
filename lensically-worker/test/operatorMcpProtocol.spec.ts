@@ -55,6 +55,16 @@ describe("Operator MCP protocol contract", () => {
     });
   });
 
+  it("keeps lifecycle continuation references short, opaque, and copy-stable", () => {
+    const reference = buildOperatorLifecycleReferenceId("123e4567-e89b-12d3-a456-426614174000");
+    expect(reference).toBe("olr_123e4567e89b12d3a456426614174000");
+    expect(reference.length).toBe(36);
+    expect(normalizeOperatorLifecycleReference(reference)).toBe(reference);
+    expect(normalizeOperatorLifecycleReference(reference.toUpperCase())).toBe(reference);
+    expect(normalizeOperatorLifecycleReference(`${reference}x`)).toBeNull();
+    expect(() => buildOperatorLifecycleReferenceId("not-a-uuid")).toThrow("operator_lifecycle_reference_uuid_invalid");
+  });
+
     it("fails closed when the executing handler and fresh endpoint commits differ", () => {
     const same = evaluateOperatorDeploymentCommitIdentity(
       "9dfff53b851f0b81358f70ad4a497e651098373c",
