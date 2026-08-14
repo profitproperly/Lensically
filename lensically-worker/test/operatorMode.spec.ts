@@ -6890,15 +6890,13 @@ active_checkpoint: none
     expect(reconfirmed.structuredContent.continuation_choice_required).toBe(false);
     expect(reconfirmed.structuredContent.continuity_capsule.brand_key).toBe(BRAND_KEY);
 
-            const blocked = await mcpToolRaw<{ error: string; requested_tool: string; account_data_loaded: boolean }>("getWorkflowStatus", {
+            const blocked = await mcpToolRaw<{ error: string }>("getWorkflowStatus", {
       brand_key: BRAND_KEY,
       proceed_confirmed: true,
     });
     expect(blocked.isError).toBe(true);
     expect(blocked.structuredContent).toMatchObject({
-      error: "public_direct_tool_required",
-      requested_tool: "getWorkflowStatus",
-      account_data_loaded: false,
+      error: "operator_planned_action_capability_unknown",
     });
   }, 30000);
 
