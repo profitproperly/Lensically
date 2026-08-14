@@ -1,10 +1,11 @@
-export const OPERATOR_MCP_VERSION = "1.42.1";
+export const OPERATOR_MCP_VERSION = "1.42.2";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v3";
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v4";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
+export const OPERATOR_BLOCKER_HALT_RULE = "If any Operator tool invocation returns a known blocker or failure, including an OpenAI safety or policy block, connector rejection, or backend error, stop the current sequence immediately. Do not retry with altered arguments, switch target forms, switch tools, or continue sibling actions. Identify and repair the exact root cause, record the incident and fix, add durable regression and prevention, verify the repair, and only then resume the original objective. An uncertain transport result may be reconciled with the same operation_id only to determine execution state; it may never be used to bypass a known blocker.";
 
 export function evaluateOperatorDeploymentCommitIdentity(
   currentCommit: unknown,
@@ -117,6 +118,16 @@ A note in chat memory is not enforcement.
 
 A problem is not resolved until the root cause is repaired and recurrence is permanently blocked.
 
+# MANDATORY BLOCKER HALT RULE
+
+If any Operator tool invocation returns a known blocker or failure, including an OpenAI safety or policy block, connector rejection, or backend error, stop the current sequence immediately.
+
+Do not retry with altered arguments. Do not switch target forms. Do not switch tools. Do not continue sibling actions from the same requested sequence.
+
+Identify and repair the exact root cause, record the incident and fix, add durable regression and prevention, verify the repair, and only then resume the original objective.
+
+An uncertain transport result may be reconciled with the same operation_id only to determine execution state; it may never be used to bypass a known blocker.
+
 # MANDATORY STARTUP DISPLAY
 
 At the beginning of every Lensically Operator Mode session, before any repository, workflow, account, content, deployment, or engineering action, the startup response must visibly display:
@@ -138,8 +149,9 @@ export const OPERATOR_GOVERNING_STANDARDS = {
   authority: "highest_lensically_operating_authority",
   exact_owner_approved_text: OPERATOR_GOVERNING_STANDARDS_TEXT,
     startup_display_required: true,
-  per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
+    per_action_acknowledgment: OPERATOR_GOVERNING_STANDARDS_ACK,
   per_action_enforcement: "Every advertised Operator tool schema requires the exact acknowledgment, and the dispatcher rejects missing or altered acknowledgment before routing, account loading, idempotency, or execution.",
+  blocker_halt_rule: OPERATOR_BLOCKER_HALT_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
   redundant_inspection_rule: "Once the exact specification, target file, and integration point are known, repeated search or read calls for the same settled evidence are forbidden unless a concrete contradiction or failed replacement requires them.",

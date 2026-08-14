@@ -6,7 +6,7 @@ import {
   createScopedOperatorWrapperTool,
   type OperatorMcpToolDefinition,
 } from "../src/operatorMcpToolDefinitions";
-import { OPERATOR_GOVERNING_STANDARDS_ACK } from "../src/operatorMcpProtocol";
+import { OPERATOR_BLOCKER_HALT_RULE, OPERATOR_GOVERNING_STANDARDS_ACK } from "../src/operatorMcpProtocol";
 
 
 const accountTool: OperatorMcpToolDefinition = {
@@ -86,7 +86,9 @@ describe("Operator MCP tool-definition construction", () => {
       expect(tool.inputSchema.properties).toMatchObject({
         governing_standards_ack: { type: "string", const: OPERATOR_GOVERNING_STANDARDS_ACK },
       });
-      expect(tool.inputSchema.required).toContain("governing_standards_ack");
+            expect(tool.inputSchema.required).toContain("governing_standards_ack");
+      const governingAck = (tool.inputSchema.properties as Record<string, Record<string, unknown>>).governing_standards_ack;
+      expect(String(governingAck.description)).toContain(OPERATOR_BLOCKER_HALT_RULE);
     }
   });
 });

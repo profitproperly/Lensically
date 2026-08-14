@@ -1,4 +1,4 @@
-import { OPERATOR_GOVERNING_STANDARDS_ACK } from "./operatorMcpProtocol";
+import { OPERATOR_BLOCKER_HALT_RULE, OPERATOR_GOVERNING_STANDARDS_ACK } from "./operatorMcpProtocol";
 
 export type OperatorMcpToolDefinition = {
   name: string;
@@ -81,7 +81,7 @@ export function addOperatorExecutionMetadataSchema(
   properties.governing_standards_ack = {
     type: "string",
     const: OPERATOR_GOVERNING_STANDARDS_ACK,
-    description: "Mandatory pre-action acknowledgment. Evaluate Autonomy, Efficiency, and Prevention before this call; stop on blockers, fix and record the root cause, add permanent prevention, then resume.",
+        description: `Mandatory pre-action acknowledgment. Evaluate Autonomy, Efficiency, and Prevention before this call. ${OPERATOR_BLOCKER_HALT_RULE}`,
   };
   if (includeMetadata) {
     properties.proceed_confirmed = {
