@@ -21880,9 +21880,6 @@ async function handleOperatorMcpEngineeringTool(
       body: JSON.stringify({ ref, inputs }),
     });
                                 const transientDispatchFailure = !result.ok && isAmbiguousGithubWorkflowDispatchStatus(Number(result.status));
-    if (task === "worker-deploy" && releaseSha && !result.ok && !transientDispatchFailure) {
-      await restoreOperatorReleaseAuthority(env.DB, previousReleaseAuthority);
-    }
     await recordEngineeringAudit(env, { action: toolName, filesChanged: [], diffSummary: `Dispatched Main workflow task ${task}${releaseSha ? ` for ${releaseSha}` : ""}.`, testsRun: [{ workflow_id: workflowId, task, release_sha: releaseSha ?? null }], result: result.ok ? "ok" : transientDispatchFailure ? "retryable" : "failed", metadata: { status: result.status, transient_dispatch_failure: transientDispatchFailure } });
     return {
       ok: result.ok,
