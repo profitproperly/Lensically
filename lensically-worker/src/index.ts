@@ -16855,15 +16855,38 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
   };
 }
 
+type OperatorInternalActionDirectory = {
+  byCapability: Map<string, { toolName: string; capability: string; tool: OperatorMcpToolDefinition }>;
+  byToolName: Map<string, OperatorMcpToolDefinition>;
+};
+
+let operatorInternalActionDirectoryCache: OperatorInternalActionDirectory | null = null;
+
+function operatorInternalActionDirectory(): OperatorInternalActionDirectory {
+  if (operatorInternalActionDirectoryCache) return operatorInternalActionDirectoryCache;
+  const byCapability = new Map<string, { toolName: string; capability: string; tool: OperatorMcpToolDefinition }>();
+  const byToolName = new Map<string, OperatorMcpToolDefinition>();
+  for (const tool of buildComposedOperatorMcpTools(false)) {
+    if (OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name)) continue;
+    if (FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) || RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name)) continue;
+    const capability = operatorActionCapabilityIdForToolName(tool.name);
+    if (byCapability.has(capability)) throw new Error(`operator_action_capability_collision:${capability}`);
+    const entry = { toolName: tool.name, capability, tool };
+    byCapability.set(capability, entry);
+    byToolName.set(tool.name, tool);
+  }
+  operatorInternalActionDirectoryCache = { byCapability, byToolName };
+  return operatorInternalActionDirectoryCache;
+}
+
 function resolveOperatorInternalActionCapability(capability: string): { toolName: string; capability: string; tool: OperatorMcpToolDefinition } | null {
   const normalized = normalizeOperatorMachineKey(capability, "");
   if (!normalized) return null;
-  const matches = buildComposedOperatorMcpTools(false)
-    .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
-    .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
-    .filter((tool) => operatorActionCapabilityIdForToolName(tool.name) === normalized);
-  if (matches.length !== 1) return null;
-  return { toolName: matches[0].name, capability: normalized, tool: matches[0] };
+  return operatorInternalActionDirectory().byCapability.get(normalized) ?? null;
+}
+
+function resolveOperatorInternalActionToolByName(toolName: string): OperatorMcpToolDefinition | null {
+  return operatorInternalActionDirectory().byToolName.get(toolName) ?? null;
 }
 
 async function resolveOperatorPlannedAction(value: unknown): Promise<{
