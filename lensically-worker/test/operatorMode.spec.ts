@@ -3993,6 +3993,85 @@ active_checkpoint: none
     expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
   }, 30000);
 
+  it("adopts the first valid MCP session for an unbound lifecycle and rejects a later different session", async () => {
+    const initializeSession = async (): Promise<string> => {
+      const response = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: MCP_AUTH_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: crypto.randomUUID(),
+          method: "initialize",
+          params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "vitest", version: "1.0.0" } },
+        }),
+      });
+      expect(response.status).toBe(200);
+      const sessionId = response.headers.get("mcp-session-id");
+      expect(sessionId).toBeTruthy();
+      return sessionId ?? "";
+    };
+    const callWithSession = async <T>(sessionId: string, toolName: string, args: Record<string, unknown>): Promise<{ structuredContent: T; isError?: boolean }> => {
+      const response = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: { ...MCP_AUTH_HEADERS, "Mcp-Session-Id": sessionId },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: crypto.randomUUID(),
+          method: "tools/call",
+          params: {
+            name: toolName,
+            arguments: {
+              governing_standards_ack: "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.",
+              ...args,
+            },
+          },
+        }),
+      });
+      expect(response.status).toBeLessThan(400);
+      const payload = await response.json() as { result: { structuredContent: T; isError?: boolean } };
+      return payload.result;
+    };
+
+    const firstSessionId = await initializeSession();
+    const secondSessionId = await initializeSession();
+    expect(secondSessionId).not.toBe(firstSessionId);
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "list_accounts", arguments: {} },
+    });
+    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(firstSessionId, "getOperatorLiveState", {
+      knowledge_token: step2.structuredContent.knowledge_token,
+    });
+    expect(step3.isError).not.toBe(true);
+    expect(step3.structuredContent.live_state_token).toBeTruthy();
+
+    const wrongSessionStep4 = await callWithSession<{ ok: boolean; error?: string }>(secondSessionId, "executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(wrongSessionStep4.isError).toBe(true);
+    expect(wrongSessionStep4.structuredContent).toMatchObject({ ok: false, error: "operator_lifecycle_session_changed" });
+
+    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(step4.isError).not.toBe(true);
+    expect(step4.structuredContent.action_execution_token).toBeTruthy();
+    const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(firstSessionId, "closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      verification: {
+        verified: true,
+        evidence: ["The unbound lifecycle adopted the first valid MCP session and the bound session completed Step 4."],
+        next_action: "Continue the isolated lifecycle regression.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError).not.toBe(true);
+    expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+  }, 30000);
+
                 it.skip("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
