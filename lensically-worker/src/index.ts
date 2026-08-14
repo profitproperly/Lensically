@@ -281,9 +281,7 @@ import {
 import {
   activateOperatorReleaseAuthority,
   evaluateOperatorReleaseAuthority,
-  publishOperatorReleaseTarget,
   readOperatorReleaseAuthority,
-  restoreOperatorReleaseAuthority,
 } from "./operatorReleaseAuthority";
 
 
