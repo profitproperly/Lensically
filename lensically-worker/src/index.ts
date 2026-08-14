@@ -16588,7 +16588,7 @@ const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
   "closeOperatorAction",
 ]);
 
-export function evaluateOperatorPublicLifecycleBoundary(listedToolNames: string[]): Record<string, unknown> {
+export function evaluateOperatorPublicLifecycleBoundary(listedToolNames: string[]) {
   const expectedLifecycleToolNames = [...OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES];
   const expectedLifecycleToolNameSet = new Set(expectedLifecycleToolNames);
   const missingLifecycleTools = expectedLifecycleToolNames.filter((name) => !listedToolNames.includes(name));
