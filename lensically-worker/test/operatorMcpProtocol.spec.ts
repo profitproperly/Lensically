@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sanitizeForLog } from "../auth/logSanitizer.js";
 import {
                                 OPERATOR_GOVERNING_STANDARDS,
         OPERATOR_DISCOVERY_EXECUTION_RULE,
