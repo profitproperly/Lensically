@@ -3869,8 +3869,8 @@ active_checkpoint: none
 
     const autonomousPersistTool = listed.tools.find((tool) => tool.name === "persist_manifest_autonomous_post");
     const autonomousPrepareTool = listed.tools.find((tool) => tool.name === "prepare_manifest_autonomous_cycle");
-    expect(autonomousPrepareTool?.description).toContain("tool discovery or schema loading is not execution");
-    expect(autonomousPrepareTool?.description).toContain("no failure may be reported without this tool's returned result");
+        expect(autonomousPrepareTool?.description).toContain("only when the owner explicitly requests the Main Cycle or canonical cycle continuation requires it");
+    expect(autonomousPrepareTool?.description).not.toMatch(/tool discovery|schema loading|\bRefresh\b/i);
     expect(autonomousPersistTool?.inputSchema?.properties?.post).toBeTruthy();
     expect(autonomousPersistTool?.inputSchema?.properties?.posts).toBeUndefined();
     expect(names).not.toContain("commit_manifest_autonomous_runway");
