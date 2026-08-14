@@ -3737,6 +3737,13 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
+if (!operatorMcpProtocol.includes("Operator MCP runtime-behavior change")
+    || !operatorMcpProtocol.includes("stale runtime release or lifecycle deployment mismatch after a release is a mandatory client-refresh boundary")
+    || !source.includes("client_refresh_required: publicLifecycleRefreshRequired")
+    || !source.includes('refresh the lensically operator mode mcp now. Start a new chat and resume from getOperatorSessionMap.')
+    || !source.includes("retryable: publicLifecycleRefreshRequired ? false : true")) {
+  errors.push("stale_public_lifecycle_refresh_boundary_missing");
+}
 if (!source.includes("let operatorPublicMcpToolsCache: OperatorMcpToolDefinition[] | null = null;")
     || !source.includes("let operatorInternalActionDirectoryCache: OperatorInternalActionDirectory | null = null;")
     || !source.includes("requiredOperatorLiveStateScopesForTool(tool.name, tool)")
