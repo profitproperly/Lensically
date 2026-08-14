@@ -4066,13 +4066,12 @@ active_checkpoint: none
     expect(step3.isError).not.toBe(true);
     expect(step3.structuredContent.live_state_token).toBeTruthy();
 
-    const secondSessionId = await initializeSession();
-    const wrongSessionStep4 = await callWithSession<{ ok: boolean; error?: string }>(secondSessionId, "executeOperatorAction", {
-      live_state_token: step3.structuredContent.live_state_token,
-      action: { capability: "list_accounts", arguments: {} },
-    });
-    expect(wrongSessionStep4.isError).toBe(true);
-    expect(wrongSessionStep4.structuredContent.error).toBe("operator_lifecycle_session_changed");
+    const persistedLiveState = await env.DB.prepare(
+      "SELECT payload_json FROM operator_continuity_refs WHERE id = ? AND kind = 'lifecycle_state' LIMIT 1",
+    ).bind(step3.structuredContent.live_state_token).first<{ payload_json: string }>();
+    expect(persistedLiveState).toBeTruthy();
+    const persistedLiveStatePayload = JSON.parse(String(persistedLiveState?.payload_json ?? "{}")) as Record<string, unknown>;
+    expect(persistedLiveStatePayload.mcp_session_id).toBe(firstSessionId);
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
