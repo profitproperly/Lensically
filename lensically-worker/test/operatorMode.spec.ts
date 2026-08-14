@@ -5977,7 +5977,7 @@ active_checkpoint: none
         risk_groups: { read_only: number; mutation: number };
       };
         }>("runMcpTests", { segment: "s0" });
-    expect(campaign.isError, JSON.stringify(campaign.structuredContent)).not.toBe(true);
+        expect(campaign.structuredContent.campaign, JSON.stringify(campaign.structuredContent)).toBeTruthy();
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 total_internal_capabilities: 124,
@@ -5986,10 +5986,11 @@ active_checkpoint: none
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
     });
-    expect(
+        expect(
       campaign.structuredContent.campaign.failed,
       JSON.stringify(campaign.structuredContent.campaign.failures),
     ).toBe(0);
+    expect(campaign.isError, JSON.stringify(campaign.structuredContent)).not.toBe(true);
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 expect(campaign.structuredContent.campaign.passed).toBe(124);
     expect(campaign.structuredContent.campaign.risk_groups).toEqual({
                                     read_only: 51,
