@@ -22296,10 +22296,8 @@ async function handleOperatorMcpToolCall(
     createExecutionGuard: (toolName, args) => createOperatorExecutionGuard(env, toolName, args),
     compilePublicProfileRequest: compileOperatorPublicProfileRequest,
     prepareRoutedGatewayCall: (gatewayRequest) => prepareOperatorRoutedGatewayCall(env, gatewayRequest),
-    toolExists: async (toolName) => Boolean(
-      buildOperatorMcpBaseTools(false).find((item) => item.name === toolName)
-      ?? (await buildOperatorMcpTools(env, false, false)).find((item) => item.name === toolName),
-    ),
+    toolExists: async (toolName) => isOperatorPublicDirectToolName(toolName)
+      || Boolean(resolveOperatorInternalActionToolByName(toolName)),
     verifyExecutionGuard: (toolName, args) => verifyOperatorExecutionGuard(env, toolName, args),
     isEngineeringToolName: isOperatorMcpEngineeringToolName,
     canonicalAutonomyToolName: OPERATOR_MCP_ROUTING_POLICY.canonicalAutonomyToolName,
