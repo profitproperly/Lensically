@@ -11,6 +11,7 @@ import {
   buildOperatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   buildOperatorMcpInstructions,
+  buildOperatorOpaqueLifecycleTokenTelemetry,
   evaluateOperatorDeploymentCommitIdentity,
 } from "../src/operatorMcpProtocol";
 
