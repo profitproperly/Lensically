@@ -29,6 +29,27 @@ describe("Operator MCP protocol contract", () => {
     });
   });
 
+  it("fingerprints opaque lifecycle tokens without exposing or normalizing them", async () => {
+    const original = "opaque.payload.signature";
+    const mutated = "opaque.payloae.signature";
+    const originalTelemetry = await buildOperatorOpaqueLifecycleTokenTelemetry(original);
+    const repeatedTelemetry = await buildOperatorOpaqueLifecycleTokenTelemetry(original);
+    const mutatedTelemetry = await buildOperatorOpaqueLifecycleTokenTelemetry(mutated);
+
+    expect(originalTelemetry).toEqual(repeatedTelemetry);
+    expect(originalTelemetry.token_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(originalTelemetry.token_length).toBe(original.length);
+    expect(originalTelemetry.token_segment_count).toBe(3);
+    expect(mutatedTelemetry.token_sha256).not.toBe(originalTelemetry.token_sha256);
+    expect(originalTelemetry).not.toHaveProperty("token");
+    expect(originalTelemetry).not.toHaveProperty("raw_token");
+    expect(await buildOperatorOpaqueLifecycleTokenTelemetry(null)).toEqual({
+      token_sha256: null,
+      token_length: 0,
+      token_segment_count: 0,
+    });
+  });
+
     it("fails closed when the executing handler and fresh endpoint commits differ", () => {
     const same = evaluateOperatorDeploymentCommitIdentity(
       "9dfff53b851f0b81358f70ad4a497e651098373c",
