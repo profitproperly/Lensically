@@ -7561,14 +7561,11 @@ active_checkpoint: none
     ).bind(canary.structuredContent.autonomy_decision.decision_id).first<{ status: string; owner_response: string }>();
     expect(decision).toEqual({ status: "executed", owner_response: "Proceed" });
 
-    const paused = await mcpToolRaw<{ ok: boolean; scheduler?: { control: { mode: string } }; result?: { scheduler: { control: { mode: string } } } }>("executeLensicallyIntent", {
-      profile_id: "set_scheduled_post_scheduler_mode",
-      inputs: {
-        brand_key: "manifest_mental",
-        mode: "paused",
-        reason: "Return regression fixture scheduler to safe state.",
-        owner_response: "Proceed",
-      },
+    const paused = await mcpToolRaw<{ ok: boolean; scheduler?: { control: { mode: string } }; result?: { scheduler: { control: { mode: string } } } }>("setScheduledPostSchedulerMode", {
+      brand_key: "manifest_mental",
+      mode: "paused",
+      reason: "Return regression fixture scheduler to safe state.",
+      owner_response: "Proceed",
     });
     expect(paused.isError).not.toBe(true);
     const pausedScheduler = paused.structuredContent.scheduler ?? paused.structuredContent.result?.scheduler;
