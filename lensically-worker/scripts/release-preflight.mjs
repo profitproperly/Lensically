@@ -3737,11 +3737,13 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
-if (!operatorMcpProtocol.includes("Operator MCP runtime-behavior change")
-    || !operatorMcpProtocol.includes("stale runtime release or lifecycle deployment mismatch after a release is a mandatory client-refresh boundary")
-    || !source.includes("client_refresh_required: publicLifecycleRefreshRequired")
-    || !source.includes('refresh the lensically operator mode mcp now. Start a new chat and resume from getOperatorSessionMap.')
-    || !source.includes("retryable: publicLifecycleRefreshRequired ? false : true")) {
+if (!operatorMcpProtocol.includes("still advertises the pre-change public schema")
+    || !operatorMcpProtocol.includes("do not by themselves require a refresh")
+    || !operatorMcpProtocol.includes("deployment or session mismatches are diagnosed separately")
+    || operatorMcpProtocol.includes("Operator MCP runtime-behavior change")
+    || !source.includes("client_refresh_required: false")
+    || !source.includes("Diagnose and reconcile the release/deployment mismatch independently")
+    || source.includes('refresh the lensically operator mode mcp now. Start a new chat and resume from getOperatorSessionMap.')) {
   errors.push("stale_public_lifecycle_refresh_boundary_missing");
 }
 if (!source.includes("let operatorPublicMcpToolsCache: OperatorMcpToolDefinition[] | null = null;")
