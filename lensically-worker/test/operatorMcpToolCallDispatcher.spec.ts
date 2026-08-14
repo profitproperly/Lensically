@@ -252,6 +252,40 @@ describe("Operator MCP tool-call dispatcher", () => {
       required_tool: "readRepoFile",
       required_route: "read the known file first",
     });
+        expect(executeAccountTool).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Step-4 action that differs from the action prepared by Steps 2 and 3", async () => {
+    const executeAccountTool = vi.fn(async () => ({ ok: true }));
+    const dependencies = baseDependencies({
+      executeAccountTool,
+      verifyLifecycleExecutionToken: vi.fn(async () => ({
+        ok: true,
+        payload: {
+          stage: 3,
+          knowledge_node_ids: ["governance"],
+          scopes: ["runtime"],
+          planned_capability: "repository_status",
+          planned_tool: "getRepoStatus",
+          planned_action_fingerprint: "different-prepared-fingerprint",
+        },
+      })),
+    });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 31,
+      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token", action: { capability: "repository_status", arguments: {} } } },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "operator_action_changed_after_preparation",
+      prepared_capability: "repository_status",
+      requested_capability: "repository_status",
+      prepared_tool: "getRepoStatus",
+      resolved_tool: "getRepoStatus",
+      required_stage: "getOperatorKnowledge",
+      execution_started: false,
+    });
     expect(executeAccountTool).not.toHaveBeenCalled();
   });
 
