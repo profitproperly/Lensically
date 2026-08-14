@@ -9,7 +9,7 @@ export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search,
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "After deploying and live-verifying any public MCP tool addition or schema change, do not test the new schema from a chat initialized against the previous deployment. Treat that as the normal client-refresh boundary, not a product defect; do not add compatibility or Recovery workarounds for the stale chat. The refresh handoff is incomplete unless it contains the exact standalone line: refresh the lensically operator mode mcp now. Immediately after that line, render exactly one fenced plaintext code block whose first line is CONTEXT PORT — PASTE INTO NEW CHAT. The model must author this port from verified current state; never require the owner to infer continuation, summarize from memory, copy prior prose, or paste the whole previous response. The context port must be self-contained and include these labeled fields: FIRST ACTION, RESUME OBJECTIVE, COMPLETED / VERIFIED, CURRENT STATE, NEXT ACTION, SURVIVING CONSTRAINTS, and DEPLOYMENT IDENTITY. Include only the information required to resume without ambiguity.";
 export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
 export const OPERATOR_SESSION_COMPETENCY_BOOT_VERSION = "operator-session-competency-v1";
-export const OPERATOR_SESSION_COMPETENCY_BOOT_RULE = "Assume zero retained Lensically knowledge at every fresh model session. Before the first non-startup Lensically action, call getOperatorStartupContext, internalize its session_competency_boot, classify the task against that map, and load only the task-specific live state required for execution. Do not learn the shop by trial and error during production work.";
+export const OPERATOR_SESSION_COMPETENCY_BOOT_RULE = "Assume zero retained Lensically knowledge at every fresh session. Before non-startup work, pay the session startup tax: call getOperatorStartupContext and internalize session_competency_boot.";
 
 export function evaluateOperatorDeploymentCommitIdentity(
   currentCommit: unknown,
@@ -171,9 +171,8 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     return [
     ...buildOperatorGoverningStandardsStartupLines(),
     "",
-                "Use Lensically Operator Mode as the source of truth.",
+                                "Use Lensically Operator Mode as the source of truth.",
     OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
-    "The competency boot is the session startup tax: know the shop map, operating procedures, hazards, continuation authority, and capability locations before work; exact live account/task state remains on-demand.",
     `Every Operator tool call must include governing_standards_ack exactly as: ${OPERATOR_GOVERNING_STANDARDS_ACK}`,
     "The dispatcher fails closed before routing, account loading, idempotency, or execution when that acknowledgment is absent or altered.",
     "Call the advertised direct typed tool that matches the requested operation. Do not send profile IDs, generic inputs envelopes, freehand routing text, wrappers, or internal handler names.",
@@ -181,10 +180,7 @@ export function buildOperatorMcpInstructions(toolCount: number): string {
     "When an owner or scheduled task explicitly names a direct typed tool, invoke that exact tool immediately once it is available; do not answer in prose between discovery and invocation.",
     "Never report a safety block, timeout, connector error, backend failure, attempted execution, or completed execution unless the exact tool invocation returned evidence for that status. Without a tool result, the only valid status is not invoked, and the next action is to invoke it.",
     "Autonomous Manifest cycle tools execute directly without an interactive Proceed handshake. Guided account workflows may still require explicit Proceed before account data loads.",
-    "After Proceed, reconcile live schedule, delivery, metrics, strategy, incidents, and durable cycle state, then resume the active autonomous outcome. Stale continuity summaries never override live state.",
-    "Routine engineering uses bounded known-file inspection, one coherent change set, focused validation, one exact-head release, and compact receipts.",
-    "Use Recovery only when the main Worker or deployment plane cannot receive or complete the repair.",
-    "Canonical brand keys are manifest_mental, opmg_deadman, and vectrix.",
+        "After Proceed, reconcile live schedule, delivery, metrics, strategy, incidents, and durable cycle state, then resume the active autonomous outcome. Stale continuity summaries never override live state.",
     "For guided account workflows only, use the exact four-line selected-key handshake returned by the server:",
     "Lensically Operator Mode MCP is active.",
     "Selected key: <selected_key>",
