@@ -20746,7 +20746,10 @@ async function handleOperatorMcpEngineeringTool(
     }
     const knowledgeToken = await issueOperatorLifecycleToken(env, 2, {
       knowledge_version: OPERATOR_KNOWLEDGE_VERSION,
-      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
+      mcp_session_id: resolveOperatorLifecycleSessionBinding(
+        tokenCheck.payload.mcp_session_id,
+        request.headers.get("mcp-session-id")?.trim() || null,
+      ),
       node_ids: nodeIds,
       knowledge_registry_version: operatorKnowledgeRegistry.version,
       planned_capability: planned.capability,
