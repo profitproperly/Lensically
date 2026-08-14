@@ -19768,10 +19768,11 @@ async function handleOperatorMcpAdminTool(
   }
 
   if (toolName === "runMcpTests") {
-    const tools = await buildOperatorMcpTools(env, true, false);
+        const tools = await buildOperatorMcpTools(env, true, false);
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
-    const campaignTools = tools.filter((tool) => tool.name !== OPERATOR_ROUTED_EXECUTION_GATEWAY);
+    const lifecycleControlStages = new Set(["getOperatorKnowledge", "getOperatorLiveState", OPERATOR_ROUTED_EXECUTION_GATEWAY, "closeOperatorAction"]);
+    const campaignTools = tools.filter((tool) => !lifecycleControlStages.has(tool.name));
     const rawCampaignSegment = normalizeOperatorText(args.segment, 80, true) ?? "routes";
     const campaignSegmentAliases: Record<string, string> = {
       s0: "routes",
