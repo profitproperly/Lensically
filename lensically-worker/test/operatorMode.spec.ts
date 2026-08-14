@@ -1141,8 +1141,8 @@ describe("operator mode backend spine", () => {
       proceed_confirmed: true,
     });
     expect(blocked.isError).toBe(true);
-    expect(blocked.structuredContent).toMatchObject({
-      error: "public_direct_tool_required",
+        expect(blocked.structuredContent).toMatchObject({
+      error: "operator_planned_action_capability_unknown",
     });
   }, 15000);
 
