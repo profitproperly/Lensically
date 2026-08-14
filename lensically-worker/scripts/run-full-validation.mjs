@@ -161,7 +161,7 @@ function validatePlan() {
   if (!Number.isInteger(COMPLETE_TEST_BATCH_SIZE) || COMPLETE_TEST_BATCH_SIZE < 1 || COMPLETE_TEST_BATCH_SIZE > 6) {
     fail("full_validation_batch_size_guard_invalid");
   }
-  if (COMPLETE_TEST_MAX_WORKERS !== 1) {
+  if (COMPLETE_TEST_MIN_WORKERS !== 1 || COMPLETE_TEST_MAX_WORKERS !== 1 || COMPLETE_TEST_MIN_WORKERS !== COMPLETE_TEST_MAX_WORKERS) {
     fail("full_validation_worker_guard_invalid");
   }
 
