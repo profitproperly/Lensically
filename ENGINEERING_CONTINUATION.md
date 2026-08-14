@@ -26,7 +26,8 @@ completion_evidence:
 - Final live Steps 1→5 `verify_deployed_mcp_version` smoke closed successfully on deployment identity `437b1456-4948-4775-8b5c-2e292a67b83e`; Step 4 returned `ok:true`, exact five advertised lifecycle tools, `release_authority_match:true`, active expected release SHA equal to production, and `account_state_mutated:false`.
 - Original hardening incident is closed and `normal_work_blocked:false`.
 prevention_locked: Release authority is owned by the release workflow rather than the caller; validation process size is bounded and serial; release preflight enforces the same validation contract; retired public/generic architecture remains regression-blocked.
-current_action: None. Lifecycle normalization is closed. Future Lensically engineering work must begin from a newly accepted canonical job rather than resuming this completed refactor.
+live_cpu_interrupt: Final canonical-ledger readback exposed a new production Step-3 failure after the prior closure write. Cloudflare telemetry proves POST /api/operator/mcp returned 503 with outcome `exceededCpu` and `Worker exceeded CPU time limit` on deployment `437b1456-4948-4775-8b5c-2e292a67b83e`. The failed planned action was a read-only repository_file_read whose Step-3 requirements should be runtime-only, so the lifecycle read itself must be CPU-safe before closure is valid.
+current_action: Identify and remove unnecessary full internal registry/schema reconstruction from getOperatorLiveState and any shared per-request lifecycle path, add durable CPU-cost regression/preflight prevention, validate one exact head, release that exact SHA, re-run the bounded canonical-ledger readback and verifier lifecycle smoke, then restore this job to completed only after both close successfully.
 
 ## COMPLETED — Manifest Scheduled Row Disappearance False Alarm
 
