@@ -70,8 +70,9 @@ describe("Operator MCP protocol contract", () => {
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
                                 expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v5");
     expect(String(result.instructions)).toContain("# MANDATORY FAILURE REPAIR RULE");
-    expect(String(result.instructions)).toContain("Switch into diagnosis and repair instead.");
-    expect(String(result.instructions)).toContain("Alternate tools are required when they are part of root-cause repair.");
+    expect(String(result.instructions)).toContain("Do not route around it to finish the action.");
+    expect(String(result.instructions)).toContain("Use engineering, diagnostic, validation, and Recovery tools");
+    expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
     expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
     expect(OPERATOR_GOVERNING_STANDARDS.per_action_enforcement).toContain("rejects missing or altered acknowledgment");
     expect(OPERATOR_GOVERNING_STANDARDS.exact_spec_execution_rule).toContain("Do not reinterpret, condense, redesign, or restart discovery.");
