@@ -20853,7 +20853,10 @@ async function handleOperatorMcpEngineeringTool(
     if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
                         const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
-      mcp_session_id: tokenCheck.payload.mcp_session_id ?? null,
+      mcp_session_id: resolveOperatorLifecycleSessionBinding(
+        tokenCheck.payload.mcp_session_id,
+        request.headers.get("mcp-session-id")?.trim() || null,
+      ),
       knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
       scopes,
       brand_key: brandKey,
