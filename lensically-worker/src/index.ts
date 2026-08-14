@@ -16109,52 +16109,31 @@ export function parseCanonicalContinuationMetadata(content: string | null): {
 }
 
 
-function buildOperatorSessionCompetencyBoot(): Record<string, unknown> {
+function buildOperatorKnowledgeTree(): Record<string, unknown> {
   return {
-    version: OPERATOR_SESSION_COMPETENCY_BOOT_VERSION,
-    architecture: "constant_size_router_v1",
-    fresh_model_assumption: "zero_retained_lensically_knowledge",
-    governing_rule: OPERATOR_SESSION_COMPETENCY_BOOT_RULE,
-    handbook_path: "OPERATOR_COMPETENCY.md",
-    startup_sequence: [
-      "Load and obey the governing authority.",
-      "Classify the task against one fixed competency domain.",
-      "Load only that bounded handbook domain, then task-specific live state.",
-      "For engineering continuation, read getEngineeringContinuation before choosing work.",
-      "Execute through the canonical typed route, verify, record durable learning when needed, and checkpoint.",
+    node_id: "lensically_operator",
+    role: "root",
+    children: [
+      { node_id: "governance", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+      {
+        node_id: "engineering",
+        role: "parent",
+        children: [
+          { node_id: "repository_engineering", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+          { node_id: "release_infrastructure", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+          { node_id: "hardening_safety", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+        ],
+      },
+      { node_id: "account_runtime", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+      { node_id: "manifest_content", role: "durable_knowledge", loader: "getOperatorKnowledge" },
+      { node_id: "commercial_product", role: "durable_knowledge", loader: "getOperatorKnowledge" },
     ],
-    domain_load_protocol: "Use searchRepoFiles on exact file OPERATOR_COMPETENCY.md with the selected domain marker, then readRepoFile around the returned line. Never load the whole handbook merely because the session is fresh.",
-    domain_routes: [
-      { key: "repository_engineering", marker: "## DOMAIN repository_engineering", load_when: "repository, code, MCP/schema, web surface, engineering continuation" },
-      { key: "release_infrastructure", marker: "## DOMAIN release_infrastructure", load_when: "GitHub Actions, Cloudflare, deployment, release verification, Recovery" },
-      { key: "account_runtime", marker: "## DOMAIN account_runtime", load_when: "account state, Proceed, scheduling, analytics, account mutation" },
-      { key: "manifest_content", marker: "## DOMAIN manifest_content", load_when: "Manifest strategy, cycles, source cards, generation, gates, lineage, performance" },
-      { key: "hardening_safety", marker: "## DOMAIN hardening_safety", load_when: "failure, blocker, recurrence, prevention, transport ambiguity, efficiency incident" },
-      { key: "commercial_product", marker: "## DOMAIN commercial_product", load_when: "public product, Stripe, checkout, delivery, license, legal/customer surfaces" },
-    ],
-    canonical_sources: {
-      operating_rules: "AGENTS.md",
-      live_architecture: "CURRENT_STATE.md",
-      reusable_rules: "OPERATING_MEMORY.md",
-      competency_handbook: "OPERATOR_COMPETENCY.md",
-      engineering_continuation: "ENGINEERING_CONTINUATION.md via getEngineeringContinuation",
-      live_account_truth: "server-side persisted Lensically state after the applicable account boundary",
-      invocation_contracts: "advertised direct typed tool schemas",
-    },
-    capability_rule: "Do not enumerate tool names in startup. The advertised tool surface and exact schemas are the live capability inventory; domain knowledge belongs in OPERATOR_COMPETENCY.md.",
-    knowledge_growth_rule: "New tools, providers, procedures, hazards, product details, and winning paths update the relevant handbook domain. They must not enlarge initialize instructions or startup payloads. Do not shed unrelated competency to make room.",
-    payload_policy: {
-      initialize_ceiling_chars: 6500,
-      startup_transport_ceiling_bytes: 24000,
-      startup_regression_target_chars: 16000,
-      rule: "Ceilings are fail-closed guardrails, not storage targets. Never raise a ceiling to accommodate knowledge growth; move domain knowledge behind the fixed router instead.",
-    },
   };
 }
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-    "Call one advertised direct typed Main tool for each external operation; do not use profile IDs, generic inputs envelopes, or wrapper routing.",
+        "Use the canonical lifecycle: getOperatorKnowledge -> getOperatorLiveState -> executeOperatorAction -> closeOperatorAction for each meaningful task after session mapping.",
     "Server-side continuity, authorization, idempotency, gates, and scheduler safety remain mandatory after the direct call arrives.",
     "Use bounded known-file repository reads and searches; a complete known-file search reports its scanned line count and match count.",
         "Use one atomic patch set for related edits. Routine pushes use fast validation; production uses one explicit exact-SHA release after the final change.",
@@ -16163,107 +16142,37 @@ function operatorStartupFallbackRoutes(): string[] {
   ];
 }
 
-async function buildOperatorStartupContext(request: Request, env: Env): Promise<Record<string, unknown>> {
-  const config = githubRepoConfig(env);
-  const tools = await buildOperatorPublicMcpTools(env);
-  const toolNames = tools.map((tool) => tool.name);
-  const adminNames = new Set<string>(OPERATOR_MCP_ADMIN_TOOL_NAMES);
-  const engineeringNames = new Set<string>(OPERATOR_MCP_ENGINEERING_TOOL_NAMES);
-  const activeEngineeringTools = toolNames.filter((name) => engineeringNames.has(name));
-  const activeAdminTools = toolNames.filter((name) => adminNames.has(name));
-  const operatorTools = toolNames
-    .filter((name) => !adminNames.has(name) && !engineeringNames.has(name))
-    .slice(0, 80);
-  const branch = await githubRepoApi(env, `/branches/${encodeURIComponent(config.branch)}`);
-  const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
-    ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
-    : undefined;
-      const continuationPath = "ENGINEERING_CONTINUATION.md";
-  const continuationFile = await getGithubFile(env, continuationPath);
-  const sourceDocuments = [
-    { path: "AGENTS.md", role: "operating_rules", load: "on_demand" },
-    { path: "CURRENT_STATE.md", role: "live_architecture", load: "on_demand" },
-    { path: "OPERATING_MEMORY.md", role: "reusable_rules", load: "on_demand" },
-    { path: "OPERATOR_COMPETENCY.md", role: "domain_competency_handbook", load: "bounded_domain_on_demand" },
-    { path: continuationPath, role: "engineering_continuation", load: "startup_metadata_from_canonical_read" },
-  ];
-  const continuationMetadata = parseCanonicalContinuationMetadata(continuationFile.content);
-  const canonicalContinuation = {
-    ok: continuationFile.ok && continuationFile.content !== null,
-    authority: "sole_canonical_repository_ledger",
-    path: continuationPath,
-    tool: "getEngineeringContinuation",
-        status: continuationMetadata.status,
-    contract: continuationMetadata.contract,
-    active_job_id: continuationMetadata.active_job_id,
-    active_checkpoint: continuationMetadata.active_checkpoint,
-    file_sha: continuationFile.sha,
-    size: continuationFile.size,
-    precedence_rule: "Read Authority and Precedence, Unified Job Queue, and Current Action. No chat, D1 work state, Growth Mission, action-closure receipt, or other document may override this ledger.",
-  };
-    return {
+async function buildOperatorSessionMap(_request: Request, env: Env): Promise<Record<string, unknown>> {
+  const sessionMapToken = await issueOperatorLifecycleToken(env, 1, {
+    session_map_version: OPERATOR_SESSION_MAP_VERSION,
+  });
+  return {
     ok: true,
-        startup_authority: OPERATOR_GOVERNING_STANDARDS,
-                bootstrap_version: "operator-startup-v8",
-    session_competency_boot: buildOperatorSessionCompetencyBoot(),
-    operating_contract: {
-      public_gateway: "direct_typed_tools",
-      router: "direct_handler_dispatch_v1",
-      model_tool_choice_allowed: true,
-      d1_route_lookup_required: false,
-      recovery_role: "independent_break_glass_only",
-      agent_native_operator: AGENT_NATIVE_OPERATING_CONTRACT,
-      account_controls: ["explicit_proceed", "guided_growth_mission", "owner_plan_approval", "server_side_continuity", "idempotency", "authorization", "content_gates", "scheduler_safety"],
-      engineering_flow: ["bounded_inspection", "coherent_change_set", "focused_validation", "exact_sha_release", "live_verification", "action_closure", "checkpoint"],
+    lifecycle: {
+      version: OPERATOR_LIFECYCLE_VERSION,
+      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
+      rule: "Step 0 initializes only. Step 1 maps. Step 2 loads durable knowledge. Step 3 loads live state. Step 4 executes. Step 5 verifies and closes.",
     },
-    captured_at: new Date().toISOString(),
-
+    session_map: {
+      version: OPERATOR_SESSION_MAP_VERSION,
+      architecture: "recursive_pointer_tree_v1",
+      root: buildOperatorKnowledgeTree(),
+      durable_knowledge_loader: "getOperatorKnowledge",
+      live_state_loader: "getOperatorLiveState",
+      action_executor: "executeOperatorAction",
+      action_closer: "closeOperatorAction",
+      canonical_knowledge_source: "OPERATOR_COMPETENCY.md",
+      rule: "Pointers live in the map; durable knowledge and mutable state do not.",
+    },
+    session_identity: {
+      mcp_version: OPERATOR_MCP_VERSION,
+      deployment_identity: currentOperatorDeploymentIdentity(env),
+      commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
+      captured_at: new Date().toISOString(),
+    },
+    session_map_token: sessionMapToken,
     account_data_loaded: false,
-
-            boundary: {
-      initial_key_selection_preserved: true,
-      backend_proceed_flag_enforced: true,
-      key_selection_tool: "selectOperatorKey",
-      proceed_confirmation_tool: "confirmOperatorProceed",
-      account_call_requirement: { server_side_continuity_required: true },
-      before_proceed_forbidden: ["account_state", "workflow_status", "source_cards", "drafts", "scheduled_posts", "account_gates", "strategy_memory", "account_metrics"],
-            first_key_response_template: [
-        "Governing standards: Autonomy. Efficiency. Prevention.",
-        "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
-        "Lensically Operator Mode MCP is active.",
-        "Selected key: <canonical_brand_key>",
-        `Full tool surface loaded: ${tools.length} tools available and usable.`,
-        "Proceed to the next step?",
-      ],
-      after_explicit_proceed: "confirmOperatorProceed restores canonical account state, produces the current Growth Mission Brief, and opens an owner-model planning discussion. It does not authorize account mutations. Later account calls send proceed_confirmed=true; the approved persistent mission and continuity are verified from server-side state.",
-    },
-                                canonical_continuation: canonicalContinuation,
-        tool_surface: {
-      public_tool_count: tools.length,
-      categories: {
-        engineering: activeEngineeringTools.length,
-        admin: activeAdminTools.length,
-        operator: operatorTools.length,
-      },
-      detail: "Tool definitions are available through listMcpTools and readMcpToolDefinition.",
-    },
-    repository: {
-      owner: config.owner,
-      repo: config.repo,
-      branch: config.branch,
-      latest_sha: commit?.sha ?? null,
-      github_status: branch.status,
-      github_available: branch.ok,
-    },
-    runtime: operatorRuntimeMetadata(env),
-        source_documents: sourceDocuments,
-        payload_limits: {
-      source_documents: "metadata only",
-      durable_work_items: "summary only",
-      tool_surface: "counts only",
-    },
-    no_account_sections_present: true,
-    request_url_origin: new URL(request.url).origin,
   };
 }
 
