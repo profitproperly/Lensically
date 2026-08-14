@@ -15574,9 +15574,13 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       actionCapabilityIds.add(capability);
             const requiredKnowledge = requiredOperatorKnowledgeNodesForTool(tool.name);
       const requiredLiveState = requiredOperatorLiveStateScopesForTool(tool.name);
-      return {
+            return {
         type: "object",
         description: `Requires Step-2 knowledge nodes: ${requiredKnowledge.join(", ")}. Requires Step-3 live-state scopes: ${requiredLiveState.join(", ")}.`,
+        x_lensically_prerequisites: {
+          knowledge_node_ids: requiredKnowledge,
+          live_state_scopes: requiredLiveState,
+        },
         properties: {
           capability: { type: "string", const: capability },
           arguments: {

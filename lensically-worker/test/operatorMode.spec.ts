@@ -139,28 +139,55 @@ function testCapabilityId(toolName: string): string {
     ?? toolName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
 }
 
+async function testLifecyclePrerequisites(capability: string): Promise<{ node_ids: string[]; scopes: string[] }> {
+  const listed = await mcpRequest<{
+    tools: Array<{
+      name: string;
+      inputSchema?: {
+        properties?: {
+          action?: {
+            oneOf?: Array<{
+              properties?: { capability?: { const?: string } };
+              x_lensically_prerequisites?: { knowledge_node_ids?: string[]; live_state_scopes?: string[] };
+            }>;
+          };
+        };
+      };
+    }>;
+  }>("tools/list");
+  const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
+  const branch = actionTool?.inputSchema?.properties?.action?.oneOf?.find((item) => item.properties?.capability?.const === capability);
+  const prerequisites = branch?.x_lensically_prerequisites;
+  if (!prerequisites?.knowledge_node_ids?.length || !prerequisites.live_state_scopes?.length) {
+    throw new Error(`missing_lifecycle_prerequisites:${capability}`);
+  }
+  return { node_ids: prerequisites.knowledge_node_ids, scopes: prerequisites.live_state_scopes };
+}
+
 async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: Record<string, unknown> = {}): Promise<{ structuredContent: T; isError?: boolean }> {
   if (TEST_LIFECYCLE_TOOL_NAMES.has(toolName)) {
     return mcpToolCallRaw<T>(toolName, args);
   }
   const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
   if (step1.isError) return step1 as unknown as { structuredContent: T; isError?: boolean };
-    const plannedAction = testCapabilityId(toolName);
+  const capability = testCapabilityId(toolName);
+  const prerequisites = await testLifecyclePrerequisites(capability);
   const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
     session_map_token: step1.structuredContent.session_map_token,
-    planned_action: plannedAction,
+    node_ids: prerequisites.node_ids,
   });
   if (step2.isError) return step2 as unknown as { structuredContent: T; isError?: boolean };
   const requestedBrand = testRequestedBrandKey(toolName, args);
   const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
     knowledge_token: step2.structuredContent.knowledge_token,
+    scopes: prerequisites.scopes,
     ...(requestedBrand ? { brand_key: requestedBrand } : {}),
   });
   if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
   const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>("executeOperatorAction", {
     live_state_token: step3.structuredContent.live_state_token,
     action: {
-      capability: testCapabilityId(toolName),
+      capability,
       arguments: args,
     },
   });
