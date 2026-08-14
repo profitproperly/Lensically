@@ -5158,7 +5158,11 @@ active_checkpoint: none
       receipt_section: "summary",
       proceed_confirmed: true,
     });
-    expect(firstReceipt).toEqual(secondReceipt);
+    const { action_execution_token: firstExecutionToken, ...firstReceiptBody } = firstReceipt as typeof firstReceipt & { action_execution_token?: string };
+    const { action_execution_token: secondExecutionToken, ...secondReceiptBody } = secondReceipt as typeof secondReceipt & { action_execution_token?: string };
+    expect(firstExecutionToken).toBeTruthy();
+    expect(secondExecutionToken).toBeTruthy();
+    expect(firstReceiptBody).toEqual(secondReceiptBody);
     expect(firstReceipt).toMatchObject({ success: true, available: true });
     expect(firstReceipt.cycle_receipt.cycle_id).toBe(fixture.prepared.cycle.id);
     expect(firstReceipt.cycle_receipt.output_strategy_version).toMatchObject({
