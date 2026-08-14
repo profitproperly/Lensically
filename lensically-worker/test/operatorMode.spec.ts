@@ -3823,8 +3823,13 @@ describe("operator mode MCP endpoint", () => {
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
     const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
     const actionSchema = actionTool?.inputSchema?.properties?.action as { oneOf?: unknown[] } | undefined;
-    expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+        expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
     expect(plannedActionSchema?.oneOf).toEqual(actionSchema?.oneOf);
+    const knownFileSearchBranch = actionSchema?.oneOf?.find((item) => {
+      const branch = item as { properties?: { capability?: { const?: string } } };
+      return branch.properties?.capability?.const === "search_repo_files";
+    }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
+    expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
     expect(JSON.stringify(knowledgeTool?.inputSchema)).not.toContain("node_ids");
     expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("scopes");
     expect(JSON.stringify(liveStateTool?.inputSchema)).not.toContain("brand_key");

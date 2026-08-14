@@ -16877,8 +16877,8 @@ function requiredOperatorLiveStateScopesForTool(toolName: string): string[] {
     : {};
   const brandScoped = Object.prototype.hasOwnProperty.call(schemaProperties, "brand_key");
   const mutates = operatorToolMutatesState(toolName);
-  const repositoryRelevant = /Repo|GitHub|Cloudflare|Workflow|repository|McpVersion|McpTool|RepoFile|EngineeringRelease|deployBackend/i.test(toolName);
-  if (repositoryRelevant) scopes.add("repository");
+    const repositoryRelevant = /Repo|GitHub|Cloudflare|Workflow|repository|McpVersion|McpTool|RepoFile|EngineeringRelease|deployBackend/i.test(toolName);
+  if (mutates && repositoryRelevant) scopes.add("repository");
   if (mutates && isOperatorMcpEngineeringToolName(toolName)) scopes.add("engineering_continuation");
   if (brandScoped && toolName !== "selectOperatorKey" && toolName !== "confirmOperatorProceed") scopes.add("account");
   if (mutates && /ScheduledPostScheduler|auditScheduledPost|recoverOverdueScheduledPosts|runApprovedPostCanary|scheduled_post|schedule_/i.test(toolName)) scopes.add("scheduler");
