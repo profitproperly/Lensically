@@ -157,9 +157,16 @@ function validatePlan() {
     fail(`full_validation_selector_regression_markers_missing:${missingSelectorMarkers.join(",")}`);
   }
 
+  if (!Number.isInteger(COMPLETE_TEST_BATCH_SIZE) || COMPLETE_TEST_BATCH_SIZE < 1 || COMPLETE_TEST_BATCH_SIZE > 6) {
+    fail("full_validation_batch_size_guard_invalid");
+  }
+  if (COMPLETE_TEST_MAX_WORKERS !== 1) {
+    fail("full_validation_worker_guard_invalid");
+  }
+
   const groupedFiles = completeTestGroups.flat();
-    if (completeTestGroups.length !== Math.ceil(completeTestFiles.length / 11)
-      || completeTestGroups.some((group, index) => group.length < 1 || group.length > 11 || (index < completeTestGroups.length - 1 && group.length !== 11))
+    if (completeTestGroups.length !== Math.ceil(completeTestFiles.length / COMPLETE_TEST_BATCH_SIZE)
+      || completeTestGroups.some((group, index) => group.length < 1 || group.length > COMPLETE_TEST_BATCH_SIZE || (index < completeTestGroups.length - 1 && group.length !== COMPLETE_TEST_BATCH_SIZE))
       || groupedFiles.length !== completeTestFiles.length
       || groupedFiles.some((file, index) => file !== completeTestFiles[index])) {
     fail("full_validation_batch_partition_invalid");
