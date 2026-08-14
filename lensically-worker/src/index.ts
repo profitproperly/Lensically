@@ -16567,7 +16567,7 @@ async function issueOperatorLifecycleToken(
   ).bind(
     reference,
     OPERATOR_LIFECYCLE_REFERENCE_KIND,
-    normalizeGptBrandKey(claims.planned_brand_key),
+    normalizeGptBrandKey(claims.planned_brand_key) ?? OPERATOR_LIFECYCLE_REFERENCE_NAMESPACE,
     null,
     null,
     normalizeOperatorJson(payload, {}),
