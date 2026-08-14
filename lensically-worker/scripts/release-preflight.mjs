@@ -3737,9 +3737,13 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
-if (!operatorMcpProtocol.includes("still advertises the pre-change public schema")
-    || !operatorMcpProtocol.includes("do not by themselves require a refresh")
-    || !operatorMcpProtocol.includes("deployment or session mismatches are diagnosed separately")
+if (!operatorMcpProtocol.includes("exactly one operational trigger")
+    || !operatorMcpProtocol.includes("still advertises the pre-change public schema")
+    || !operatorMcpProtocol.includes("cannot correctly use the newly deployed invocation contract")
+    || !operatorMcpProtocol.includes("If the changed tools or actions are already surfaced and usable, do not request an MCP refresh and do not instruct the owner to start a new chat")
+    || !operatorMcpProtocol.includes("A client-side block by itself never authorizes an MCP refresh or a new-chat instruction")
+    || !operatorMcpProtocol.includes("No other rule may independently request an MCP refresh or a new chat")
+    || operatorMcpProtocol.includes("fresh MCP/client transport")
     || operatorMcpProtocol.includes("Operator MCP runtime-behavior change")
     || !source.includes("client_refresh_required: false")
     || !source.includes("Diagnose and reconcile the release/deployment mismatch independently")
