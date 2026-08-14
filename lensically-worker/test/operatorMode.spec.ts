@@ -7844,7 +7844,7 @@ active_checkpoint: none
     const missingReason = await mcpToolRaw<{ error?: string; validation_errors?: Array<{ path: string; error: string }> }>("delete_scheduled_post", {
       brand_key: BRAND_KEY,
       scheduled_post_id: scheduledPostId,
-      proceed_confirmed: true,
+      owner_response: "Proceed",
     });
     expect(missingReason.isError).toBe(true);
     expect(missingReason.structuredContent).toMatchObject({
