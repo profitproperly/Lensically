@@ -84,6 +84,15 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_GOVERNING_STANDARDS.public_schema_refresh_rule).toBe(OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE);
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
     expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("byte-for-byte");
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("Never decode, reconstruct, transcribe, normalize, trim, edit");
+    expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("never retry the corrupted token");
+    expect(OPERATOR_GOVERNING_STANDARDS.opaque_lifecycle_token_rule).toBe(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE);
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("before it reaches Lensically");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("fresh MCP/client transport");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("Do not retry or reshape the blocked request in the same connection");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("server-side evidence");
+    expect(OPERATOR_GOVERNING_STANDARDS.client_predispatch_block_rule).toBe(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE);
     expect(OPERATOR_GOVERNING_STANDARDS.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
   });
 
