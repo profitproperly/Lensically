@@ -6188,9 +6188,10 @@ active_checkpoint: none
         JSON.stringify(result.structuredContent.campaign.live_reads.failures),
       ).toBe(0);
     }
-            // The bounded read campaign includes the two native Stripe reads:
-    // getStripeAccountState and readStripeObjects.
-    expect(eligibleReads).toBe(46);
+            // The bounded internal read campaign includes the two native Stripe reads:
+    // getStripeAccountState and readStripeObjects. getOperatorSessionMap is a public
+    // lifecycle tool and is intentionally excluded from the internal capability campaign.
+    expect(eligibleReads).toBe(45);
     expect(failedReads).toBe(0);
   }, 90000);
 
