@@ -71,7 +71,7 @@ describe("Operator MCP protocol contract", () => {
     expect(String(result.instructions)).toContain("The requirement is the fastest complete, correct, verified, and durable route.");
                                                                 expect(OPERATOR_GOVERNING_STANDARDS.version).toBe("operator-governing-standards-v6");
         expect(String(result.instructions)).toContain("# MANDATORY FAILURE REPAIR RULE");
-    expect(String(result.instructions)).toContain("Discovery results are candidates only");
+        expect(String(result.instructions)).toContain("Discovery returns candidates, not authorization");
     expect(OPERATOR_DISCOVERY_EXECUTION_RULE).toContain("never authorize execution");
     expect(OPERATOR_GOVERNING_STANDARDS.discovery_execution_rule).toBe(OPERATOR_DISCOVERY_EXECUTION_RULE);
     expect(String(result.instructions)).toContain("Do not route around it to finish the action.");

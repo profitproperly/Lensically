@@ -3884,7 +3884,7 @@ active_checkpoint: none
       deployment_fresh_sessions: true,
     });
         expect(initialized.instructions).toContain("advertised direct typed tool");
-        expect(initialized.instructions).toContain("Discovery results are candidates only, never execution authorization");
+            expect(initialized.instructions).toContain("Discovery returns candidates, not authorization");
     expect(initialized.instructions).toContain("Without a tool result, the only valid status is not invoked");
     expect(initialized.instructions).toContain(`Full tool surface loaded: ${names.length} tools available and usable.`);
         expect(initialized.instructions.length).toBeLessThan(6500);
