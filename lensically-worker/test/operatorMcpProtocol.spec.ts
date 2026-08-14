@@ -13,6 +13,8 @@ import {
   buildOperatorKeyHandshakeLines,
   buildOperatorMcpInitializeResult,
   buildOperatorMcpInstructions,
+  buildOperatorLifecycleReferenceId,
+  normalizeOperatorLifecycleReference,
   buildOperatorOpaqueLifecycleTokenTelemetry,
   evaluateOperatorDeploymentCommitIdentity,
 } from "../src/operatorMcpProtocol";
