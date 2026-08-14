@@ -19349,14 +19349,11 @@ async function getOperatorMcpBoundaryBlock(
     authority: releaseAuthority,
   });
   if (!releaseGate.allowed) {
-    const publicLifecycleRefreshRequired = OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(toolName);
     return {
       ok: false,
-      retryable: publicLifecycleRefreshRequired ? false : true,
-      client_refresh_required: publicLifecycleRefreshRequired,
-      required_next_action: publicLifecycleRefreshRequired
-        ? "refresh the lensically operator mode mcp now. Start a new chat and resume from getOperatorSessionMap."
-        : "Retry this repair-control tool only after the executing Worker reaches the shared released production SHA.",
+      retryable: true,
+      client_refresh_required: false,
+      required_next_action: "Diagnose and reconcile the release/deployment mismatch independently. Do not classify a deployment or session mismatch as a client-schema refresh unless the current chat actually advertises a stale public MCP schema.",
       ...releaseGate,
     };
   }
