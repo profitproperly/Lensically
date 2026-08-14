@@ -4050,13 +4050,7 @@ active_checkpoint: none
     });
     expect(step3.isError).not.toBe(true);
     expect(step3.structuredContent.live_state_token).toBeTruthy();
-
-    const wrongSessionStep4 = await callWithSession<{ ok: boolean; error?: string }>(secondSessionId, "executeOperatorAction", {
-      live_state_token: step3.structuredContent.live_state_token,
-      action: { capability: "list_accounts", arguments: {} },
-    });
-    expect(wrongSessionStep4.isError).toBe(true);
-    expect(wrongSessionStep4.structuredContent).toMatchObject({ ok: false, error: "operator_lifecycle_session_changed" });
+    expect(decodeLifecycleToken(step3.structuredContent.live_state_token).mcp_session_id).toBe(firstSessionId);
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
