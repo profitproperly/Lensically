@@ -50,9 +50,9 @@ describe("Operator MCP tool-definition construction", () => {
         expect(enriched.inputSchema.properties).toMatchObject({
       brand_key: { type: "string" },
       governing_standards_ack: { type: "string", const: OPERATOR_GOVERNING_STANDARDS_ACK },
-      proceed_confirmed: { type: "boolean" },
       operation_id: { type: "string" },
     });
+    expect(enriched.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
     expect(enriched.inputSchema.required).toContain("governing_standards_ack");
     expect(accountTool.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
   });
