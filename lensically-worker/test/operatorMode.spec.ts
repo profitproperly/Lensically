@@ -7875,7 +7875,7 @@ active_checkpoint: none
       reason_code: "technical_corruption",
       reason_detail: "Malformed payload fixture.",
       operation_id: "delete-reason-code-fixture",
-      proceed_confirmed: true,
+      owner_response: "Proceed",
     });
     expect(deleted).toMatchObject({
       success: true,
