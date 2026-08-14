@@ -5510,11 +5510,13 @@ active_checkpoint: none
   }, 30000);
 
     it("classifies a repeated resolved failure as a prevention regression", async () => {
-    const first = await mcpTool<{
+        const firstCall = await mcpToolRaw<{
       ok: boolean;
       hardening_incident?: { id: string; classification: string };
       hardening_recurrence?: { status: string };
     }>("getDatabaseSchemaState", { table_name: "invalid-schema-name-a", column_names: [] });
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).toBe(true);
     expect(first.ok).toBe(false);
     expect(first.hardening_incident?.classification).toBe("novel_failure");
     const firstIncidentId = first.hardening_incident?.id;
@@ -5528,12 +5530,14 @@ active_checkpoint: none
        WHERE id = ?`,
     ).bind(firstIncidentId).run();
 
-    const second = await mcpTool<{
+        const secondCall = await mcpToolRaw<{
       ok: boolean;
       hardening_incident?: { id: string; classification: string; severity: string };
       hardening_recurrence?: { status: string; prior_incident_id: string; prior_prevention_rule_id: string };
       normal_work_blocked?: boolean;
     }>("getDatabaseSchemaState", { table_name: "invalid-schema-name-b", column_names: [] });
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).toBe(true);
     expect(second.ok).toBe(false);
     expect(second.hardening_incident).toMatchObject({ classification: "prevention_breach", severity: "P0" });
     expect(second.hardening_recurrence).toMatchObject({
