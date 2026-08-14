@@ -3819,7 +3819,10 @@ describe("operator mode MCP endpoint", () => {
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
     const actionSchema = actionTool?.inputSchema?.properties?.action as { oneOf?: unknown[] } | undefined;
-    expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+        expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
+    expect(actionCapabilities.every(Boolean)).toBe(true);
+    expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
     expect(JSON.stringify(actionTool?.inputSchema)).not.toContain("profile_id");
     expect(JSON.stringify(actionTool?.inputSchema)).not.toContain('"inputs"');
     expect(initialized.instructions.split("\n")).toEqual([

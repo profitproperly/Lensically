@@ -88,7 +88,7 @@ function baseDependencies(
       next_action: "continue",
       checkpoint: "resume",
     })),
-    verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, scopes: ["runtime"] } })),
+        verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, planned_action: "repository_status", scopes: ["runtime"] } })),
     issueActionExecutionToken: vi.fn(async () => "action-token"),
     ...overrides,
   };
@@ -181,8 +181,9 @@ describe("Operator MCP tool-call dispatcher", () => {
   });
 
   it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
-    const dependencies = baseDependencies({
+        const dependencies = baseDependencies({
       isPublicDirectToolName: vi.fn(() => false),
+      verifyLifecycleExecutionToken: vi.fn(async () => ({ ok: true, payload: { stage: 3, planned_action: "unknown_profile", scopes: ["runtime"] } })),
       compilePublicProfileRequest: vi.fn(() => ({
         ok: false,
         error: "unknown_profile",
