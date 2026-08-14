@@ -214,7 +214,7 @@
       "implementation_mode": "new_handler",
       "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
       "release_scope": "operator-engineering",
-            "live_verification": "The deployed Step-3 tool rejects missing Step-2 proof, derives only the prepared action's mandatory authoritative mutable scopes and account target, preserves existing account authorization boundaries, and issues action-bound current deployment proof without caller-selected scopes."
+                  "live_verification": "The deployed Step-3 tool rejects missing Step-2 proof, derives only the prepared action's mandatory authoritative mutable scopes and account target, preserves existing account authorization boundaries, and issues action-bound current deployment proof without caller-selected scopes.",
       "compatibility_bridge": false
     },
     {
