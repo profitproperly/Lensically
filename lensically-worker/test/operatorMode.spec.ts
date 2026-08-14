@@ -715,7 +715,7 @@ async function resetTables(): Promise<void> {
   await env.DB.prepare("DELETE FROM operator_performance_evidence").run();
   await env.DB.prepare("DELETE FROM operator_post_performance_scores").run();
   await env.DB.prepare("DELETE FROM operator_post_fingerprints").run();
-  await env.DB.prepare("DELETE FROM operator_execution_events").run();
+  
   
   await env.DB.prepare("DELETE FROM operator_manifest_prepare_checkpoints").run();
   await env.DB.prepare("DELETE FROM operator_repo_write_sessions").run();
