@@ -5223,6 +5223,42 @@ active_checkpoint: none
     expect(operatorOperationLeaseMs("schedule_approved_draft")).toBe(120000);
   });
 
+  it("treats exactly the five normalized lifecycle tools as a healthy public deployment boundary", () => {
+    const exact = evaluateOperatorPublicLifecycleBoundary([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+    ]);
+    expect(exact).toMatchObject({
+      lifecycle_surface_exact: true,
+      legacy_persist_hidden: true,
+      retired_commit_hidden: true,
+      missing_lifecycle_tools: [],
+      unexpected_public_tools: [],
+    });
+    const legacy = evaluateOperatorPublicLifecycleBoundary([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+      "closeOperatorAction",
+      "persist_manifest_autonomous_post",
+    ]);
+    expect(legacy.lifecycle_surface_exact).toBe(false);
+    expect(legacy.legacy_persist_hidden).toBe(false);
+    expect(legacy.unexpected_public_tools).toContain("persist_manifest_autonomous_post");
+    const incomplete = evaluateOperatorPublicLifecycleBoundary([
+      "getOperatorSessionMap",
+      "getOperatorKnowledge",
+      "getOperatorLiveState",
+      "executeOperatorAction",
+    ]);
+    expect(incomplete.lifecycle_surface_exact).toBe(false);
+    expect(incomplete.missing_lifecycle_tools).toContain("closeOperatorAction");
+  });
+
     it("treats exact-head patch conflicts as expected non-destructive engineering control flow", () => {
     expect(isExpectedHardeningControlResult(
       "applyRepoPatchSet",
