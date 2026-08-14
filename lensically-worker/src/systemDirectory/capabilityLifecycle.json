@@ -183,7 +183,62 @@
       "reuse_existing_handler"
     ]
   },
-    "declarations": [
+        "declarations": [
+    {
+      "capability_id": "operating.operator_session_map",
+      "directory_entry_id": "operating.startup",
+      "canonical_handler": "getOperatorSessionMap",
+      "route_intent": "get operator session map",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "A fresh deployed MCP advertises getOperatorSessionMap first, returns only the recursive lifecycle pointer tree plus deployment-bound Step-1 token, and contains no durable knowledge or mutable task state.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.operator_knowledge",
+      "directory_entry_id": "operating.knowledge",
+      "canonical_handler": "getOperatorKnowledge",
+      "route_intent": "get operator knowledge",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed Step-2 tool rejects missing Step-1 proof and resolves only requested durable governance or competency nodes while issuing a deployment-bound knowledge token and no mutable live state.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.operator_live_state",
+      "directory_entry_id": "operating.live_state",
+      "canonical_handler": "getOperatorLiveState",
+      "route_intent": "get operator live state",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed Step-3 tool rejects missing Step-2 proof, loads only requested authoritative mutable scopes, preserves existing account authorization boundaries, and issues current deployment-bound execution proof.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.operator_action_execution",
+      "directory_entry_id": "operating.action_execution",
+      "canonical_handler": "executeOperatorAction",
+      "route_intent": "execute operator action",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed Step-4 gateway refuses profile compilation without valid Step-3 proof, then reuses the registered-profile Execution Kernel and returns a durable signed action-execution token with explicit Step-5 closure pending.",
+      "compatibility_bridge": false
+    },
+    {
+      "capability_id": "operating.operator_action_closure",
+      "directory_entry_id": "operating.action_closure",
+      "canonical_handler": "closeOperatorAction",
+      "route_intent": "close operator action",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed Step-5 tool consumes only valid Step-4 proof, requires verification evidence and an explicit next action, refuses unresolved failed-action prevention, and returns the recurring Steps 2-5 sequence.",
+      "compatibility_bridge": false
+    },
     {
       "capability_id": "content.prepare_manifest_source_card_backfill",
       "directory_entry_id": "content.manifest_source_card_backfill",
