@@ -86,8 +86,11 @@ const completeTestFiles = [
 ];
 
 const completeTestGroups = Array.from(
-  { length: Math.ceil(completeTestFiles.length / 11) },
-  (_, index) => completeTestFiles.slice(index * 11, (index + 1) * 11),
+  { length: Math.ceil(completeTestFiles.length / COMPLETE_TEST_BATCH_SIZE) },
+  (_, index) => completeTestFiles.slice(
+    index * COMPLETE_TEST_BATCH_SIZE,
+    (index + 1) * COMPLETE_TEST_BATCH_SIZE,
+  ),
 );
 
 const operatorMilestoneTitles = [
