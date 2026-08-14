@@ -22,9 +22,10 @@ describe("Operator MCP autonomous execution registry", () => {
     expect(new Set(OPERATOR_MCP_AUTONOMOUS_EXECUTION_TOOL_NAMES).size).toBe(4);
   });
 
-  it("preserves immediate prepare invocation and rolling runway bounds", () => {
+    it("preserves explicit Main Cycle invocation and rolling runway bounds", () => {
     const prepare = tool("prepare_manifest_autonomous_cycle");
-    expect(prepare.description).toContain("call this tool immediately after it is available");
+    expect(prepare.description).toContain("only when the owner explicitly requests the Main Cycle or canonical cycle continuation requires it");
+    expect(prepare.description).not.toMatch(/tool discovery|schema loading|\bRefresh\b/i);
     expect(prepare.description).toContain("Threads and database clock evidence");
         expect(prepare.description).toContain("eight source-backed candidates persisted through two persist_manifest_autonomous_batch calls");
     expect(prepare.description).toContain("each batch reconciles authoritative coverage once");
