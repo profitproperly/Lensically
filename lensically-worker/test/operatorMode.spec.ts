@@ -5275,6 +5275,21 @@ active_checkpoint: none
       "repository_file_search_requires_exact_file",
       { ok: false, status: 200 },
     )).toBe(true);
+    for (const lifecycleError of [
+      "operator_lifecycle_token_invalid_or_expired",
+      "operator_lifecycle_token_contract_mismatch",
+      "operator_lifecycle_stage_incomplete",
+      "operator_lifecycle_deployment_changed",
+      "operator_lifecycle_session_changed",
+      "operator_action_closure_verification_required",
+      "operator_action_closure_prevention_incomplete",
+    ]) {
+      expect(isExpectedHardeningControlResult(
+        "executeOperatorAction",
+        lifecycleError,
+        { ok: false, error: lifecycleError, status: 200 },
+      )).toBe(true);
+    }
     expect(isExpectedHardeningControlResult(
       "persist_manifest_autonomous_batch",
       "unexpected_result",
