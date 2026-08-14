@@ -22343,9 +22343,7 @@ async function handleOperatorMcpToolCall(
       toolName,
       args,
       result,
-      (sourceDefinedDirectEngineering
-        ? buildOperatorMcpBaseTools(false)
-        : await buildOperatorMcpTools(env, false, false)) as MandatoryExecutionToolDefinition[],
+      [] as MandatoryExecutionToolDefinition[],
       {
         signPermit: (payload) => createSignedOperatorEnvelope(env, payload),
         verifyPermit: (token) => verifySignedOperatorEnvelope(env, token),
