@@ -1,4 +1,8 @@
 import { resolveLensicallySystemDirectory } from "./systemDirectory";
+import {
+  OPERATOR_TURN_CLOSE_GATE_VERSION,
+  type OperatorTurnCloseGate,
+} from "./operatorTurnCloseGate";
 
 export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v2";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
