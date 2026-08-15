@@ -4104,6 +4104,97 @@ active_checkpoint: none
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
   }, 30000);
 
+  it("reconciles corrupted opaque lifecycle references only from the exact current MCP session and stage", async () => {
+    const initializeSession = async (): Promise<string> => {
+      const response = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: MCP_AUTH_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: crypto.randomUUID(),
+          method: "initialize",
+          params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "vitest", version: "1.0.0" } },
+        }),
+      });
+      expect(response.status).toBe(200);
+      const sessionId = response.headers.get("mcp-session-id");
+      expect(sessionId).toBeTruthy();
+      return sessionId ?? "";
+    };
+    const callWithSession = async <T>(sessionId: string, toolName: string, args: Record<string, unknown>): Promise<{ structuredContent: T; isError?: boolean }> => {
+      const response = await fetchFromWorker("/api/operator/mcp", {
+        method: "POST",
+        headers: { ...MCP_AUTH_HEADERS, "Mcp-Session-Id": sessionId },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: crypto.randomUUID(),
+          method: "tools/call",
+          params: {
+            name: toolName,
+            arguments: {
+              governing_standards_ack: "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.",
+              ...args,
+            },
+          },
+        }),
+      });
+      expect(response.status).toBeLessThan(400);
+      const payload = await response.json() as { result: { structuredContent: T; isError?: boolean } };
+      return payload.result;
+    };
+
+    const sessionId = await initializeSession();
+    const otherSessionId = await initializeSession();
+    const step1 = await callWithSession<{ session_map_token: string }>(sessionId, "getOperatorSessionMap", {});
+    expect(step1.isError).not.toBe(true);
+    const step2 = await callWithSession<{ knowledge_token: string }>(sessionId, "getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(step2.isError).not.toBe(true);
+
+    const corruptedKnowledgeToken = `olr_${"f".repeat(32)}`;
+    const crossSession = await callWithSession<{ ok: boolean; error?: string }>(otherSessionId, "getOperatorLiveState", {
+      knowledge_token: corruptedKnowledgeToken,
+    });
+    expect(crossSession.isError).toBe(true);
+    expect(crossSession.structuredContent).toMatchObject({ ok: false, error: "operator_lifecycle_token_invalid_or_expired" });
+
+    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(sessionId, "getOperatorLiveState", {
+      knowledge_token: corruptedKnowledgeToken,
+    });
+    expect(step3.isError).not.toBe(true);
+    expect(step3.structuredContent.live_state_token).toBeTruthy();
+
+    const corruptedLiveStateToken = `olr_${"e".repeat(32)}`;
+    const changedAction = await callWithSession<{ ok: boolean; error?: string }>(sessionId, "executeOperatorAction", {
+      live_state_token: corruptedLiveStateToken,
+      action: { capability: "repository_status", arguments: {} },
+    });
+    expect(changedAction.isError).toBe(true);
+    expect(changedAction.structuredContent.ok).toBe(false);
+
+    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(sessionId, "executeOperatorAction", {
+      live_state_token: corruptedLiveStateToken,
+      action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(step4.isError).not.toBe(true);
+    expect(step4.structuredContent.action_execution_token).toBeTruthy();
+
+    const corruptedExecutionToken = `olr_${"d".repeat(32)}`;
+    const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(sessionId, "closeOperatorAction", {
+      action_execution_token: corruptedExecutionToken,
+      verification: {
+        verified: true,
+        evidence: ["The canonical session-bound Step-4 execution completed after opaque-reference reconciliation."],
+        next_action: "Continue the isolated lifecycle regression.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError).not.toBe(true);
+    expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+  }, 30000);
+
                 it.skip("keeps a missing guided review batch non-blocking and routes an active autonomous cycle back to persistence", async () => {
     await activateManifestAutonomyForTest();
     const prepared = await mcpTool<{ cycle: { id: string } }>("prepare_manifest_autonomous_cycle", {
