@@ -262,6 +262,55 @@ jobs:
 
 
 
+  recovery-release:
+    needs: push-validation
+    if: >-
+      github.event_name == 'push' &&
+      needs.push-validation.result == 'success' &&
+      needs.push-validation.outputs.recovery_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Recovery head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact Recovery release identity
+        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-recovery-worker/package-lock.json
+
+      - name: Restore Recovery dependencies
+        id: release_recovery_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-recovery-worker/node_modules
+          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+
+      - name: Install Recovery dependencies
+        if: steps.release_recovery_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-recovery-worker
+        run: npm ci
+
+      - name: Revalidate Recovery release head
+        working-directory: lensically-recovery-worker
+        run: |
+          npm run typecheck
+          npm run test:retry-contract
+
+      - name: Deploy exact validated Recovery head
+        working-directory: lensically-recovery-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --var "LENSICALLY_COMMIT_SHA:${GITHUB_SHA}"
+
   fast-validation:
     if: >-
       github.event_name == 'workflow_dispatch' &&
