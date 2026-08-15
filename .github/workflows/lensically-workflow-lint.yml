@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 jobs:
   parse-engineering-workflow:
@@ -21,25 +20,8 @@ jobs:
       - name: Checkout exact head
         uses: actions/checkout@v4
 
-      - name: Parse and validate engineering workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set +e
-          output="$(ruby lensically-worker/scripts/validate-workflow-yaml.rb && ruby lensically-worker/scripts/validate-engineering-workflow.rb .github/workflows/lensically-engineering.yml 2>&1)"
-          status=$?
-          printf '%s\n' "$output"
-          if (( status != 0 )); then
-            description="$(printf '%s\n' "$output" | grep -v '^ | head -n 1)"
-            description="${description:-workflow_lint_failed}"
-            description="${description:0:140}"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure \
-              -f context='lensically/workflow-lint' \
-              -f description="$description" >/dev/null
-            exit "$status"
-          fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=success \
-            -f context='lensically/workflow-lint' \
-            -f description='workflow_lint_passed' >/dev/null
+      - name: Validate workflow YAML
+        run: ruby lensically-worker/scripts/validate-workflow-yaml.rb
+
+      - name: Validate engineering workflow structure
+        run: ruby lensically-worker/scripts/validate-engineering-workflow.rb .github/workflows/lensically-engineering.yml
