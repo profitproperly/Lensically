@@ -315,9 +315,10 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       .filter((path) => (!prefix || path.startsWith(prefix)) && textFile.test(path))
       .sort((left, right) => {
         const rank = (path: string) => /(?:^|\/)index\.(?:ts|tsx|js|mjs|cjs)$/i.test(path) ? 0 : /(?:test|spec)[._-]/i.test(path) ? 1 : 2;
-        return rank(left) - rank(right) || left.localeCompare(right);
+        const depth = (path: string) => path.split("/").length;
+        return rank(left) - rank(right) || depth(left) - depth(right) || left.localeCompare(right);
       });
-    const scanCap = Math.min(candidatePaths.length, Math.max(12, Math.min(32, limit * 2)));
+    const scanCap = Math.min(candidatePaths.length, 12);
     const contentMatches: Array<Record<string, unknown>> = [];
     let fileContentFanout = 0;
     scan_files: for (const path of candidatePaths.slice(0, scanCap)) {
