@@ -84,12 +84,23 @@ async function github(env: Env, path: string, init: RequestInit = {}): Promise<{
   const transientStatuses = new Set([502, 503, 504]);
   const maxAttempts = retryableRead ? 4 : 1;
   let response: Response | null = null;
+  let lastTransportError: string | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    response = await request();
+    try {
+      response = await request();
+      lastTransportError = null;
+    } catch (error) {
+      response = null;
+      lastTransportError = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+      if (!retryableRead || attempt === maxAttempts) break;
+      await new Promise((resolve) => setTimeout(resolve, 75 * (2 ** (attempt - 1))));
+      continue;
+    }
     if (!retryableRead || !transientStatuses.has(response.status) || attempt === maxAttempts) break;
     await new Promise((resolve) => setTimeout(resolve, 75 * (2 ** (attempt - 1))));
   }
-  return { ok: Boolean(response?.ok), status: response?.status ?? 0, data: await response?.json().catch(() => null) ?? null };
+  if (!response) return { ok: false, status: 0, data: { error: "github_transport_failed", safe_message: lastTransportError } };
+  return { ok: response.ok, status: response.status, data: await response.json().catch(() => null) ?? null };
 }
 
 async function cloudflare(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; result: unknown; errors: unknown }> {
