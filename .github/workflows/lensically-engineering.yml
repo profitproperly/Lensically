@@ -297,7 +297,24 @@ jobs:
         working-directory: lensically-worker
         run: rm -rf node_modules/.vite node_modules/.cache
 
-                  
+      - name: Restore Recovery dependencies
+        id: recovery_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-recovery-worker/node_modules
+          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+
+      - name: Install Recovery dependencies
+        if: steps.recovery_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-recovery-worker
+        run: npm ci
+
+      - name: Validate Recovery worker and retry contract
+        working-directory: lensically-recovery-worker
+        run: |
+          npm run typecheck
+          npm run test:retry-contract
+
       - name: Typecheck and lifecycle gate
         working-directory: lensically-worker
         run: |
