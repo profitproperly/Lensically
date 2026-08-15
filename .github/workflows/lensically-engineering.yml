@@ -234,7 +234,27 @@ jobs:
 
       - name: Validate full release preflight
         working-directory: lensically-worker
-        run: node scripts/release-preflight.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          output="$(node scripts/release-preflight.mjs 2>&1)"
+          status=$?
+          printf '%s\n' "$output"
+          first_error="$(printf '%s\n' "$output" | sed -n 's/^\[release-preflight\] //p' | head -n 1)"
+          if (( status != 0 )); then
+            description="${first_error:-release_preflight_failed}"
+            description="${description:0:140}"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
+              -f context='lensically/full-release-preflight' \
+              -f description="$description" >/dev/null
+            exit "$status"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='lensically/full-release-preflight' \
+            -f description='release_preflight_passed' >/dev/null
 
       - name: Validate Worker architecture baseline
         working-directory: lensically-worker
