@@ -3853,6 +3853,14 @@ describe("operator mode MCP endpoint", () => {
     expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref", "deployment"]);
     const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
     expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
+    const checkpointStepBranch = actionSchema?.oneOf?.find((item) => {
+      const branch = item as { properties?: { capability?: { const?: string } } };
+      return branch.properties?.capability?.const === "checkpoint_step";
+    }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
+    expect(checkpointStepBranch?.properties?.arguments?.required).toEqual(["stage"]);
+    expect(Object.keys(checkpointStepBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref"]);
+    const checkpointStageSchema = checkpointStepBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
+    expect(checkpointStageSchema?.enum).toEqual(["a0", "a1", "a2", "a3", "a4", "a5"]);
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
