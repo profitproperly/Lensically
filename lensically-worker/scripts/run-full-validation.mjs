@@ -210,7 +210,7 @@ function validatePlan() {
   };
 }
 
-function run(label, command, args) {
+function run(label, command, args, diagnosticTestFiles = []) {
   const startedAt = performance.now();
   console.log(`[full-validation] start ${label}`);
   const result = spawnSync(command, args, {
