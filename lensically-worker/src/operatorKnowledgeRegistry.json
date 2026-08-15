@@ -24,9 +24,9 @@
         "New small files use createRepoFile. Repository and head state uses getRepoStatus."
       ],
       "mcp_schema_procedure": [
-        "The public invocation contract is the five-stage lifecycle. Step 4 exposes a generated closed discriminated union derived from internal typed capability schemas.",
+        "The public invocation contract is the five-stage lifecycle. Step 2 accepts the generated closed typed action union and binds the normalized action server-side; after Step 3, the client forwards only opaque lifecycle tokens and Step 5 verification evidence.",
         "Public generic profile_id, generic inputs envelopes, freehand routing text, wrappers, and internal handler names are forbidden.",
-        "Internal capability names describe server capabilities, not independently callable public tools. Step 4 is the only model-facing operational execution choke point.",
+        "Internal capability names describe server capabilities, not independently callable public tools. Step 4 is the only model-facing operational execution choke point, and it executes the server-bound prepared action from the opaque live-state token without replaying capability names or arguments.",
         "Discovery returns candidates only. Verify declared purpose, side effects, and exact typed branch before Step-4 invocation.",
         "After a public lifecycle schema change is deployed and live verified, first test the contract surfaced in the current chat. Use the refresh and context-port handoff only when that surfaced public schema is stale and the changed contract cannot be used; if the changed contract is already surfaced and usable, do not request refresh or a new chat."
       ],
