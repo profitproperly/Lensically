@@ -96,6 +96,7 @@ function baseDependencies(
         scopes: ["runtime"],
         planned_capability: "repository_status",
         planned_tool: "getRepoStatus",
+        planned_arguments: {},
         planned_action_fingerprint: "request-fingerprint",
       },
     })),
