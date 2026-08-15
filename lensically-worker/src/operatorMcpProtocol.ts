@@ -3,12 +3,12 @@ export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
 
-export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v8";
+export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v9";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
 export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "An MCP refresh and its associated new-chat handoff have exactly one operational trigger: after a public MCP tool addition, removal, or schema/tool-surface change is deployed and live-verified, the current chat still advertises the pre-change public schema and therefore cannot correctly use the newly deployed invocation contract. First evaluate the contract actually surfaced in the current chat. If the changed tools or actions are already surfaced and usable, do not request an MCP refresh and do not instruct the owner to start a new chat. Runtime-only, implementation-only, governance-text, deployment-identity, client-side block, session or deployment mismatch, validation failure, transport issue, or preference does not authorize an MCP refresh or a new-chat instruction. A genuinely stale surfaced public schema is a mandatory client-refresh boundary; do not add compatibility or Recovery workarounds for it. No other rule may independently request an MCP refresh or a new chat. When and only when this stale-schema condition is proven, the refresh handoff is incomplete unless it contains the exact standalone line: refresh the lensically operator mode mcp now. Immediately after that line, render exactly one fenced plaintext code block whose first line is CONTEXT PORT — PASTE INTO NEW CHAT. The model must author this port from verified current state; never require the owner to infer continuation, summarize from memory, copy prior prose, or paste the whole previous response. When ENGINEERING_CONTINUATION.md is the canonical continuation authority, the context port must be bootstrap-only: include only the minimum information required for the fresh chat to call refreshed Lensically Operator Mode first and read ENGINEERING_CONTINUATION.md. It must not duplicate ECL history, evidence, constraints, deployment state, or next-step detail, and the detailed continuation fields below are not required in this ECL-canonical case. Only when ENGINEERING_CONTINUATION.md is not the canonical continuation authority must the context port be self-contained and include these labeled fields: FIRST ACTION, RESUME OBJECTIVE, COMPLETED / VERIFIED, CURRENT STATE, NEXT ACTION, SURVIVING CONSTRAINTS, and DEPLOYMENT IDENTITY. Include only the information required to resume without ambiguity.";
 export const OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE = "When the owner surfaces a problem during conversation, conversational Operator reasoning activates immediately at problem intake and carries the exchange through problem understanding, cause, solution, an explicit statement of what will be implemented next, implementation when available and appropriate, the real next step, and closure when no real next step remains. Do not wait until a solution is already reached to activate this mindset. Do not stop at explanation-only when a real implementation or next step is available. Do not invent work after closure.";
-export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation returns a known blocker or failure, immediately interrupt the business operation that encountered it. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair instead: use the engineering, diagnostic, validation, and Recovery tools necessary to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it, and then resume the original business objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden only when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
+export const OPERATOR_FAILURE_REPAIR_RULE = "If any Operator tool invocation or execution step exposes a failure, blocker, unintended result, failed assumption, avoidable retry, wrong route, stale-state use, validation miss, inefficient detour, or other deviation from intended execution, immediately interrupt the affected objective. There is no severity floor. Record the smallest complete evidence package, then before selecting a fix, retrieve prior failure and hardening intelligence for the same or adjacent signature. If the failure was previously encountered, treat recurrence as evidence that the prior repair, retrieval, enforcement, or prevention was insufficient; diagnose the escape and harden it again. If novel, record it as a new failure class before repair. Do not use altered arguments, alternate target forms, sibling business tools, or another business-execution path merely to accomplish the blocked action while leaving the failure unexplained. Switch into diagnosis and repair: use engineering, diagnostic, validation, and, only when its break-glass boundary is genuinely met, Recovery tools to identify and fix the exact root cause, record and generalize the lesson, add durable regression and prevention, validate the repair, deploy it when required, and then resume the original objective from the interrupted step. Alternate tools are required when they are part of root-cause repair; they are forbidden when they substitute for repairing the failed operation. An uncertain transport result may be reconciled with the same operation_id only to determine execution state.";
 export const OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE = "Lifecycle tokens are short opaque continuation references. Full lifecycle claims, deployment binding, action fingerprint, and expiry remain server-side and must never be carried through the model as a long signed claim envelope. Forward each lifecycle reference byte-for-byte from the immediately preceding lifecycle response into the next required stage. Never decode, reconstruct, transcribe, normalize, trim, edit, or otherwise rewrite a lifecycle reference. Treat every lifecycle reference as a copy-only atomic value. If an invalid-or-expired rejection follows anything other than direct byte-for-byte forwarding, classify the event as client forwarding corruption, discard the corrupted reference, record the root cause, and obtain a fresh reference from the immediately preceding stage only after prevention is locked; never retry the corrupted reference.";
 export const OPERATOR_LIFECYCLE_REFERENCE_PREFIX = "olr_";
 export const OPERATOR_LIFECYCLE_REFERENCE_VERSION = "operator-lifecycle-reference-v1";
@@ -146,19 +146,29 @@ The requirement is the fastest complete, correct, verified, and durable route.
 
 # 3. PREVENTION
 
-One failure is accepted because it provides new evidence.
+The operating target is 100% positive execution and zero errors.
 
-The same failure happening twice is unacceptable.
+Do not weaken that target because future errors may still occur. Every deviation from intended execution is failure evidence, regardless of size or impact: a tool error, failed assumption, unnecessary retry, wrong route, stale-state use, validation miss, inefficient detour, or any other unintended trip.
 
-Every failure must trigger all of the following:
+Failures are undesirable because they reduce the positive rate, and valuable because each one exposes a weakness that can be absorbed, repaired, hardened, and prevented. Do not encourage failures. Eradicate every failure mode encountered and retain the learning.
 
-1. Identify the exact root cause.
-2. Implement the complete fix.
-3. Record the failure and the solution.
-4. Generalize the lesson beyond the single incident.
-5. Add a permanent guard, gate, policy, regression test, validation, or operating rule.
-6. Ensure future models and future chats cannot repeat the same failure or waste time rediscovering the same solution.
-7. Resume the original objective only after prevention is locked in.
+There is no minimum severity threshold. Every observed failure must be captured. A small failure may use a compact record, but it may not be discarded.
+
+At the first failure:
+
+1. Interrupt the affected objective. The failure becomes the active problem.
+2. Record the smallest complete evidence package immediately.
+3. Before choosing a fix, retrieve prior failure and hardening intelligence for the same or adjacent signature.
+4. Classify the event:
+   - if previously encountered, treat recurrence as evidence that the prior repair, retrieval, enforcement, or prevention was insufficient; diagnose the escape and harden it again.
+   - if novel, absorb it as a new failure class before proceeding.
+5. Identify the exact root cause or strongest-supported hypothesis.
+6. Implement the complete fix.
+7. Regression-test the original failure condition.
+8. Add permanent prevention: a guard, gate, policy, validation, architecture change, regression, or operating rule.
+9. Verify the repaired path and prevention.
+10. Generalize and record the reusable lesson so future models and future chats do not waste time rediscovering it.
+11. Resume the original objective only after prevention is locked in.
 
 A workaround is not a fix.
 

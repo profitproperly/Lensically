@@ -3872,7 +3872,18 @@ describe("operator mode MCP endpoint", () => {
       planned_action: { capability: "list_accounts", arguments: {} },
     });
     expect(step2.nodes[0]?.node_id).toBe("governance");
-    expect(step2.nodes[0]?.content).toMatchObject({ version: "operator-governing-standards-v8" });
+        const governanceNode = step2.nodes[0]?.content ?? {};
+    expect(governanceNode).toMatchObject({ version: "operator-governing-standards-v9" });
+    const governanceText = String(governanceNode.exact_owner_approved_text ?? "");
+    const failureRepairRule = String(governanceNode.failure_repair_rule ?? "");
+    expect(governanceText).toContain("The operating target is 100% positive execution and zero errors.");
+    expect(governanceText).toContain("There is no minimum severity threshold.");
+    expect(governanceText).toContain("Before choosing a fix, retrieve prior failure and hardening intelligence");
+    expect(governanceText).toContain("if previously encountered");
+    expect(governanceText).toContain("if novel");
+    expect(failureRepairRule).toContain("There is no severity floor.");
+    expect(failureRepairRule).toContain("before selecting a fix, retrieve prior failure and hardening intelligence");
+    expect(failureRepairRule).toContain("treat recurrence as evidence");
         const step3 = await mcpTool<{ live_state_token: string; state: { runtime: Record<string, unknown> } }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
     });
