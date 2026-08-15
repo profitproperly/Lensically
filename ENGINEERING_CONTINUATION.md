@@ -6,7 +6,7 @@ repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
 active_job_id: operator-lifecycle-architecture-refactor-20260814
-active_checkpoint: external-openai-hardening-transition-predispatch-block
+active_checkpoint: neutral-hardening-case-step-public-schema-refresh
 
 ## ACTIVE — Operator Lifecycle Architecture Refactor
 
