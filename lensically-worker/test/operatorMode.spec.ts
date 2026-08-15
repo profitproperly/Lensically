@@ -4288,7 +4288,6 @@ active_checkpoint: none
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
-      action: { capability: "list_accounts", arguments: {} },
     });
     expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.action_execution_token).toBeTruthy();
