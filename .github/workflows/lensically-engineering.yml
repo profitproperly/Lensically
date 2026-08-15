@@ -221,12 +221,13 @@ jobs:
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
 
-      - name: Validate release acceptance contracts
+      - name: Test release acceptance contract
         working-directory: lensically-worker
-        run: |
-          set -euo pipefail
-          node scripts/test-release-acceptance.mjs
-          node scripts/validate-release-acceptance.mjs
+        run: node scripts/test-release-acceptance.mjs
+
+      - name: Validate release acceptance contract
+        working-directory: lensically-worker
+        run: node scripts/validate-release-acceptance.mjs
 
       - name: Validate capability lifecycle preflight
         working-directory: lensically-worker
