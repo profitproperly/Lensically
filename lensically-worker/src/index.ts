@@ -15618,32 +15618,17 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       planned_action: typedActionSchema,
     },
   };
-  const closeInputSchema = closeGateway.inputSchema && typeof closeGateway.inputSchema === "object" && !Array.isArray(closeGateway.inputSchema)
-    ? closeGateway.inputSchema as Record<string, unknown>
-    : {};
-  const closeInputProperties = closeInputSchema.properties && typeof closeInputSchema.properties === "object" && !Array.isArray(closeInputSchema.properties)
-    ? closeInputSchema.properties as Record<string, unknown>
-    : {};
-  closeGateway.inputSchema = {
-    ...closeInputSchema,
-    properties: {
-      ...closeInputProperties,
-      action: typedActionSchema,
-    },
-  };
-  
   actionGateway.inputSchema = {
     type: "object",
     properties: {
       live_state_token: { type: "string", minLength: 16 },
-      action: typedActionSchema,
       governing_standards_ack: {
         type: "string",
         const: OPERATOR_GOVERNING_STANDARDS_ACK,
         description: "Mandatory pre-action acknowledgment.",
       },
     },
-    required: ["live_state_token", "action", "governing_standards_ack"],
+    required: ["live_state_token", "governing_standards_ack"],
     additionalProperties: false,
   };
   return tools;
