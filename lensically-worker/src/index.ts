@@ -18203,8 +18203,9 @@ async function closeResolvedHardeningIncidentsForRequest(
 
 function hardeningRecurrenceFamily(boundary: string, category: string): string {
   if (boundary === "client" && (
-    category === "openai_client_safety_block"
+        category === "openai_client_safety_block"
     || category === "openai_client_safety_pre_dispatch"
+    || category === "openai_predispatch_safety_block"
     || category.startsWith("openai_safety_check_blocked_")
   )) {
     return "client:openai_safety_predispatch";

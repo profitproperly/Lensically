@@ -5992,11 +5992,35 @@ active_checkpoint: none
     const second = secondCall.structuredContent;
     expect(secondCall.isError).not.toBe(true);
     expect(second.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
-    expect(second.recurrence).toMatchObject({
+        expect(second.recurrence).toMatchObject({
       status: "known_active_recurrence",
       prior_incident_id: first.incident.id,
       recurrence_family: "client:openai_safety_predispatch",
     });
+
+    const aliasCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; severity: string };
+      recurrence: { status: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "run_git_hub_workflow",
+      request_fingerprint: "fixture-openai-client-block-new-live-alias",
+      error_category: "openai_predispatch_safety_block",
+      operation_class: "engineering_validation_workflow_dispatch",
+      observed_outcome: { client_blocked: true },
+    });
+    const alias = aliasCall.structuredContent;
+    expect(aliasCall.isError).not.toBe(true);
+    expect(alias.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
+    expect(alias.recurrence).toMatchObject({
+      status: "known_active_recurrence",
+      recurrence_family: "client:openai_safety_predispatch",
+    });
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(alias.incident.id).run();
 
     await env.DB.prepare(
       `UPDATE operator_hardening_incidents SET
