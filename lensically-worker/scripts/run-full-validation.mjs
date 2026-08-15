@@ -105,6 +105,7 @@ const operatorMilestoneTitles = [
   "arms, executes, and re-arms the independent scheduled-post alarm with shared cron health",
   "recovers a known Saved Pattern into complete published-post lineage",
   "reconciles prepare_manifest_autonomous_cycle again with the same durable operation id",
+  "enforces the normalized Operator lifecycle from session map through explicit closure",
 ];
 
 const requiredFiles = [
