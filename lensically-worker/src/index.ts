@@ -16999,7 +16999,7 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
     return {
       type: "object",
       properties: {
-                stage: { type: "string", enum: ["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"] },
+                        stage: { type: "string", enum: ["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"], description: "Use n to advance exactly one state from the current server-resolved hardening state. a0 through a10 are absolute target stages: a0=contained, a1=classified, a2=reproduced, a3=generalized, a4=repaired, a5=prevention_locked, a6=validated, a7=released, a8=live_verified, a9=resumed, a10=closed. Do not treat a0 through a10 as relative progression." },
         case: { type: "string", maxLength: 120 },
         cause: { type: "string", maxLength: 1000 },
         generalization: { type: "string", maxLength: 1000 },

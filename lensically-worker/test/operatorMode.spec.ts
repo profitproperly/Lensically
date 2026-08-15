@@ -3851,8 +3851,9 @@ describe("operator mode MCP endpoint", () => {
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
         expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
     expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization", "rule", "tests", "ref", "deployment", "proof", "resume", "gain"]);
-    const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
+        const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[]; description?: string } | undefined;
     expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
+    expect(hardeningCaseStageSchema?.description).toBe("Use n to advance exactly one state from the current server-resolved hardening state. a0 through a10 are absolute target stages: a0=contained, a1=classified, a2=reproduced, a3=generalized, a4=repaired, a5=prevention_locked, a6=validated, a7=released, a8=live_verified, a9=resumed, a10=closed. Do not treat a0 through a10 as relative progression.");
     const checkpointStepBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "checkpoint_step";
@@ -4077,7 +4078,7 @@ active_checkpoint: none
     });
     expect(recordedCall.isError).not.toBe(true);
     const incidentId = recordedCall.structuredContent.incident.id;
-        const action = { capability: "case_step", arguments: { stage: "a0" } };
+            const action = { capability: "case_step", arguments: { stage: "n" } };
     const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
     const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
       session_map_token: step1.structuredContent.session_map_token,
@@ -4103,7 +4104,7 @@ active_checkpoint: none
       action_execution_token: step4.structuredContent.action_execution_token,
       verification: {
         verified: true,
-        evidence: ["Neutral case_step advanced the active fixture incident through advanceHardeningIncident."],
+                evidence: ["Neutral case_step stage n advanced the active fixture incident exactly one server-resolved state through advanceHardeningIncident."],
         next_action: "Continue the isolated regression fixture.",
         prevention_required: false,
       },
