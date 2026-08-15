@@ -233,11 +233,23 @@ function run(label, command, args, diagnosticTestFiles = []) {
           "--bail=1",
         ], {
           cwd: workerRoot,
-          stdio: "inherit",
+          encoding: "utf8",
           env: process.env,
         });
+        if (isolated.stdout) process.stdout.write(isolated.stdout);
+        if (isolated.stderr) process.stderr.write(isolated.stderr);
         if (isolated.error || isolated.status !== 0) {
           isolatedFailure = testFile;
+          const combinedOutput = `${isolated.stdout ?? ""}\n${isolated.stderr ?? ""}`
+            .replace(/\u001b\[[0-9;]*m/g, "");
+          const failureTitle = combinedOutput
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .find((line) => line.includes(" > ") && (line.includes("FAIL") || line.startsWith("❯") || line.startsWith("×")));
+          if (failureTitle) {
+            const annotationTitle = failureTitle.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+            console.error(`::error title=Full validation test failed::${annotationTitle}`);
+          }
           break;
         }
       }
