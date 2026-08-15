@@ -15562,17 +15562,8 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   const actionBranches = tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
-    .map((tool) => {
-      const sourceSchema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
-        ? tool.inputSchema as Record<string, unknown>
-        : {};
-      const sourceProperties = sourceSchema.properties && typeof sourceSchema.properties === "object" && !Array.isArray(sourceSchema.properties)
-        ? { ...(sourceSchema.properties as Record<string, unknown>) }
-        : {};
-      delete sourceProperties.governing_standards_ack;
-      const sourceRequired = Array.isArray(sourceSchema.required)
-        ? (sourceSchema.required as string[]).filter((field) => field !== "governing_standards_ack")
-        : [];
+        .map((tool) => {
+      const actionArgumentSchema = operatorInternalActionArgumentSchema(tool);
             const capability = operatorActionCapabilityIdForToolName(tool.name);
       if (actionCapabilityIds.has(capability)) {
         throw new Error(`operator_action_capability_collision:${capability}`);
@@ -15589,13 +15580,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
         },
         properties: {
           capability: { type: "string", const: capability },
-          arguments: {
-            ...sourceSchema,
-            type: "object",
-            properties: sourceProperties,
-            required: sourceRequired,
-            additionalProperties: false,
-          },
+                    arguments: actionArgumentSchema,
         },
         required: ["capability", "arguments"],
         additionalProperties: false,
