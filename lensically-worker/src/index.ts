@@ -16593,6 +16593,7 @@ async function verifyOperatorLifecycleToken(
   token: unknown,
   minimumStage: 1 | 2 | 3 | 4 | 5,
   expectedSessionId: string | null = null,
+  expectedActionFingerprint: string | null = null,
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
   const reference = normalizeOperatorLifecycleReference(token);
   const now = Math.floor(Date.now() / 1000);
@@ -16603,6 +16604,7 @@ async function verifyOperatorLifecycleToken(
   ).bind(candidate, OPERATOR_LIFECYCLE_REFERENCE_KIND, now).first<Record<string, unknown>>();
   let row = reference ? await readReference(reference) : null;
   let reconciledReference: string | null = null;
+  let reconciliationMode: string | null = null;
   if (!row && expectedSessionId) {
     const canonicalRow = await env.DB.prepare(
       `SELECT id, payload_json, expires_at FROM operator_continuity_refs
@@ -16614,6 +16616,7 @@ async function verifyOperatorLifecycleToken(
          AND CAST(json_extract(payload_json, '$.stage') AS INTEGER) = ?
          AND json_extract(payload_json, '$.deployment_identity') = ?
          AND json_extract(payload_json, '$.mcp_session_id') = ?
+         AND (? IS NULL OR json_extract(payload_json, '$.planned_action_fingerprint') = ?)
        ORDER BY rowid DESC
        LIMIT 1`,
     ).bind(
@@ -16624,17 +16627,79 @@ async function verifyOperatorLifecycleToken(
       minimumStage,
       currentOperatorDeploymentIdentity(env),
       expectedSessionId,
+      expectedActionFingerprint,
+      expectedActionFingerprint,
     ).first<Record<string, unknown>>();
     if (canonicalRow && typeof canonicalRow.id === "string") {
       row = canonicalRow;
       reconciledReference = canonicalRow.id;
-      logWorkerEvent("OPERATOR_LIFECYCLE_REFERENCE_RECONCILED", {
-        minimum_stage: minimumStage,
-        expected_session_present: true,
-        received: await buildOperatorOpaqueLifecycleTokenTelemetry(token),
-        canonical: await buildOperatorOpaqueLifecycleTokenTelemetry(reconciledReference),
-      });
+      reconciliationMode = "mcp_session";
     }
+  }
+  if (!row && !expectedSessionId && expectedActionFingerprint) {
+    const canonicalRow = await env.DB.prepare(
+      `SELECT id, payload_json, expires_at FROM operator_continuity_refs
+       WHERE kind = ?
+         AND expires_at >= ?
+         AND json_extract(payload_json, '$.kind') = 'operator_lifecycle'
+         AND json_extract(payload_json, '$.lifecycle_version') = ?
+         AND json_extract(payload_json, '$.lifecycle_reference_version') = ?
+         AND CAST(json_extract(payload_json, '$.stage') AS INTEGER) = ?
+         AND json_extract(payload_json, '$.deployment_identity') = ?
+         AND json_extract(payload_json, '$.mcp_session_id') IS NULL
+         AND json_extract(payload_json, '$.planned_action_fingerprint') = ?
+       ORDER BY rowid DESC
+       LIMIT 1`,
+    ).bind(
+      OPERATOR_LIFECYCLE_REFERENCE_KIND,
+      now,
+      OPERATOR_LIFECYCLE_VERSION,
+      OPERATOR_LIFECYCLE_REFERENCE_VERSION,
+      minimumStage,
+      currentOperatorDeploymentIdentity(env),
+      expectedActionFingerprint,
+    ).first<Record<string, unknown>>();
+    if (canonicalRow && typeof canonicalRow.id === "string") {
+      row = canonicalRow;
+      reconciledReference = canonicalRow.id;
+      reconciliationMode = "action_fingerprint";
+    }
+  }
+  if (!row && !expectedSessionId && !expectedActionFingerprint && minimumStage === 1) {
+    const canonicalRow = await env.DB.prepare(
+      `SELECT id, payload_json, expires_at FROM operator_continuity_refs
+       WHERE kind = ?
+         AND expires_at >= ?
+         AND json_extract(payload_json, '$.kind') = 'operator_lifecycle'
+         AND json_extract(payload_json, '$.lifecycle_version') = ?
+         AND json_extract(payload_json, '$.lifecycle_reference_version') = ?
+         AND CAST(json_extract(payload_json, '$.stage') AS INTEGER) = 1
+         AND json_extract(payload_json, '$.deployment_identity') = ?
+         AND json_extract(payload_json, '$.mcp_session_id') IS NULL
+       ORDER BY rowid DESC
+       LIMIT 1`,
+    ).bind(
+      OPERATOR_LIFECYCLE_REFERENCE_KIND,
+      now,
+      OPERATOR_LIFECYCLE_VERSION,
+      OPERATOR_LIFECYCLE_REFERENCE_VERSION,
+      currentOperatorDeploymentIdentity(env),
+    ).first<Record<string, unknown>>();
+    if (canonicalRow && typeof canonicalRow.id === "string") {
+      row = canonicalRow;
+      reconciledReference = canonicalRow.id;
+      reconciliationMode = "unbound_session_map";
+    }
+  }
+  if (reconciledReference) {
+    logWorkerEvent("OPERATOR_LIFECYCLE_REFERENCE_RECONCILED", {
+      minimum_stage: minimumStage,
+      reconciliation_mode: reconciliationMode,
+      expected_session_present: Boolean(expectedSessionId),
+      expected_action_fingerprint_present: Boolean(expectedActionFingerprint),
+      received: await buildOperatorOpaqueLifecycleTokenTelemetry(token),
+      canonical: await buildOperatorOpaqueLifecycleTokenTelemetry(reconciledReference),
+    });
   }
   const decodedPayload = row ? safeParseJsonString(String(row.payload_json ?? "{}")) : null;
   const payload = decodedPayload && typeof decodedPayload === "object" && !Array.isArray(decodedPayload)
@@ -16645,6 +16710,7 @@ async function verifyOperatorLifecycleToken(
       minimum_stage: minimumStage,
       ...(await buildOperatorOpaqueLifecycleTokenTelemetry(token)),
       expected_session_present: Boolean(expectedSessionId),
+      expected_action_fingerprint_present: Boolean(expectedActionFingerprint),
     }, "error");
     return { ok: false, error: "operator_lifecycle_token_invalid_or_expired" };
   }
@@ -16656,12 +16722,15 @@ async function verifyOperatorLifecycleToken(
   if (Number(payload.stage ?? 0) < minimumStage) {
     return { ok: false, error: "operator_lifecycle_stage_incomplete" };
   }
-    if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
+  if (payload.deployment_identity !== currentOperatorDeploymentIdentity(env)) {
     return { ok: false, error: "operator_lifecycle_deployment_changed" };
   }
   const boundSessionId = resolveOperatorLifecycleSessionBinding(payload.mcp_session_id, null);
   if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId) {
     return { ok: false, error: "operator_lifecycle_session_changed" };
+  }
+  if (expectedActionFingerprint && payload.planned_action_fingerprint !== expectedActionFingerprint) {
+    return { ok: false, error: "operator_lifecycle_action_changed_after_preparation" };
   }
   return { ok: true, payload };
 }
