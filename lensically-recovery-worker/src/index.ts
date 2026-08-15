@@ -268,15 +268,16 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     if (!query) return { ok: false, error: "query_required" };
     if (prefix && /\.[a-z0-9]+$/i.test(prefix)) {
       const file = await repoFile(env, prefix);
-      if (file.ok && file.content) {
-        const normalizedQuery = query.toLowerCase();
-        const lines = file.content.split(/\r?\n/);
-        const matches = lines
-          .map((line, index) => ({ line_number: index + 1, line }))
-          .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery))
-          .slice(0, limit);
-        return { ok: true, matches, path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1, complete: true };
+      if (!file.ok || !file.content) {
+        return { ok: false, error: file.error || "repo_file_unavailable", status: file.status, matches: [], path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1, complete: false };
       }
+      const normalizedQuery = query.toLowerCase();
+      const lines = file.content.split(/\r?\n/);
+      const matches = lines
+        .map((line, index) => ({ line_number: index + 1, line }))
+        .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery))
+        .slice(0, limit);
+      return { ok: true, matches, path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1, complete: true };
     }
     const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
     if (prefix) searchTerms.push(`path:${prefix}`);
