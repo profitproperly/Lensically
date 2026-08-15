@@ -1326,7 +1326,12 @@ describe("System Directory foundation", () => {
       intent: "record hardening incident",
       inputs: { resume_capsule: { interrupted_stage: "executeOperatorAction" } },
     });
-    expect(() => buildClientSafeGatewayRequest("client_block_intake", { resume_capsule: { interrupted_stage: "executeInternalHandler" } })).toThrow(/internal_handler_identifier:inputs\.resume_capsule\.interrupted_stage/);
+    expect(buildClientSafeGatewayRequest("client_block_intake", {
+      expected_outcome: { query: "issueActionExecutionToken" },
+      observed_outcome: { error: "system.recordhardeningincident rejected nested evidence" },
+      resume_capsule: { interrupted_stage: "executeInternalHandler" },
+    })).toMatchObject({ intent: "record hardening incident" });
+    expect(() => buildClientSafeGatewayRequest("client_block_intake", { blocked_profile_id: "executeInternalHandler" })).toThrow(/internal_handler_identifier:inputs\.blocked_profile_id/);
     expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toContain("client_block_intake_public_lifecycle_stage_false_positive");
   });
 
