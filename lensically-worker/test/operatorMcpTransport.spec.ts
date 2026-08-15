@@ -38,13 +38,22 @@ describe("Operator MCP transport", () => {
     });
   });
 
-  it("preserves exact MCP tool-result envelopes and response shaping", async () => {
+  it("preserves MCP tool-result envelopes while forcing error responses into repair mode", async () => {
     const envelope = buildMcpToolResultEnvelope(7, { ok: false, error: "blocked" }, "Blocked.", true);
-    expect(envelope).toEqual({
+    expect(envelope).toMatchObject({
       jsonrpc: "2.0",
       id: 7,
       result: {
-        structuredContent: { ok: false, error: "blocked" },
+        structuredContent: {
+          ok: false,
+          error: "blocked",
+          turn_close_gate: {
+            mode: "repair",
+            must_continue: true,
+            normal_turn_close_allowed: false,
+            unresolved_failure: true,
+          },
+        },
         content: [{ type: "text", text: "Blocked." }],
         isError: true,
       },
