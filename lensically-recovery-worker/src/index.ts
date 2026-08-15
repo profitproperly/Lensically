@@ -604,7 +604,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const liveStateContent = structured(liveState);
     const liveStateToken = typeof liveStateContent?.live_state_token === "string" ? liveStateContent.live_state_token : "";
     if (!liveStateToken) return { ok: false, phase: "get_operator_live_state", status: liveState.status, content: liveStateContent };
-    const execution = await mainMcpRequest(origin, token, 7, "tools/call", { name: "executeOperatorAction", arguments: { live_state_token: liveStateToken, action: plannedAction, governing_standards_ack: governingAck } }, sessionId);
+    const execution = await mainMcpRequest(origin, token, 7, "tools/call", { name: "executeOperatorAction", arguments: { live_state_token: liveStateToken, governing_standards_ack: governingAck } }, sessionId);
     const executionContent = structured(execution);
     const actionExecutionToken = typeof executionContent?.action_execution_token === "string" ? executionContent.action_execution_token : "";
     if (!actionExecutionToken) return { ok: false, phase: "execute_operator_action", status: execution.status, content: executionContent };
