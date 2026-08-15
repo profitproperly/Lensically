@@ -104,9 +104,23 @@ Tempfile.create(["lensically-production-verification", ".sh"]) do |file|
   abort("production_verification_shell_syntax_invalid") unless system("bash", "-n", file.path, out: File::NULL, err: File::NULL)
 end
 
-push_gate_run = step_run(jobs, "push-validation", "Typecheck and lifecycle gate")
-
-abort("push_release_fallback_preflight_missing") unless push_gate_run.lines.count { |line| line.strip == "node scripts/release-preflight.mjs" } == 1
+push_typecheck_run = step_run(jobs, "push-validation", "Typecheck Worker")
+abort("push_typecheck_missing") unless push_typecheck_run.include?("npx tsc --noEmit")
+push_plan_run = step_run(jobs, "push-validation", "Validate test syntax and plan")
+abort("push_test_syntax_validation_missing") unless push_plan_run.include?("node scripts/validate-test-syntax.mjs")
+abort("push_full_validation_plan_check_missing") unless push_plan_run.include?("node scripts/run-full-validation.mjs --check")
+push_d1_run = step_run(jobs, "push-validation", "Validate D1 release contracts")
+abort("push_migration_contract_validation_missing") unless push_d1_run.include?("node scripts/test-d1-migration-release.mjs") && push_d1_run.include?("node scripts/test-d1-backfill-runner.mjs") && push_d1_run.include?("node scripts/d1-migration-release.mjs --check")
+push_cron_run = step_run(jobs, "push-validation", "Validate cron release contracts")
+abort("push_cron_contract_validation_missing") unless push_cron_run.include?("node scripts/test-cron-release.mjs") && push_cron_run.include?("node scripts/cron-release.mjs --check --config wrangler.jsonc")
+push_acceptance_run = step_run(jobs, "push-validation", "Validate release acceptance contracts")
+abort("push_release_acceptance_validation_missing") unless push_acceptance_run.include?("node scripts/test-release-acceptance.mjs") && push_acceptance_run.include?("node scripts/validate-release-acceptance.mjs")
+push_capability_preflight_run = step_run(jobs, "push-validation", "Validate capability lifecycle preflight")
+abort("push_capability_lifecycle_preflight_missing") unless push_capability_preflight_run.include?("node scripts/release-preflight.mjs --capability-lifecycle-only")
+push_full_preflight_run = step_run(jobs, "push-validation", "Validate full release preflight")
+abort("push_release_fallback_preflight_missing") unless push_full_preflight_run.include?("node scripts/release-preflight.mjs")
+push_architecture_run = step_run(jobs, "push-validation", "Validate Worker architecture baseline")
+abort("push_architecture_baseline_missing") unless push_architecture_run.include?("node scripts/worker-architecture-baseline.mjs")
 
 push_full_run = step_run(jobs, "push-validation", "Run full push validation")
 abort("push_shared_full_validation_missing") unless push_full_run.strip == "node scripts/run-full-validation.mjs"
