@@ -13303,12 +13303,18 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
           ).bind(brandKey).first<{ id: string }>();
         return row?.id ?? null;
       },
-      findActiveAutonomousCycle: (brandKey) => env.DB.prepare(
-        `SELECT id, status, timezone, horizon_hours, updated_at
-         FROM operator_autonomous_growth_cycles
-         WHERE brand_key = ? AND status IN ('prepared', 'partially_committed')
-         ORDER BY datetime(updated_at) DESC LIMIT 1`,
-      ).bind(brandKey).first<Record<string, unknown>>(),
+      findActiveAutonomousCycle: (brandKey) => {
+        const localNow = operatorLocalDateTimeParts(new Date(), WORKSPACE_DEFAULT_TIMEZONE);
+        const currentLocalHourKey = `${localNow.date}T${operatorHourlySlot(localNow.hour)}`;
+        return env.DB.prepare(
+          `SELECT id, status, timezone, horizon_hours, updated_at
+           FROM operator_autonomous_growth_cycles
+           WHERE brand_key = ?
+             AND status IN ('prepared', 'partially_committed')
+             AND horizon_end_local >= ?
+           ORDER BY datetime(updated_at) DESC LIMIT 1`,
+        ).bind(brandKey, currentLocalHourKey).first<Record<string, unknown>>();
+      },
       serializeReviewBatch: (reviewBatchId) => serializeManifestReviewBatch(env, brand, reviewBatchId),
     });
           return { body: reviewState.body, status: reviewState.status };
