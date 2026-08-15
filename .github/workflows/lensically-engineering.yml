@@ -194,24 +194,50 @@ jobs:
           retention-days: 7
 
                   
-      - name: Typecheck and lifecycle gate
+      - name: Typecheck Worker
+        working-directory: lensically-worker
+        run: npx tsc --noEmit
+
+      - name: Validate test syntax and plan
         working-directory: lensically-worker
         run: |
           set -euo pipefail
-          npx tsc --noEmit
           node scripts/validate-test-syntax.mjs
-                    node scripts/run-full-validation.mjs --check
+          node scripts/run-full-validation.mjs --check
+
+      - name: Validate D1 release contracts
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
           node scripts/test-d1-migration-release.mjs
           node scripts/test-d1-backfill-runner.mjs
           node scripts/d1-migration-release.mjs --check
+
+      - name: Validate cron release contracts
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
           node scripts/test-cron-release.mjs
           node scripts/cron-release.mjs --check --config wrangler.jsonc
+
+      - name: Validate release acceptance contracts
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
           node scripts/test-release-acceptance.mjs
           node scripts/validate-release-acceptance.mjs
-          node scripts/release-preflight.mjs --capability-lifecycle-only
-          node scripts/release-preflight.mjs
 
-          node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
+      - name: Validate capability lifecycle preflight
+        working-directory: lensically-worker
+        run: node scripts/release-preflight.mjs --capability-lifecycle-only
+
+      - name: Validate full release preflight
+        working-directory: lensically-worker
+        run: node scripts/release-preflight.mjs
+
+      - name: Validate Worker architecture baseline
+        working-directory: lensically-worker
+        run: node scripts/worker-architecture-baseline.mjs > /tmp/lensically-worker-architecture.json
 
       - name: Run fast mapped validation
         if: steps.push_scope.outputs.full_validation != 'true'
