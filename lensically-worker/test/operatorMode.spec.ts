@@ -3868,7 +3868,7 @@ describe("operator mode MCP endpoint", () => {
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
-    const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
+    const actionCapabilities = (plannedActionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
         expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
     expect(actionCapabilities).toContain("case_step");
