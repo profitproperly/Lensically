@@ -183,8 +183,10 @@
       "id": "fast-workflow-structural-lint",
       "path": "../.github/workflows/lensically-workflow-lint.yml",
       "all_of": [
+        "validate-workflow-yaml.rb",
         "validate-engineering-workflow.rb",
-        "Parse and validate engineering workflow"
+        "Validate workflow YAML",
+        "Validate engineering workflow structure"
       ]
     },
     {
