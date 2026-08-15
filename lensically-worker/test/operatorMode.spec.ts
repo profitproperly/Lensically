@@ -3868,7 +3868,9 @@ describe("operator mode MCP endpoint", () => {
         expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
     expect(actionCapabilities).toContain("case_step");
+    expect(actionCapabilities).toContain("checkpoint_step");
     expect(actionCapabilities).not.toContain("hardening_transition");
+    expect(actionCapabilities).not.toContain("operator_work_transition");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("profile_id");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("inputs");
     expect(initialized.instructions.split("\n")).toEqual([
