@@ -123,7 +123,8 @@ push_architecture_run = step_run(jobs, "push-validation", "Validate Worker archi
 abort("push_architecture_baseline_missing") unless push_architecture_run.include?("node scripts/worker-architecture-baseline.mjs")
 
 push_full_run = step_run(jobs, "push-validation", "Run full push validation")
-abort("push_shared_full_validation_missing") unless push_full_run.strip == "node scripts/run-full-validation.mjs"
+abort("push_shared_full_validation_missing") unless push_full_run.include?("node scripts/run-full-validation.mjs")
+abort("push_full_validation_diagnostic_status_missing") unless push_full_run.include?("lensically/full-validation") && push_full_run.include?("/tmp/lensically-full-validation.log")
 
 release_gate_run = step_run(jobs, "worker-release", "Run exact-head release gates")
 abort("release_shared_full_validation_missing") unless release_gate_run.include?("node scripts/run-full-validation.mjs --check")
