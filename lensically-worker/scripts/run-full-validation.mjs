@@ -283,7 +283,7 @@ for (const [index, testFiles] of completeTestGroups.entries()) {
     COMPLETE_TEST_FILE_PARALLELISM ? "--fileParallelism" : "--no-file-parallelism",
     "--reporter=dot",
     "--bail=1",
-  ]));
+  ], testFiles));
 }
 const escapedPattern = operatorMilestoneTitles
   .map((title) => title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
