@@ -17016,6 +17016,17 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
       additionalProperties: false,
     };
   }
+  if (tool.name === "advanceOperatorWork") {
+    return {
+      type: "object",
+      properties: {
+        stage: { type: "string", enum: ["a0", "a1", "a2", "a3", "a4", "a5"] },
+        ref: { type: "string", maxLength: 120 },
+      },
+      required: ["stage"],
+      additionalProperties: false,
+    };
+  }
   const sourceSchema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
     ? tool.inputSchema as Record<string, unknown>
     : {};
