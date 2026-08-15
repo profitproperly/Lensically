@@ -4027,6 +4027,63 @@ active_checkpoint: none
     expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
   }, 30000);
 
+  it("reconciles corrupted opaque lifecycle references by exact action binding when the client omits MCP session headers", async () => {
+    const plannedAction = {
+      capability: "repository_file_read",
+      arguments: { path: "ENGINEERING_CONTINUATION.md", start_line: 1, max_lines: 7 },
+    };
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    expect(step1.isError).not.toBe(true);
+
+    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: `olr_${"a".repeat(32)}`,
+      planned_action: plannedAction,
+    });
+    expect(step2.isError).not.toBe(true);
+    expect(step2.structuredContent.knowledge_token).toBeTruthy();
+
+    const changedStep3 = await mcpToolCallRaw<{ ok: boolean; error?: string }>("getOperatorLiveState", {
+      knowledge_token: `olr_${"b".repeat(32)}`,
+      planned_action: { capability: "repository_status", arguments: {} },
+    });
+    expect(changedStep3.isError).toBe(true);
+    expect(changedStep3.structuredContent.ok).toBe(false);
+
+    const step3 = await mcpToolCallRaw<{ ok: boolean; live_state_token: string }>("getOperatorLiveState", {
+      knowledge_token: `olr_${"b".repeat(32)}`,
+      planned_action: plannedAction,
+    });
+    expect(step3.isError).not.toBe(true);
+    expect(step3.structuredContent.live_state_token).toBeTruthy();
+
+    const changedStep4 = await mcpToolCallRaw<{ ok: boolean; error?: string }>("executeOperatorAction", {
+      live_state_token: `olr_${"c".repeat(32)}`,
+      action: { capability: "repository_status", arguments: {} },
+    });
+    expect(changedStep4.isError).toBe(true);
+    expect(changedStep4.structuredContent.ok).toBe(false);
+
+    const step4 = await mcpToolCallRaw<{ ok: boolean; action_execution_token: string }>("executeOperatorAction", {
+      live_state_token: `olr_${"c".repeat(32)}`,
+      action: plannedAction,
+    });
+    expect(step4.isError).not.toBe(true);
+    expect(step4.structuredContent.action_execution_token).toBeTruthy();
+
+    const step5 = await mcpToolCallRaw<{ ok: boolean; lifecycle_stage: number }>("closeOperatorAction", {
+      action_execution_token: `olr_${"d".repeat(32)}`,
+      action: plannedAction,
+      verification: {
+        verified: true,
+        evidence: ["The unbound connector lifecycle recovered every corrupted opaque reference from exact server-side stage and action state."],
+        next_action: "Continue the isolated lifecycle regression.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError).not.toBe(true);
+    expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+  }, 30000);
+
   it("adopts the first valid MCP session for an unbound lifecycle and carries the binding forward", async () => {
     const initializeSession = async (): Promise<string> => {
       const response = await fetchFromWorker("/api/operator/mcp", {
