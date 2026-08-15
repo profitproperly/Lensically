@@ -7,6 +7,7 @@ import {
 } from "./mandatoryRecoveryMap";
 
 // Recovery source commits may carry [operator-tests] to trigger one bounded validation of deterministic MCP self-check routing, health metadata generation, single-preparation routing, compact receipts, and canonical execution policy enforcement.
+// GitHub GET/HEAD reads use bounded transient retries; mutations remain single-attempt and reconcile separately.
 // Verified main Worker release marker: profile-only-gateway-v2.
 
 interface Env {
