@@ -4118,6 +4118,59 @@ active_checkpoint: none
     ).bind(incidentId).run();
   }, 30000);
 
+  it("exposes and executes neutral checkpoint_step through the normalized lifecycle", async () => {
+    const workKey = `fixture_checkpoint_${crypto.randomUUID().replace(/-/g, "")}`;
+    const intake = await mcpToolRaw<{ ok: boolean; item: { work_key: string; status: string } }>("intakeOperatorWork", {
+      work_key: workKey,
+      title: "Checkpoint fixture",
+      summary: "Create one isolated interrupt for neutral checkpoint-step verification.",
+      severity: "P0",
+      prerequisite_for_active_outcome: true,
+      irreversible_rework_if_deferred: true,
+      completion_condition: "Neutral checkpoint step resolves the active interrupt server-side.",
+      execution_order: 1,
+    });
+    expect(intake.isError).not.toBe(true);
+    expect(intake.structuredContent.item).toMatchObject({ work_key: workKey, status: "interrupting" });
+
+    const action = { capability: "checkpoint_step", arguments: { stage: "a3" } };
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: action,
+    });
+    expect(step2.isError).not.toBe(true);
+    const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+      knowledge_token: step2.structuredContent.knowledge_token,
+      planned_action: action,
+    });
+    expect(step3.isError).not.toBe(true);
+    const step4 = await mcpToolCallRaw<{
+      ok: boolean;
+      work_state: { active_interrupt_key: string | null };
+      items: Array<{ work_key: string; status: string }>;
+      action_execution_token: string;
+    }>("executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      action,
+    });
+    expect(step4.isError).not.toBe(true);
+    expect(step4.structuredContent.work_state.active_interrupt_key).toBeNull();
+    expect(step4.structuredContent.items.find((item) => item.work_key === workKey)).toMatchObject({ status: "completed" });
+    const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      action,
+      verification: {
+        verified: true,
+        evidence: ["Neutral checkpoint_step completed the active interrupt without exposing semantic work-state values in the public action."],
+        next_action: "Continue the isolated regression fixture.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError).not.toBe(true);
+    expect(step5.structuredContent.ok).toBe(true);
+  }, 30000);
+
   it("reconciles corrupted opaque lifecycle references by exact action binding when the client omits MCP session headers", async () => {
     const plannedAction = {
       capability: "repository_file_read",
