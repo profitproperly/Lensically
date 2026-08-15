@@ -50,6 +50,9 @@ jobs:
       - name: Test Recovery workflow dispatch contract
         run: node scripts/test-workflow-dispatch-contract.mjs
 
+      - name: Test Recovery search fallback contract
+        run: node scripts/test-search-fallback-contract.mjs
+
       - name: Deploy Recovery
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
