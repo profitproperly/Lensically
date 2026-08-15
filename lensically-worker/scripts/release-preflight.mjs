@@ -1465,7 +1465,9 @@ if (!operatorMcpTransport.includes("export function mcpJsonResponse")
 }
 if (!operatorMcpTransportTests.includes("preserves JSON status, cache, content type, and extra headers")
     || !operatorMcpTransportTests.includes("preserves JSON-RPC errors, null IDs, optional data, and request IDs")
-    || !operatorMcpTransportTests.includes("preserves exact MCP tool-result envelopes and response shaping")
+    || !operatorMcpTransportTests.includes("preserves MCP tool-result envelopes while forcing error responses into repair mode")
+    || !operatorMcpTransportTests.includes("turn_close_gate")
+    || !operatorMcpTransportTests.includes("normal_turn_close_allowed")
     || !operatorMcpTransportTests.includes("preserves canonical completion and failure language")
     || !operatorMcpTransportTests.includes("preserves deployment, commit, kernel, and optional session headers")
     || !operatorMcpTransportTests.includes("preserves bounded transport failures and runtime evidence")) {
