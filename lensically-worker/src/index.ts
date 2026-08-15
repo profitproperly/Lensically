@@ -17310,6 +17310,31 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           },
         };
       }
+      if (profileId === "checkpoint_step") {
+        const stage = normalizeOperatorMachineKey(safeInputs.stage, "");
+        const workStateMap: Record<string, string> = {
+          a0: "queued",
+          a1: "deferred",
+          a2: "interrupting",
+          a3: "completed",
+          a4: "merged",
+          a5: "rejected",
+        };
+        const targetStatus = workStateMap[stage];
+        if (!targetStatus) throw new Error("checkpoint_step_stage_invalid");
+        compiledRequest = {
+          ...compiled,
+          objective: "Advance one checkpoint.",
+          intent: "advance operator work",
+          inputs: {
+            work_key: typeof safeInputs.ref === "string" && safeInputs.ref.trim() ? safeInputs.ref.trim() : "__active_interrupt__",
+            status: targetStatus,
+            evidence: ["server-resolved neutral checkpoint transition"],
+            next_action: "Resume the frozen canonical continuation from the last verified checkpoint.",
+            limit: 30,
+          },
+        };
+      }
       if (profileId === "case_step" || (profileId === "case_open" && typeof gatewayArgs.continuation_id === "string")) {
         const stage = normalizeOperatorMachineKey(profileId === "case_open" ? gatewayArgs.continuation_id : safeInputs.stage, "");
         const stageMap: Record<string, string> = {
