@@ -738,6 +738,7 @@ describe("System Directory foundation", () => {
 
       it("keeps one permanent registry for every known prevented client-block signature", () => {
     expect(PREVENTED_CLIENT_BLOCKS.map((incident) => incident.id)).toEqual([
+      "normalized_lifecycle_semantic_work_transition_branch",
       "normalized_lifecycle_semantic_hardening_branch",
       "client_block_intake_public_lifecycle_stage_false_positive",
       "semantic_profile_name_client_preflight_block",
