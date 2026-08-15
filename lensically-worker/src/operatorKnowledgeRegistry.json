@@ -122,12 +122,13 @@
         "Scheduling and results cover scheduled-post reads, edits, deletions, hourly coverage, post results, and published-lineage audit or recovery."
       ]
     },
-        "hardening_safety": {
-      "version": "hardening-safety-v2",
+            "hardening_safety": {
+      "version": "hardening-safety-v3",
       "load_when": "Failures, blockers, regressions, repeat incidents, prevention design, idempotency ambiguity, payload failures, validation defects, or efficiency degradation.",
       "failure_law": [
         "A real unexpected tool failure interrupts the affected objective.",
-        "Every failure occurrence leaves durable evidence; incident convergence may deduplicate identity but may not erase another occurrence.",
+                "Every failure occurrence leaves durable evidence; incident convergence may deduplicate identity but may not erase another occurrence.",
+        "Once raw failure evidence is durably stored in the incident, later hardening transitions carry only new transition-specific delta evidence. Do not replay raw blocked payloads, prior error text, or previously stored evidence through the client.",
         "Diagnose exact cause, repair it, generalize the lesson, add durable prevention and regression, validate, release when required, live verify, then resume the interrupted step.",
         "A workaround, retry, alternate target, sibling business tool, or chat note is not a fix.",
         "Expected fail-closed control responses are boundaries to satisfy, not excuses to route around the control."

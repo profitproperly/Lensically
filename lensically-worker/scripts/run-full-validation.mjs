@@ -143,8 +143,19 @@ function validatePlan() {
   const governanceVersionLiteralFiles = governanceVersionGuardFiles.filter((file) =>
     /operator-governing-standards-v\d+/.test(readFileSync(resolve(workerRoot, file), "utf8")),
   );
-  if (governanceVersionLiteralFiles.length > 0) {
+    if (governanceVersionLiteralFiles.length > 0) {
     fail(`full_validation_governance_version_literal_forbidden:${governanceVersionLiteralFiles.join(",")}`);
+  }
+
+  const operatorKnowledgeRegistryText = readFileSync(resolve(workerRoot, "src/operatorKnowledgeRegistry.json"), "utf8");
+  const hardeningSafetyV3Markers = [
+    '"version": "hardening-safety-v3"',
+    "Once raw failure evidence is durably stored in the incident, later hardening transitions carry only new transition-specific delta evidence.",
+    "Do not replay raw blocked payloads, prior error text, or previously stored evidence through the client.",
+  ];
+  const missingHardeningSafetyV3Markers = hardeningSafetyV3Markers.filter((marker) => !operatorKnowledgeRegistryText.includes(marker));
+  if (missingHardeningSafetyV3Markers.length > 0) {
+    fail(`full_validation_hardening_safety_v3_missing:${missingHardeningSafetyV3Markers.join("|")}`);
   }
 
   const selectorRegressionPath = resolve(workerRoot, "test/sourceFamilySelection.spec.ts");
