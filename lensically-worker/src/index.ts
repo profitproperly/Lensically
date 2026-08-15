@@ -15619,6 +15619,32 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       planned_action: typedActionSchema,
     },
   };
+  const liveStateInputSchema = liveStateGateway.inputSchema && typeof liveStateGateway.inputSchema === "object" && !Array.isArray(liveStateGateway.inputSchema)
+    ? liveStateGateway.inputSchema as Record<string, unknown>
+    : {};
+  const liveStateInputProperties = liveStateInputSchema.properties && typeof liveStateInputSchema.properties === "object" && !Array.isArray(liveStateInputSchema.properties)
+    ? liveStateInputSchema.properties as Record<string, unknown>
+    : {};
+  liveStateGateway.inputSchema = {
+    ...liveStateInputSchema,
+    properties: {
+      ...liveStateInputProperties,
+      planned_action: typedActionSchema,
+    },
+  };
+  const closeInputSchema = closeGateway.inputSchema && typeof closeGateway.inputSchema === "object" && !Array.isArray(closeGateway.inputSchema)
+    ? closeGateway.inputSchema as Record<string, unknown>
+    : {};
+  const closeInputProperties = closeInputSchema.properties && typeof closeInputSchema.properties === "object" && !Array.isArray(closeInputSchema.properties)
+    ? closeInputSchema.properties as Record<string, unknown>
+    : {};
+  closeGateway.inputSchema = {
+    ...closeInputSchema,
+    properties: {
+      ...closeInputProperties,
+      action: typedActionSchema,
+    },
+  };
   
   actionGateway.inputSchema = {
     type: "object",
