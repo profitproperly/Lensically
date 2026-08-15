@@ -164,7 +164,7 @@
           "count": 4
         },
         {
-          "pattern": "node scripts/run-full-validation\\.mjs(?:\\r?\\n|$)",
+          "pattern": "node scripts/run-full-validation\\.mjs(?: 2>&1 \\| tee /tmp/lensically-full-validation\\.log)?(?:\\r?\\n|$)",
           "count": 2
         }
       ]
