@@ -18044,6 +18044,13 @@ async function closeResolvedHardeningIncidentsForRequest(
   return incidents.length;
 }
 
+function hardeningRecurrenceFamily(boundary: string, category: string): string {
+  if (boundary === "client" && (category === "openai_client_safety_block" || category.startsWith("openai_safety_check_blocked_"))) {
+    return "client:openai_safety_predispatch";
+  }
+  return `${boundary}:${category}`;
+}
+
 async function recordHardeningIncident(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
   const boundary = normalizeHardeningBoundary(args.boundary);
@@ -18055,29 +18062,77 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const fingerprint = normalizeOperatorText(args.request_fingerprint, 200, true);
   const observed = normalizeOperatorText(args.observed_outcome, 1000, true) ?? category;
   const rule = resolvePromotedWinningPath(category.replace(/_/g, " "), observed, { blocked_profile_id: profile });
+    const recurrenceFamily = hardeningRecurrenceFamily(boundary, category);
   const signature = await sha256OperatorText(JSON.stringify({ boundary, profile, category, fingerprint }));
-    const existing = await env.DB.prepare(
+  const existing = await env.DB.prepare(
     `SELECT * FROM operator_hardening_incidents WHERE signature = ? AND state <> 'closed' LIMIT 1`,
   ).bind(signature).first<Record<string, unknown>>();
   if (existing) {
-    return { ok: true, created: false, incident: serializeHardeningIncident(existing), normal_work_blocked: ["P0", "P1"].includes(String(existing.severity)) };
+    const existingState = String(existing.state ?? "detected");
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE operator_hardening_incidents
+         SET classification = CASE WHEN classification = 'novel_failure' THEN 'known_prevention' ELSE classification END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(existing.id),
+      env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), existing.id, existingState, existingState,
+        normalizeOperatorJson({
+          error_category: category,
+          recurrence_family: recurrenceFamily,
+          recurrence_status: "active_exact_repeat",
+          request_fingerprint: fingerprint ?? null,
+          observed_outcome: args.observed_outcome ?? null,
+        }, {}),
+      ),
+    ]);
+    const updated = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(existing.id).first<Record<string, unknown>>();
+    const incident = serializeHardeningIncident(updated ?? existing);
+    return {
+      ok: true,
+      created: false,
+      incident,
+      normal_work_blocked: ["P0", "P1"].includes(String(incident.severity)),
+      recurrence: {
+        status: "active_exact_repeat",
+        prior_incident_id: incident.id,
+        recurrence_family: recurrenceFamily,
+        required_response: "Continue the existing hardening investigation from accumulated evidence; do not restart or classify this occurrence as novel.",
+      },
+      required_next_state: existingState === "detected" ? "contained" : "next",
+    };
   }
-  const priorClosed = await env.DB.prepare(
-    `SELECT i.* FROM operator_hardening_incidents i
+  const priorRows = await env.DB.prepare(
+    `SELECT i.*, json_extract(e.evidence_json, '$.error_category') AS detected_error_category
+     FROM operator_hardening_incidents i
      JOIN operator_hardening_incident_events e ON e.incident_id = i.id
-     WHERE i.state = 'closed'
-       AND i.boundary = ?
-       AND COALESCE(i.blocked_profile_id, '') = ?
-       AND COALESCE(i.blocked_tool_name, '') = ?
+     WHERE i.boundary = ?
        AND e.from_state IS NULL
        AND e.to_state = 'detected'
-       AND json_extract(e.evidence_json, '$.error_category') = ?
      ORDER BY datetime(COALESCE(i.closed_at, i.updated_at)) DESC
-     LIMIT 1`,
-  ).bind(boundary, profile, blockedTool ?? "", category).first<Record<string, unknown>>();
-  const priorIncident = priorClosed ? serializeHardeningIncident(priorClosed) : null;
+     LIMIT 100`,
+  ).bind(boundary).all<Record<string, unknown>>();
+  const relatedPriorRows = (priorRows.results ?? []).filter((candidate) => {
+    const candidateCategory = normalizeOperatorMachineKey(candidate.detected_error_category, "");
+    if (!candidateCategory || hardeningRecurrenceFamily(boundary, candidateCategory) !== recurrenceFamily) return false;
+    if (recurrenceFamily === "client:openai_safety_predispatch") return true;
+    return String(candidate.blocked_profile_id ?? "") === profile
+      && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "")
+      && candidateCategory === category;
+  });
+  const priorActiveRow = relatedPriorRows.find((candidate) => String(candidate.state) !== "closed") ?? null;
+  const priorClosedRow = relatedPriorRows.find((candidate) => String(candidate.state) === "closed") ?? null;
+  const priorIncident = priorClosedRow ? serializeHardeningIncident(priorClosedRow) : null;
+  const priorActiveIncident = priorActiveRow ? serializeHardeningIncident(priorActiveRow) : null;
   const preventionRegression = Boolean(priorIncident);
-  const classification: HardeningClassification = (rule || preventionRegression) ? "prevention_breach" : "novel_failure";
+  const knownActiveRecurrence = Boolean(priorActiveIncident);
+  const classification: HardeningClassification = (rule || preventionRegression)
+    ? "prevention_breach"
+    : knownActiveRecurrence ? "known_prevention" : "novel_failure";
   const severity: HardeningSeverity = boundary === "efficiency"
     ? preventionRegression ? "P1" : "P2"
     : (rule || preventionRegression) ? "P0" : "P1";
@@ -18091,11 +18146,19 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
         prior_regression_test_ids: priorIncident.regression_test_ids,
         prior_tested_sha: priorIncident.tested_sha,
         prior_deployment_id: priorIncident.deployment_id,
+        recurrence_family: recurrenceFamily,
         required_response: "Investigate why the prior prevention failed, strengthen or replace it, validate the stronger prevention, then resume the interrupted objective.",
       }
     : rule
-      ? { status: "known_prevention_breach", promoted_rule_id: rule.id, required_response: "Repair the breach of the promoted winning path before resuming." }
-      : { status: "first_occurrence", required_response: "Root-cause, repair, generalize, and create durable prevention before resuming." };
+      ? { status: "known_prevention_breach", promoted_rule_id: rule.id, recurrence_family: recurrenceFamily, required_response: "Repair the breach of the promoted winning path before resuming." }
+      : priorActiveIncident
+        ? {
+            status: "known_active_recurrence",
+            prior_incident_id: priorActiveIncident.id,
+            recurrence_family: recurrenceFamily,
+            required_response: "Continue from the already-known active failure class, preserve this occurrence as new evidence, and strengthen the same investigation before resuming.",
+          }
+        : { status: "first_occurrence", recurrence_family: recurrenceFamily, required_response: "Root-cause, repair, generalize, and create durable prevention before resuming." };
   const id = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO operator_hardening_incidents (
@@ -18113,7 +18176,13 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
      VALUES (?, ?, NULL, 'detected', ?)`,
   ).bind(
     crypto.randomUUID(), id,
-    normalizeOperatorJson({ error_category: category, promoted_rule_id: rule?.id ?? null, recurrence_status: recurrence.status, prior_incident_id: priorIncident?.id ?? null }, {}),
+        normalizeOperatorJson({
+      error_category: category,
+      recurrence_family: recurrenceFamily,
+      promoted_rule_id: rule?.id ?? null,
+      recurrence_status: recurrence.status,
+      prior_incident_id: priorIncident?.id ?? priorActiveIncident?.id ?? null,
+    }, {}),
   ).run();
   const row = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   return {
