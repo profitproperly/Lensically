@@ -16983,7 +16983,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["recordOperationalObservation", "operational_observation"],
   ["getOperatorWorkState", "operator_work_state"],
   ["intakeOperatorWork", "operator_work_intake"],
-  ["advanceOperatorWork", "operator_work_transition"],
+  ["advanceOperatorWork", "checkpoint_step"],
   
   ["auditScheduledPost", "scheduled_post_audit"],
   ["recoverOverdueScheduledPosts", "protected_scheduler_recovery"],
