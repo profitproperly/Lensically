@@ -90,7 +90,7 @@ async function github(env: Env, path: string, init: RequestInit = {}): Promise<{
   const method = String(init.method || "GET").toUpperCase();
   const retryableRead = ["GET", "HEAD"].includes(method);
   const transientStatuses = new Set([502, 503, 504]);
-  const maxAttempts = 1;
+  const maxAttempts = 3;
   let response: Response | null = null;
   let lastTransportError: string | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
