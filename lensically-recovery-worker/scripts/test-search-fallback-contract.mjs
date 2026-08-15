@@ -38,4 +38,7 @@ assert.ok(
   "tree/content fallback must remain reachable when GitHub code search returns zero items",
 );
 
+assert.match(source, /executeOperatorAction\", arguments: \{ live_state_token: liveStateToken, governing_standards_ack: governingAck \}/);
+assert.doesNotMatch(source, /live_state_token: liveStateToken, action: plannedAction/);
+
 console.log("Recovery search fallback contract: PASS");
