@@ -3787,6 +3787,14 @@ if (!workflow.includes("- name: Publish exact release authority target")
     || !workflow.includes("npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json --file /tmp/lensically-release-authority.sql")) {
   errors.push("release_workflow_authority_publication_missing");
 }
+if (!workflow.includes("- name: Refuse deployment during active Main content cycle")
+    || !workflow.includes("SELECT COUNT(*) AS active_cycle_count FROM operator_autonomous_growth_cycles")
+    || !workflow.includes("status IN ('prepared', 'partially_committed')")
+    || !workflow.includes("active_main_content_cycle_state_unavailable")
+    || !workflow.includes("active_main_content_cycle_deploy_forbidden")
+    || !workflow.includes("active_main_content_cycle_guard_passed")) {
+  errors.push("release_workflow_active_content_cycle_guard_missing");
+}
 if (source.includes("publishOperatorReleaseTarget(env.DB")
     || source.includes("restoreOperatorReleaseAuthority(env.DB")) {
   errors.push("dispatcher_owned_release_authority_forbidden");
