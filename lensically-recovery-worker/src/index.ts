@@ -78,10 +78,17 @@ function safePath(value: unknown): string {
 
 async function github(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
   const request = () => fetch(`https://api.github.com${path}`, { ...init, headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_TOKEN}`, "user-agent": "lensically-recovery", "x-github-api-version": "2022-11-28", ...(init.headers || {}) } });
-  let response = await request();
   const method = String(init.method || "GET").toUpperCase();
-  if (["GET", "HEAD"].includes(method) && [502, 503, 504].includes(response.status)) response = await request();
-  return { ok: response.ok, status: response.status, data: await response.json().catch(() => null) };
+  const retryableRead = ["GET", "HEAD"].includes(method);
+  const transientStatuses = new Set([502, 503, 504]);
+  const maxAttempts = retryableRead ? 4 : 1;
+  let response: Response | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    response = await request();
+    if (!retryableRead || !transientStatuses.has(response.status) || attempt === maxAttempts) break;
+    await new Promise((resolve) => setTimeout(resolve, 75 * (2 ** (attempt - 1))));
+  }
+  return { ok: Boolean(response?.ok), status: response?.status ?? 0, data: await response?.json().catch(() => null) ?? null };
 }
 
 async function cloudflare(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; result: unknown; errors: unknown }> {
