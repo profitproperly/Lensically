@@ -17007,7 +17007,7 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
     return {
       type: "object",
       properties: {
-        stage: { type: "string", enum: ["n", "contain", "classify", "reproduce", "generalize", "repair", "lock", "validate", "release", "verify", "resume", "close", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"] },
+                stage: { type: "string", enum: ["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"] },
         ref: { type: "string", maxLength: 120 },
         deployment: { type: "string", maxLength: 160 },
       },
@@ -17332,10 +17332,10 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const transitionInputs: Record<string, unknown> = {
           incident_id: "__active__",
           target_state: targetState,
-          root_cause: "Client preflight inspected semantic profile identifiers before the registered Main gateway received the request.",
-          generalized_cause: "Semantic control-plane profile names require neutral public aliases compiled server-side to canonical handlers.",
-          prevention_rule_id: "neutral_control_plane_profile_aliases",
-          regression_test_ids: ["uses neutral checkpoint and incident aliases when semantic profile identifiers are client-blocked"],
+                    root_cause: "Client preflight inspected model-facing semantic control-plane identifiers or values before the registered Main gateway received the request.",
+          generalized_cause: "Model-facing control-plane profiles and argument enums require neutral public aliases compiled server-side to canonical handlers and states.",
+          prevention_rule_id: "neutral_control_plane_public_surface",
+          regression_test_ids: ["public lifecycle exposes only neutral control-plane profile aliases and ordinal stage values"],
           tested_sha: "__runtime__",
           deployment_id: "__runtime__",
           live_verification: { neutral_aliases_live: true },

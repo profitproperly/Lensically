@@ -3849,8 +3849,10 @@ describe("operator mode MCP endpoint", () => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "case_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
-    expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
+        expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
     expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref", "deployment"]);
+    const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
+    expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
@@ -4049,7 +4051,7 @@ active_checkpoint: none
     });
     expect(recordedCall.isError).not.toBe(true);
     const incidentId = recordedCall.structuredContent.incident.id;
-    const action = { capability: "case_step", arguments: { stage: "contain" } };
+        const action = { capability: "case_step", arguments: { stage: "a0" } };
     const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
     const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
       session_map_token: step1.structuredContent.session_map_token,
