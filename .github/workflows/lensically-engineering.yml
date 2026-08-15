@@ -143,12 +143,15 @@ jobs:
         working-directory: lensically-recovery-worker
         run: npm ci
 
-      - name: Validate Recovery worker and retry contract
+      - name: Typecheck Recovery worker
         if: steps.push_scope.outputs.recovery_changed == 'true'
         working-directory: lensically-recovery-worker
-        run: |
-          npm run typecheck
-          npm run test:retry-contract
+        run: npm run typecheck
+
+      - name: Test Recovery retry contract
+        if: steps.push_scope.outputs.recovery_changed == 'true'
+        working-directory: lensically-recovery-worker
+        run: npm run test:retry-contract
 
       - name: Restore web dependencies
         if: steps.push_scope.outputs.web_changed == 'true'
