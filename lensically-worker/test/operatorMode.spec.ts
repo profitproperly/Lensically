@@ -5847,7 +5847,7 @@ active_checkpoint: none
       boundary: "client",
       blocked_profile_id: "hardening_transition",
       request_fingerprint: "fixture-openai-client-block-b",
-      error_category: "openai_safety_check_blocked_hardening_transition_before_lensically_dispatch",
+      error_category: "openai_client_safety_pre_dispatch",
       operation_class: "engineering_hardening_transition",
       observed_outcome: { client_blocked: true },
     });
