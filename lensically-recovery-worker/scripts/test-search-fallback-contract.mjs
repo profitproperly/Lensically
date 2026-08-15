@@ -8,7 +8,7 @@ assert.match(source, /if \(codeSearchItems\.length > 0\)/);
 assert.match(source, /search_mode: "bounded_tree_content_fallback"/);
 assert.match(source, /error: "search_incomplete_no_match"/);
 assert.match(source, /candidate_files_scanned: scanCap/);
-assert.match(source, /const scanCap = Math\.min\(candidatePaths\.length, 12\);/);
+assert.match(source, /const scanCap = Math\.min\(candidatePaths\.length, 50\);/);
 assert.match(source, /depth\(left\) - depth\(right\)/);
 assert.match(source, /error: "repo_file_not_found"/);
 assert.match(source, /error: "repo_contents_unavailable"/);

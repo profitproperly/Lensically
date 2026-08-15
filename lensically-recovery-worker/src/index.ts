@@ -343,7 +343,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         const depth = (path: string) => path.split("/").length;
         return rank(left) - rank(right) || depth(left) - depth(right) || left.localeCompare(right);
       });
-    const scanCap = Math.min(candidatePaths.length, 12);
+    const scanCap = Math.min(candidatePaths.length, 50);
     const contentMatches: Array<Record<string, unknown>> = [];
     let fileContentFanout = 0;
     scan_files: for (const path of candidatePaths.slice(0, scanCap)) {
