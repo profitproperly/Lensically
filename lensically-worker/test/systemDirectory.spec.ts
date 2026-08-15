@@ -977,18 +977,18 @@ describe("System Directory foundation", () => {
 
   it("returns the mandatory client-safety receipt for every startup response", () => {
     expect(getClientSafetyRegistrySummary()).toMatchObject({
-                        registry_version: "client-safe-requests-v11",
-      canonical_location: "lensically-worker/src/systemDirectory/clientSafeRequests.ts",
+      registry_version: CLIENT_SAFE_REQUEST_REGISTRY_VERSION,
+      canonical_location: CLIENT_SAFETY_CANONICAL_LOCATION,
       registry_valid: true,
       intake_contract_version: "client-block-intake-v1",
       intake_mandatory: true,
-            resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
-                        prevented_client_block_count: 42,
-                                                      safe_request_profile_count: 46,
-      universal_policy_count: 8,
-      migrated_legacy_rule_count: 8,
+      resume_allowed_only_after: "prevention_validation_exact_head_release_and_live_verification",
+      prevented_client_block_count: PREVENTED_CLIENT_BLOCKS.length,
+      safe_request_profile_count: Object.keys(CLIENT_SAFE_REQUEST_PROFILES).length,
+      universal_policy_count: CLIENT_SAFETY_POLICIES.length,
+      migrated_legacy_rule_count: CLIENT_SAFETY_LEGACY_MIGRATIONS.length,
     });
-        expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("close_incident");
+    expect((getClientSafetyRegistrySummary().required_sequence as string[]).at(-1)).toBe("close_incident");
     expect(getClientSafetyRegistrySummary().required_sequence).toEqual(expect.arrayContaining([
       "generalize_shared_cause", "lock_prevention_rule", "verify_live", "resume_original_objective", "record_autonomy_dividend",
     ]));
