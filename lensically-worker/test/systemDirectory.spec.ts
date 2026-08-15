@@ -1380,6 +1380,7 @@ describe("System Directory foundation", () => {
       progress_recorded: true,
       deferred_work_preserved: true,
       checkpoint: "resume from durable work state",
+      turn_close_gate: evaluateOperatorTurnCloseGate({ reachable_next_action: true }),
     };
     expect(validateOperatorActionClosure(complete)).toEqual({ ok: true, errors: [] });
     expect(validateOperatorActionClosure({ ...complete, next_action: "" })).toMatchObject({ ok: false, errors: ["next_action_required"] });
