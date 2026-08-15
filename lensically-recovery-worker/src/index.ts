@@ -173,8 +173,11 @@ function base64ToText(value: string): string {
 
 function textToBase64(value: string): string {
   const bytes = new TextEncoder().encode(value);
+  const chunkSize = 0x8000;
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
   return btoa(binary);
 }
 
