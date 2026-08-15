@@ -9,6 +9,7 @@ import {
   OPERATOR_GOVERNING_STANDARDS_TEXT,
   OPERATOR_GOVERNING_STANDARDS_VERSION,
 } from "./operatorMcpProtocol";
+import { evaluateOperatorTurnCloseGate } from "./operatorTurnCloseGate";
 
 type JsonRecord = Record<string, unknown>;
 
