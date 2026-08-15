@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test:retry-contract": "node scripts/test-github-retry-contract.mjs",
     "deploy": "wrangler deploy",
     "test:live": "node scripts/live-smoke.mjs"
   },
