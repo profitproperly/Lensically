@@ -1415,6 +1415,7 @@ describe("System Directory foundation", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.case_open).toMatchObject({ intent: "record hardening incident", allowed_input_keys: [] });
     expect(CLIENT_SAFE_REQUEST_PROFILES.case_step).toMatchObject({ intent: "advance hardening incident", allowed_input_keys: ["stage", "ref", "deployment"] });
     expect(buildClientSafeGatewayRequest("checkpoint_read", {})).toMatchObject({ intent: "get operator work state", inputs: {} });
+    expect(buildClientSafeGatewayRequest("checkpoint_step", { stage: "a3" })).toMatchObject({ intent: "advance operator work", inputs: { stage: "a3" } });
     expect(buildClientSafeGatewayRequest("case_open", {})).toMatchObject({ intent: "record hardening incident", inputs: {} });
     expect(buildClientSafeGatewayRequest("case_step", { stage: "contain" })).toMatchObject({ intent: "advance hardening incident" });
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_intake.allowed_input_keys).toContain("completion_condition");
