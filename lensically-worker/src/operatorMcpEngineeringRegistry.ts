@@ -253,14 +253,13 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "executeOperatorAction",
     title: "Execute operator action",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute exactly one strongly typed internal capability through the existing Execution Kernel after valid Step-3 live-state proof. The public schema is generated from the canonical internal capability contracts; generic profile_id and generic inputs are not exposed.`,
+    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute exactly the server-bound action prepared in Steps 2 and 3 using only the opaque live-state token. The client does not replay capability names or arguments at the execution choke point.`,
     inputSchema: {
       type: "object",
       properties: {
         live_state_token: { type: "string", minLength: 16 },
-        action: { type: "object", description: "Generated discriminated action contract; runtime composition replaces this placeholder with closed one-of capability branches." },
       },
-      required: ["live_state_token", "action"],
+      required: ["live_state_token"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -268,12 +267,11 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "closeOperatorAction",
     title: "Close operator action",
-    description: "Step 5 of the canonical Operator lifecycle. Consume Step-4 execution proof, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before closure. Always repeat the exact executed action when available so the server can deterministically recover client-corrupted opaque references without changing the prepared action.",
+    description: "Step 5 of the canonical Operator lifecycle. Consume the server-bound Step-4 execution proof, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before closure. The executed action is not replayed through the client.",
     inputSchema: {
       type: "object",
       properties: {
         action_execution_token: { type: "string", minLength: 16 },
-        action: { type: "object", description: "Repeat the exact typed action executed in Step 4. Runtime composition replaces this placeholder with the same closed action union used by Steps 2 and 4." },
         verification: {
           type: "object",
           properties: {
