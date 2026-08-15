@@ -122,20 +122,24 @@
         "Scheduling and results cover scheduled-post reads, edits, deletions, hourly coverage, post results, and published-lineage audit or recovery."
       ]
     },
-    "hardening_safety": {
-      "version": "hardening-safety-v1",
+        "hardening_safety": {
+      "version": "hardening-safety-v2",
       "load_when": "Failures, blockers, regressions, repeat incidents, prevention design, idempotency ambiguity, payload failures, validation defects, or efficiency degradation.",
       "failure_law": [
         "A real unexpected tool failure interrupts the affected objective.",
+        "Every failure occurrence leaves durable evidence; incident convergence may deduplicate identity but may not erase another occurrence.",
         "Diagnose exact cause, repair it, generalize the lesson, add durable prevention and regression, validate, release when required, live verify, then resume the interrupted step.",
         "A workaround, retry, alternate target, sibling business tool, or chat note is not a fix.",
         "Expected fail-closed control responses are boundaries to satisfy, not excuses to route around the control."
       ],
       "recurrence": [
-        "New hardening incidents are checked against prior closed incidents and promoted winning paths.",
+        "Before novelty classification, check exact active incidents, related active incidents in the same causal family, prior closed incidents, and promoted winning paths.",
+        "An exact active repeat appends occurrence evidence to the existing incident and becomes known prevention; it is never silently discarded as a duplicate.",
+        "A related active failure class is known recurrence, not a novel failure. Continue from accumulated evidence instead of restarting diagnosis.",
         "A repeat of a resolved failure is a prevention regression, not a fresh bug.",
         "Prevention-regression handling starts from the prior incident, root cause, prevention, and regressions and asks why that prevention failed; strengthen or replace it before closure.",
-        "First occurrence earns investigation and permanent prevention. Recurrence indicts the prevention mechanism."
+        "Causal-family generalization must remain narrow and evidence-based. OpenAI client safety pre-dispatch blocks are one family even when blocked profile or specific category wording changes; unrelated client failures remain separate.",
+        "First occurrence earns investigation and permanent prevention. Recurrence indicts the prevention or unresolved active repair path."
       ],
       "efficiency_incidents": [
         "Repeated fingerprints, excessive call count, or execution-duration degradation without progress can become efficiency incidents.",
