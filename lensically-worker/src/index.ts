@@ -16373,6 +16373,7 @@ async function createOperatorMcpSessionId(env: Env): Promise<string> {
   return createSignedOperatorEnvelope(env, {
     kind: "operator_mcp_session",
     version: OPERATOR_MCP_SESSION_VERSION,
+    session_nonce: crypto.randomUUID(),
     deployment_id: currentOperatorDeploymentIdentity(env),
     commit_sha: env.LENSICALLY_COMMIT_SHA?.trim() || null,
     execution_kernel_version: EXECUTION_KERNEL_VERSION,
