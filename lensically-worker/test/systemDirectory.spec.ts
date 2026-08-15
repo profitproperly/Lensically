@@ -1334,6 +1334,7 @@ describe("System Directory foundation", () => {
     expect(AUTONOMOUS_BUSINESS_OPERATOR_ROLE).toBe("Lensically Autonomous Business Operator");
     expect(AGENT_NATIVE_OPERATING_CONTRACT).toMatchObject({
       action_closure_required: true,
+      turn_close_gate_required: true,
       single_active_outcome: true,
       owner_role: "authorize_only_when_required",
     });
