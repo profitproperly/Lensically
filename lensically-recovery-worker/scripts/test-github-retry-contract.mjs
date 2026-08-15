@@ -25,4 +25,8 @@ if (!source.includes('const method = String(init.method || "GET").toUpperCase();
   throw new Error("recovery_github_retry_method_guard_missing");
 }
 
+if (source.includes("for (const byte of bytes) binary += String.fromCharCode(byte);")) {
+  throw new Error("recovery_large_file_base64_per_byte_loop_forbidden");
+}
+
 console.log("Recovery GitHub retry contract verified.");
