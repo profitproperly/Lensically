@@ -1,20 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { sanitizeForLog } from "../auth/logSanitizer.js";
-
-function listTestSourceFiles(root: string): string[] {
-  const files: string[] = [];
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    const fullPath = join(root, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...listTestSourceFiles(fullPath));
-    } else if (entry.isFile() && /\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name)) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
 import {
                                                                 OPERATOR_GOVERNING_STANDARDS,
     OPERATOR_GOVERNING_STANDARDS_VERSION,
@@ -36,13 +21,6 @@ import {
 } from "../src/operatorMcpProtocol";
 
 describe("Operator MCP protocol contract", () => {
-  it("keeps governing-standards version ownership single-sourced across worker tests", () => {
-    const testRoot = join(process.cwd(), "test");
-    const offenders = listTestSourceFiles(testRoot)
-      .filter((path) => /operator-governing-standards-v\d+/.test(readFileSync(path, "utf8")));
-    expect(offenders).toEqual([]);
-  });
-
   it("builds the exact default initialize payload", () => {
     expect(buildOperatorMcpInitializeResult(undefined, 75)).toEqual({
       protocolVersion: OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION,

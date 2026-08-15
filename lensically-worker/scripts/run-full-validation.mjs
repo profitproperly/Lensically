@@ -136,8 +136,16 @@ function validatePlan() {
   const missingFiles = completeTestFiles.filter((file) => !existsSync(resolve(workerRoot, file)));
   if (missingFiles.length > 0) fail(`full_validation_missing_files:${missingFiles.join(",")}`);
 
-      const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
+            const missingRequired = requiredFiles.filter((file) => !completeTestFiles.includes(file));
   if (missingRequired.length > 0) fail(`full_validation_required_files_missing:${missingRequired.join(",")}`);
+
+  const governanceVersionGuardFiles = [...new Set(["test/operatorMode.spec.ts", ...completeTestFiles])];
+  const governanceVersionLiteralFiles = governanceVersionGuardFiles.filter((file) =>
+    /operator-governing-standards-v\d+/.test(readFileSync(resolve(workerRoot, file), "utf8")),
+  );
+  if (governanceVersionLiteralFiles.length > 0) {
+    fail(`full_validation_governance_version_literal_forbidden:${governanceVersionLiteralFiles.join(",")}`);
+  }
 
   const selectorRegressionPath = resolve(workerRoot, "test/sourceFamilySelection.spec.ts");
   const selectorRegressionText = readFileSync(selectorRegressionPath, "utf8");
