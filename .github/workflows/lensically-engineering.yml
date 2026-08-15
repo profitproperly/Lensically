@@ -106,6 +106,7 @@ jobs:
           cache-dependency-path: |
             lensically-worker/package-lock.json
             lensically-web/package-lock.json
+            lensically-recovery-worker/package-lock.json
 
       - name: Restore worker dependencies
         id: push_worker_cache
