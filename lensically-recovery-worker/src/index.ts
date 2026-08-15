@@ -159,7 +159,7 @@ function textToBase64(value: string): string {
   return btoa(binary);
 }
 
-async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null }> {
+async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; error?: string }> {
   const config = repo(env);
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
   const result = await github(env, `/repos/${config.owner}/${config.repo}/contents/${encodedPath}?ref=${encodeURIComponent(config.branch)}`);
@@ -174,11 +174,13 @@ async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: 
     : [];
   const entry = entries.find((item) => item.type === "blob" && item.path === path);
   const blobSha = typeof entry?.sha === "string" ? entry.sha : null;
-  if (!tree.ok || !blobSha) return { ok: false, status: tree.status || result.status, sha: null, content: null };
+  if (!tree.ok) return { ok: false, status: tree.status || result.status || 502, sha: null, content: null, error: "repo_tree_unavailable" };
+  if (!blobSha) return { ok: false, status: result.ok ? 404 : (result.status || 404), sha: null, content: null, error: "repo_file_not_found" };
   const blob = await github(env, `/repos/${config.owner}/${config.repo}/git/blobs/${blobSha}`);
   const blobData = blob.data && typeof blob.data === "object" && !Array.isArray(blob.data) ? blob.data as Record<string, unknown> : null;
   const blobContent = typeof blobData?.content === "string" ? base64ToText(blobData.content) : null;
-  return { ok: blob.ok && Boolean(blobContent), status: blob.status, sha: blobSha, content: blobContent };
+  if (!blob.ok || !blobContent) return { ok: false, status: blob.status || 502, sha: blobSha, content: null, error: "repo_blob_unavailable" };
+  return { ok: true, status: blob.status, sha: blobSha, content: blobContent };
 }
 
 async function commitRepoFileViaGitData(env: Env, path: string, content: string, message: string): Promise<{ ok: boolean; status: number; commit_sha: string | null; phase?: string }> {
