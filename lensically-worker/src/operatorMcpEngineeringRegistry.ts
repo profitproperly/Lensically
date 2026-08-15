@@ -268,11 +268,12 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "closeOperatorAction",
     title: "Close operator action",
-    description: "Step 5 of the canonical Operator lifecycle. Consume a signed Step-4 execution token, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before the action can be closed.",
+    description: "Step 5 of the canonical Operator lifecycle. Consume Step-4 execution proof, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before closure. Always repeat the exact executed action when available so the server can deterministically recover client-corrupted opaque references without changing the prepared action.",
     inputSchema: {
       type: "object",
       properties: {
         action_execution_token: { type: "string", minLength: 16 },
+        action: { type: "object", description: "Repeat the exact typed action executed in Step 4. Runtime composition replaces this placeholder with the same closed action union used by Steps 2 and 4." },
         verification: {
           type: "object",
           properties: {
