@@ -4022,6 +4022,11 @@ active_checkpoint: none
       status: "pending_explicit_close",
       lifecycle_stage: 4,
       required_tool: "closeOperatorAction",
+      turn_close_gate: {
+        mode: "continue",
+        must_continue: true,
+        normal_turn_close_allowed: false,
+      },
     });
     const step5 = await mcpTool<{
       ok: boolean;
