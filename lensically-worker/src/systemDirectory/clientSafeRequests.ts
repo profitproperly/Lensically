@@ -170,13 +170,14 @@ function containsGatewayInternalFreeText(value: string): boolean { const normali
 function containsDatabaseSchemaFreeText(value: string): boolean { const normalized = value.toLowerCase(); return DATABASE_SCHEMA_FREE_TEXT.some((phrase) => normalized.includes(phrase)); }
 function inspectValue(value: unknown, path: string, violations: string[]): void {
   if (typeof value === "string") {
-        const trimmed = value.trim();
+    const trimmed = value.trim();
     if (/^inputs\.patches\[\d+\]\.(find|replace)$/.test(path)) return;
+    const diagnosticEvidencePath = /^inputs\.(expected_outcome|observed_outcome|resume_capsule)(?:\.|\[|$)/.test(path);
     const typedPublicLifecycleStage = path === "inputs.resume_capsule.interrupted_stage" && PUBLIC_OPERATOR_LIFECYCLE_STAGES.has(trimmed);
-        if (path !== "inputs.symbol" && !typedPublicLifecycleStage && INTERNAL_HANDLER_IDENTIFIER.test(trimmed)) violations.push(`internal_handler_identifier:${path}`);
-    if (INTERNAL_ACTION_KEY.test(trimmed)) violations.push(`internal_action_key:${path}`);
+    if (path !== "inputs.symbol" && !diagnosticEvidencePath && !typedPublicLifecycleStage && INTERNAL_HANDLER_IDENTIFIER.test(trimmed)) violations.push(`internal_handler_identifier:${path}`);
+    if (!diagnosticEvidencePath && INTERNAL_ACTION_KEY.test(trimmed)) violations.push(`internal_action_key:${path}`);
     if (path !== "inputs.brand_key" && containsTypedOnlyAccountIdentifier(trimmed)) violations.push(`typed_account_identifier_outside_brand_key:${path}`);
-        if (containsGatewayInternalFreeText(trimmed)) violations.push(`gateway_internal_free_text:${path}`);
+    if (!diagnosticEvidencePath && containsGatewayInternalFreeText(trimmed)) violations.push(`gateway_internal_free_text:${path}`);
     if (containsDatabaseSchemaFreeText(trimmed)) violations.push(`database_schema_free_text:${path}`);
     return;
   }
