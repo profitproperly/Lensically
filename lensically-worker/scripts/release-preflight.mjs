@@ -3810,7 +3810,10 @@ if (!source.includes("run_id: payload.run_id ?? null")
 
 if (errors.length > 0) {
 
-  for (const error of errors) console.error(`[release-preflight] ${error}`);
+  for (const error of errors) {
+    console.error(`[release-preflight] ${error}`);
+    console.error(`::error title=Release preflight::${error}`);
+  }
   process.exit(1);
 }
 
