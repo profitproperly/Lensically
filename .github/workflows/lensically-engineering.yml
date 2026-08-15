@@ -49,6 +49,8 @@ jobs:
   push-validation:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      recovery_changed: ${{ steps.push_scope.outputs.recovery_changed }}
     steps:
       - name: Checkout pushed head
         uses: actions/checkout@v4
