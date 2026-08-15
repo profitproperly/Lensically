@@ -37,6 +37,7 @@ import {
   type HardeningTransitionEvidence,
   type MandatoryExecutionToolDefinition,
 } from "./mandatoryExecutionMap";
+import { evaluateOperatorTurnCloseGate } from "./operatorTurnCloseGate";
 import {
   assertClientSafetyRegistry,
     buildClientSafeGatewayRequest,
