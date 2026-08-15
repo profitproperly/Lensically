@@ -4033,6 +4033,9 @@ active_checkpoint: none
       lifecycle_stage: number;
       closure_token: string;
       next_sequence: string[];
+      operator_action_closure: {
+        turn_close_gate: { must_continue: boolean; normal_turn_close_allowed: boolean };
+      };
     }>("closeOperatorAction", {
       action_execution_token: step4.action_execution_token,
       verification: {
