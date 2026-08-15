@@ -18747,6 +18747,34 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
     || ["explicit_proceed_required", "owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
   const temporaryDependency = normalizeOperatorText(result.temporary_dependency, 500, true);
   const retirementCondition = normalizeOperatorText(result.retirement_condition, 1000, true);
+  const embeddedActiveOutcome = operatorRecord(result.active_outcome);
+  let activeInterruptKey = normalizeOperatorText(
+    embeddedActiveOutcome.active_interrupt_key ?? result.active_interrupt_key,
+    120,
+    true,
+  );
+  let turnStateReadFailed = false;
+  if (!activeInterruptKey) {
+    try {
+      const turnState = await env.DB.prepare(
+        `SELECT active_interrupt_key FROM operator_work_state WHERE id = 'singleton' LIMIT 1`,
+      ).first<Record<string, unknown>>();
+      activeInterruptKey = normalizeOperatorText(turnState?.active_interrupt_key, 120, true);
+    } catch (error) {
+      if (!getErrorMessage(error).includes("no such table: operator_work_state")) turnStateReadFailed = true;
+    }
+  }
+  const externalWait = Boolean(temporaryDependency && retirementCondition);
+  const objectiveComplete = result.objective_complete === true;
+  const turnCloseGate = evaluateOperatorTurnCloseGate({
+    unresolved_failure: failed || result.normal_work_blocked === true || hasIncident || turnStateReadFailed,
+    active_interrupt: Boolean(activeInterruptKey),
+    active_interrupt_key: activeInterruptKey,
+    owner_action_required: ownerActionRequired,
+    external_wait: externalWait,
+    reachable_next_action: Boolean(nextAction) && !ownerActionRequired && !externalWait && !objectiveComplete,
+    objective_complete: objectiveComplete,
+  });
   const closure = {
     version: AGENT_NATIVE_OPERATING_CONTRACT_VERSION,
     role: AUTONOMOUS_BUSINESS_OPERATOR_ROLE,
