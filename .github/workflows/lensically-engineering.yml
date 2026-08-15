@@ -75,24 +75,29 @@ jobs:
             fi
           fi
           git diff --name-only "${validation_base}" HEAD > /tmp/lensically-changed-files.txt
+          push_base="${{ github.event.before }}"
+          if [[ -z "${push_base}" || "${push_base}" =~ ^0+$ ]] || ! git cat-file -e "${push_base}^{commit}" 2>/dev/null; then
+            push_base="$(git rev-parse HEAD^)"
+          fi
+          git diff --name-only "${push_base}" HEAD > /tmp/lensically-push-files.txt
           echo "validation_scope=${validation_scope} base=${validation_base} head=$(git rev-parse HEAD)"
           full_validation=false
           web_changed=false
-          recovery_changed=false
           while IFS= read -r path; do
             case "${path}" in
               lensically-web/*)
                 web_changed=true
                 full_validation=true
                 ;;
-              lensically-recovery-worker/*)
-                recovery_changed=true
-                ;;
               .github/workflows/*|lensically-worker/package.json|lensically-worker/package-lock.json|lensically-worker/wrangler*|lensically-worker/database/migrations/*|lensically-worker/database/backfills/*|lensically-worker/scripts/*|lensically-worker/src/index.ts|lensically-worker/tsconfig*|lensically-worker/vitest*)
                 full_validation=true
                 ;;
             esac
           done < /tmp/lensically-changed-files.txt
+          recovery_changed=false
+          if grep -q '^lensically-recovery-worker/' /tmp/lensically-push-files.txt; then
+            recovery_changed=true
+          fi
           echo "full_validation=${full_validation}" >> "${GITHUB_OUTPUT}"
           echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
           echo "recovery_changed=${recovery_changed}" >> "${GITHUB_OUTPUT}"
