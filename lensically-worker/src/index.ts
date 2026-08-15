@@ -15553,8 +15553,10 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   assertClientSafetyRegistry();
     const tools = buildComposedOperatorMcpTools(includeScopedWrappers);
     const knowledgeGateway = tools.find((tool) => tool.name === "getOperatorKnowledge");
+    const liveStateGateway = tools.find((tool) => tool.name === "getOperatorLiveState");
     const actionGateway = tools.find((tool) => tool.name === "executeOperatorAction");
-  if (!knowledgeGateway || !actionGateway) return tools;
+    const closeGateway = tools.find((tool) => tool.name === "closeOperatorAction");
+  if (!knowledgeGateway || !liveStateGateway || !actionGateway || !closeGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
   const actionBranches = tools
