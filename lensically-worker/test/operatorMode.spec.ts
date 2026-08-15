@@ -4064,7 +4064,7 @@ active_checkpoint: none
     });
   }, 30000);
 
-    it("exposes and executes neutral case_step through the normalized lifecycle", async () => {
+      it("exposes and executes the complete neutral case_step contract through the normalized lifecycle", async () => {
     const recordedCall = await mcpToolRaw<{
       ok: boolean;
       incident: { id: string; state: string };
@@ -4078,43 +4078,96 @@ active_checkpoint: none
     });
     expect(recordedCall.isError).not.toBe(true);
     const incidentId = recordedCall.structuredContent.incident.id;
-            const action = { capability: "case_step", arguments: { stage: "n" } };
-    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
-    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
-      session_map_token: step1.structuredContent.session_map_token,
-      planned_action: action,
-    });
-    expect(step2.isError).not.toBe(true);
-    const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
-      knowledge_token: step2.structuredContent.knowledge_token,
-      planned_action: action,
-    });
-    expect(step3.isError).not.toBe(true);
-    const step4 = await mcpToolCallRaw<{
-      ok: boolean;
-      current_state: string;
-      incident: { id: string };
-      action_execution_token: string;
-    }>("executeOperatorAction", {
-      live_state_token: step3.structuredContent.live_state_token,
-    });
-    expect(step4.isError).not.toBe(true);
-    expect(step4.structuredContent).toMatchObject({ ok: true, current_state: "contained", incident: { id: incidentId } });
-    const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
-      action_execution_token: step4.structuredContent.action_execution_token,
-      verification: {
-        verified: true,
-                evidence: ["Neutral case_step stage n advanced the active fixture incident exactly one server-resolved state through advanceHardeningIncident."],
-        next_action: "Continue the isolated regression fixture.",
-        prevention_required: false,
-      },
-    });
-    expect(step5.isError).not.toBe(true);
-    expect(step5.structuredContent.ok).toBe(true);
-    await env.DB.prepare(
-      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    ).bind(incidentId).run();
-  }, 30000);
+    const session = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    expect(session.isError).not.toBe(true);
+
+    const executeCaseStep = async (
+      arguments_: Record<string, unknown>,
+      expectedState: string,
+      expectedBlocked = true,
+    ) => {
+      const action = { capability: "case_step", arguments: arguments_ };
+      const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+        session_map_token: session.structuredContent.session_map_token,
+        planned_action: action,
+      });
+      expect(step2.isError, JSON.stringify(step2.structuredContent)).not.toBe(true);
+      const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+        knowledge_token: step2.structuredContent.knowledge_token,
+        planned_action: action,
+      });
+      expect(step3.isError, JSON.stringify(step3.structuredContent)).not.toBe(true);
+      const step4 = await mcpToolCallRaw<{
+        ok: boolean;
+        current_state: string;
+        normal_work_blocked: boolean;
+        incident: { id: string };
+        action_execution_token: string;
+      }>("executeOperatorAction", {
+        live_state_token: step3.structuredContent.live_state_token,
+      });
+      expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
+      expect(step4.structuredContent).toMatchObject({
+        ok: true,
+        current_state: expectedState,
+        normal_work_blocked: expectedBlocked,
+        incident: { id: incidentId },
+      });
+      const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
+        action_execution_token: step4.structuredContent.action_execution_token,
+        verification: {
+          verified: true,
+          evidence: [`Neutral case_step reached ${expectedState} through the canonical hardening validator.`],
+          next_action: expectedState === "closed" ? "Fixture complete." : "Continue the isolated regression fixture.",
+          prevention_required: false,
+        },
+      });
+      expect(step5.isError, JSON.stringify(step5.structuredContent)).not.toBe(true);
+      expect(step5.structuredContent.ok).toBe(true);
+    };
+
+    await executeCaseStep({ stage: "a0", case: incidentId }, "contained");
+    await executeCaseStep({ stage: "n", case: incidentId }, "classified");
+    await executeCaseStep({ stage: "a2", case: incidentId }, "reproduced");
+    await executeCaseStep({
+      stage: "a3",
+      case: incidentId,
+      cause: "The client-safe hardening branch exposed semantic control-plane fields.",
+      generalization: "Client-visible control-plane transitions require neutral aliases with server-side semantic compilation.",
+    }, "generalized");
+    await executeCaseStep({ stage: "a4", case: incidentId }, "repaired");
+    await executeCaseStep({
+      stage: "a5",
+      case: incidentId,
+      rule: "neutral_case_step_contract",
+    }, "prevention_locked");
+    await executeCaseStep({
+      stage: "a6",
+      case: incidentId,
+      tests: ["operator-mode-neutral-case-step-complete-contract"],
+    }, "validated");
+    await executeCaseStep({
+      stage: "a7",
+      case: incidentId,
+      ref: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    }, "released");
+    await executeCaseStep({
+      stage: "a8",
+      case: incidentId,
+      deployment: "fixture-neutral-case-step-deployment",
+    }, "live_verified");
+    await executeCaseStep({
+      stage: "a9",
+      case: incidentId,
+      proof: { verified: true, contract: "neutral_case_step" },
+    }, "resumed");
+    await executeCaseStep({
+      stage: "a10",
+      case: incidentId,
+      resume: { resumed: true, objective: "isolated_fixture" },
+      gain: { semantic_fields_removed_from_client: true },
+    }, "closed", false);
+  }, 60000);
 
   it("exposes and executes neutral checkpoint_step through the normalized lifecycle", async () => {
     const workKey = `fixture_checkpoint_${crypto.randomUUID().replace(/-/g, "")}`;
