@@ -110,6 +110,7 @@ const operatorMilestoneTitles = [
 const requiredFiles = [
   "test/databaseMigrations.spec.ts",
         "test/operatorMcpRoutingPolicy.spec.ts",
+    "test/operatorTurnCloseGate.spec.ts",
     "test/operatorManifestShadowService.spec.ts",
         "test/operatorManifestShadowRuntimeService.spec.ts",
   "test/operatorRepositoryPatchSafety.spec.ts",
