@@ -75,7 +75,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
         session_map_token: { type: "string", minLength: 16 },
         planned_action: {
           type: "object",
-          description: "Generated at runtime as the same closed typed action union used by Step 4.",
+          description: "Generated at runtime as the closed typed preparation action union. The normalized action is stored server-side and is not replayed by Steps 4 or 5.",
         },
       },
       required: ["session_map_token", "planned_action"],
