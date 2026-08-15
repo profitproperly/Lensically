@@ -4006,7 +4006,12 @@ active_checkpoint: none
     const step4 = await mcpTool<{
       ok: boolean;
       action_execution_token: string;
-      operator_action_closure: { status: string; lifecycle_stage: number; required_tool: string };
+      operator_action_closure: {
+        status: string;
+        lifecycle_stage: number;
+        required_tool: string;
+        turn_close_gate: { mode: string; must_continue: boolean; normal_turn_close_allowed: boolean };
+      };
     }>("executeOperatorAction", {
       live_state_token: step3.live_state_token,
       action: { capability: "list_accounts", arguments: {} },
