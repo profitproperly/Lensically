@@ -17,15 +17,18 @@ const required = [
 
 for (const [label, fragment] of required) {
   if (!source.includes(fragment)) {
+    console.error(`::error title=Recovery retry contract missing::${label}`);
     throw new Error(`recovery_github_retry_contract_missing:${label}`);
   }
 }
 
 if (!source.includes('const method = String(init.method || "GET").toUpperCase();')) {
+  console.error("::error title=Recovery retry contract missing::method guard");
   throw new Error("recovery_github_retry_method_guard_missing");
 }
 
 if (source.includes("for (const byte of bytes) binary += String.fromCharCode(byte);")) {
+  console.error("::error title=Recovery retry contract regression::per-byte base64 loop present");
   throw new Error("recovery_large_file_base64_per_byte_loop_forbidden");
 }
 
