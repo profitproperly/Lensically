@@ -113,7 +113,7 @@ export interface OperatorMcpToolCallDependencies {
   executionFingerprint(toolName: string, args: JsonRecord): Promise<string>;
   toolMutatesState(toolName: string): boolean;
     buildActionClosure(toolName: string, result: JsonRecord): Promise<unknown>;
-    verifyLifecycleExecutionToken(token: unknown, action: unknown): Promise<{ ok: boolean; error?: string; payload?: JsonRecord }>;
+    verifyLifecycleExecutionToken(token: unknown): Promise<{ ok: boolean; error?: string; payload?: JsonRecord }>;
   requiredKnowledgeNodes(toolName: string): string[];
   requiredLiveStateScopes(toolName: string): string[];
   issueActionExecutionToken(input: { profileId: string | null; toolName: string; result: JsonRecord; liveStatePayload: JsonRecord }): Promise<string>;
