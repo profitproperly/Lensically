@@ -4149,14 +4149,12 @@ active_checkpoint: none
       action_execution_token: string;
     }>("executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
-      action,
     });
     expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.work_state.active_interrupt_key).toBeNull();
     expect(step4.structuredContent.items.find((item) => item.work_key === workKey)).toMatchObject({ status: "completed" });
     const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
       action_execution_token: step4.structuredContent.action_execution_token,
-      action,
       verification: {
         verified: true,
         evidence: ["Neutral checkpoint_step completed the active interrupt without exposing semantic work-state values in the public action."],
