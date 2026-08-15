@@ -125,7 +125,7 @@ const TEST_SAFE_CAPABILITY_BY_TOOL: Record<string, string> = {
   readMcpToolDefinition: "capability_definition",
   recordHardeningIncident: "client_block_intake",
   getHardeningStatus: "hardening_status",
-  advanceHardeningIncident: "hardening_transition",
+    advanceHardeningIncident: "case_step",
   recordOperationalObservation: "operational_observation",
   getOperatorWorkState: "operator_work_state",
   intakeOperatorWork: "operator_work_intake",
@@ -3839,18 +3839,26 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "run_mcp_tests";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
     expect(mcpCampaignBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-    const autonomousPrepareBranch = actionSchema?.oneOf?.find((item) => {
+        const autonomousPrepareBranch = actionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "prepare_manifest_autonomous_cycle";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown> } } } | undefined;
     expect(autonomousPrepareBranch?.properties?.arguments?.properties).toHaveProperty("operation_id");
     expect(autonomousPrepareBranch?.properties?.arguments?.properties).not.toHaveProperty("proceed_confirmed");
+    const hardeningCaseBranch = actionSchema?.oneOf?.find((item) => {
+      const branch = item as { properties?: { capability?: { const?: string } } };
+      return branch.properties?.capability?.const === "case_step";
+    }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
+    expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
+    expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref", "deployment"]);
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
     const actionCapabilities = (actionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
-    expect(actionCapabilities.every(Boolean)).toBe(true);
+        expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
+    expect(actionCapabilities).toContain("case_step");
+    expect(actionCapabilities).not.toContain("hardening_transition");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("profile_id");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("inputs");
     expect(initialized.instructions.split("\n")).toEqual([
@@ -4025,6 +4033,60 @@ active_checkpoint: none
     expect(step5).toMatchObject({ ok: true, lifecycle_stage: 5 });
     expect(step5.closure_token).toBeTruthy();
     expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"]);
+  }, 30000);
+
+    it("exposes and executes neutral case_step through the normalized lifecycle", async () => {
+    const recordedCall = await mcpToolRaw<{
+      ok: boolean;
+      incident: { id: string; state: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "fixture_neutral_case_step",
+      request_fingerprint: `fixture-neutral-case-step-${crypto.randomUUID()}`,
+      error_category: "fixture_client_pre_dispatch_block",
+      operation_class: "engineering",
+      observed_outcome: { client_blocked: true },
+    });
+    expect(recordedCall.isError).not.toBe(true);
+    const incidentId = recordedCall.structuredContent.incident.id;
+    const action = { capability: "case_step", arguments: { stage: "contain" } };
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: action,
+    });
+    expect(step2.isError).not.toBe(true);
+    const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+      knowledge_token: step2.structuredContent.knowledge_token,
+      planned_action: action,
+    });
+    expect(step3.isError).not.toBe(true);
+    const step4 = await mcpToolCallRaw<{
+      ok: boolean;
+      current_state: string;
+      incident: { id: string };
+      action_execution_token: string;
+    }>("executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      action,
+    });
+    expect(step4.isError).not.toBe(true);
+    expect(step4.structuredContent).toMatchObject({ ok: true, current_state: "contained", incident: { id: incidentId } });
+    const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      action,
+      verification: {
+        verified: true,
+        evidence: ["Neutral case_step advanced the active fixture incident through advanceHardeningIncident."],
+        next_action: "Continue the isolated regression fixture.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError).not.toBe(true);
+    expect(step5.structuredContent.ok).toBe(true);
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(incidentId).run();
   }, 30000);
 
   it("reconciles corrupted opaque lifecycle references by exact action binding when the client omits MCP session headers", async () => {

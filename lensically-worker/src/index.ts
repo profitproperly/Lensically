@@ -16993,7 +16993,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
   ["readMcpToolDefinition", "capability_definition"],
   ["recordHardeningIncident", "client_block_intake"],
   ["getHardeningStatus", "hardening_status"],
-  ["advanceHardeningIncident", "hardening_transition"],
+    ["advanceHardeningIncident", "case_step"],
   ["recordOperationalObservation", "operational_observation"],
   ["getOperatorWorkState", "operator_work_state"],
   ["intakeOperatorWork", "operator_work_intake"],
@@ -17018,6 +17018,18 @@ function operatorActionCapabilityIdForToolName(toolName: string): string {
 }
 
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
+  if (tool.name === "advanceHardeningIncident") {
+    return {
+      type: "object",
+      properties: {
+        stage: { type: "string", enum: ["n", "contain", "classify", "reproduce", "generalize", "repair", "lock", "validate", "release", "verify", "resume", "close", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"] },
+        ref: { type: "string", maxLength: 120 },
+        deployment: { type: "string", maxLength: 160 },
+      },
+      required: ["stage"],
+      additionalProperties: false,
+    };
+  }
   const sourceSchema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
     ? tool.inputSchema as Record<string, unknown>
     : {};
