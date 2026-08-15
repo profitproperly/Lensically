@@ -85,6 +85,7 @@ export type OperatorActionClosureInput = {
   progress_recorded?: boolean;
   deferred_work_preserved?: boolean;
   checkpoint?: string | null;
+  turn_close_gate?: OperatorTurnCloseGate | null;
 };
 
 export const AGENT_NATIVE_OPERATING_CONTRACT = {
