@@ -4197,27 +4197,32 @@ active_checkpoint: none
 
     const changedStep4 = await mcpToolCallRaw<{ ok: boolean; error?: string }>("executeOperatorAction", {
       live_state_token: `olr_${"c".repeat(32)}`,
-      action: { capability: "repository_status", arguments: {} },
     });
     expect(changedStep4.isError).toBe(true);
     expect(changedStep4.structuredContent.ok).toBe(false);
 
     const step4 = await mcpToolCallRaw<{ ok: boolean; action_execution_token: string }>("executeOperatorAction", {
-      live_state_token: `olr_${"c".repeat(32)}`,
-      action: plannedAction,
+      live_state_token: step3.structuredContent.live_state_token,
     });
     expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.action_execution_token).toBeTruthy();
 
-    const step5 = await mcpToolCallRaw<{ ok: boolean; lifecycle_stage: number }>("closeOperatorAction", {
+    const verification = {
+      verified: true,
+      evidence: ["Preparation-stage recovery succeeded, while post-preparation execution remained bound exclusively to valid opaque server tokens."],
+      next_action: "Continue the isolated lifecycle regression.",
+      prevention_required: false,
+    };
+    const changedStep5 = await mcpToolCallRaw<{ ok: boolean; error?: string }>("closeOperatorAction", {
       action_execution_token: `olr_${"d".repeat(32)}`,
-      action: plannedAction,
-      verification: {
-        verified: true,
-        evidence: ["The unbound connector lifecycle recovered every corrupted opaque reference from exact server-side stage and action state."],
-        next_action: "Continue the isolated lifecycle regression.",
-        prevention_required: false,
-      },
+      verification,
+    });
+    expect(changedStep5.isError).toBe(true);
+    expect(changedStep5.structuredContent.ok).toBe(false);
+
+    const step5 = await mcpToolCallRaw<{ ok: boolean; lifecycle_stage: number }>("closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      verification,
     });
     expect(step5.isError).not.toBe(true);
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
