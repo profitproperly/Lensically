@@ -5634,6 +5634,122 @@ active_checkpoint: none
     expect(serialized.length).toBeLessThan(16000);
   }, 30000);
 
+      it("records every exact active hardening recurrence instead of silently deduplicating it", async () => {
+    const args = {
+      boundary: "client",
+      blocked_profile_id: "fixture_active_repeat_profile",
+      request_fingerprint: "fixture-active-repeat-fingerprint",
+      error_category: "fixture_active_repeat_failure",
+      operation_class: "read",
+      observed_outcome: { client_blocked: true },
+    };
+    const firstCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string };
+    }>("recordHardeningIncident", args);
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).not.toBe(true);
+    expect(first).toMatchObject({ ok: true, created: true });
+    expect(first.incident.classification).toBe("novel_failure");
+
+    const secondCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string };
+      recurrence: { status: string; prior_incident_id: string };
+    }>("recordHardeningIncident", args);
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).not.toBe(true);
+    expect(second).toMatchObject({ ok: true, created: false });
+    expect(second.incident).toMatchObject({ id: first.incident.id, classification: "known_prevention" });
+    expect(second.recurrence).toMatchObject({ status: "active_exact_repeat", prior_incident_id: first.incident.id });
+    const eventCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM operator_hardening_incident_events WHERE incident_id = ?`,
+    ).bind(first.incident.id).first<{ count: number }>();
+    expect(Number(eventCount?.count ?? 0)).toBe(2);
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
+  }, 30000);
+
+  it("generalizes OpenAI client safety blocks across active and closed related incidents", async () => {
+    const firstCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "run_git_hub_workflow",
+      request_fingerprint: "fixture-openai-client-block-a",
+      error_category: "openai_client_safety_block",
+      operation_class: "engineering_validation_workflow_dispatch",
+      observed_outcome: { client_blocked: true },
+    });
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).not.toBe(true);
+    expect(first.incident.classification).toBe("novel_failure");
+
+    const secondCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; severity: string };
+      recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "hardening_transition",
+      request_fingerprint: "fixture-openai-client-block-b",
+      error_category: "openai_safety_check_blocked_hardening_transition_before_lensically_dispatch",
+      operation_class: "engineering_hardening_transition",
+      observed_outcome: { client_blocked: true },
+    });
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).not.toBe(true);
+    expect(second.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
+    expect(second.recurrence).toMatchObject({
+      status: "known_active_recurrence",
+      prior_incident_id: first.incident.id,
+      recurrence_family: "client:openai_safety_predispatch",
+    });
+
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET
+        state = 'closed', root_cause = 'fixture client root cause', generalized_cause = 'fixture client generalized cause',
+        prevention_rule_id = 'fixture_client_prevention', regression_test_ids_json = '["fixture-client-regression"]',
+        tested_sha = 'fixture-client-sha', deployment_id = 'fixture-client-deployment',
+        closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(second.incident.id).run();
+
+    const thirdCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; severity: string };
+      recurrence: { status: string; prior_incident_id: string; prior_prevention_rule_id: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "verify_deployed_mcp_version",
+      request_fingerprint: "fixture-openai-client-block-c",
+      error_category: "openai_safety_check_blocked_runtime_verification_before_lensically_dispatch",
+      operation_class: "engineering_runtime_verification",
+      observed_outcome: { client_blocked: true },
+    });
+    const third = thirdCall.structuredContent;
+    expect(thirdCall.isError).not.toBe(true);
+    expect(third.incident).toMatchObject({ classification: "prevention_breach", severity: "P0" });
+    expect(third.recurrence).toMatchObject({
+      status: "prevention_regression",
+      prior_incident_id: second.incident.id,
+      prior_prevention_rule_id: "fixture_client_prevention",
+      recurrence_family: "client:openai_safety_predispatch",
+    });
+    for (const incidentId of [first.incident.id, third.incident.id]) {
+      await env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(incidentId).run();
+    }
+  }, 30000);
+
     it("classifies a repeated resolved failure as a prevention regression", async () => {
         const firstCall = await mcpToolRaw<{
       ok: boolean;
