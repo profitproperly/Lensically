@@ -176,7 +176,10 @@ export async function dispatchOperatorMcpToolCall(
   let lifecycleLiveStatePayload: JsonRecord | null = null;
 
   if (requestedToolName === dependencies.routedExecutionGateway) {
-    const lifecycleCheck = await dependencies.verifyLifecycleExecutionToken(governedRequestedArgs.live_state_token);
+    const lifecycleCheck = await dependencies.verifyLifecycleExecutionToken(
+      governedRequestedArgs.live_state_token,
+      governedRequestedArgs.action,
+    );
     if (!lifecycleCheck.ok || !lifecycleCheck.payload) {
       return mcpToolResultResponse(id, {
         ok: false,
