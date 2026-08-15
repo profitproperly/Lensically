@@ -3850,7 +3850,7 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "case_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
         expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
-    expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref", "deployment"]);
+    expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization", "rule", "tests", "ref", "deployment", "proof", "resume", "gain"]);
     const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
     expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
     const checkpointStepBranch = plannedActionSchema?.oneOf?.find((item) => {
