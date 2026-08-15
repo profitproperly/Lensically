@@ -4202,6 +4202,7 @@ active_checkpoint: none
 
     const sessionId = await initializeSession();
     const otherSessionId = await initializeSession();
+    expect(otherSessionId).not.toBe(sessionId);
     const step1 = await callWithSession<{ session_map_token: string }>(sessionId, "getOperatorSessionMap", {});
     expect(step1.isError).not.toBe(true);
     const step2 = await callWithSession<{ knowledge_token: string }>(sessionId, "getOperatorKnowledge", {
