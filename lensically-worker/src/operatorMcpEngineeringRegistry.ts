@@ -86,7 +86,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "getOperatorLiveState",
     title: "Get operator live state",
-    description: "Step 3 of the canonical Operator lifecycle. Derive exactly the mutable live-state scopes required by the action already bound into Step 2. Always repeat the exact Step-2 planned_action when available so the server can deterministically recover client-corrupted opaque references without weakening the action binding. Callers do not choose scopes or account targets.",
+    description: "Step 3 of the canonical Operator lifecycle. Derive exactly the mutable live-state scopes required by the action already bound into Step 2. The optional exact Step-2 planned_action exists only for preparation-stage reference recovery; successful Step 3 carries the verified action forward server-side. Callers do not choose scopes or account targets.",
     inputSchema: {
       type: "object",
       properties: {
