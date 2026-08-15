@@ -15,7 +15,7 @@ assert.match(source, /error: "repo_contents_unavailable"/);
 assert.match(source, /error: "github_transport_failed"/);
 assert.match(source, /if \(\[0, 502, 503, 504\]\.includes\(result\.status\)\)/);
 assert.match(source, /lastTransportError/);
-assert.match(source, /const maxAttempts = 1;/);
+assert.match(source, /const maxAttempts = 3;/);
 assert.match(source, /controller\.abort\(\), 4000/);
 assert.match(source, /error: file\.error \|\| "repo_file_unavailable"/);
 const patchBranchStart = source.indexOf('if (name === "applyRepoTextPatch") {');
