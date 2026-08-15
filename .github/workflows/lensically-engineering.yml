@@ -296,8 +296,26 @@ jobs:
       - name: Run full push validation
         if: steps.push_scope.outputs.full_validation == 'true'
         working-directory: lensically-worker
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          node scripts/run-full-validation.mjs
+          set +e
+          node scripts/run-full-validation.mjs 2>&1 | tee /tmp/lensically-full-validation.log
+          status=${PIPESTATUS[0]}
+          if (( status != 0 )); then
+            failure="$(grep -E 'FAIL|AssertionError|Error:|expected|received|_failed|_missing|_invalid' /tmp/lensically-full-validation.log | tail -n 1 || true)"
+            description="${failure:-full_validation_failed}"
+            description="${description:0:140}"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
+              -f context='lensically/full-validation' \
+              -f description="$description" >/dev/null
+            exit "$status"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='lensically/full-validation' \
+            -f description='full_validation_passed' >/dev/null
 
 
 
