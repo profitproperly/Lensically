@@ -1411,6 +1411,7 @@ describe("System Directory foundation", () => {
   it("registers bounded work-state profiles and the complete hardening release sequence", () => {
     expect(CLIENT_SAFE_REQUEST_PROFILES.operator_work_state.allowed_input_keys).toEqual(["status", "limit"]);
     expect(CLIENT_SAFE_REQUEST_PROFILES.checkpoint_read).toMatchObject({ intent: "get operator work state", allowed_input_keys: [] });
+    expect(CLIENT_SAFE_REQUEST_PROFILES.checkpoint_step).toMatchObject({ intent: "advance operator work", allowed_input_keys: ["stage", "ref"] });
     expect(CLIENT_SAFE_REQUEST_PROFILES.case_open).toMatchObject({ intent: "record hardening incident", allowed_input_keys: [] });
     expect(CLIENT_SAFE_REQUEST_PROFILES.case_step).toMatchObject({ intent: "advance hardening incident", allowed_input_keys: ["stage", "ref", "deployment"] });
     expect(buildClientSafeGatewayRequest("checkpoint_read", {})).toMatchObject({ intent: "get operator work state", inputs: {} });
