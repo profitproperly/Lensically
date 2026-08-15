@@ -221,6 +221,8 @@ function run(label, command, args) {
   const durationMs = Math.round(performance.now() - startedAt);
   if (result.error) fail(`[full-validation] ${label} spawn failed: ${result.error.message}`);
   if (result.status !== 0) {
+    const annotationLabel = String(label).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+    console.error(`::error title=Full validation child failed::${annotationLabel} status=${result.status ?? 1}`);
     console.error(JSON.stringify({ label, duration_ms: durationMs, status: result.status }, null, 2));
     process.exit(result.status ?? 1);
   }
