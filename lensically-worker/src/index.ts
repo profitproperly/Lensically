@@ -21144,6 +21144,7 @@ async function handleOperatorMcpEngineeringTool(
       knowledge_registry_version: operatorKnowledgeRegistry.version,
       planned_capability: planned.capability,
       planned_tool: planned.toolName,
+      planned_arguments: planned.arguments,
       planned_action_fingerprint: planned.fingerprint,
       planned_brand_key: planned.brandKey,
     });
