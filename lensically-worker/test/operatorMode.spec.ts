@@ -4304,7 +4304,7 @@ active_checkpoint: none
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
   }, 30000);
 
-  it("reconciles corrupted opaque lifecycle references only from the exact current MCP session and stage", async () => {
+  it("reconciles corrupted opaque lifecycle references only from the exact current MCP session and stage without replaying post-Step-3 actions", async () => {
     const initializeSession = async (): Promise<string> => {
       const response = await fetchFromWorker("/api/operator/mcp", {
         method: "POST",
