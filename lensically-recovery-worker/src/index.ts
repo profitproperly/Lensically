@@ -33,7 +33,7 @@ type Tool = {
   annotations: Record<string, unknown>;
 };
 
-const VERSION = "1.4.4";
+const VERSION = "1.4.5";
 const JSON_HEADERS = { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" };
 const TOOLS: Tool[] = [
   { name: "recoveryHealth", title: "Recovery health", description: "Verify the independent recovery plane and the main Lensically health endpoint.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
@@ -82,7 +82,7 @@ async function github(env: Env, path: string, init: RequestInit = {}): Promise<{
   const method = String(init.method || "GET").toUpperCase();
   const retryableRead = ["GET", "HEAD"].includes(method);
   const transientStatuses = new Set([502, 503, 504]);
-  const maxAttempts = retryableRead ? 4 : 1;
+    const maxAttempts = retryableRead ? 2 : 1;
   let response: Response | null = null;
   let lastTransportError: string | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -382,8 +382,31 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     if (occurrences !== 1) return { ok: false, error: "find_text_must_match_exactly_once", occurrences };
     const content = file.content.replace(find, replace);
     if (content === file.content) return { ok: true, status: 200, path, commit_sha: null, phase: "no_change", write_mode: "git_data_api" };
-    const result = await commitRepoFileViaGitData(env, path, content, message);
-    return { ok: result.ok, status: result.status, path, commit_sha: result.commit_sha, phase: result.phase ?? null, write_mode: "git_data_api" };
+        const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+    const update = await github(env, `/repos/${config.owner}/${config.repo}/contents/${encodedPath}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message, content: textToBase64(content), sha: file.sha, branch: config.branch }),
+    });
+    const updateData = update.data && typeof update.data === "object" && !Array.isArray(update.data) ? update.data as Record<string, unknown> : null;
+    const updateCommit = updateData?.commit && typeof updateData.commit === "object" && !Array.isArray(updateData.commit) ? updateData.commit as Record<string, unknown> : null;
+    const updateCommitSha = typeof updateCommit?.sha === "string" ? updateCommit.sha : null;
+    if (update.ok && updateCommitSha) {
+      return { ok: true, status: update.status, path, commit_sha: updateCommitSha, phase: null, write_mode: "contents_api" };
+    }
+    if ([0, 502, 503, 504].includes(update.status)) {
+      const reconciledFile = await repoFile(env, path);
+      if (reconciledFile.ok && reconciledFile.content === content) {
+        const branch = await github(env, `/repos/${config.owner}/${config.repo}/branches/${encodeURIComponent(config.branch)}`);
+        const branchData = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data) ? branch.data as Record<string, unknown> : null;
+        const branchCommit = branchData?.commit && typeof branchData.commit === "object" && !Array.isArray(branchData.commit) ? branchData.commit as Record<string, unknown> : null;
+        const branchCommitSha = typeof branchCommit?.sha === "string" ? branchCommit.sha : null;
+        if (branch.ok && branchCommitSha) {
+          return { ok: true, status: update.status, path, commit_sha: branchCommitSha, phase: "contents_update_reconciled", write_mode: "contents_api" };
+        }
+      }
+    }
+    return { ok: false, status: update.status, path, commit_sha: null, phase: "contents_update_failed", write_mode: "contents_api" };
   }
   if (name === "listGitHubWorkflowRuns") {
     const limit = Math.min(20, Math.max(1, Number(args.limit || 10)));
