@@ -3788,8 +3788,14 @@ if (!workflow.includes("- name: Publish exact release authority target")
   errors.push("release_workflow_authority_publication_missing");
 }
 if (!workflow.includes("- name: Refuse deployment during active Main content cycle")
-    || !workflow.includes("SELECT COUNT(*) AS active_cycle_count FROM operator_autonomous_growth_cycles")
+    || !workflow.includes("SELECT COUNT(*) AS active_cycle_count")
+    || !workflow.includes("latest_active_cycle_id")
+    || !workflow.includes("latest_active_cycle_status")
+    || !workflow.includes("latest_active_cycle_updated_at")
     || !workflow.includes("status IN ('prepared', 'partially_committed')")
+    || !workflow.includes("::error title=Main content cycle deployment guard::state unavailable")
+    || !workflow.includes("::error title=Main content cycle deployment guard::active_cycle_count=${active_cycle_count}; latest_id=${latest_active_cycle_id}; status=${latest_active_cycle_status}; updated_at=${latest_active_cycle_updated_at}")
+    || !workflow.includes("::notice title=Main content cycle deployment guard::active_cycle_count=0")
     || !workflow.includes("active_main_content_cycle_state_unavailable")
     || !workflow.includes("active_main_content_cycle_deploy_forbidden")
     || !workflow.includes("active_main_content_cycle_guard_passed")) {
