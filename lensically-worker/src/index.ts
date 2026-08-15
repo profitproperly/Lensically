@@ -22616,8 +22616,16 @@ async function handleOperatorMcpToolCall(
     executionFingerprint: operatorExecutionFingerprint,
     toolMutatesState: operatorToolMutatesState,
         buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
-            verifyLifecycleExecutionToken: async (token) => {
-      const check = await verifyOperatorLifecycleToken(env, token, 3, request.headers.get("mcp-session-id")?.trim() || null);
+            verifyLifecycleExecutionToken: async (token, action) => {
+      const planned = await resolveOperatorPlannedAction(action);
+      if (!planned.ok) return { ok: false, error: planned.error };
+      const check = await verifyOperatorLifecycleToken(
+        env,
+        token,
+        3,
+        request.headers.get("mcp-session-id")?.trim() || null,
+        planned.fingerprint,
+      );
       return check.ok ? { ok: true, payload: check.payload } : { ok: false, error: check.error };
     },
     requiredKnowledgeNodes: (toolName) => requiredOperatorKnowledgeNodesForTool(toolName),
