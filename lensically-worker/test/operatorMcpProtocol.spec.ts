@@ -136,6 +136,10 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE).toContain("Do not stop at explanation-only");
     expect(OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE).toContain("Do not invent work after closure");
     expect(OPERATOR_GOVERNING_STANDARDS.conversational_problem_intake_rule).toBe(OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE);
+    expect(OPERATOR_TURN_CLOSE_RULE).toContain("blocked work enters repair mode and never terminal mode");
+    expect(OPERATOR_TURN_CLOSE_RULE).toContain("Lifecycle action closure closes one action only");
+    expect(OPERATOR_TURN_CLOSE_RULE).toContain("Status reporting may describe progress but may not substitute for execution");
+    expect(OPERATOR_GOVERNING_STANDARDS.turn_close_rule).toBe(OPERATOR_TURN_CLOSE_RULE);
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
     expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("short opaque continuation references");
