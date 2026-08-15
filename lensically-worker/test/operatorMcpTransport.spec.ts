@@ -137,6 +137,11 @@ describe("Operator MCP transport", () => {
       request_id: "req-3",
       commit_sha: "abc123",
       mcp_version: "1.40.3",
+      turn_close_gate: {
+        mode: "repair",
+        must_continue: true,
+        normal_turn_close_allowed: false,
+      },
     });
     expect(String(body.message)).toHaveLength(500);
   });
