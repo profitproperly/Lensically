@@ -3825,27 +3825,31 @@ describe("operator mode MCP endpoint", () => {
         const knowledgeTool = listed.tools.find((tool) => tool.name === "getOperatorKnowledge");
     const liveStateTool = listed.tools.find((tool) => tool.name === "getOperatorLiveState");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
+    const closeTool = listed.tools.find((tool) => tool.name === "closeOperatorAction");
     const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
-    const actionSchema = actionTool?.inputSchema?.properties?.action as { oneOf?: unknown[] } | undefined;
-        expect(actionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
-    expect(plannedActionSchema?.oneOf).toEqual(actionSchema?.oneOf);
-    const knownFileSearchBranch = actionSchema?.oneOf?.find((item) => {
+    expect(plannedActionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    expect(actionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
+    expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
+    expect(closeTool?.inputSchema?.properties).toHaveProperty("action_execution_token");
+    expect(closeTool?.inputSchema?.properties).toHaveProperty("verification");
+    expect(closeTool?.inputSchema?.properties).not.toHaveProperty("action");
+    const knownFileSearchBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "search_repo_files";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
         expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-    const mcpCampaignBranch = actionSchema?.oneOf?.find((item) => {
+    const mcpCampaignBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "run_mcp_tests";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
     expect(mcpCampaignBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-        const autonomousPrepareBranch = actionSchema?.oneOf?.find((item) => {
+        const autonomousPrepareBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "prepare_manifest_autonomous_cycle";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown> } } } | undefined;
     expect(autonomousPrepareBranch?.properties?.arguments?.properties).toHaveProperty("operation_id");
     expect(autonomousPrepareBranch?.properties?.arguments?.properties).not.toHaveProperty("proceed_confirmed");
-    const hardeningCaseBranch = actionSchema?.oneOf?.find((item) => {
+    const hardeningCaseBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "case_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
@@ -3853,7 +3857,7 @@ describe("operator mode MCP endpoint", () => {
     expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "ref", "deployment"]);
     const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[] } | undefined;
     expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
-    const checkpointStepBranch = actionSchema?.oneOf?.find((item) => {
+    const checkpointStepBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "checkpoint_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
