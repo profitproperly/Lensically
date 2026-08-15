@@ -18668,7 +18668,13 @@ async function intakeOperatorWork(env: Env, args: Record<string, unknown>): Prom
 
 async function advanceOperatorWork(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
-  const workKey = normalizeOperatorMachineKey(args.work_key, "");
+  const requestedWorkKey = typeof args.work_key === "string" ? args.work_key.trim() : "";
+  let workKey = requestedWorkKey === "__active_interrupt__" ? "" : normalizeOperatorMachineKey(requestedWorkKey, "");
+  if (requestedWorkKey === "__active_interrupt__") {
+    const activeState = await env.DB.prepare(`SELECT active_interrupt_key FROM operator_work_state WHERE id = 'singleton' LIMIT 1`).first<Record<string, unknown>>();
+    workKey = normalizeOperatorMachineKey(activeState?.active_interrupt_key, "");
+    if (!workKey) return { ok: false, error: "operator_active_interrupt_required" };
+  }
   const status = normalizeOperatorMachineKey(args.status, "") as OperatorWorkItemStatus;
   const allowed = new Set<OperatorWorkItemStatus>(["queued", "deferred", "interrupting", "completed", "merged", "rejected"]);
   if (!workKey || !allowed.has(status)) return { ok: false, error: "work_key_and_valid_status_required" };
