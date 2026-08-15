@@ -212,6 +212,7 @@ export const OPERATOR_GOVERNING_STANDARDS = {
   discovery_execution_rule: OPERATOR_DISCOVERY_EXECUTION_RULE,
   public_schema_refresh_rule: OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE,
   conversational_problem_intake_rule: OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE,
+  turn_close_rule: OPERATOR_TURN_CLOSE_RULE,
   exact_spec_execution_rule: "When the owner supplies exact implementation text and the target is known, that text is the implementation contract. Do not reinterpret, condense, redesign, or restart discovery. Apply the direct atomic change, run focused validation, release the exact SHA, and verify live.",
     prevention_closure_rule: "A failure audit may not end with analysis, a recommendation, a retry, or a chat note. Before resuming or declaring resolution, durable prevention evidence must exist in source control, a gate, a regression, validation, or an operating rule.",
   redundant_inspection_rule: "Once the exact specification, target file, and integration point are known, repeated search or read calls for the same settled evidence are forbidden unless a concrete contradiction or failed replacement requires them.",
