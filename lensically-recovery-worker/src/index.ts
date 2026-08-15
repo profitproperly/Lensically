@@ -262,7 +262,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   if (name === "searchRepoFiles") {
     const query = String(args.query || "").trim();
     const prefix = safePath(args.prefix || "") || "";
-    const limit = Math.min(20, Math.max(1, Number(args.limit || 20)));
+    const limit = Math.min(50, Math.max(1, Number(args.limit || 20)));
     if (!query) return { ok: false, error: "query_required" };
     if (prefix && /\.[a-z0-9]+$/i.test(prefix)) {
       const file = await repoFile(env, prefix);
@@ -273,34 +273,87 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
           .map((line, index) => ({ line_number: index + 1, line }))
           .filter((entry) => entry.line.toLowerCase().includes(normalizedQuery))
           .slice(0, limit);
-        return { ok: true, matches, path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1 };
+        return { ok: true, matches, path: prefix, search_mode: "bounded_known_file_content", external_requests: 1, file_content_fanout: 1, complete: true };
       }
     }
     const searchTerms = [`${query} repo:${config.owner}/${config.repo}`];
     if (prefix) searchTerms.push(`path:${prefix}`);
     const codeSearch = await github(env, `/search/code?q=${encodeURIComponent(searchTerms.join(" "))}&per_page=${limit}`);
-    if (codeSearch.ok && codeSearch.data && typeof codeSearch.data === "object" && !Array.isArray(codeSearch.data)) {
-      const items = Array.isArray((codeSearch.data as Record<string, unknown>).items)
-        ? (codeSearch.data as { items: Array<Record<string, unknown>> }).items
-        : [];
+    const codeSearchItems = codeSearch.ok && codeSearch.data && typeof codeSearch.data === "object" && !Array.isArray(codeSearch.data)
+      && Array.isArray((codeSearch.data as Record<string, unknown>).items)
+      ? (codeSearch.data as { items: Array<Record<string, unknown>> }).items
+      : [];
+    if (codeSearchItems.length > 0) {
       return {
         ok: true,
-        matches: items.slice(0, limit).map((item) => ({ path: item.path ?? null, name: item.name ?? null, sha: item.sha ?? null, source: "github_code_search" })),
+        matches: codeSearchItems.slice(0, limit).map((item) => ({ path: item.path ?? null, name: item.name ?? null, sha: item.sha ?? null, source: "github_code_search" })),
         search_mode: "github_code_search",
         external_requests: 1,
         file_content_fanout: 0,
+        complete: true,
       };
     }
     const tree = await github(env, `/repos/${config.owner}/${config.repo}/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
     const entries = Array.isArray((tree.data as Record<string, unknown> | null)?.tree) ? (tree.data as { tree: Array<Record<string, unknown>> }).tree : [];
     const normalized = query.toLowerCase();
-    const matches = entries
+    const pathMatches = entries
       .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
       .map((entry) => String(entry.path))
       .filter((path) => (!prefix || path.startsWith(prefix)) && path.toLowerCase().includes(normalized))
       .slice(0, limit)
       .map((path) => ({ path, source: "bounded_tree_path_fallback" }));
-    return { ok: tree.ok, matches, search_mode: "bounded_tree_path_fallback", external_requests: 2, file_content_fanout: 0, code_search_status: codeSearch.status };
+    if (pathMatches.length > 0) {
+      return { ok: tree.ok, matches: pathMatches, search_mode: "bounded_tree_path_fallback", external_requests: 2, file_content_fanout: 0, code_search_status: codeSearch.status, complete: true };
+    }
+    const textFile = /\.(?:ts|tsx|js|mjs|cjs|json|jsonc|md|yml|yaml|toml|txt|html|css|sql)$/i;
+    const candidatePaths = entries
+      .filter((entry) => entry.type === "blob" && typeof entry.path === "string")
+      .map((entry) => String(entry.path))
+      .filter((path) => (!prefix || path.startsWith(prefix)) && textFile.test(path))
+      .sort((left, right) => {
+        const rank = (path: string) => /(?:^|\/)index\.(?:ts|tsx|js|mjs|cjs)$/i.test(path) ? 0 : /(?:test|spec)[._-]/i.test(path) ? 1 : 2;
+        return rank(left) - rank(right) || left.localeCompare(right);
+      });
+    const scanCap = Math.min(candidatePaths.length, Math.max(12, Math.min(32, limit * 2)));
+    const contentMatches: Array<Record<string, unknown>> = [];
+    let fileContentFanout = 0;
+    scan_files: for (const path of candidatePaths.slice(0, scanCap)) {
+      const file = await repoFile(env, path);
+      fileContentFanout += 1;
+      if (!file.ok || !file.content) continue;
+      const lines = file.content.split(/\r?\n/);
+      for (let index = 0; index < lines.length; index += 1) {
+        if (!lines[index].toLowerCase().includes(normalized)) continue;
+        contentMatches.push({ path, line_number: index + 1, line: lines[index], source: "bounded_tree_content_fallback" });
+        if (contentMatches.length >= limit) break scan_files;
+      }
+    }
+    const complete = contentMatches.length >= limit || scanCap >= candidatePaths.length;
+    if (contentMatches.length === 0 && !complete) {
+      return {
+        ok: false,
+        error: "search_incomplete_no_match",
+        matches: [],
+        search_mode: "bounded_tree_content_fallback",
+        external_requests: 2 + fileContentFanout,
+        file_content_fanout: fileContentFanout,
+        code_search_status: codeSearch.status,
+        candidate_files_total: candidatePaths.length,
+        candidate_files_scanned: scanCap,
+        complete: false,
+      };
+    }
+    return {
+      ok: tree.ok,
+      matches: contentMatches,
+      search_mode: "bounded_tree_content_fallback",
+      external_requests: 2 + fileContentFanout,
+      file_content_fanout: fileContentFanout,
+      code_search_status: codeSearch.status,
+      candidate_files_total: candidatePaths.length,
+      candidate_files_scanned: scanCap,
+      complete,
+    };
   }
   if (name === "applyRepoTextPatch") {
     const path = safePath(args.path); const find = String(args.find || ""); const replace = String(args.replace ?? ""); const message = String(args.message || "");
