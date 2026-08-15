@@ -228,6 +228,7 @@ describe("Operator MCP tool-call dispatcher", () => {
           scopes: ["runtime"],
           planned_capability: "unknown_profile",
           planned_tool: "unknown",
+          planned_arguments: {},
           planned_action_fingerprint: "request-fingerprint",
         },
       })),
