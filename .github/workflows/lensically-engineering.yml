@@ -242,8 +242,9 @@ jobs:
           status=$?
           printf '%s\n' "$output"
           first_error="$(printf '%s\n' "$output" | sed -n 's/^\[release-preflight\] //p' | head -n 1)"
+          terminal_error="$(printf '%s\n' "$output" | grep -E 'Error:|_(missing|invalid|forbidden|incomplete|mismatch|returned|failed)' | tail -n 1 || true)"
           if (( status != 0 )); then
-            description="${first_error:-release_preflight_failed}"
+            description="${first_error:-${terminal_error:-release_preflight_failed}}"
             description="${description:0:140}"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=failure \
