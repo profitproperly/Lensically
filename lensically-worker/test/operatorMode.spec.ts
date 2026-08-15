@@ -129,7 +129,7 @@ const TEST_SAFE_CAPABILITY_BY_TOOL: Record<string, string> = {
   recordOperationalObservation: "operational_observation",
   getOperatorWorkState: "operator_work_state",
   intakeOperatorWork: "operator_work_intake",
-  advanceOperatorWork: "operator_work_transition",
+  advanceOperatorWork: "checkpoint_step",
   auditScheduledPost: "scheduled_post_audit",
   recoverOverdueScheduledPosts: "protected_scheduler_recovery",
   selectOperatorKey: "account_key_selection",
