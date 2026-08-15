@@ -1391,6 +1391,21 @@ describe("System Directory foundation", () => {
       ok: false,
       errors: ["dependency_retirement_condition_required"],
     });
+    expect(validateOperatorActionClosure({ ...complete, turn_close_gate: null })).toMatchObject({
+      ok: false,
+      errors: ["turn_close_gate_required"],
+    });
+    expect(validateOperatorActionClosure({
+      ...complete,
+      turn_close_gate: {
+        ...evaluateOperatorTurnCloseGate({ unresolved_failure: true }),
+        must_continue: false,
+        normal_turn_close_allowed: true,
+      },
+    })).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining(["turn_close_gate_reachable_work_cannot_close"]),
+    });
   });
 
   it("registers bounded work-state profiles and the complete hardening release sequence", () => {
