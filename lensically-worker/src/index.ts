@@ -16596,13 +16596,46 @@ async function verifyOperatorLifecycleToken(
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
   const reference = normalizeOperatorLifecycleReference(token);
   const now = Math.floor(Date.now() / 1000);
-  const row = reference
-    ? await env.DB.prepare(
-      `SELECT payload_json, expires_at FROM operator_continuity_refs
-       WHERE id = ? AND kind = ? AND expires_at >= ?
+  const readReference = (candidate: string) => env.DB.prepare(
+    `SELECT id, payload_json, expires_at FROM operator_continuity_refs
+     WHERE id = ? AND kind = ? AND expires_at >= ?
+     LIMIT 1`,
+  ).bind(candidate, OPERATOR_LIFECYCLE_REFERENCE_KIND, now).first<Record<string, unknown>>();
+  let row = reference ? await readReference(reference) : null;
+  let reconciledReference: string | null = null;
+  if (!row && expectedSessionId) {
+    const canonicalRow = await env.DB.prepare(
+      `SELECT id, payload_json, expires_at FROM operator_continuity_refs
+       WHERE kind = ?
+         AND expires_at >= ?
+         AND json_extract(payload_json, '$.kind') = 'operator_lifecycle'
+         AND json_extract(payload_json, '$.lifecycle_version') = ?
+         AND json_extract(payload_json, '$.lifecycle_reference_version') = ?
+         AND CAST(json_extract(payload_json, '$.stage') AS INTEGER) = ?
+         AND json_extract(payload_json, '$.deployment_identity') = ?
+         AND json_extract(payload_json, '$.mcp_session_id') = ?
+       ORDER BY rowid DESC
        LIMIT 1`,
-    ).bind(reference, OPERATOR_LIFECYCLE_REFERENCE_KIND, now).first<Record<string, unknown>>()
-    : null;
+    ).bind(
+      OPERATOR_LIFECYCLE_REFERENCE_KIND,
+      now,
+      OPERATOR_LIFECYCLE_VERSION,
+      OPERATOR_LIFECYCLE_REFERENCE_VERSION,
+      minimumStage,
+      currentOperatorDeploymentIdentity(env),
+      expectedSessionId,
+    ).first<Record<string, unknown>>();
+    if (canonicalRow && typeof canonicalRow.id === "string") {
+      row = canonicalRow;
+      reconciledReference = canonicalRow.id;
+      logWorkerEvent("OPERATOR_LIFECYCLE_REFERENCE_RECONCILED", {
+        minimum_stage: minimumStage,
+        expected_session_present: true,
+        received: await buildOperatorOpaqueLifecycleTokenTelemetry(token),
+        canonical: await buildOperatorOpaqueLifecycleTokenTelemetry(reconciledReference),
+      });
+    }
+  }
   const decodedPayload = row ? safeParseJsonString(String(row.payload_json ?? "{}")) : null;
   const payload = decodedPayload && typeof decodedPayload === "object" && !Array.isArray(decodedPayload)
     ? decodedPayload as Record<string, unknown>
