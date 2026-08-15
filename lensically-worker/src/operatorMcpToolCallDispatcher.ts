@@ -179,7 +179,6 @@ export async function dispatchOperatorMcpToolCall(
   if (requestedToolName === dependencies.routedExecutionGateway) {
     const lifecycleCheck = await dependencies.verifyLifecycleExecutionToken(
       governedRequestedArgs.live_state_token,
-      governedRequestedArgs.action,
     );
     if (!lifecycleCheck.ok || !lifecycleCheck.payload) {
       return mcpToolResultResponse(id, {
@@ -191,31 +190,31 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
     }
-        lifecycleLiveStatePayload = lifecycleCheck.payload;
-        const action = asRecord(governedRequestedArgs.action);
-    const capability = typeof action?.capability === "string" ? action.capability.trim() : "";
-    const actionArguments = asRecord(action?.arguments);
+    lifecycleLiveStatePayload = lifecycleCheck.payload;
+    const capability = typeof lifecycleCheck.payload.planned_capability === "string" ? lifecycleCheck.payload.planned_capability.trim() : "";
+    const actionArguments = asRecord(lifecycleCheck.payload.planned_arguments);
     if (!capability || !actionArguments) {
       return mcpToolResultResponse(id, {
         ok: false,
-        error: "operator_typed_action_required",
-        required_tool: dependencies.routedExecutionGateway,
+        error: "operator_prepared_action_binding_invalid",
+        required_stage: "getOperatorKnowledge",
+        required_tool: "getOperatorKnowledge",
         execution_started: false,
         account_data_loaded: gatewayAccountDataLoaded,
-      }, "Lensically blocked Step 4 because the generated strongly typed action contract was not satisfied.", true);
+      }, "Lensically blocked Step 4 because the server-bound prepared action was missing or invalid.", true);
     }
-            const preparedBrandKey = typeof lifecycleCheck.payload.brand_key === "string" ? lifecycleCheck.payload.brand_key : "";
-    const requestedBrandKey = typeof actionArguments.brand_key === "string" ? actionArguments.brand_key.trim().toLowerCase().replace(/-/g, "_") : "";
-    if (preparedBrandKey && requestedBrandKey && preparedBrandKey !== requestedBrandKey) {
+    const preparedBrandKey = typeof lifecycleCheck.payload.brand_key === "string" ? lifecycleCheck.payload.brand_key : "";
+    const boundBrandKey = typeof actionArguments.brand_key === "string" ? actionArguments.brand_key.trim().toLowerCase().replace(/-/g, "_") : "";
+    if (preparedBrandKey && boundBrandKey && preparedBrandKey !== boundBrandKey) {
       return mcpToolResultResponse(id, {
         ok: false,
         error: "operator_action_brand_changed_after_live_state",
         prepared_brand_key: preparedBrandKey,
-        requested_brand_key: requestedBrandKey,
-        required_stage: "getOperatorLiveState",
+        bound_brand_key: boundBrandKey,
+        required_stage: "getOperatorKnowledge",
         execution_started: false,
         account_data_loaded: gatewayAccountDataLoaded,
-      }, "Lensically blocked Step 4 because the account target changed after live state was loaded.", true);
+      }, "Lensically blocked Step 4 because the server-bound account target no longer matches the prepared lifecycle state.", true);
     }
     const compiledProfile = dependencies.compilePublicProfileRequest({
       profile_id: capability,
