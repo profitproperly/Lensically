@@ -18784,6 +18784,7 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
       ? "Complete the active autonomous Manifest cycle through canonical receipt closure with zero cycle-horizon missing slots."
       : `Defined only by ${canonicalContinuationPath}; call ${canonicalContinuationTool}.`,
     next_action: nextAction,
+    turn_close_gate: turnCloseGate,
         priority_reason: manifestAutonomousCycleTool
       ? "The prepared Manifest cycle remains the sole active objective until its canonical completion receipt proves zero cycle-horizon missing slots."
       : hasIncident
