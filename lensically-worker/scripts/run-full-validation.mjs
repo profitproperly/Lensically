@@ -25,6 +25,7 @@ const completeTestFiles = [
   "test/operatorMcpRegistryComposition.spec.ts",
   "test/operatorMcpRoutingPolicy.spec.ts",
   "test/operatorMcpTransport.spec.ts",
+  "test/operatorTurnCloseGate.spec.ts",
   "test/operatorMcpDispatcher.spec.ts",
   "test/operatorMcpToolCallDispatcher.spec.ts",
                 "test/operatorManifestCycleService.spec.ts",
