@@ -21190,8 +21190,28 @@ async function handleOperatorMcpEngineeringTool(
   }
 
   if (toolName === "closeOperatorAction") {
-        const tokenCheck = await verifyOperatorLifecycleToken(env, args.action_execution_token, 4, request.headers.get("mcp-session-id")?.trim() || null);
+    const requestedAction = args.action === undefined
+      ? null
+      : await resolveOperatorPlannedAction(args.action);
+    if (requestedAction && !requestedAction.ok) {
+      return { ...requestedAction, required_stage: "executeOperatorAction", execution_started: false };
+    }
+    const expectedActionFingerprint = requestedAction?.ok ? requestedAction.fingerprint : null;
+    const tokenCheck = await verifyOperatorLifecycleToken(
+      env,
+      args.action_execution_token,
+      4,
+      request.headers.get("mcp-session-id")?.trim() || null,
+      expectedActionFingerprint,
+    );
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "executeOperatorAction" };
+    if (requestedAction?.ok && (
+      tokenCheck.payload.planned_capability !== requestedAction.capability
+      || tokenCheck.payload.planned_tool !== requestedAction.toolName
+      || tokenCheck.payload.planned_action_fingerprint !== requestedAction.fingerprint
+    )) {
+      return { ok: false, error: "operator_lifecycle_action_changed_after_preparation", required_stage: "executeOperatorAction" };
+    }
     const verification = args.verification && typeof args.verification === "object" && !Array.isArray(args.verification)
       ? args.verification as Record<string, unknown>
       : {};
