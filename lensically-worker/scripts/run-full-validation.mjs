@@ -221,6 +221,32 @@ function run(label, command, args, diagnosticTestFiles = []) {
   const durationMs = Math.round(performance.now() - startedAt);
   if (result.error) fail(`[full-validation] ${label} spawn failed: ${result.error.message}`);
   if (result.status !== 0) {
+    if (Array.isArray(diagnosticTestFiles) && diagnosticTestFiles.length > 0) {
+      let isolatedFailure = null;
+      for (const testFile of diagnosticTestFiles) {
+        const isolated = spawnSync(process.execPath, [
+          vitestCli,
+          "--run",
+          testFile,
+          "--no-file-parallelism",
+          "--reporter=dot",
+          "--bail=1",
+        ], {
+          cwd: workerRoot,
+          stdio: "inherit",
+          env: process.env,
+        });
+        if (isolated.error || isolated.status !== 0) {
+          isolatedFailure = testFile;
+          break;
+        }
+      }
+      if (isolatedFailure) {
+        console.error(`::error title=Full validation test file failed::${isolatedFailure}`);
+      } else {
+        console.error(`::error title=Full validation batch isolation inconclusive::${label}`);
+      }
+    }
     const annotationLabel = String(label).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
     console.error(`::error title=Full validation child failed::${annotationLabel} status=${result.status ?? 1}`);
     console.error(JSON.stringify({ label, duration_ms: durationMs, status: result.status }, null, 2));
