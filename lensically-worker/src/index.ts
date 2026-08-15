@@ -21066,7 +21066,20 @@ async function handleOperatorMcpEngineeringTool(
 
 
       if (toolName === "getOperatorLiveState") {
-    const tokenCheck = await verifyOperatorLifecycleToken(env, args.knowledge_token, 2, request.headers.get("mcp-session-id")?.trim() || null);
+    const requestedPlannedAction = args.planned_action === undefined
+      ? null
+      : await resolveOperatorPlannedAction(args.planned_action);
+    if (requestedPlannedAction && !requestedPlannedAction.ok) {
+      return { ...requestedPlannedAction, required_stage: "getOperatorKnowledge", execution_started: false };
+    }
+    const expectedActionFingerprint = requestedPlannedAction?.ok ? requestedPlannedAction.fingerprint : null;
+    const tokenCheck = await verifyOperatorLifecycleToken(
+      env,
+      args.knowledge_token,
+      2,
+      request.headers.get("mcp-session-id")?.trim() || null,
+      expectedActionFingerprint,
+    );
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
     const plannedCapability = normalizeOperatorMachineKey(tokenCheck.payload.planned_capability, "");
     const plannedTool = normalizeOperatorText(tokenCheck.payload.planned_tool, 200, true);
@@ -21074,6 +21087,13 @@ async function handleOperatorMcpEngineeringTool(
     const resolvedPlanned = resolveOperatorInternalActionCapability(plannedCapability);
     if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedFingerprint) {
       return { ok: false, error: "operator_knowledge_action_binding_invalid", required_stage: "getOperatorKnowledge" };
+    }
+    if (requestedPlannedAction?.ok && (
+      requestedPlannedAction.capability !== plannedCapability
+      || requestedPlannedAction.toolName !== plannedTool
+      || requestedPlannedAction.fingerprint !== plannedFingerprint
+    )) {
+      return { ok: false, error: "operator_lifecycle_action_changed_after_preparation", required_stage: "getOperatorKnowledge" };
     }
     const scopes = requiredOperatorLiveStateScopesForTool(plannedTool, resolvedPlanned.tool);
     const brandKey = normalizeGptBrandKey(tokenCheck.payload.planned_brand_key);
