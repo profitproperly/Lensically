@@ -68,7 +68,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
         {
     name: "getOperatorKnowledge",
     title: "Get operator knowledge",
-    description: "Step 2 of the canonical Operator lifecycle. Accept one typed planned action from the Step-1 map, derive exactly the durable knowledge that action requires, and issue a signed action-bound knowledge token. Callers do not choose knowledge nodes.",
+    description: "Step 2 of the canonical Operator lifecycle. Accept one closed typed planned action from the Step-1 map, derive exactly the durable knowledge that action requires, and bind the normalized action server-side for the remaining lifecycle. Callers do not choose knowledge nodes.",
     inputSchema: {
       type: "object",
       properties: {
