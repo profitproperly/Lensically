@@ -8,6 +8,7 @@ on:
     paths:
       - "lensically-worker/**"
       - "lensically-web/**"
+      - "lensically-recovery-worker/**"
       - ".github/workflows/lensically-engineering.yml"
   workflow_dispatch:
     inputs:
