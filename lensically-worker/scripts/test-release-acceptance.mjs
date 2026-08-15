@@ -8,6 +8,15 @@ import {
   validateSourceAssertion,
 } from "./validate-release-acceptance.mjs";
 
+process.on("uncaughtException", (error) => {
+  const message = String(error?.message ?? error)
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+  console.error(`::error file=lensically-worker/scripts/test-release-acceptance.mjs::${message}`);
+  process.exit(1);
+});
+
 function clone(value) {
   return structuredClone(value);
 }
