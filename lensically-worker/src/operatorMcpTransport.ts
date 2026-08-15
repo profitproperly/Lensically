@@ -137,5 +137,6 @@ export function operatorTransportFailureResponse(options: {
     request_id: options.requestId,
     ...options.runtimeMetadata,
     message: safeMessage.slice(0, 500),
+    turn_close_gate: evaluateOperatorTurnCloseGate({ unresolved_failure: true }),
   }, options.status ?? 500, { "x-request-id": options.requestId });
 }
