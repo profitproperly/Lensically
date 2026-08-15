@@ -86,11 +86,12 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "getOperatorLiveState",
     title: "Get operator live state",
-    description: "Step 3 of the canonical Operator lifecycle. Derive exactly the mutable live-state scopes required by the action already bound into Step 2, load them, and issue a signed action-bound live-state token. Callers do not choose scopes or account targets.",
+    description: "Step 3 of the canonical Operator lifecycle. Derive exactly the mutable live-state scopes required by the action already bound into Step 2. Always repeat the exact Step-2 planned_action when available so the server can deterministically recover client-corrupted opaque references without weakening the action binding. Callers do not choose scopes or account targets.",
     inputSchema: {
       type: "object",
       properties: {
         knowledge_token: { type: "string", minLength: 16 },
+        planned_action: { type: "object", description: "Repeat the exact typed Step-2 planned action. Runtime composition replaces this placeholder with the same closed action union used by Steps 2 and 4." },
       },
       required: ["knowledge_token"],
       additionalProperties: false,
