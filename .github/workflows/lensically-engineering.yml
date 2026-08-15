@@ -304,10 +304,9 @@ jobs:
           node scripts/run-full-validation.mjs 2>&1 | tee /tmp/lensically-full-validation.log
           status=${PIPESTATUS[0]}
           if (( status != 0 )); then
-            test_failure="$(grep -E '^[[:space:]]*(❯|×)|^ FAIL ' /tmp/lensically-full-validation.log | tail -n 1 || true)"
             failure="$(grep -E 'FAIL|AssertionError|Error:|expected|received|_failed|_missing|_invalid' /tmp/lensically-full-validation.log | tail -n 1 || true)"
-            description="${test_failure:-${failure:-full_validation_failed}}"
-            description="$(printf '%s' "$description" | sed -E 
+            description="${failure:-full_validation_failed}"
+            description="${description:0:140}"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=failure \
               -f context='lensically/full-validation' \
