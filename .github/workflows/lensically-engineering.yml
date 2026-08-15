@@ -44,6 +44,7 @@ concurrency:
 permissions:
   contents: read
   actions: write
+  statuses: write
 
 jobs:
   push-validation:
