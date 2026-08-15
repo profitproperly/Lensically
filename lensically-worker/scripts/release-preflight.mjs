@@ -3324,7 +3324,14 @@ for (const entryId of directoryEntryIds) {
   if (!lifecycleBaselineDirectoryIds.has(entryId) && !declaredDirectoryIds.has(entryId)) lifecycleErrors.push(`undeclared_new_directory_entry:${entryId}`);
 }
 if (!workflow.includes("fast-validation:")
-    || !workflow.includes("Typecheck and lifecycle gate")
+    || !workflow.includes("Typecheck Worker")
+    || !workflow.includes("Validate test syntax and plan")
+    || !workflow.includes("Validate D1 release contracts")
+    || !workflow.includes("Validate cron release contracts")
+    || !workflow.includes("Validate release acceptance contracts")
+    || !workflow.includes("Validate capability lifecycle preflight")
+    || !workflow.includes("Validate full release preflight")
+    || !workflow.includes("Validate Worker architecture baseline")
     || !workflow.includes("node scripts/release-preflight.mjs --capability-lifecycle-only")) {
   lifecycleErrors.push("capability_lifecycle_fast_validation_gate_missing");
 }
