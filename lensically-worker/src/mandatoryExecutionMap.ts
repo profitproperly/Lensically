@@ -128,6 +128,18 @@ export function validateOperatorActionClosure(input: OperatorActionClosureInput)
   if (input.deferred_work_preserved !== true) errors.push("deferred_work_preserved_required");
   if (!input.checkpoint?.trim()) errors.push("checkpoint_required");
   if (input.temporary_dependency?.trim() && !input.retirement_condition?.trim()) errors.push("dependency_retirement_condition_required");
+  const gate = input.turn_close_gate;
+  if (!gate) {
+    errors.push("turn_close_gate_required");
+  } else {
+    if (gate.version !== OPERATOR_TURN_CLOSE_GATE_VERSION) errors.push("turn_close_gate_version_invalid");
+    if (gate.must_continue === gate.normal_turn_close_allowed) errors.push("turn_close_gate_disposition_inconsistent");
+    if ((gate.unresolved_failure || gate.active_interrupt || gate.reachable_next_action) && gate.normal_turn_close_allowed) {
+      errors.push("turn_close_gate_reachable_work_cannot_close");
+    }
+    if (gate.mode === "repair" && !(gate.unresolved_failure || gate.active_interrupt)) errors.push("turn_close_gate_repair_reason_required");
+    if (gate.mode === "terminal" && (!gate.objective_complete || gate.reachable_next_action)) errors.push("turn_close_gate_terminality_unproven");
+  }
   return { ok: errors.length === 0, errors };
 }
 
