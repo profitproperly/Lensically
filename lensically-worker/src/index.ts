@@ -310,7 +310,7 @@ import {
 } from "./operatorMcpConstants";
 
 
-export { OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
+export { OPERATOR_GOVERNING_STANDARDS_VERSION, OPERATOR_MCP_VERSION } from "./operatorMcpProtocol";
 
 
 

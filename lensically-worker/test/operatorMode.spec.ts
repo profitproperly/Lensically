@@ -18,6 +18,7 @@ import worker, {
     getScheduledPostPublishLineageStatus,
   isExpectedHardeningControlResult,
   isSixHourInsightsRefreshWindow,
+        OPERATOR_GOVERNING_STANDARDS_VERSION,
     OPERATOR_MCP_VERSION,
     operatorOperationLeaseMs,
   parseCanonicalContinuationMetadata,
@@ -3873,7 +3874,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(step2.nodes[0]?.node_id).toBe("governance");
         const governanceNode = step2.nodes[0]?.content ?? {};
-    expect(governanceNode).toMatchObject({ version: "operator-governing-standards-v9" });
+        expect(governanceNode).toMatchObject({ version: OPERATOR_GOVERNING_STANDARDS_VERSION });
     const governanceText = String(governanceNode.exact_owner_approved_text ?? "");
     const failureRepairRule = String(governanceNode.failure_repair_rule ?? "");
     expect(governanceText).toContain("The operating target is 100% positive execution and zero errors.");
@@ -6724,7 +6725,7 @@ active_checkpoint: none
     expect(status.structuredContent.routed_execution.executed_tool).toBe("engineeringPrecheck");
         expect(status.structuredContent.status_kind).toBe("compact_engineering_precheck");
                                                                 expect(status.structuredContent.startup_authority).toMatchObject({
-      version: "operator-governing-standards-v8",
+            version: OPERATOR_GOVERNING_STANDARDS_VERSION,
       authority: "highest_lensically_operating_authority",
     });
     expect(status.structuredContent.startup_authority?.governing_rule).toContain("fastest complete route");
