@@ -178,6 +178,9 @@ async function repoFile(env: Env, path: string): Promise<{ ok: boolean; status: 
   const content = typeof data?.content === "string" && data.content.trim() ? base64ToText(data.content) : null;
   const sha = typeof data?.sha === "string" ? data.sha : null;
   if (result.ok && content && sha) return { ok: true, status: result.status, sha, content };
+  if ([0, 502, 503, 504].includes(result.status)) {
+    return { ok: false, status: result.status, sha: null, content: null, error: "repo_contents_unavailable" };
+  }
 
   const tree = await github(env, `/repos/${config.owner}/${config.repo}/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
   const entries = Array.isArray((tree.data as Record<string, unknown> | null)?.tree)
