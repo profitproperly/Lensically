@@ -94,10 +94,11 @@ export const AGENT_NATIVE_OPERATING_CONTRACT = {
   mission_source: "durable_state_not_chat_memory",
   execution_loop: ["restore_state", "reconcile", "diagnose", "select_priority", "execute", "verify", "record", "declare_next_action", "checkpoint"],
   action_closure_required: true,
+  turn_close_gate_required: true,
   single_active_outcome: true,
   incident_interruptions: ["P0", "P1"],
   owner_role: "authorize_only_when_required",
-  prohibited_closures: ["analysis_without_action", "untracked_scope_expansion", "temporary_dependency_without_retirement_condition", "routine_question_back_to_owner"],
+  prohibited_closures: ["analysis_without_action", "blocked_or_reachable_work_declared_terminal", "untracked_scope_expansion", "temporary_dependency_without_retirement_condition", "routine_question_back_to_owner"],
 } as const;
 
 export function classifyOperatorWorkIntake(input: OperatorWorkIntakeInput): {
