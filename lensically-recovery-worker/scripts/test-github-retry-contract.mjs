@@ -11,6 +11,8 @@ const required = [
   ['bounded four-attempt read budget', 'const maxAttempts = retryableRead ? 4 : 1;'],
   ['bounded exponential backoff', '75 * (2 ** (attempt - 1))'],
   ['stop after successful or final attempt', '!transientStatuses.has(response.status) || attempt === maxAttempts'],
+  ['bounded base64 encoding chunk size', 'const chunkSize = 0x8000;'],
+  ['chunked base64 byte conversion', 'String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)))'],
 ];
 
 for (const [label, fragment] of required) {
