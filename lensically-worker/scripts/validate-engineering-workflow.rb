@@ -168,7 +168,6 @@ abort("inline_cron_schedule_api_returned") if source.include?("workers/scripts/l
 abort("schedule_contract_classifier_missing") unless release_scope.include?("schedule_contract_changed") && release_scope.include?("lensically-worker/wrangler*")
 
 [
-  ["push-validation", "Typecheck and lifecycle gate"],
   ["fast-validation", "Typecheck and lifecycle gate"],
   ["operator-test-shards", "Verify lifecycle and run deterministic shard"],
 ].each do |job_name, step_name|
