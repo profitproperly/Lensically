@@ -21186,9 +21186,15 @@ async function handleOperatorMcpEngineeringTool(
     if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "getOperatorKnowledge" };
     const plannedCapability = normalizeOperatorMachineKey(tokenCheck.payload.planned_capability, "");
     const plannedTool = normalizeOperatorText(tokenCheck.payload.planned_tool, 200, true);
+    const plannedArguments = tokenCheck.payload.planned_arguments && typeof tokenCheck.payload.planned_arguments === "object" && !Array.isArray(tokenCheck.payload.planned_arguments)
+      ? tokenCheck.payload.planned_arguments as Record<string, unknown>
+      : null;
     const plannedFingerprint = normalizeOperatorText(tokenCheck.payload.planned_action_fingerprint, 200, true);
     const resolvedPlanned = resolveOperatorInternalActionCapability(plannedCapability);
-    if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedFingerprint) {
+    const recomputedFingerprint = plannedTool && plannedArguments
+      ? await operatorExecutionFingerprint(plannedTool, plannedArguments)
+      : null;
+    if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedArguments || !plannedFingerprint || recomputedFingerprint !== plannedFingerprint) {
       return { ok: false, error: "operator_knowledge_action_binding_invalid", required_stage: "getOperatorKnowledge" };
     }
     if (requestedPlannedAction?.ok && (
