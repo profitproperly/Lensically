@@ -743,6 +743,11 @@ export async function dispatchOperatorMcpToolCall(
       lifecycle_stage: 4,
       required_tool: "closeOperatorAction",
       rule: "Execution is not lifecycle-closed until closeOperatorAction verifies evidence and records the next checkpoint.",
+      turn_close_gate: evaluateOperatorTurnCloseGate({
+        unresolved_failure: resultPayload.ok === false || resultPayload.normal_work_blocked === true || Boolean(resultPayload.hardening_incident),
+        active_interrupt: Boolean(resultPayload.hardening_incident),
+        reachable_next_action: true,
+      }),
     };
   } else {
     resultPayload.operator_action_closure = await dependencies.buildActionClosure(toolName, resultPayload);
