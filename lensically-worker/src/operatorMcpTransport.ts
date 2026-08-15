@@ -1,3 +1,5 @@
+import { evaluateOperatorTurnCloseGate } from "./operatorTurnCloseGate";
+
 export type OperatorMcpJsonRpcId = string | number | null | undefined;
 
 export function mcpJsonResponse(
