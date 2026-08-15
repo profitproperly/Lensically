@@ -790,19 +790,25 @@ jobs:
         run: |
           set -euo pipefail
           npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json \
-            --command "SELECT COUNT(*) AS active_cycle_count FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed')" \
+            --command "SELECT COUNT(*) AS active_cycle_count, (SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_id, (SELECT status FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_status, (SELECT updated_at FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_updated_at FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed')" \
             --json > /tmp/lensically-active-content-cycle.json
           active_cycle_count="$(jq -r '[.. | objects | select(has("active_cycle_count")) | .active_cycle_count] | first // "missing"' /tmp/lensically-active-content-cycle.json)"
+          latest_active_cycle_id="$(jq -r '[.. | objects | select(has("latest_active_cycle_id")) | .latest_active_cycle_id] | first // "none"' /tmp/lensically-active-content-cycle.json)"
+          latest_active_cycle_status="$(jq -r '[.. | objects | select(has("latest_active_cycle_status")) | .latest_active_cycle_status] | first // "none"' /tmp/lensically-active-content-cycle.json)"
+          latest_active_cycle_updated_at="$(jq -r '[.. | objects | select(has("latest_active_cycle_updated_at")) | .latest_active_cycle_updated_at] | first // "none"' /tmp/lensically-active-content-cycle.json)"
           if [[ ! "${active_cycle_count}" =~ ^[0-9]+$ ]]; then
             cat /tmp/lensically-active-content-cycle.json >&2
+            echo "::error title=Main content cycle deployment guard::state unavailable" >&2
             echo "active_main_content_cycle_state_unavailable" >&2
             exit 1
           fi
           if (( active_cycle_count != 0 )); then
             cat /tmp/lensically-active-content-cycle.json >&2
+            echo "::error title=Main content cycle deployment guard::active_cycle_count=${active_cycle_count}; latest_id=${latest_active_cycle_id}; status=${latest_active_cycle_status}; updated_at=${latest_active_cycle_updated_at}" >&2
             echo "active_main_content_cycle_deploy_forbidden" >&2
             exit 1
           fi
+          echo "::notice title=Main content cycle deployment guard::active_cycle_count=0"
           echo "active_main_content_cycle_guard_passed"
 
       - name: Publish exact release authority target
