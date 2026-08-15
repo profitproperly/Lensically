@@ -4096,13 +4096,11 @@ active_checkpoint: none
       action_execution_token: string;
     }>("executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
-      action,
     });
     expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent).toMatchObject({ ok: true, current_state: "contained", incident: { id: incidentId } });
     const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
       action_execution_token: step4.structuredContent.action_execution_token,
-      action,
       verification: {
         verified: true,
         evidence: ["Neutral case_step advanced the active fixture incident through advanceHardeningIncident."],
