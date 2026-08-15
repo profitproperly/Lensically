@@ -280,37 +280,29 @@ describe("Operator MCP tool-call dispatcher", () => {
         expect(executeAccountTool).not.toHaveBeenCalled();
   });
 
-  it("rejects a Step-4 action that differs from the action prepared by Steps 2 and 3", async () => {
+  it("fails closed when the server-bound Step-4 action binding is invalid", async () => {
+    const compilePublicProfileRequest = vi.fn();
     const executeAccountTool = vi.fn(async () => ({ ok: true }));
     const dependencies = baseDependencies({
       executeAccountTool,
+      compilePublicProfileRequest,
       verifyLifecycleExecutionToken: vi.fn(async () => ({
-        ok: true,
-        payload: {
-          stage: 3,
-          knowledge_node_ids: ["governance"],
-          scopes: ["runtime"],
-          planned_capability: "repository_status",
-          planned_tool: "getRepoStatus",
-          planned_action_fingerprint: "different-prepared-fingerprint",
-        },
+        ok: false,
+        error: "operator_live_state_action_binding_invalid",
       })),
     });
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 31,
-      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token", action: { capability: "repository_status", arguments: {} } } },
+      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
-      error: "operator_action_changed_after_preparation",
-      prepared_capability: "repository_status",
-      requested_capability: "repository_status",
-      prepared_tool: "getRepoStatus",
-      resolved_tool: "getRepoStatus",
-      required_stage: "getOperatorKnowledge",
+      error: "operator_live_state_action_binding_invalid",
+      required_tool: "getOperatorLiveState",
       execution_started: false,
     });
+    expect(compilePublicProfileRequest).not.toHaveBeenCalled();
     expect(executeAccountTool).not.toHaveBeenCalled();
   });
 
