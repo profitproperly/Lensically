@@ -17360,27 +17360,20 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const ordinalIndex = ordinalMatch ? Number(ordinalMatch[1]) : -1;
         const targetState = compactStage === "n" ? "next" : stageMap[stage] ?? stageMap[compactStage] ?? ordinalTargets[ordinalIndex] ?? stage;
         const transitionInputs: Record<string, unknown> = {
-          incident_id: "__active__",
+          incident_id: typeof safeInputs.case === "string" && safeInputs.case.trim() ? safeInputs.case.trim() : "__active__",
           target_state: targetState,
-                    root_cause: "Client preflight inspected model-facing semantic control-plane identifiers or values before the registered Main gateway received the request.",
-          generalized_cause: "Model-facing control-plane profiles and argument enums require neutral public aliases compiled server-side to canonical handlers and states.",
-          prevention_rule_id: "neutral_control_plane_public_surface",
-          regression_test_ids: ["public lifecycle exposes only neutral control-plane profile aliases and ordinal stage values"],
-          tested_sha: "__runtime__",
-          deployment_id: "__runtime__",
-          live_verification: { neutral_aliases_live: true },
-          resume_result: { original_objective_resumed: true },
-          autonomy_dividend: { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true },
         };
-        if (typeof safeInputs.ref === "string" && safeInputs.ref.trim()) transitionInputs.tested_sha = safeInputs.ref;
-        if (typeof safeInputs.deployment === "string" && safeInputs.deployment.trim()) transitionInputs.deployment_id = safeInputs.deployment;
+        if (typeof safeInputs.cause === "string" && safeInputs.cause.trim()) transitionInputs.root_cause = safeInputs.cause.trim();
+        if (typeof safeInputs.generalization === "string" && safeInputs.generalization.trim()) transitionInputs.generalized_cause = safeInputs.generalization.trim();
+        if (typeof safeInputs.rule === "string" && safeInputs.rule.trim()) transitionInputs.prevention_rule_id = safeInputs.rule.trim();
+        if (Array.isArray(safeInputs.tests)) transitionInputs.regression_test_ids = safeInputs.tests.map(String).filter(Boolean);
+        if (typeof safeInputs.ref === "string" && safeInputs.ref.trim()) transitionInputs.tested_sha = safeInputs.ref.trim();
+        if (typeof safeInputs.deployment === "string" && safeInputs.deployment.trim()) transitionInputs.deployment_id = safeInputs.deployment.trim();
+        if (safeInputs.proof && typeof safeInputs.proof === "object" && !Array.isArray(safeInputs.proof)) transitionInputs.live_verification = safeInputs.proof;
+        if (safeInputs.resume && typeof safeInputs.resume === "object" && !Array.isArray(safeInputs.resume)) transitionInputs.resume_result = safeInputs.resume;
+        if (safeInputs.gain && typeof safeInputs.gain === "object" && !Array.isArray(safeInputs.gain)) transitionInputs.autonomy_dividend = safeInputs.gain;
         if (["released", "live_verified", "resumed", "closed"].includes(targetState) && !transitionInputs.tested_sha) transitionInputs.tested_sha = "__runtime__";
         if (["live_verified", "resumed", "closed"].includes(targetState) && !transitionInputs.deployment_id) transitionInputs.deployment_id = "__runtime__";
-        if (targetState === "resumed" || targetState === "closed") transitionInputs.live_verification = { neutral_aliases_live: true };
-        if (targetState === "closed") {
-          transitionInputs.resume_result = { original_objective_resumed: true };
-          transitionInputs.autonomy_dividend = { owner_intervention_removed: true, semantic_profile_name_dependency_removed: true };
-        }
         compiledRequest = { ...compiled, objective: "Advance one blocked-call record.", intent: "advance hardening incident", inputs: transitionInputs };
       }
       return {
