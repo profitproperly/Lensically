@@ -38,11 +38,17 @@ export function buildMcpToolResultEnvelope(
   text: string,
   isError: boolean,
 ): Record<string, unknown> {
+  const guardedStructuredContent = isError && !structuredContent.turn_close_gate
+    ? {
+        ...structuredContent,
+        turn_close_gate: evaluateOperatorTurnCloseGate({ unresolved_failure: true }),
+      }
+    : structuredContent;
   return {
     jsonrpc: "2.0",
     id: id ?? null,
     result: {
-      structuredContent,
+      structuredContent: guardedStructuredContent,
       content: [{ type: "text", text }],
       isError,
     },
