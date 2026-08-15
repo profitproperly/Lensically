@@ -21279,6 +21279,7 @@ async function handleOperatorMcpEngineeringTool(
       brand_key: brandKey,
       planned_capability: plannedCapability,
       planned_tool: plannedTool,
+      planned_arguments: plannedArguments,
       planned_action_fingerprint: plannedFingerprint,
       captured_at: new Date().toISOString(),
     });
