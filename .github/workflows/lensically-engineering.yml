@@ -304,8 +304,631 @@ jobs:
           node scripts/run-full-validation.mjs 2>&1 | tee /tmp/lensically-full-validation.log
           status=${PIPESTATUS[0]}
           if (( status != 0 )); then
+            test_failure="$(grep -E '^[[:space:]]*(❯|×)|^ FAIL ' /tmp/lensically-full-validation.log | tail -n 1 || true)"
             failure="$(grep -E 'FAIL|AssertionError|Error:|expected|received|_failed|_missing|_invalid' /tmp/lensically-full-validation.log | tail -n 1 || true)"
-            description="${failure:-full_validation_failed}"
+            description="${test_failure:-${failure:-full_validation_failed}}"
+            description="$(printf '%s' "$description" | sed -E 
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
+              -f context='lensically/full-validation' \
+              -f description="$description" >/dev/null
+            exit "$status"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='lensically/full-validation' \
+            -f description='full_validation_passed' >/dev/null
+
+
+
+
+
+
+    
+
+
+
+
+
+  recovery-release:
+    needs: push-validation
+    if: >-
+      github.event_name == 'push' &&
+      needs.push-validation.result == 'success' &&
+      needs.push-validation.outputs.recovery_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Recovery head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact Recovery release identity
+        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-recovery-worker/package-lock.json
+
+      - name: Restore Recovery dependencies
+        id: release_recovery_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-recovery-worker/node_modules
+          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+
+      - name: Install Recovery dependencies
+        if: steps.release_recovery_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-recovery-worker
+        run: npm ci
+
+      - name: Revalidate Recovery release head
+        working-directory: lensically-recovery-worker
+        run: |
+          npm run typecheck
+          npm run test:retry-contract
+
+      - name: Deploy exact validated Recovery head
+        working-directory: lensically-recovery-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ../lensically-worker/scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:${GITHUB_SHA}"
+
+  fast-validation:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.task != 'operator-tests' &&
+      inputs.task != 'worker-deploy'
+    
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            lensically-worker/package-lock.json
+            lensically-recovery-worker/package-lock.json
+
+      - name: Restore worker dependencies
+        id: worker_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+            
+      - name: Install worker dependencies
+        if: steps.worker_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-worker
+        run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
+
+      - name: Restore Recovery dependencies
+        id: recovery_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-recovery-worker/node_modules
+          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
+
+      - name: Install Recovery dependencies
+        if: steps.recovery_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-recovery-worker
+        run: npm ci
+
+      - name: Validate Recovery worker and retry contract
+        working-directory: lensically-recovery-worker
+        run: |
+          npm run typecheck
+          npm run test:retry-contract
+
+      - name: Typecheck and lifecycle gate
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit
+          node scripts/validate-test-syntax.mjs
+          node scripts/run-full-validation.mjs --check
+          
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          
+          node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
+          node scripts/release-preflight.mjs --capability-lifecycle-only
+
+      - name: Run selected fast validation
+        working-directory: lensically-worker
+        env:
+          TASK: ${{ inputs.task }}
+        run: |
+          set -euo pipefail
+          case "${TASK}" in
+            typecheck) ;;
+            operator-smoke)
+              node scripts/run-operator-validation.mjs smoke
+              npm run test -- --run manifest-autonomous-cycle.test.ts --reporter=dot --bail=1
+              ;;
+            system-directory-tests)
+              npm run test -- --run test/systemDirectory.spec.ts --reporter=dot --bail=1
+              ;;
+            threads-publish-tests)
+              npm run test -- --run test/threadsPublishService.spec.ts --reporter=dot --bail=1
+              ;;
+            human-free-tests)
+              npm run test -- --run test/humanFreeAutonomy.spec.ts --reporter=dot --bail=1
+              ;;
+            architecture-baseline)
+              node scripts/worker-architecture-baseline.mjs --live | tee worker-architecture-baseline.json
+              ;;
+            *)
+              echo "Unsupported fast-validation task: ${TASK}"
+                            exit 2
+              ;;
+          esac
+
+      - name: Upload architecture baseline
+        if: inputs.task == 'architecture-baseline'
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-architecture-baseline-${{ inputs.release_sha || github.sha }}
+          path: lensically-worker/worker-architecture-baseline.json
+
+  operator-test-shards:
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'operator-tests'
+    name: Operator shard ${{ matrix.shard }}/8
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lensically-worker/package-lock.json
+
+      - name: Restore worker dependencies
+        id: operator_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: steps.operator_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-worker
+        run: npm ci
+
+            
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
+
+                  
+      - name: Verify lifecycle and run deterministic shard
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+          node scripts/validate-test-syntax.mjs
+          node scripts/run-full-validation.mjs --check
+          
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          
+          node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
+          node scripts/release-preflight.mjs --capability-lifecycle-only
+          node scripts/run-operator-shard.mjs "${{ matrix.shard }}" 8
+
+  worker-release:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.task == 'worker-deploy' &&
+      inputs.release_sha != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout exact release head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+
+            
+
+      - name: Verify exact release identity
+        run: test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
+
+      - name: Resolve exact-SHA release scope
+        id: release_scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          runs_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/lensically-engineering.yml/runs?event=push&head_sha=${RELEASE_SHA}&per_page=20"
+          curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            "${runs_url}" > /tmp/lensically-push-runs.json
+                    validated_run_id="$(jq -r --arg sha "${RELEASE_SHA}" '[.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success")] | sort_by(.id) | last | .id // empty' /tmp/lensically-push-runs.json)"
+          if [[ -n "${validated_run_id}" ]]; then
+            full_release=false
+          else
+            full_release=true
+          fi
+          web_artifact_available=false
+          if [[ -n "${validated_run_id}" ]]; then
+            artifacts_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${validated_run_id}/artifacts?per_page=100"
+            if curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              "${artifacts_url}" > /tmp/lensically-push-artifacts.json; then
+              artifact_name="lensically-web-${RELEASE_SHA}"
+              if jq -e --arg name "${artifact_name}" '.artifacts | any(.name == $name and .expired == false)' /tmp/lensically-push-artifacts.json > /dev/null; then
+                web_artifact_available=true
+              fi
+            else
+              echo "Validated web artifact lookup failed; complete fallback remains required." >&2
+            fi
+          fi
+          deployed_sha="$(curl --fail-with-body --silent --show-error https://api.lensically.com/api/operator/health | jq -r '.commit_sha // empty')"
+          if [[ -n "${deployed_sha}" ]] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+            git diff --name-only "${deployed_sha}" "${RELEASE_SHA}" > /tmp/lensically-release-files.txt
+          else
+            git show --pretty='' --name-only "${RELEASE_SHA}" > /tmp/lensically-release-files.txt
+            full_release=true
+          fi
+                    web_changed=false
+          migrations_changed=false
+          schedule_contract_changed=false
+          while IFS= read -r path; do
+            case "${path}" in
+              lensically-web/*) web_changed=true ;;
+              lensically-worker/database/migrations/*) migrations_changed=true ;;
+              lensically-worker/wrangler*) schedule_contract_changed=true ;;
+            esac
+          done < /tmp/lensically-release-files.txt
+          echo "full_release=${full_release}" >> "${GITHUB_OUTPUT}"
+          echo "web_changed=${web_changed}" >> "${GITHUB_OUTPUT}"
+          echo "migrations_changed=${migrations_changed}" >> "${GITHUB_OUTPUT}"
+          echo "schedule_contract_changed=${schedule_contract_changed}" >> "${GITHUB_OUTPUT}"
+          echo "validated_run_id=${validated_run_id}" >> "${GITHUB_OUTPUT}"
+          echo "web_artifact_available=${web_artifact_available}" >> "${GITHUB_OUTPUT}"
+          echo "deployed_sha=${deployed_sha}" >> "${GITHUB_OUTPUT}"
+          cat /tmp/lensically-release-files.txt
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            lensically-worker/package-lock.json
+            lensically-web/package-lock.json
+
+      - name: Restore worker dependencies
+        id: release_worker_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-worker/node_modules
+          key: ${{ runner.os }}-node22-worker-${{ hashFiles('lensically-worker/package-lock.json') }}
+
+      - name: Install worker dependencies
+        if: steps.release_worker_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-worker
+        run: npm ci
+
+      - name: Clear stale worker transforms
+        working-directory: lensically-worker
+        run: rm -rf node_modules/.vite node_modules/.cache
+
+            
+
+      
+      - name: Restore web dependencies
+        if: steps.release_scope.outputs.web_changed == 'true'
+        id: release_web_cache
+        uses: actions/cache@v4
+        with:
+          path: lensically-web/node_modules
+          key: ${{ runner.os }}-node22-web-${{ hashFiles('lensically-web/package-lock.json') }}
+
+      - name: Download exact validated web artifact
+        id: download_web_artifact
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.release_scope.outputs.web_artifact_available == 'true' &&
+          steps.release_scope.outputs.validated_run_id != '' &&
+          steps.release_web_cache.outputs.cache-hit == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: lensically-web-${{ inputs.release_sha }}
+          path: ${{ runner.temp }}/lensically-web-artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.release_scope.outputs.validated_run_id }}
+
+      - name: Restore exact validated web artifact
+        id: restore_web_artifact
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.download_web_artifact.outcome == 'success'
+        continue-on-error: true
+        working-directory: lensically-web
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/lensically-web-artifact
+        run: node scripts/validated-web-artifact.mjs restore --sha "${RELEASE_SHA}" --directory "${ARTIFACT_DIRECTORY}"
+
+      - name: Resolve validated web release path
+        id: web_release_path
+        if: steps.release_scope.outputs.web_changed == 'true'
+        env:
+          ARTIFACT_AVAILABLE: ${{ steps.release_scope.outputs.web_artifact_available }}
+          WEB_CACHE_HIT: ${{ steps.release_web_cache.outputs.cache-hit }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_web_artifact.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore_web_artifact.outcome }}
+        run: |
+          set -euo pipefail
+          use_validated_artifact=false
+          fallback_reason=artifact_unavailable
+          if [[ "${ARTIFACT_AVAILABLE}" == "true" && "${WEB_CACHE_HIT}" == "true" && "${DOWNLOAD_OUTCOME}" == "success" && "${RESTORE_OUTCOME}" == "success" ]]; then
+            use_validated_artifact=true
+            fallback_reason=none
+          elif [[ "${WEB_CACHE_HIT}" != "true" ]]; then
+            fallback_reason=web_dependency_cache_miss
+          elif [[ "${DOWNLOAD_OUTCOME}" == "failure" ]]; then
+            fallback_reason=artifact_download_failed
+          elif [[ "${RESTORE_OUTCOME}" == "failure" ]]; then
+            fallback_reason=artifact_verification_failed
+          fi
+          echo "use_validated_artifact=${use_validated_artifact}" >> "${GITHUB_OUTPUT}"
+          echo "fallback_reason=${fallback_reason}" >> "${GITHUB_OUTPUT}"
+          echo "web_release_path=${use_validated_artifact} reason=${fallback_reason}"
+
+      - name: Install fallback web dependencies
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.web_release_path.outputs.use_validated_artifact != 'true' &&
+          steps.release_web_cache.outputs.cache-hit != 'true'
+        working-directory: lensically-web
+        run: npm ci
+
+      - name: Build fallback exact-head web product
+        if: >-
+          steps.release_scope.outputs.web_changed == 'true' &&
+          steps.web_release_path.outputs.use_validated_artifact != 'true'
+        working-directory: lensically-web
+        run: |
+          npm run test:validated-artifact
+          npm run build:cf
+
+      - name: Run exact-head release gates
+        if: >-
+          steps.release_scope.outputs.full_release == 'true' ||
+          (steps.release_scope.outputs.web_changed == 'true' && steps.web_release_path.outputs.use_validated_artifact != 'true')
+        working-directory: lensically-worker
+        run: |
+          set -euo pipefail
+                              
+          node scripts/release-preflight.mjs
+          npx tsc --noEmit
+          node scripts/run-full-validation.mjs --check
+          
+          node scripts/test-d1-migration-release.mjs
+          node scripts/test-d1-backfill-runner.mjs
+          
+          node scripts/d1-migration-release.mjs --check
+          node scripts/test-cron-release.mjs
+          node scripts/cron-release.mjs --check --config wrangler.jsonc
+          node scripts/test-release-acceptance.mjs
+          node scripts/validate-release-acceptance.mjs
+          node scripts/run-full-validation.mjs
+
+      - name: Plan exact-head database migrations
+        if: steps.release_scope.outputs.migrations_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LENSICALLY_PRODUCTION_SHA: ${{ steps.release_scope.outputs.deployed_sha }}
+        run: node scripts/d1-migration-release.mjs --plan-remote --production-sha "${LENSICALLY_PRODUCTION_SHA}" --output /tmp/lensically-d1-migration-plan.json
+
+      - name: Apply exact planned database migrations
+        if: steps.release_scope.outputs.migrations_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LENSICALLY_PRODUCTION_SHA: ${{ steps.release_scope.outputs.deployed_sha }}
+        run: node scripts/d1-migration-release.mjs --apply-remote --production-sha "${LENSICALLY_PRODUCTION_SHA}" --plan /tmp/lensically-d1-migration-plan.json
+
+      - name: Verify exact production migration ledger
+        if: steps.release_scope.outputs.migrations_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/d1-migration-release.mjs --verify-remote
+
+      - name: Prepare trigger-neutral Worker deploy config
+        working-directory: lensically-worker
+        run: node scripts/cron-release.mjs --write-deploy-config --config wrangler.jsonc --output wrangler.release.generated.json
+
+      - name: Publish exact release authority target
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_SHA}" =~ ^[a-fA-F0-9]{40}$ ]]; then
+            echo "exact_release_sha_required" >&2
+            exit 1
+          fi
+          release_id="workflow-${GITHUB_RUN_ID}"
+          cat > /tmp/lensically-release-authority.sql <<SQL
+          INSERT INTO operator_release_authority (
+            authority_id, expected_release_sha, previous_release_sha, release_id, state, source, updated_at
+          ) VALUES (
+            'production', '${RELEASE_SHA}',
+            (SELECT expected_release_sha FROM operator_release_authority WHERE authority_id = 'production'),
+            '${release_id}', 'pending', 'exact_sha_release_workflow', CURRENT_TIMESTAMP
+          )
+          ON CONFLICT(authority_id) DO UPDATE SET
+            previous_release_sha = CASE
+              WHEN operator_release_authority.expected_release_sha = excluded.expected_release_sha
+                THEN operator_release_authority.previous_release_sha
+              ELSE operator_release_authority.expected_release_sha
+            END,
+            expected_release_sha = excluded.expected_release_sha,
+            release_id = excluded.release_id,
+            state = 'pending',
+            source = 'exact_sha_release_workflow',
+            updated_at = CURRENT_TIMESTAMP;
+          SQL
+          npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json --file /tmp/lensically-release-authority.sql
+
+      - name: Provision, migrate, and bind isolated Shadow D1
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/shadow-d1-release.mjs --config wrangler.release.generated.json
+
+      - name: Deploy exact validated Worker head
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.release.generated.json --var "LENSICALLY_COMMIT_SHA:$(git rev-parse HEAD)"
+
+
+
+            
+
+      - name: Deploy exact validated web head
+        if: steps.release_scope.outputs.web_changed == 'true'
+        working-directory: lensically-web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ../lensically-worker/scripts/run-wrangler-deploy-with-retry.mjs --config wrangler.toml
+
+            
+
+      
+      - name: Reconcile exact Wrangler cron schedule
+        if: steps.release_scope.outputs.schedule_contract_changed == 'true'
+        working-directory: lensically-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/cron-release.mjs --reconcile-remote --config wrangler.jsonc
+
+
+      - name: Verify production runtime, scheduler, retained website, and retired legacy surfaces
+        run: |
+          set -euo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          verified=false
+          for attempt in $(seq 1 45); do
+                        runtime_ok=false
+            scheduler_ok=false
+            dashboard_ok=false
+                        cycles_api_ok=false
+            cycles_page_ok=false
+            cycles_contract_ok=false
+
+
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "operator_lifecycle" and .execution_kernel.public_contract == "operator-lifecycle-v1" and (.live_tool_count == 5)' /tmp/lensically-runtime-health.json > /dev/null; then
+              runtime_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
+              && jq -e '.enabled == true and .healthy == true and .operational == true and .heartbeat_fresh == true and (.control.mode == "normal") and (.current_overdue_count == 0)' /tmp/lensically-scheduler-health.json > /dev/null; then
+              scheduler_ok=true
+            fi
+                        if curl --fail-with-body --silent --show-error "https://app.lensically.com/dashboard" > /tmp/lensically-dashboard.html \
+              && grep -q "Operator Dashboard" /tmp/lensically-dashboard.html; then
+              dashboard_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/cycles/state?brand_key=manifest_mental" > /tmp/lensically-cycles-state.json \
+              && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null and .innovation.latest_run.state == "promoted" and .innovation.latest_run.promotion_destination_version == "v1.0.0"' /tmp/lensically-cycles-state.json > /dev/null; then
+              cycles_api_ok=true
+            fi
+                        if curl --fail-with-body --silent --show-error "https://app.lensically.com/cycles" > /tmp/lensically-cycles.html \
+              && grep -Fq 'app/(internal)/cycles/page-' /tmp/lensically-cycles.html; then
+              cycles_page_ok=true
+            fi
+            if curl --fail-with-body --silent --show-error "https://app.lensically.com/site.webmanifest" > /tmp/lensically-site.webmanifest \
+              && jq -e '.cycles_contract == "unified-source-ranking-v2"' /tmp/lensically-site.webmanifest > /dev/null; then
+              cycles_contract_ok=true
+            fi
+
+
+            gpt_memory_status="$(curl --silent --output /tmp/gpt-memory-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/gpt-memory/dashboard' || true)"
+            agent_status="$(curl --silent --output /tmp/agent-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/agent/accounts' || true)"
+            intelligence_status="$(curl --silent --output /tmp/intelligence-retired.json --write-out '%{http_code}' 'https://api.lensically.com/api/threads/intelligence-dashboard' || true)"
+
+                        if [ "${runtime_ok}" = "true" ] && [ "${scheduler_ok}" = "true" ] && [ "${dashboard_ok}" = "true" ] && [ "${cycles_api_ok}" = "true" ] && [ "${cycles_page_ok}" = "true" ] && [ "${cycles_contract_ok}" = "true" ] && [ "${gpt_memory_status}" = "410" ] && [ "${agent_status}" = "410" ] && [ "${intelligence_status}" = "410" ]; then
+
+              verified=true
+              break
+            fi
+
+            sleep 2
+          done
+          if [ "${verified}" != "true" ]; then
+            cat /tmp/lensically-runtime-health.json || true
+            cat /tmp/lensically-scheduler-health.json || true
+                        head -c 2000 /tmp/lensically-dashboard.html || true
+                        cat /tmp/lensically-cycles-state.json || true
+            head -c 4000 /tmp/lensically-cycles.html || true
+            cat /tmp/lensically-site.webmanifest || true
+            echo "runtime_ok=${runtime_ok:-unset} scheduler_ok=${scheduler_ok:-unset} dashboard_ok=${dashboard_ok:-unset} cycles_api_ok=${cycles_api_ok:-unset} cycles_page_ok=${cycles_page_ok:-unset} cycles_contract_ok=${cycles_contract_ok:-unset} gpt_memory_status=${gpt_memory_status:-unset} agent_status=${agent_status:-unset} intelligence_status=${intelligence_status:-unset}"
+            cat /tmp/gpt-memory-retired.json || true
+
+            cat /tmp/agent-retired.json || true
+            cat /tmp/intelligence-retired.json || true
+            exit 1
+          fi
+
+
+
+
+s/\\x1B\\[[0-9;]*[mK]//g')"
             description="${description:0:140}"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=failure \
