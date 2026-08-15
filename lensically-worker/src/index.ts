@@ -22746,17 +22746,28 @@ async function handleOperatorMcpToolCall(
     executionFingerprint: operatorExecutionFingerprint,
     toolMutatesState: operatorToolMutatesState,
         buildActionClosure: (toolName, result) => buildOperatorActionClosure(env, toolName, result),
-            verifyLifecycleExecutionToken: async (token, action) => {
-      const planned = await resolveOperatorPlannedAction(action);
-      if (!planned.ok) return { ok: false, error: planned.error };
+            verifyLifecycleExecutionToken: async (token) => {
       const check = await verifyOperatorLifecycleToken(
         env,
         token,
         3,
         request.headers.get("mcp-session-id")?.trim() || null,
-        planned.fingerprint,
       );
-      return check.ok ? { ok: true, payload: check.payload } : { ok: false, error: check.error };
+      if (!check.ok) return { ok: false, error: check.error };
+      const capability = normalizeOperatorMachineKey(check.payload.planned_capability, "");
+      const toolName = normalizeOperatorText(check.payload.planned_tool, 200, true);
+      const actionArguments = check.payload.planned_arguments && typeof check.payload.planned_arguments === "object" && !Array.isArray(check.payload.planned_arguments)
+        ? check.payload.planned_arguments as Record<string, unknown>
+        : null;
+      const fingerprint = normalizeOperatorText(check.payload.planned_action_fingerprint, 200, true);
+      const resolved = resolveOperatorInternalActionCapability(capability);
+      const recomputedFingerprint = toolName && actionArguments
+        ? await operatorExecutionFingerprint(toolName, actionArguments)
+        : null;
+      if (!resolved || !toolName || resolved.toolName !== toolName || !actionArguments || !fingerprint || recomputedFingerprint !== fingerprint) {
+        return { ok: false, error: "operator_live_state_action_binding_invalid" };
+      }
+      return { ok: true, payload: check.payload };
     },
     requiredKnowledgeNodes: (toolName) => requiredOperatorKnowledgeNodesForTool(toolName),
     requiredLiveStateScopes: (toolName) => requiredOperatorLiveStateScopesForTool(toolName),
