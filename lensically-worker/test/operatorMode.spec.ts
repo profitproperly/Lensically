@@ -4127,7 +4127,7 @@ active_checkpoint: none
       completion_condition: "Neutral checkpoint step resolves the active interrupt server-side.",
       execution_order: 1,
     });
-    expect(intake.isError).not.toBe(true);
+    expect(intake.isError, JSON.stringify(intake.structuredContent)).not.toBe(true);
     expect(intake.structuredContent.item).toMatchObject({ work_key: workKey, status: "interrupting" });
 
     const action = { capability: "checkpoint_step", arguments: { stage: "a3" } };
