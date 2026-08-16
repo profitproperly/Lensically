@@ -6012,6 +6012,56 @@ active_checkpoint: none
     ).bind(first.incident.id).run();
   }, 30000);
 
+    it("generalizes closed-schema client violations across category aliases and lifecycle surfaces", async () => {
+    const firstCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "workflow_run_list",
+      request_fingerprint: "fixture-closed-schema-bound-a",
+      field_names: ["limit"],
+      error_category: "client_schema_validation_failure",
+      operation_class: "engineering_read",
+      expected_outcome: { maximum: 20 },
+      observed_outcome: { submitted: 30, lensically_receipt: false },
+    });
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).not.toBe(true);
+    expect(first.incident.classification).toBe("novel_failure");
+
+    const secondCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; severity: string };
+      recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "get_operator_knowledge",
+      request_fingerprint: "fixture-closed-schema-bound-b",
+      field_names: ["planned_action.arguments.max_lines"],
+      error_category: "caller_schema_bound_violation",
+      operation_class: "engineering_read",
+      expected_outcome: { maximum: 400 },
+      observed_outcome: { submitted: 500, lensically_receipt: false },
+    });
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).not.toBe(true);
+    expect(second.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
+    expect(second.recurrence).toMatchObject({
+      status: "known_active_recurrence",
+      prior_incident_id: first.incident.id,
+      recurrence_family: "client:closed_schema_contract_violation",
+    });
+
+    for (const incidentId of [first.incident.id, second.incident.id]) {
+      await env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(incidentId).run();
+    }
+  }, 30000);
+
   it("generalizes OpenAI client safety blocks across active and closed related incidents", async () => {
     const firstCall = await mcpToolRaw<{
       ok: boolean;

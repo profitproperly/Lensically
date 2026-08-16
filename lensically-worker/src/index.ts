@@ -18210,7 +18210,13 @@ function hardeningRecurrenceFamily(boundary: string, category: string): string {
     || category === "client_pre_dispatch_block"
     || category.startsWith("openai_safety_check_blocked_")
   )) {
-    return "client:openai_safety_predispatch";
+        return "client:openai_safety_predispatch";
+  }
+  if (boundary === "client" && (
+    category === "client_schema_validation_failure"
+    || category === "caller_schema_bound_violation"
+  )) {
+    return "client:closed_schema_contract_violation";
   }
   return `${boundary}:${category}`;
 }
@@ -18283,7 +18289,10 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const relatedPriorRows = (priorRows.results ?? []).filter((candidate) => {
     const candidateCategory = normalizeOperatorMachineKey(candidate.detected_error_category, "");
     if (!candidateCategory || hardeningRecurrenceFamily(boundary, candidateCategory) !== recurrenceFamily) return false;
-    if (recurrenceFamily === "client:openai_safety_predispatch") return true;
+        if (
+      recurrenceFamily === "client:openai_safety_predispatch"
+      || recurrenceFamily === "client:closed_schema_contract_violation"
+    ) return true;
     return String(candidate.blocked_profile_id ?? "") === profile
       && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "")
       && candidateCategory === category;
