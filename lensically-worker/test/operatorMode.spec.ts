@@ -4130,7 +4130,8 @@ active_checkpoint: none
       knowledge_token: string;
       action_rule_binding: {
         action_intelligence_ids: string[];
-        action_intelligence: Array<{ intelligence_id: string; root_cause: string; proven_repair: string[] }>;
+        action_intelligence: Array<{ intelligence_id: string; root_cause: string; prevention_rule_id: string }>;
+        prevention_rules: Array<{ id: string; winning_path: string[] }>;
       };
     }>("getOperatorKnowledge", {
       session_map_token: step1.structuredContent.session_map_token,
