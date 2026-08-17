@@ -121,12 +121,14 @@ push_capability_preflight_run = step_run(jobs, "push-validation", "Validate capa
 abort("push_capability_lifecycle_preflight_missing") unless push_capability_preflight_run.include?("node scripts/release-preflight.mjs --capability-lifecycle-only")
 push_full_preflight_run = step_run(jobs, "push-validation", "Validate full release preflight")
 abort("push_release_fallback_preflight_missing") unless push_full_preflight_run.include?("node scripts/release-preflight.mjs")
+abort("push_release_status_publication_must_be_nonblocking") unless push_full_preflight_run.include?("GitHub status publication")
 push_architecture_run = step_run(jobs, "push-validation", "Validate Worker architecture baseline")
 abort("push_architecture_baseline_missing") unless push_architecture_run.include?("node scripts/worker-architecture-baseline.mjs")
 
 push_full_run = step_run(jobs, "push-validation", "Run full push validation")
 abort("push_shared_full_validation_missing") unless push_full_run.include?("node scripts/run-full-validation.mjs")
 abort("push_full_validation_diagnostic_status_missing") unless push_full_run.include?("lensically/full-validation") && push_full_run.include?("/tmp/lensically-full-validation.log")
+abort("push_full_validation_status_publication_must_be_nonblocking") unless push_full_run.include?("GitHub status publication")
 
 release_gate_run = step_run(jobs, "worker-release", "Run exact-head release gates")
 abort("release_shared_full_validation_missing") unless release_gate_run.include?("node scripts/run-full-validation.mjs --check")

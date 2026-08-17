@@ -250,14 +250,14 @@ jobs:
             printf '::error title=Full release preflight::%s\n' "$description"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=failure \
-              -f context='lensically/full-release-preflight' \
-              -f description="$description" >/dev/null
+                            -f context='lensically/full-release-preflight' \
+              -f description="$description" >/dev/null || echo "::warning title=GitHub status publication::full-release-preflight failure status unavailable"
             exit "$status"
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
-            -f context='lensically/full-release-preflight' \
-            -f description='release_preflight_passed' >/dev/null
+                        -f context='lensically/full-release-preflight' \
+            -f description='release_preflight_passed' >/dev/null || echo "::warning title=GitHub status publication::full-release-preflight success status unavailable"
 
       - name: Validate Worker architecture baseline
         working-directory: lensically-worker
@@ -310,14 +310,14 @@ jobs:
             description="${description:0:140}"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=failure \
-              -f context='lensically/full-validation' \
-              -f description="$description" >/dev/null
+                            -f context='lensically/full-validation' \
+              -f description="$description" >/dev/null || echo "::warning title=GitHub status publication::full-validation failure status unavailable"
             exit "$status"
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
-            -f context='lensically/full-validation' \
-            -f description='full_validation_passed' >/dev/null
+                        -f context='lensically/full-validation' \
+            -f description='full_validation_passed' >/dev/null || echo "::warning title=GitHub status publication::full-validation success status unavailable"
 
 
 
