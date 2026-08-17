@@ -4515,7 +4515,7 @@ active_checkpoint: none
     expect(persistedLiveState).toBeTruthy();
         const persistedLiveStatePayload = JSON.parse(String(persistedLiveState?.payload_json ?? "{}")) as Record<string, unknown>;
     expect(persistedLiveStatePayload.mcp_session_id).toBeNull();
-    expect(persistedLiveStatePayload.action_rule_registry_version).toBe("operator-action-rule-registry-v3");
+    expect(persistedLiveStatePayload.action_rule_registry_version).toBe(OPERATOR_ACTION_RULE_REGISTRY_VERSION);
     expect(persistedLiveStatePayload.winning_path_registry_version).toBe("winning-path-promotion-v2");
     expect(persistedLiveStatePayload.action_intelligence_version).toBe("action-intelligence-binding-v1");
     expect(persistedLiveStatePayload.action_rule_ids).toEqual(expect.arrayContaining(["prevention.typed_profile_exact_contract", "prevention.client_safe_step4_execution_descriptor"]));
@@ -4533,7 +4533,7 @@ active_checkpoint: none
     ).bind(step4.structuredContent.action_execution_token).first<{ payload_json: string }>();
     expect(persistedExecution).toBeTruthy();
     const persistedExecutionPayload = JSON.parse(String(persistedExecution?.payload_json ?? "{}")) as Record<string, unknown>;
-    expect(persistedExecutionPayload.action_rule_registry_version).toBe("operator-action-rule-registry-v3");
+    expect(persistedExecutionPayload.action_rule_registry_version).toBe(OPERATOR_ACTION_RULE_REGISTRY_VERSION);
     expect(persistedExecutionPayload.action_intelligence_version).toBe("action-intelligence-binding-v1");
     expect(persistedExecutionPayload.action_rule_ids).toEqual(persistedLiveStatePayload.action_rule_ids);
     expect(persistedExecutionPayload.prevention_rule_ids).toEqual(persistedLiveStatePayload.prevention_rule_ids);
