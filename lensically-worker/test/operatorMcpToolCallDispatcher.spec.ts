@@ -232,6 +232,8 @@ describe("Operator MCP tool-call dispatcher", () => {
           planned_tool: "unknown",
           planned_arguments: {},
           planned_action_fingerprint: "request-fingerprint",
+          client_action_id: "unknown_profile",
+          effect_class: "read_only",
         },
       })),
       compilePublicProfileRequest: vi.fn(() => ({
