@@ -133,6 +133,38 @@ function fail(message) {
   process.exit(1);
 }
 
+const VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE = '[vitest-worker]: Timeout calling "onTaskUpdate"';
+
+function stripAnsi(value) {
+  return String(value ?? "").replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function isVitestTaskUpdateTransportTimeout(value) {
+  const output = stripAnsi(value);
+  const allAssertionsPassed = /\bTests\s+\d+\s+passed(?:\s+\(\d+\))?/i.test(output);
+  const semanticFailureReported = /\bTests\s+[^\n]*\bfailed\b/i.test(output)
+    || /\bAssertionError\b/.test(output)
+    || /(?:^|\n)\s*(?:FAIL|❯|×)\s/m.test(output);
+  return output.includes(VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE)
+    && allAssertionsPassed
+    && !semanticFailureReported;
+}
+
+function runCapturedVitest(testFiles) {
+  return spawnSync(process.execPath, [
+    vitestCli,
+    "--run",
+    ...testFiles,
+    "--no-file-parallelism",
+    "--reporter=dot",
+    "--bail=1",
+  ], {
+    cwd: workerRoot,
+    encoding: "utf8",
+    env: process.env,
+  });
+}
+
 function validatePlan() {
   const duplicates = completeTestFiles.filter((file, index) => completeTestFiles.indexOf(file) !== index);
   if (duplicates.length > 0) fail(`full_validation_duplicate_files:${[...new Set(duplicates)].join(",")}`);
