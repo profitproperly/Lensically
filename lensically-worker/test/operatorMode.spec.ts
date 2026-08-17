@@ -4052,7 +4052,7 @@ active_checkpoint: none
       session_map_token: step1.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
     });
-    const step3 = await mcpTool<{ live_state_token: string }>("getOperatorLiveState", {
+    const step3 = await mcpTool<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
       knowledge_token: step2.knowledge_token,
     });
     const step4 = await mcpTool<{
