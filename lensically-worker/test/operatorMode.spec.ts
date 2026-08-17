@@ -4265,7 +4265,7 @@ active_checkpoint: none
     };
 
     await executeCaseStep({ stage: "a0", case: incidentId }, "contained");
-    await executeCaseStep({ stage: "n", case: incidentId }, "classified");
+    await executeCaseStep({ stage: "a1", case: incidentId }, "classified");
     await executeCaseStep({ stage: "a2", case: incidentId }, "reproduced");
     await executeCaseStep({
       stage: "a3",
