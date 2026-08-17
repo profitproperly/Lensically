@@ -3865,11 +3865,20 @@ describe("operator mode MCP endpoint", () => {
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
+        const controlStepBranch = plannedActionSchema?.oneOf?.find((item) => {
+      const branch = item as { properties?: { capability?: { const?: string } } };
+      return branch.properties?.capability?.const === "control_step";
+    }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean } } } | undefined;
+    expect(controlStepBranch?.properties?.arguments?.required).toEqual([]);
+    expect(controlStepBranch?.properties?.arguments?.properties).toEqual({});
+    expect(controlStepBranch?.properties?.arguments?.additionalProperties).toBe(false);
     const actionCapabilities = (plannedActionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
         expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
     expect(actionCapabilities).toContain("case_step");
     expect(actionCapabilities).toContain("checkpoint_step");
+    expect(actionCapabilities).toContain("control_step");
+    expect(actionCapabilities).not.toContain("run_git_hub_workflow");
     expect(actionCapabilities).not.toContain("hardening_transition");
     expect(actionCapabilities).not.toContain("operator_work_transition");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("profile_id");
@@ -3888,7 +3897,12 @@ describe("operator mode MCP endpoint", () => {
     expect(step1.session_map_token).toBeTruthy();
     expect(step1).not.toHaveProperty("startup_authority");
     expect(step1).not.toHaveProperty("canonical_continuation");
-    expect(step1).not.toHaveProperty("tool_surface");
+        expect(step1).not.toHaveProperty("tool_surface");
+    const controlStepKnowledge = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: step1.session_map_token,
+      planned_action: { capability: "control_step", arguments: {} },
+    });
+    expect(controlStepKnowledge.knowledge_token).toBeTruthy();
             const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
