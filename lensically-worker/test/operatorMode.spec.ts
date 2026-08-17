@@ -3938,7 +3938,14 @@ describe("operator mode MCP endpoint", () => {
       },
     });
     expect(repositorySearchKnowledge.knowledge_token).toBeTruthy();
-    expect(repositorySearchKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["neutral_repository_symbol_search_contract"]));
+    expect(repositorySearchKnowledge.action_rule_binding.action_intelligence_version).toBe("action-intelligence-binding-v1");
+    expect(repositorySearchKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["neutral_repository_symbol_search_contract", "client_safe_step4_execution_descriptor"]));
+    expect(repositorySearchKnowledge.action_rule_binding.action_intelligence_ids).toEqual(expect.arrayContaining(["neutral_repository_symbol_search_contract", "client_safe_step4_execution_descriptor"]));
+    const repositorySearchClientSafety = repositorySearchKnowledge.action_rule_binding.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor");
+    expect(repositorySearchClientSafety?.root_cause).toContain("five-stage refactor");
+    expect(repositorySearchClientSafety?.failure_history.length).toBeGreaterThan(0);
+    expect(repositorySearchClientSafety?.proven_repair).toEqual(expect.arrayContaining([expect.stringContaining("execution descriptor")]));
+    expect(repositorySearchClientSafety?.prevention.regression_test_id).toBe("preserves client-visible action effect semantics through the token-only five-stage lifecycle");
             const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
