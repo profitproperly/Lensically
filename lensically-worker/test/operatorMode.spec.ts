@@ -3827,7 +3827,14 @@ describe("operator mode MCP endpoint", () => {
     const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
     expect(plannedActionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
     expect(actionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
+    expect(actionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
+    const executionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
+    expect(executionDescriptorSchema?.oneOf?.length).toBe(plannedActionSchema?.oneOf?.length);
+    const continuationDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "get_engineering_continuation");
+    expect(continuationDescriptor?.properties?.effect_class?.const).toBe("read_only");
+    const repositoryPatchDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
+    expect(repositoryPatchDescriptor?.properties?.effect_class?.const).toBe("mutation");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("action_execution_token");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("verification");
     expect(closeTool?.inputSchema?.properties).not.toHaveProperty("action");
