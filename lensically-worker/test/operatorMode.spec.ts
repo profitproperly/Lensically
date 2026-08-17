@@ -4122,6 +4122,79 @@ active_checkpoint: none
     });
   }, 30000);
 
+  it("preserves client-visible read semantics for engineering continuation through Step 4", async () => {
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    const step2 = await mcpToolCallRaw<{
+      knowledge_token: string;
+      action_rule_binding: {
+        action_intelligence_ids: string[];
+        action_intelligence: Array<{ intelligence_id: string; root_cause: string; proven_repair: string[] }>;
+      };
+    }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "get_engineering_continuation", arguments: {} },
+    });
+    expect(step2.isError, JSON.stringify(step2.structuredContent)).not.toBe(true);
+    expect(step2.structuredContent.action_rule_binding.action_intelligence_ids).toEqual(expect.arrayContaining([
+      "typed_profile_exact_contract",
+      "client_safe_step4_execution_descriptor",
+    ]));
+    const clientSafetyIntelligence = step2.structuredContent.action_rule_binding.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor");
+    expect(clientSafetyIntelligence?.root_cause).toContain("five-stage refactor");
+    expect(clientSafetyIntelligence?.proven_repair).toEqual(expect.arrayContaining([expect.stringContaining("read_only or mutation effect class")]));
+
+    const step3 = await mcpToolCallRaw<{
+      live_state_token: string;
+      execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" };
+    }>("getOperatorLiveState", {
+      knowledge_token: step2.structuredContent.knowledge_token,
+    });
+    expect(step3.isError, JSON.stringify(step3.structuredContent)).not.toBe(true);
+    expect(step3.structuredContent.execution_descriptor).toEqual({
+      action_id: "get_engineering_continuation",
+      effect_class: "read_only",
+    });
+
+    const mismatch = await mcpToolCallRaw<{ ok: boolean; error?: string }>("executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      execution_descriptor: { action_id: "get_engineering_continuation", effect_class: "mutation" },
+    });
+    expect(mismatch.isError).toBe(true);
+    expect(mismatch.structuredContent).toMatchObject({ ok: false, error: "operator_execution_descriptor_mismatch", execution_started: false });
+
+    const step4 = await mcpToolCallRaw<{
+      ok: boolean;
+      status_kind: string;
+      authority: string;
+      path: string;
+      content: string;
+      action_execution_token: string;
+    }>("executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      execution_descriptor: step3.structuredContent.execution_descriptor,
+    });
+    expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
+    expect(step4.structuredContent).toMatchObject({
+      ok: true,
+      status_kind: "canonical_continuation",
+      authority: "sole_canonical_repository_ledger",
+      path: "ENGINEERING_CONTINUATION.md",
+    });
+    expect(step4.structuredContent.content).toContain("# Lensically Continuation Ledger");
+
+    const step5 = await mcpToolCallRaw<{ ok: boolean; lifecycle_stage: number }>("closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      verification: {
+        verified: true,
+        evidence: ["The canonical engineering continuation executed through Step 4 with the exact server-derived read-only descriptor."],
+        next_action: "Continue the isolated lifecycle regression.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError, JSON.stringify(step5.structuredContent)).not.toBe(true);
+    expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+  }, 30000);
+
       it("exposes and executes the complete neutral case_step contract through the normalized lifecycle", async () => {
     const recordedCall = await mcpToolRaw<{
       ok: boolean;
