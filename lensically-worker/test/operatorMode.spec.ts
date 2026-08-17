@@ -4144,7 +4144,9 @@ active_checkpoint: none
     ]));
     const clientSafetyIntelligence = step2.structuredContent.action_rule_binding.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor");
     expect(clientSafetyIntelligence?.root_cause).toContain("five-stage refactor");
-    expect(clientSafetyIntelligence?.proven_repair).toEqual(expect.arrayContaining([expect.stringContaining("read_only or mutation effect class")]));
+    expect(clientSafetyIntelligence?.prevention_rule_id).toBe("client_safe_step4_execution_descriptor");
+    const clientSafetyPrevention = step2.structuredContent.action_rule_binding.prevention_rules.find((entry) => entry.id === clientSafetyIntelligence?.prevention_rule_id);
+    expect(clientSafetyPrevention?.winning_path).toEqual(expect.arrayContaining([expect.stringContaining("read_only or mutation effect class")]));
 
     const step3 = await mcpToolCallRaw<{
       live_state_token: string;
