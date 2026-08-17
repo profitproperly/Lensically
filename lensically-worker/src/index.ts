@@ -15569,6 +15569,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   if (!knowledgeGateway || !liveStateGateway || !actionGateway || !closeGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
+  const actionDescriptorBranches: Record<string, unknown>[] = [];
   const actionBranches = tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
