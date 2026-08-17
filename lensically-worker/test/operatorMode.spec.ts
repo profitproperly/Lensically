@@ -121,6 +121,7 @@ const TEST_SAFE_CAPABILITY_BY_TOOL: Record<string, string> = {
   getRepoStatus: "repository_status",
   getDatabaseSchemaState: "database_schema",
   readRepoFile: "repository_file_read",
+  searchRepoFiles: "repository_symbol_search",
   applyRepoPatchSet: "repository_patch_set",
   readMcpToolDefinition: "capability_definition",
   recordHardeningIncident: "client_block_intake",
