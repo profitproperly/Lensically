@@ -18422,6 +18422,7 @@ function hardeningRecurrenceFamily(boundary: string, category: string): string {
     || category === "openai_client_safety_pre_dispatch"
         || category === "openai_predispatch_safety_block"
     || category === "openai_safety_predispatch_block"
+    || category === "openai_safety_checks_pre_dispatch"
     || category === "client_pre_dispatch_block"
     || category.startsWith("openai_safety_check_blocked_")
   )) {
