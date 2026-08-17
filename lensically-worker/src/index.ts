@@ -15642,13 +15642,17 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     type: "object",
     properties: {
       live_state_token: { type: "string", minLength: 16 },
+      execution_descriptor: {
+        oneOf: actionDescriptorBranches,
+        description: "Repeat the exact server-derived Step-3 client-safe descriptor. It exposes only the neutral action identity and effect class; raw internal handlers and arguments remain server-side.",
+      },
       governing_standards_ack: {
         type: "string",
         const: OPERATOR_GOVERNING_STANDARDS_ACK,
         description: "Mandatory pre-action acknowledgment.",
       },
     },
-    required: ["live_state_token", "governing_standards_ack"],
+    required: ["live_state_token", "execution_descriptor", "governing_standards_ack"],
     additionalProperties: false,
   };
   return tools;
