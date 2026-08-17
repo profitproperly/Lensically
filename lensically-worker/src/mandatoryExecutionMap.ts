@@ -411,7 +411,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     scope: "universal",
     binding_scope: "action",
     action_binding: { tool_names: ["advanceHardeningIncident"] },
-    enforcement_point: "Public stage-specific case_step schema, Step-2 action-rule binding, server-side neutral-to-semantic compilation, and continuous-hardening transition validation.",
+    enforcement_point: "Public explicit a0-a10 case_step schema, Step-2 action-rule binding, Step-3 ordinal execution-descriptor derivation, Step-4 closed ordinal descriptor schema and exact-match guard, server-side neutral-to-semantic compilation, and continuous-hardening transition validation.",
     regression_test_id: "exposes and executes the complete stage-specific neutral case_step contract through the normalized lifecycle",
     supersession_rule: "Any replacement must keep semantic hardening controls off the client surface, forbid evidence before its required stage, and preserve complete server-side hardening transitions with pre-execution action binding.",
   },
