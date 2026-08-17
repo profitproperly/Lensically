@@ -4201,7 +4201,7 @@ active_checkpoint: none
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
   }, 30000);
 
-      it("exposes and executes the complete neutral case_step contract through the normalized lifecycle", async () => {
+      it("exposes and executes the complete stage-specific neutral case_step contract through the normalized lifecycle", async () => {
     const recordedCall = await mcpToolRaw<{
       ok: boolean;
       incident: { id: string; state: string };
