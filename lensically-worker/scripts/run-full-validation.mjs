@@ -231,6 +231,13 @@ function validatePlan() {
     fail("full_validation_operator_milestone_plan_invalid");
   }
 
+  const transportTimeoutFixture = `Tests 28 passed (28)\nErrors 1 error\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}`;
+  const semanticFailureFixture = `Tests 27 passed | 1 failed (28)\nAssertionError\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}`;
+  if (!isVitestTaskUpdateTransportTimeout(transportTimeoutFixture)
+    || isVitestTaskUpdateTransportTimeout(semanticFailureFixture)) {
+    fail("full_validation_transport_timeout_classifier_invalid");
+  }
+
   return {
     contract: "lensically-full-validation-v1",
     complete_test_file_count: completeTestFiles.length,
