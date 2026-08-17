@@ -4397,6 +4397,7 @@ active_checkpoint: none
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
+      execution_descriptor: step3.structuredContent.execution_descriptor,
     });
         expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.action_execution_token).toBeTruthy();
