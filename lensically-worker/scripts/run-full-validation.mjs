@@ -293,6 +293,26 @@ function run(label, command, args, diagnosticTestFiles = []) {
       }
       if (isolatedFailure) {
         console.error(`::error title=Full validation test file failed::${isolatedFailure}`);
+      } else if (transportRecovered) {
+        const transportBatchRetry = spawnSync(command, args, {
+          cwd: workerRoot,
+          stdio: "inherit",
+          env: process.env,
+        });
+        if (transportBatchRetry.error) {
+          fail(`[full-validation] ${label} transport recovery spawn failed: ${transportBatchRetry.error.message}`);
+        }
+        if (transportBatchRetry.status === 0) {
+          const recoveredDurationMs = Math.round(performance.now() - startedAt);
+          console.warn(`::warning title=Vitest transport batch recovered::${label}`);
+          console.log(JSON.stringify({
+            label,
+            duration_ms: recoveredDurationMs,
+            status: "passed_after_transport_retry",
+          }));
+          return recoveredDurationMs;
+        }
+        console.error(`::error title=Vitest transport batch retry failed::${label} status=${transportBatchRetry.status ?? 1}`);
       } else {
         let cumulativeFailure = null;
         for (let end = 2; end <= diagnosticTestFiles.length; end += 1) {
