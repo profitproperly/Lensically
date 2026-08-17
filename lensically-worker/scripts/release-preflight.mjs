@@ -3437,6 +3437,7 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
     || !operatorMcpProtocol.includes("prevention_rule_id")
     || !tests.includes("preserves client-visible read semantics for engineering continuation through Step 4")
     || !tests.includes("operator_execution_descriptor_mismatch")
+    || !tests.includes("exposes and executes the complete stage-specific neutral case_step contract through the normalized lifecycle")
     || !systemDirectoryTests.includes("promotes multi-stage architecture work to implementation before release")
         || !systemDirectoryTests.includes("keeps bounded large repository patch sets on the Main gateway")
     || !systemDirectoryTests.includes("blocks incident closure until the winning path is promoted and enforced")
