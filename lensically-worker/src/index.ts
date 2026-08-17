@@ -16588,11 +16588,14 @@ async function issueOperatorLifecycleToken(
   return reference;
 }
 
-function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, requestSessionId: string | null): string | null {
-  const boundSessionId = typeof payloadSessionId === "string" && payloadSessionId.trim()
+function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, _requestSessionId: string | null): string | null {
+  // Step 1 owns lifecycle session identity. Downstream stages must inherit that exact
+  // binding, including null for clients that intentionally omit MCP session headers.
+  // Rebinding a null Step-1 token to a later request header lets one lifecycle action
+  // supersede itself when the client rotates transport sessions between stages.
+  return typeof payloadSessionId === "string" && payloadSessionId.trim()
     ? payloadSessionId.trim()
     : null;
-  return boundSessionId ?? requestSessionId;
 }
 
 async function verifyOperatorLifecycleToken(
