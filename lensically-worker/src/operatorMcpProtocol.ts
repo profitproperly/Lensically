@@ -1,4 +1,4 @@
-import { WINNING_PATH_PROMOTION_VERSION, resolveActionBoundWinningPaths } from "./mandatoryExecutionMap";
+import { ACTION_INTELLIGENCE_BINDING_VERSION, WINNING_PATH_PROMOTION_VERSION, resolveActionBoundWinningPaths } from "./mandatoryExecutionMap";
 
 export const OPERATOR_MCP_VERSION = "1.45.4";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
