@@ -51,6 +51,37 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
       enforcement_point: prevention.enforcement_point,
       regression_test_id: prevention.regression_test_id,
     })),
+    };
+}
+
+function exactOperatorRuleIdArray(value: unknown): string[] | null {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string")
+    ? value as string[]
+    : null;
+}
+
+function exactOperatorRuleIdArraysMatch(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+export function validateOperatorActionRuleBindingContinuity(
+  toolName: string,
+  args: Record<string, unknown>,
+  payload: Record<string, unknown>,
+) {
+  const binding = operatorActionRuleBindingForTool(toolName, args);
+  const observedRuleIds = exactOperatorRuleIdArray(payload.action_rule_ids);
+  const observedPreventionRuleIds = exactOperatorRuleIdArray(payload.prevention_rule_ids);
+  const ok = payload.action_rule_registry_version === binding.registry_version
+    && payload.winning_path_registry_version === binding.winning_path_registry_version
+    && observedRuleIds !== null
+    && observedPreventionRuleIds !== null
+    && exactOperatorRuleIdArraysMatch(observedRuleIds, binding.rule_ids)
+    && exactOperatorRuleIdArraysMatch(observedPreventionRuleIds, binding.prevention_rule_ids);
+  return {
+    ok,
+    error: ok ? null : "operator_action_rule_binding_mismatch",
+    binding,
   };
 }
 

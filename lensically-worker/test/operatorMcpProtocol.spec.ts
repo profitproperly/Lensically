@@ -4,7 +4,9 @@ import {
                                                                 OPERATOR_GOVERNING_STANDARDS,
     OPERATOR_GOVERNING_STANDARDS_VERSION,
     OPERATOR_ACTION_RULE_REGISTRY_VERSION,
-    operatorActionRuleBindingForTool,
+        operatorActionRuleBindingForTool,
+    validateOperatorActionRuleBindingContinuity,
+
 
         OPERATOR_DISCOVERY_EXECUTION_RULE,
     OPERATOR_FAILURE_REPAIR_RULE,
@@ -177,9 +179,22 @@ describe("Operator MCP protocol contract", () => {
     const patchRules = operatorActionRuleBindingForTool("applyRepoPatchSet", {});
     expect(patchRules.rule_ids).toContain("repository.contiguous_source_anchor");
     expect(patchRules.rule_ids).toContain("repository.non_whitespace_semantic_anchor");
-    const releaseRules = operatorActionRuleBindingForTool("runGitHubWorkflow", { task: "worker-deploy" });
+        const releaseRules = operatorActionRuleBindingForTool("runGitHubWorkflow", { task: "worker-deploy" });
     expect(releaseRules.rule_ids).toContain("release.exact_validated_head");
     expect(releaseRules.rule_ids).toContain("release.no_active_content_cycle");
+    const continuityPayload = {
+      action_rule_registry_version: readRules.registry_version,
+      winning_path_registry_version: readRules.winning_path_registry_version,
+      action_rule_ids: readRules.rule_ids,
+      prevention_rule_ids: readRules.prevention_rule_ids,
+    };
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, continuityPayload).ok).toBe(true);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, prevention_rule_ids: undefined }).ok).toBe(false);
+    const futureRules = operatorActionRuleBindingForTool("futureRegisteredTool", {});
+    expect(futureRules.prevention_rule_ids).toContain("typed_profile_exact_contract");
+    expect(futureRules.rule_ids).toContain("prevention.typed_profile_exact_contract");
+
 
   });
 
