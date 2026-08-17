@@ -4286,7 +4286,7 @@ active_checkpoint: none
     expect(changedStep3.isError).toBe(true);
     expect(changedStep3.structuredContent.ok).toBe(false);
 
-    const step3 = await mcpToolCallRaw<{ ok: boolean; live_state_token: string }>("getOperatorLiveState", {
+    const step3 = await mcpToolCallRaw<{ ok: boolean; live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
       knowledge_token: `olr_${"b".repeat(32)}`,
       planned_action: plannedAction,
     });
