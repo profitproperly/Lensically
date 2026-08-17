@@ -216,9 +216,10 @@ export async function dispatchOperatorMcpToolCall(
         account_data_loaded: gatewayAccountDataLoaded,
       }, "Lensically blocked Step 4 because the server-bound account target no longer matches the prepared lifecycle state.", true);
     }
-    const compiledProfile = dependencies.compilePublicProfileRequest({
+        const compiledProfile = dependencies.compilePublicProfileRequest({
       profile_id: capability,
       inputs: actionArguments,
+      typed_lifecycle_bound: true,
     });
     if (!compiledProfile.ok) {
       return mcpToolResultResponse(id, {

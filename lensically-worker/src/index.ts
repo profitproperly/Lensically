@@ -17232,6 +17232,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
   const rawInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
     : {};
+  const typedLifecycleBound = gatewayArgs.typed_lifecycle_bound === true;
   const explicitProfileId = normalizeOperatorMachineKey(gatewayArgs.profile_id, "");
     const lifecycleProfile = explicitProfileId ? resolveOperatorAccountLifecycleProfile(gatewayArgs, rawInputs) : null;
   let profileId = explicitProfileId;
@@ -17267,7 +17268,9 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
           ? { ...inputs, brand_key: inputs.account_key, account_key: undefined }
           : inputs;
       delete safeInputs.account_key;
-            const compiled = buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
+                        const compiled = typedLifecycleBound
+        ? { objective: safeProfile.objective, intent: safeProfile.intent, inputs: { ...safeInputs } }
+        : buildClientSafeGatewayRequest(profileId as ClientSafeRequestProfileId, safeInputs);
             let compiledRequest = compiled;
       if (profileId === "capability_definition") {
         const exactTool = resolveExactCapabilityToolName(safeInputs.capability);
@@ -17277,7 +17280,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       if (profileId === "repository_symbol_search") {
         compiledRequest = { ...compiled, inputs: { prefix: safeInputs.path, query: safeInputs.symbol, limit: safeInputs.limit ?? 20 } };
       }
-      if (profileId === "repository_file_read") {
+            if (profileId === "repository_file_read" && !typedLifecycleBound) {
         const requestedLines = Number(safeInputs.max_lines ?? (Number(safeInputs.max_characters ?? 0) > 0 ? Math.ceil(Number(safeInputs.max_characters) / 100) : 200));
         compiledRequest = { ...compiled, inputs: { path: safeInputs.path, start_line: safeInputs.start_line ?? 1, max_lines: Math.min(Math.max(Math.trunc(requestedLines), 1), 200) } };
       }
