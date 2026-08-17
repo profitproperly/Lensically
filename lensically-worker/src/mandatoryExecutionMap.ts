@@ -363,7 +363,7 @@ export function validateWinningPathPromotions(promotions: readonly WinningPathPr
 function actionBindingMatches(promotion: WinningPathPromotion, toolName: string, args: Record<string, unknown>): boolean {
   if (promotion.binding_scope !== "action" || promotion.status !== "active") return false;
   const binding = promotion.action_binding;
-  if (!binding?.tool_names.includes(toolName)) return false;
+  if (!binding || (!binding.tool_names.includes("*") && !binding.tool_names.includes(toolName))) return false;
   return Object.entries(binding.argument_equals ?? {}).every(([key, expected]) => args[key] === expected);
 }
 
