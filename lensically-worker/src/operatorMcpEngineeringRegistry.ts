@@ -252,7 +252,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "executeOperatorAction",
     title: "Execute operator action",
-    description: `${CLIENT_SAFETY_GATEWAY_DESCRIPTION} Step 4 of the canonical Operator lifecycle. Execute exactly the server-bound action prepared in Steps 2 and 3 using only the opaque live-state token. The client does not replay capability names or arguments at the execution choke point.`,
+    description: "Step 4 of the canonical Operator lifecycle. Execute exactly the server-bound action prepared in Steps 2 and 3. Repeat the exact client-safe execution_descriptor returned by Step 3 so the client can see the neutral action identity and whether the prepared action is read-only or mutating. Raw internal handler names and action arguments remain server-side and are never replayed at the execution choke point.",
     inputSchema: {
       type: "object",
       properties: {
