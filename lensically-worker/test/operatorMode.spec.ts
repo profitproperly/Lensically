@@ -4282,7 +4282,7 @@ active_checkpoint: none
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
   }, 30000);
 
-  it("adopts the first valid MCP session for an unbound lifecycle and carries the binding forward", async () => {
+  it("keeps a sessionless lifecycle unbound across valid transport-session rotation while preserving strict bound-session mismatch rejection", async () => {
     const initializeSession = async (): Promise<string> => {
       const response = await fetchFromWorker("/api/operator/mcp", {
         method: "POST",
@@ -4322,12 +4322,16 @@ active_checkpoint: none
     };
 
     const firstSessionId = await initializeSession();
+    const secondSessionId = await initializeSession();
+    expect(secondSessionId).not.toBe(firstSessionId);
+
     const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
-    const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+    const step2 = await callWithSession<{ ok: boolean; knowledge_token: string }>(firstSessionId, "getOperatorKnowledge", {
       session_map_token: step1.structuredContent.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
     });
-    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(firstSessionId, "getOperatorLiveState", {
+    expect(step2.isError).not.toBe(true);
+    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(secondSessionId, "getOperatorLiveState", {
       knowledge_token: step2.structuredContent.knowledge_token,
     });
     expect(step3.isError).not.toBe(true);
@@ -4338,24 +4342,33 @@ active_checkpoint: none
     ).bind(step3.structuredContent.live_state_token).first<{ payload_json: string }>();
     expect(persistedLiveState).toBeTruthy();
     const persistedLiveStatePayload = JSON.parse(String(persistedLiveState?.payload_json ?? "{}")) as Record<string, unknown>;
-    expect(persistedLiveStatePayload.mcp_session_id).toBe(firstSessionId);
+    expect(persistedLiveStatePayload.mcp_session_id).toBeNull();
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
     });
     expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.action_execution_token).toBeTruthy();
-    const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(firstSessionId, "closeOperatorAction", {
+    const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(secondSessionId, "closeOperatorAction", {
       action_execution_token: step4.structuredContent.action_execution_token,
       verification: {
         verified: true,
-        evidence: ["The unbound lifecycle adopted the first valid MCP session and the bound session completed Step 4."],
+        evidence: ["A sessionless Step-1 lifecycle remained transport-unbound while valid MCP session IDs rotated across later stages."],
         next_action: "Continue the isolated lifecycle regression.",
         prevention_required: false,
       },
     });
     expect(step5.isError).not.toBe(true);
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+
+    const strictStep1 = await callWithSession<{ session_map_token: string }>(firstSessionId, "getOperatorSessionMap", {});
+    expect(strictStep1.isError).not.toBe(true);
+    const crossSessionStep2 = await callWithSession<{ ok: boolean; error?: string }>(secondSessionId, "getOperatorKnowledge", {
+      session_map_token: strictStep1.structuredContent.session_map_token,
+      planned_action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(crossSessionStep2.isError).toBe(true);
+    expect(crossSessionStep2.structuredContent).toMatchObject({ ok: false, error: "operator_lifecycle_session_changed" });
   }, 30000);
 
   it("reconciles corrupted opaque lifecycle references only from the exact current MCP session and stage without replaying post-Step-3 actions", async () => {
