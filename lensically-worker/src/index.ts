@@ -16810,6 +16810,19 @@ function normalizeOperatorGuardValue(
 ): { value: unknown; corrections: OperatorGuardCorrection[]; errors: OperatorGuardError[] } {
   const corrections: OperatorGuardCorrection[] = [];
   const errors: OperatorGuardError[] = [];
+  const oneOfSchemas = Array.isArray(schema.oneOf)
+    ? schema.oneOf.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+  if (oneOfSchemas.length) {
+    const candidates = oneOfSchemas.map((branch) => normalizeOperatorGuardValue(value, branch, path));
+    const valid = candidates.filter((candidate) => candidate.errors.length === 0);
+    if (valid.length === 1) return valid[0];
+    return {
+      value,
+      corrections: [],
+      errors: [{ path, error: valid.length > 1 ? "one_of_multiple_matches" : "one_of_no_match" }],
+    };
+  }
   const type = typeof schema.type === "string" ? schema.type : null;
   const enumValues = Array.isArray(schema.enum) ? schema.enum : null;
   if (enumValues && !enumValues.some((item) => Object.is(item, value))) {
