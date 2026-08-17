@@ -178,10 +178,16 @@ export type WinningPathPromotion = {
     route_intent?: string;
     procedure: string[];
   };
-  evidence: string[];
+    evidence: string[];
   scope: "isolated" | "component" | "account" | "universal";
+  binding_scope: "action" | "routing" | "runtime_guard" | "source_control";
+  action_binding?: {
+    tool_names: string[];
+    argument_equals?: Record<string, string | number | boolean>;
+  };
   enforcement_point: string;
   regression_test_id: string;
+
   supersedes?: string;
   supersession_rule: string;
 };
@@ -212,7 +218,8 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       procedure: ["Acquire the approved-to-posting claim atomically.", "Create the Threads container and poll its status until FINISHED before committing.", "Call threads_publish exactly once after readiness succeeds.", "Compare processing timestamps through SQLite datetime normalization.", "Keep failed, stale, or ambiguous external attempts quarantined in posting.", "Pause the scheduler immediately when any quarantined publish exists.", "Treat a returned Threads post ID as authoritative.", "Require explicit reconciliation before any new publish attempt."],
     },
     evidence: ["Cloudflare telemetry showed scheduled posts 579 and 580 claimed by fetch and alarm invocations seconds apart.", "One concurrent attempt published successfully while the sibling failed its local posting-to-posted transition.", "The stale cutoff used ISO text against SQLite CURRENT_TIMESTAMP text, immediately reopening active posting rows.", "The July 18 8:00 PM failure remained quarantined while scheduler health still reported normal and operational, leaving later slots exposed."],
-    scope: "universal",
+        scope: "universal",
+    binding_scope: "runtime_guard",
     enforcement_point: "Scheduled-post state machine, automatic quarantine pause, health fail-closed behavior, normalized stale-state guard, and focused Operator regressions.",
     regression_test_id: "never reopens stale posting rows after an external publish attempt",
     supersession_rule: "A replacement must preserve at-most-once external publication and require positive reconciliation evidence before retrying an uncertain attempt.",
@@ -233,7 +240,9 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       procedure: ["Use the registered atomic patch-set profile.", "Validate every exact replacement against one repository head.", "Commit once only after all replacements validate.", "Run focused validation and release the exact tested head."],
     },
         evidence: ["The Main gateway exposes bounded exact-head atomic patch sets.", "The fresh-chat acceptance campaign proved the former Recovery-only threshold blocked a valid registered Main request."],
-    scope: "universal",
+        scope: "universal",
+    binding_scope: "action",
+    action_binding: { tool_names: ["applyRepoPatchSet"] },
         enforcement_point: "Mandatory Execution Map pre-action resolution and exact-head atomic patch validation.",
     regression_test_id: "keeps bounded large repository patch sets on the Main gateway",
     supersession_rule: "Any replacement must keep bounded registered patch sets on Main with atomic validation and zero partial commits.",
@@ -254,7 +263,8 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       procedure: ["Implement first.", "Run focused validation.", "Release the exact tested head.", "Verify production."],
     },
     evidence: ["The broad end-to-end implementation objective was not classified.", "The deterministic implementation route is the required first stage."],
-    scope: "universal",
+        scope: "universal",
+    binding_scope: "routing",
     enforcement_point: "Mandatory Execution Map pre-action resolution.",
     regression_test_id: "promotes multi-stage architecture work to implementation before release",
     supersession_rule: "A replacement must preserve implementation-before-verification ordering and pass the same regression.",
@@ -274,7 +284,8 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       procedure: ["Keep the production behavior unchanged.", "Assign a bounded timeout to the specific integration regression.", "Do not raise the global test timeout.", "Re-run the deterministic shard."],
     },
     evidence: ["The monthly-growth integration regression completed beyond the five-second default while neighboring shard tests passed."],
-    scope: "component",
+        scope: "component",
+    binding_scope: "source_control",
     enforcement_point: "Focused integration test definition and deterministic shard regression.",
     regression_test_id: "records the bounded integration-test timeout winning path",
     supersession_rule: "Remove the explicit timeout only after the test is measurably optimized below the default across repeated deterministic runs.",
@@ -294,7 +305,9 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       procedure: ["Write the version only in OPERATOR_MCP_VERSION.", "Keep architecture documentation versionless.", "Verify artifact, runtime version, deployment commit, and exact release head."],
     },
     evidence: ["A manually duplicated CURRENT_STATE version caused a release-preflight failure."],
-    scope: "universal",
+        scope: "universal",
+    binding_scope: "action",
+    action_binding: { "tool_names": ["runGitHubWorkflow"], "argument_equals": {"task":"worker-deploy"} },
     enforcement_point: "Release preflight.",
     regression_test_id: "keeps Operator MCP version metadata single-source",
     supersession_rule: "Any replacement must retain one writable version source and fail closed on runtime or artifact mismatch.",
@@ -323,11 +336,51 @@ export function validateWinningPathPromotions(promotions: readonly WinningPathPr
   const idSet = new Set(ids);
   for (const promotion of promotions) {
     if (!promotion.losing_path.trim() || !promotion.winning_path.procedure.length || !promotion.evidence.length) errors.push(`winning_path_incomplete:${promotion.id}`);
-    if (!promotion.enforcement_point.trim() || !promotion.regression_test_id.trim() || !promotion.supersession_rule.trim()) errors.push(`winning_path_enforcement_incomplete:${promotion.id}`);
+        if (!promotion.enforcement_point.trim() || !promotion.regression_test_id.trim() || !promotion.supersession_rule.trim()) errors.push(`winning_path_enforcement_incomplete:${promotion.id}`);
     if (promotion.supersedes && !idSet.has(promotion.supersedes)) errors.push(`winning_path_supersedes_unknown:${promotion.id}:${promotion.supersedes}`);
     if (!promotion.matching_conditions.all_terms?.length && !promotion.matching_conditions.any_terms?.length && promotion.matching_conditions.min_input_characters === undefined) errors.push(`winning_path_match_missing:${promotion.id}`);
+    if (promotion.binding_scope === "action") {
+      const toolNames = promotion.action_binding?.tool_names ?? [];
+      if (!toolNames.length || toolNames.some((toolName) => !toolName.trim())) errors.push(`winning_path_action_binding_missing:${promotion.id}`);
+      if (new Set(toolNames).size !== toolNames.length) errors.push(`winning_path_action_binding_duplicate_tool:${promotion.id}`);
+    } else if (promotion.action_binding) {
+      errors.push(`winning_path_non_action_binding_forbidden:${promotion.id}`);
+    }
+
   }
-  return { ok: errors.length === 0, errors };
+    return { ok: errors.length === 0, errors };
+}
+
+function actionBindingMatches(promotion: WinningPathPromotion, toolName: string, args: Record<string, unknown>): boolean {
+  if (promotion.binding_scope !== "action" || promotion.status !== "active") return false;
+  const binding = promotion.action_binding;
+  if (!binding?.tool_names.includes(toolName)) return false;
+  return Object.entries(binding.argument_equals ?? {}).every(([key, expected]) => args[key] === expected);
+}
+
+export function resolveActionBoundWinningPaths(toolName: string, args: Record<string, unknown> = {}): WinningPathPromotion[] {
+  return WINNING_PATH_PROMOTIONS
+    .filter((promotion) => actionBindingMatches(promotion, toolName, args))
+    .sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+}
+
+export function resolveHardeningPreventionBinding(ruleId: string): {
+  id: string;
+  binding_scope: WinningPathPromotion["binding_scope"];
+  tool_names: string[];
+  enforcement_point: string;
+  regression_test_id: string;
+} | null {
+  const normalizedId = ruleId.replace(/^prevention\./, "");
+  const promotion = WINNING_PATH_PROMOTIONS.find((candidate) => candidate.status === "active" && candidate.id === normalizedId);
+  if (!promotion) return null;
+  return {
+    id: promotion.id,
+    binding_scope: promotion.binding_scope,
+    tool_names: [...(promotion.action_binding?.tool_names ?? [])],
+    enforcement_point: promotion.enforcement_point,
+    regression_test_id: promotion.regression_test_id,
+  };
 }
 
 export function resolvePromotedWinningPath(actionIntent: string, objective: string | null, inputs: Record<string, unknown>): WinningPathPromotion | null {
