@@ -3878,6 +3878,8 @@ describe("operator mode MCP endpoint", () => {
     expect(actionCapabilities).toContain("case_step");
     expect(actionCapabilities).toContain("checkpoint_step");
     expect(actionCapabilities).toContain("control_step");
+    expect(actionCapabilities).toContain("repository_symbol_search");
+    expect(actionCapabilities).not.toContain("search_repo_files");
     expect(actionCapabilities).not.toContain("run_git_hub_workflow");
     expect(actionCapabilities).not.toContain("hardening_transition");
     expect(actionCapabilities).not.toContain("operator_work_transition");
