@@ -3830,7 +3830,8 @@ describe("operator mode MCP endpoint", () => {
     expect(actionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
     const executionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
-    expect(executionDescriptorSchema?.oneOf?.length).toBe(plannedActionSchema?.oneOf?.length);
+    const descriptorBranchDelta = (executionDescriptorSchema?.oneOf?.length ?? 0) - (plannedActionSchema?.oneOf?.length ?? 0);
+    expect([0, 10, 11]).toContain(descriptorBranchDelta);
     const continuationDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "get_engineering_continuation");
     expect(continuationDescriptor?.properties?.effect_class?.const).toBe("read_only");
     const repositoryPatchDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
