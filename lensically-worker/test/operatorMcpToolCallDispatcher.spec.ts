@@ -98,6 +98,8 @@ function baseDependencies(
         planned_tool: "getRepoStatus",
         planned_arguments: {},
         planned_action_fingerprint: "request-fingerprint",
+        client_action_id: "repository_status",
+        effect_class: "read_only",
       },
     })),
     requiredKnowledgeNodes: vi.fn(() => []),
