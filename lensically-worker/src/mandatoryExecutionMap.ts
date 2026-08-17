@@ -441,6 +441,7 @@ export function resolvePromotedWinningPath(actionIntent: string, objective: stri
   const inputCharacters = JSON.stringify(inputs).length;
   return [...WINNING_PATH_PROMOTIONS]
     .filter((promotion) => promotion.status === "active")
+    .filter((promotion) => promotion.binding_scope !== "action" || promotion.action_binding?.semantic_routing === true)
     .filter((promotion) => {
       const conditions = promotion.matching_conditions;
       if (conditions.min_input_characters !== undefined && inputCharacters < conditions.min_input_characters) return false;
