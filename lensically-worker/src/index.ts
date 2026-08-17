@@ -17397,7 +17397,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         if (!exactTool) throw new Error("unknown_capability_definition");
         compiledRequest = { ...compiled, inputs: { tool_name: exactTool } };
       }
-      if (profileId === "repository_symbol_search") {
+      if (profileId === "repository_symbol_search" && !typedLifecycleBound) {
         compiledRequest = { ...compiled, inputs: { prefix: safeInputs.path, query: safeInputs.symbol, limit: safeInputs.limit ?? 20 } };
       }
             if (profileId === "repository_file_read" && !typedLifecycleBound) {
