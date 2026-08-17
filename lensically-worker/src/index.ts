@@ -21510,6 +21510,7 @@ async function handleOperatorMcpEngineeringTool(
         fingerprint: plannedFingerprint,
       },
       action_rule_binding: actionRuleContinuity.binding,
+      execution_descriptor: executionDescriptor,
       state,
 
       live_state_token: liveStateToken,
