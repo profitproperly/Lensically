@@ -3919,6 +3919,15 @@ describe("operator mode MCP endpoint", () => {
       planned_action: { capability: "control_step", arguments: {} },
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
+    const repositorySearchKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
+      session_map_token: step1.session_map_token,
+      planned_action: {
+        capability: "repository_symbol_search",
+        arguments: { query: "Current Action", prefix: "ENGINEERING_CONTINUATION.md", limit: 1 },
+      },
+    });
+    expect(repositorySearchKnowledge.knowledge_token).toBeTruthy();
+    expect(repositorySearchKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["neutral_repository_symbol_search_contract"]));
             const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
