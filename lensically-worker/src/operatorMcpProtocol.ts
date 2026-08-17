@@ -5,6 +5,38 @@ export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix"
 
 export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v10";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
+export const OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v1";
+
+const OPERATOR_BASE_ACTION_RULE_IDS = [
+  "governance.autonomy_efficiency_prevention",
+  "governance.failure_interrupt",
+  "governance.discovery_execution_match",
+  "schema.closed_typed_contract",
+  "schema.declared_bounds_hard",
+  "lifecycle.prepared_action_immutable",
+  "lifecycle.explicit_close",
+] as const;
+
+export function operatorActionRuleBindingForTool(toolName: string, args: Record<string, unknown> = {}) {
+  const ruleIds = new Set<string>(OPERATOR_BASE_ACTION_RULE_IDS);
+  if (toolName === "readRepoFile") ruleIds.add("repository.known_file_read");
+  if (toolName === "searchRepoFiles") ruleIds.add("repository.exact_known_file_search");
+  if (toolName === "applyRepoTextPatch" || toolName === "applyRepoPatchSet") {
+    ruleIds.add("repository.exact_unique_patch");
+    ruleIds.add("repository.contiguous_source_anchor");
+    ruleIds.add("repository.non_whitespace_semantic_anchor");
+  }
+  if (toolName === "applyRepoPatchSet") ruleIds.add("repository.exact_head_discipline");
+  if (toolName === "runGitHubWorkflow") {
+    ruleIds.add("workflow.declared_task_only");
+    if (args.task === "worker-deploy") {
+      ruleIds.add("release.exact_validated_head");
+      ruleIds.add("release.no_active_content_cycle");
+    }
+  }
+  return { registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION, rule_ids: [...ruleIds] };
+}
+
 export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
 export const OPERATOR_PUBLIC_SCHEMA_REFRESH_RULE = "An MCP refresh and its associated new-chat handoff have exactly one operational trigger: after a public MCP tool addition, removal, or schema/tool-surface change is deployed and live-verified, the current chat still advertises the pre-change public schema and therefore cannot correctly use the newly deployed invocation contract. First evaluate the contract actually surfaced in the current chat. If the changed tools or actions are already surfaced and usable, do not request an MCP refresh and do not instruct the owner to start a new chat. Runtime-only, implementation-only, governance-text, deployment-identity, client-side block, session or deployment mismatch, validation failure, transport issue, or preference does not authorize an MCP refresh or a new-chat instruction. A genuinely stale surfaced public schema is a mandatory client-refresh boundary; do not add compatibility or Recovery workarounds for it. No other rule may independently request an MCP refresh or a new chat. When and only when this stale-schema condition is proven, the refresh handoff is incomplete unless it contains the exact standalone line: refresh the lensically operator mode mcp now. Immediately after that line, render exactly one fenced plaintext code block whose first line is CONTEXT PORT — PASTE INTO NEW CHAT. The model must author this port from verified current state; never require the owner to infer continuation, summarize from memory, copy prior prose, or paste the whole previous response. When ENGINEERING_CONTINUATION.md is the canonical continuation authority, the context port must be bootstrap-only: include only the minimum information required for the fresh chat to call refreshed Lensically Operator Mode first and read ENGINEERING_CONTINUATION.md. It must not duplicate ECL history, evidence, constraints, deployment state, or next-step detail, and the detailed continuation fields below are not required in this ECL-canonical case. Only when ENGINEERING_CONTINUATION.md is not the canonical continuation authority must the context port be self-contained and include these labeled fields: FIRST ACTION, RESUME OBJECTIVE, COMPLETED / VERIFIED, CURRENT STATE, NEXT ACTION, SURVIVING CONSTRAINTS, and DEPLOYMENT IDENTITY. Include only the information required to resume without ambiguity.";
 export const OPERATOR_CONVERSATIONAL_PROBLEM_INTAKE_RULE = "When the owner surfaces a problem during conversation, conversational Operator reasoning activates immediately at problem intake and carries the exchange through problem understanding, cause, solution, an explicit statement of what will be implemented next, implementation when available and appropriate, the real next step, and closure when no real next step remains. Do not wait until a solution is already reached to activate this mindset. Do not stop at explanation-only when a real implementation or next step is available. Do not invent work after closure.";

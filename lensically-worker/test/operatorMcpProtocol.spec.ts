@@ -3,6 +3,9 @@ import { sanitizeForLog } from "../auth/logSanitizer.js";
 import {
                                                                 OPERATOR_GOVERNING_STANDARDS,
     OPERATOR_GOVERNING_STANDARDS_VERSION,
+    OPERATOR_ACTION_RULE_REGISTRY_VERSION,
+    operatorActionRuleBindingForTool,
+
         OPERATOR_DISCOVERY_EXECUTION_RULE,
     OPERATOR_FAILURE_REPAIR_RULE,
     OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE,
@@ -156,6 +159,17 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("server-side evidence");
     expect(OPERATOR_GOVERNING_STANDARDS.client_predispatch_block_rule).toBe(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE);
     expect(OPERATOR_GOVERNING_STANDARDS.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
+    const readRules = operatorActionRuleBindingForTool("readRepoFile", { path: "lensically-worker/src/index.ts", max_lines: 400 });
+    expect(readRules.registry_version).toBe(OPERATOR_ACTION_RULE_REGISTRY_VERSION);
+    expect(readRules.rule_ids).toContain("schema.declared_bounds_hard");
+    expect(readRules.rule_ids).toContain("repository.known_file_read");
+    const patchRules = operatorActionRuleBindingForTool("applyRepoPatchSet", {});
+    expect(patchRules.rule_ids).toContain("repository.contiguous_source_anchor");
+    expect(patchRules.rule_ids).toContain("repository.non_whitespace_semantic_anchor");
+    const releaseRules = operatorActionRuleBindingForTool("runGitHubWorkflow", { task: "worker-deploy" });
+    expect(releaseRules.rule_ids).toContain("release.exact_validated_head");
+    expect(releaseRules.rule_ids).toContain("release.no_active_content_cycle");
+
   });
 
     it("builds the visible standards-first selected-key handshake", () => {

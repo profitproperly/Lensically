@@ -787,15 +787,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                run: |
+        run: |
           set -euo pipefail
           current_local_hour_key="$(TZ=America/New_York date +'%Y-%m-%dT%H:00')"
-
-                    npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json \
-
+          npx wrangler d1 execute lensically-db --remote --config wrangler.release.generated.json \
             --command "SELECT COUNT(CASE WHEN horizon_end_local IS NOT NULL AND TRIM(horizon_end_local) <> '' AND horizon_end_local GLOB '????-??-??T??:??*' AND horizon_end_local >= '${current_local_hour_key}' THEN 1 END) AS active_cycle_count, COALESCE(SUM(CASE WHEN horizon_end_local IS NULL OR TRIM(horizon_end_local) = '' OR horizon_end_local NOT GLOB '????-??-??T??:??*' THEN 1 ELSE 0 END), 0) AS indeterminate_cycle_count, COALESCE(SUM(CASE WHEN horizon_end_local IS NOT NULL AND TRIM(horizon_end_local) <> '' AND horizon_end_local GLOB '????-??-??T??:??*' AND horizon_end_local < '${current_local_hour_key}' THEN 1 ELSE 0 END), 0) AS expired_cycle_count, (SELECT id FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') AND horizon_end_local GLOB '????-??-??T??:??*' AND horizon_end_local >= '${current_local_hour_key}' ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_id, (SELECT status FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') AND horizon_end_local GLOB '????-??-??T??:??*' AND horizon_end_local >= '${current_local_hour_key}' ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_status, (SELECT updated_at FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed') AND horizon_end_local GLOB '????-??-??T??:??*' AND horizon_end_local >= '${current_local_hour_key}' ORDER BY datetime(updated_at) DESC LIMIT 1) AS latest_active_cycle_updated_at FROM operator_autonomous_growth_cycles WHERE brand_key = 'manifest_mental' AND status IN ('prepared', 'partially_committed')" \
-
-                        --json > /tmp/lensically-active-content-cycle.json
+            --json > /tmp/lensically-active-content-cycle.json
           active_cycle_count="$(jq -r '[.. | objects | select(has("active_cycle_count")) | .active_cycle_count] | first // "missing"' /tmp/lensically-active-content-cycle.json)"
           indeterminate_cycle_count="$(jq -r '[.. | objects | select(has("indeterminate_cycle_count")) | .indeterminate_cycle_count] | first // "missing"' /tmp/lensically-active-content-cycle.json)"
           expired_cycle_count="$(jq -r '[.. | objects | select(has("expired_cycle_count")) | .expired_cycle_count] | first // "missing"' /tmp/lensically-active-content-cycle.json)"
@@ -808,7 +805,7 @@ jobs:
             echo "::error title=Main content cycle deployment guard::state unavailable" >&2
             echo "active_main_content_cycle_state_unavailable" >&2
             exit 1
-                    fi
+          fi
           if (( indeterminate_cycle_count != 0 )); then
             cat /tmp/lensically-active-content-cycle.json >&2
 
@@ -822,7 +819,7 @@ jobs:
             echo "::error title=Main content cycle deployment guard::active_cycle_count=${active_cycle_count}; latest_id=${latest_active_cycle_id}; status=${latest_active_cycle_status}; updated_at=${latest_active_cycle_updated_at}" >&2
             echo "active_main_content_cycle_deploy_forbidden" >&2
             exit 1
-                    fi
+          fi
           echo "::notice title=Main content cycle deployment guard::active_cycle_count=0; expired_cycle_count=${expired_cycle_count}; current_local_hour=${current_local_hour_key}"
           echo "active_main_content_cycle_guard_passed"
 
