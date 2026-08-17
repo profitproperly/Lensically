@@ -7,7 +7,8 @@ import {
 export const MANDATORY_EXECUTION_MAP_VERSION = "static-execution-router-v2";
 export const EXECUTION_POLICY_LIBRARY_VERSION = "retired";
 export const DEFECT_GENERALIZATION_GATE_VERSION = "defect-generalization-gate-v1";
-export const WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v1";
+export const WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v2";
+export const ACTION_INTELLIGENCE_BINDING_VERSION = "action-intelligence-binding-v1";
 export const CONTINUOUS_HARDENING_VERSION = "continuous-hardening-loop-v1";
 export type HardeningBoundary = "client" | "gateway" | "routing" | "server" | "database" | "deployment" | "quality" | "efficiency" | "external";
 export type HardeningSeverity = "P0" | "P1" | "P2" | "P3";
