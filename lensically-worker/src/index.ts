@@ -17054,7 +17054,7 @@ function operatorClientExecutionDescriptor(
   plannedArguments: Record<string, unknown> = {},
 ): { action_id: string; effect_class: "read_only" | "mutation" } {
   let actionId = capability;
-  if (toolName === "advanceHardeningIncident" && plannedArguments.stage !== undefined) {
+  if (toolName === "advanceHardeningIncident") {
     const stage = normalizeOperatorMachineKey(plannedArguments.stage, "");
     if (!OPERATOR_CASE_STEP_STAGES.includes(stage as OperatorCaseStepStage)) {
       throw new Error("case_step_execution_descriptor_stage_invalid");
