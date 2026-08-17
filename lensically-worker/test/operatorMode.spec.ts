@@ -4406,9 +4406,11 @@ active_checkpoint: none
     ).bind(step4.structuredContent.action_execution_token).first<{ payload_json: string }>();
     expect(persistedExecution).toBeTruthy();
     const persistedExecutionPayload = JSON.parse(String(persistedExecution?.payload_json ?? "{}")) as Record<string, unknown>;
-    expect(persistedExecutionPayload.action_rule_registry_version).toBe("operator-action-rule-registry-v2");
+    expect(persistedExecutionPayload.action_rule_registry_version).toBe("operator-action-rule-registry-v3");
+    expect(persistedExecutionPayload.action_intelligence_version).toBe("action-intelligence-binding-v1");
     expect(persistedExecutionPayload.action_rule_ids).toEqual(persistedLiveStatePayload.action_rule_ids);
     expect(persistedExecutionPayload.prevention_rule_ids).toEqual(persistedLiveStatePayload.prevention_rule_ids);
+    expect(persistedExecutionPayload.action_intelligence_ids).toEqual(persistedLiveStatePayload.action_intelligence_ids);
     const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(secondSessionId, "closeOperatorAction", {
       action_execution_token: step4.structuredContent.action_execution_token,
       verification: {
