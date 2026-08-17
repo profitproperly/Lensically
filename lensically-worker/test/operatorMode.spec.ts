@@ -6311,7 +6311,7 @@ active_checkpoint: none
       boundary: "client",
       blocked_profile_id: "run_git_hub_workflow",
       request_fingerprint: "fixture-openai-client-block-current-alias",
-      error_category: "client_pre_dispatch_block",
+      error_category: "openai_safety_checks_pre_dispatch",
       operation_class: "engineering_validation_workflow_dispatch",
       observed_outcome: { client_blocked: true, lensically_receipt: false },
     });
