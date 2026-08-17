@@ -439,6 +439,7 @@ export function validateWinningPathPromotions(promotions: readonly WinningPathPr
     if (!promotion.matching_conditions.all_terms?.length && !promotion.matching_conditions.any_terms?.length && promotion.matching_conditions.min_input_characters === undefined) errors.push(`winning_path_match_missing:${promotion.id}`);
     if (promotion.binding_scope === "action") {
       const toolNames = promotion.action_binding?.tool_names ?? [];
+      if (!promotion.root_cause?.trim()) errors.push(`winning_path_action_root_cause_missing:${promotion.id}`);
       if (!toolNames.length || toolNames.some((toolName) => !toolName.trim())) errors.push(`winning_path_action_binding_missing:${promotion.id}`);
       if (new Set(toolNames).size !== toolNames.length) errors.push(`winning_path_action_binding_duplicate_tool:${promotion.id}`);
     } else if (promotion.action_binding) {
