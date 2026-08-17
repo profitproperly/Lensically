@@ -4341,14 +4341,26 @@ active_checkpoint: none
       "SELECT payload_json FROM operator_continuity_refs WHERE id = ? AND kind = 'lifecycle_state' LIMIT 1",
     ).bind(step3.structuredContent.live_state_token).first<{ payload_json: string }>();
     expect(persistedLiveState).toBeTruthy();
-    const persistedLiveStatePayload = JSON.parse(String(persistedLiveState?.payload_json ?? "{}")) as Record<string, unknown>;
+        const persistedLiveStatePayload = JSON.parse(String(persistedLiveState?.payload_json ?? "{}")) as Record<string, unknown>;
     expect(persistedLiveStatePayload.mcp_session_id).toBeNull();
+    expect(persistedLiveStatePayload.action_rule_registry_version).toBe("operator-action-rule-registry-v2");
+    expect(persistedLiveStatePayload.winning_path_registry_version).toBe("winning-path-promotion-v1");
+    expect(persistedLiveStatePayload.action_rule_ids).toEqual(expect.arrayContaining(["prevention.typed_profile_exact_contract"]));
+    expect(persistedLiveStatePayload.prevention_rule_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract"]));
 
     const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
       live_state_token: step3.structuredContent.live_state_token,
     });
-    expect(step4.isError).not.toBe(true);
+        expect(step4.isError).not.toBe(true);
     expect(step4.structuredContent.action_execution_token).toBeTruthy();
+    const persistedExecution = await env.DB.prepare(
+      "SELECT payload_json FROM operator_continuity_refs WHERE id = ? AND kind = 'lifecycle_state' LIMIT 1",
+    ).bind(step4.structuredContent.action_execution_token).first<{ payload_json: string }>();
+    expect(persistedExecution).toBeTruthy();
+    const persistedExecutionPayload = JSON.parse(String(persistedExecution?.payload_json ?? "{}")) as Record<string, unknown>;
+    expect(persistedExecutionPayload.action_rule_registry_version).toBe("operator-action-rule-registry-v2");
+    expect(persistedExecutionPayload.action_rule_ids).toEqual(persistedLiveStatePayload.action_rule_ids);
+    expect(persistedExecutionPayload.prevention_rule_ids).toEqual(persistedLiveStatePayload.prevention_rule_ids);
     const step5 = await callWithSession<{ ok: boolean; lifecycle_stage: number }>(secondSessionId, "closeOperatorAction", {
       action_execution_token: step4.structuredContent.action_execution_token,
       verification: {

@@ -70,7 +70,9 @@ import { readCycleObservability } from "./cycleObservabilityService";
 import {
   OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_GOVERNING_STANDARDS_ACK,
-  operatorActionRuleBindingForTool,
+    operatorActionRuleBindingForTool,
+  validateOperatorActionRuleBindingContinuity,
+
   OPERATOR_MCP_VERSION,
   OPERATOR_LIFECYCLE_VERSION,
   OPERATOR_SESSION_MAP_VERSION,
@@ -21224,8 +21226,11 @@ async function handleOperatorMcpEngineeringTool(
       ),
       node_ids: nodeIds,
       knowledge_registry_version: operatorKnowledgeRegistry.version,
-      action_rule_registry_version: actionRuleBinding.registry_version,
+            action_rule_registry_version: actionRuleBinding.registry_version,
+      winning_path_registry_version: actionRuleBinding.winning_path_registry_version,
       action_rule_ids: actionRuleBinding.rule_ids,
+      prevention_rule_ids: actionRuleBinding.prevention_rule_ids,
+
       planned_capability: planned.capability,
       planned_tool: planned.toolName,
       planned_arguments: planned.arguments,
@@ -21282,14 +21287,19 @@ async function handleOperatorMcpEngineeringTool(
     if (!resolvedPlanned || !plannedTool || resolvedPlanned.toolName !== plannedTool || !plannedArguments || !plannedFingerprint || recomputedFingerprint !== plannedFingerprint) {
       return { ok: false, error: "operator_knowledge_action_binding_invalid", required_stage: "getOperatorKnowledge" };
     }
-    if (requestedPlannedAction?.ok && (
+        if (requestedPlannedAction?.ok && (
       requestedPlannedAction.capability !== plannedCapability
       || requestedPlannedAction.toolName !== plannedTool
       || requestedPlannedAction.fingerprint !== plannedFingerprint
     )) {
       return { ok: false, error: "operator_lifecycle_action_changed_after_preparation", required_stage: "getOperatorKnowledge" };
     }
+    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(plannedTool, plannedArguments, tokenCheck.payload);
+    if (!actionRuleContinuity.ok) {
+      return { ok: false, error: "operator_knowledge_action_competence_invalid", required_stage: "getOperatorKnowledge", action_rule_error: actionRuleContinuity.error };
+    }
     const scopes = requiredOperatorLiveStateScopesForTool(plannedTool, resolvedPlanned.tool);
+
     const brandKey = normalizeGptBrandKey(tokenCheck.payload.planned_brand_key);
     const accountScopes = scopes.filter((scope) => ["account", "growth_mission", "manifest_intelligence"].includes(scope));
     if (accountScopes.length && !brandKey) {
@@ -21359,8 +21369,13 @@ async function handleOperatorMcpEngineeringTool(
         tokenCheck.payload.mcp_session_id,
         request.headers.get("mcp-session-id")?.trim() || null,
       ),
-      knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
+            knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
+      action_rule_registry_version: actionRuleContinuity.binding.registry_version,
+      winning_path_registry_version: actionRuleContinuity.binding.winning_path_registry_version,
+      action_rule_ids: actionRuleContinuity.binding.rule_ids,
+      prevention_rule_ids: actionRuleContinuity.binding.prevention_rule_ids,
       scopes,
+
       brand_key: brandKey,
       planned_capability: plannedCapability,
       planned_tool: plannedTool,
@@ -21374,12 +21389,14 @@ async function handleOperatorMcpEngineeringTool(
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
       scopes,
       brand_key: brandKey,
-      action_binding: {
+            action_binding: {
         capability: plannedCapability,
         tool_name: plannedTool,
         fingerprint: plannedFingerprint,
       },
+      action_rule_binding: actionRuleContinuity.binding,
       state,
+
       live_state_token: liveStateToken,
     };
   }
@@ -21391,8 +21408,20 @@ async function handleOperatorMcpEngineeringTool(
       4,
       request.headers.get("mcp-session-id")?.trim() || null,
     );
-    if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "executeOperatorAction" };
+        if (!tokenCheck.ok) return { ok: false, error: tokenCheck.error, required_stage: "executeOperatorAction" };
+    const closurePlannedTool = normalizeOperatorText(tokenCheck.payload.planned_tool, 200, true);
+    const closurePlannedArguments = tokenCheck.payload.planned_arguments && typeof tokenCheck.payload.planned_arguments === "object" && !Array.isArray(tokenCheck.payload.planned_arguments)
+      ? tokenCheck.payload.planned_arguments as Record<string, unknown>
+      : null;
+    if (!closurePlannedTool || !closurePlannedArguments) {
+      return { ok: false, error: "operator_action_closure_competence_invalid", required_stage: "executeOperatorAction" };
+    }
+    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(closurePlannedTool, closurePlannedArguments, tokenCheck.payload);
+    if (!actionRuleContinuity.ok) {
+      return { ok: false, error: "operator_action_closure_competence_invalid", action_rule_error: actionRuleContinuity.error, required_stage: "executeOperatorAction" };
+    }
     const verification = args.verification && typeof args.verification === "object" && !Array.isArray(args.verification)
+
       ? args.verification as Record<string, unknown>
       : {};
     const evidence = Array.isArray(verification.evidence) ? verification.evidence.map(String).filter(Boolean).slice(0, 20) : [];
@@ -21414,18 +21443,28 @@ async function handleOperatorMcpEngineeringTool(
         tokenCheck.payload.mcp_session_id,
         request.headers.get("mcp-session-id")?.trim() || null,
       ),
-      executed_tool: tokenCheck.payload.executed_tool ?? null,
+            executed_tool: tokenCheck.payload.executed_tool ?? null,
       profile_id: tokenCheck.payload.profile_id ?? null,
+      planned_tool: closurePlannedTool,
+      planned_arguments: closurePlannedArguments,
+      planned_action_fingerprint: tokenCheck.payload.planned_action_fingerprint ?? null,
+      action_rule_registry_version: actionRuleContinuity.binding.registry_version,
+      winning_path_registry_version: actionRuleContinuity.binding.winning_path_registry_version,
+      action_rule_ids: actionRuleContinuity.binding.rule_ids,
+      prevention_rule_ids: actionRuleContinuity.binding.prevention_rule_ids,
       result_ok: tokenCheck.payload.result_ok ?? null,
       closed_at: new Date().toISOString(),
+
     });
     return {
       ok: true,
       lifecycle_stage: 5,
       closure_version: OPERATOR_ACTION_CLOSURE_VERSION,
       executed_tool: tokenCheck.payload.executed_tool ?? null,
-      profile_id: tokenCheck.payload.profile_id ?? null,
+            profile_id: tokenCheck.payload.profile_id ?? null,
+      action_rule_binding: actionRuleContinuity.binding,
       verification: {
+
         verified: true,
         evidence,
         next_action: nextAction,
@@ -22863,10 +22902,15 @@ async function handleOperatorMcpToolCall(
       const recomputedFingerprint = toolName && actionArguments
         ? await operatorExecutionFingerprint(toolName, actionArguments)
         : null;
-      if (!resolved || !toolName || resolved.toolName !== toolName || !actionArguments || !fingerprint || recomputedFingerprint !== fingerprint) {
+            if (!resolved || !toolName || resolved.toolName !== toolName || !actionArguments || !fingerprint || recomputedFingerprint !== fingerprint) {
         return { ok: false, error: "operator_live_state_action_binding_invalid" };
       }
+      const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(toolName, actionArguments, check.payload);
+      if (!actionRuleContinuity.ok) {
+        return { ok: false, error: "operator_live_state_action_competence_invalid" };
+      }
       return { ok: true, payload: check.payload };
+
     },
     requiredKnowledgeNodes: (toolName) => requiredOperatorKnowledgeNodesForTool(toolName),
     requiredLiveStateScopes: (toolName) => requiredOperatorLiveStateScopesForTool(toolName),
@@ -22878,10 +22922,16 @@ async function handleOperatorMcpToolCall(
       ),
       profile_id: profileId,
       executed_tool: toolName,
-      planned_capability: liveStatePayload.planned_capability ?? null,
+            planned_capability: liveStatePayload.planned_capability ?? null,
       planned_tool: liveStatePayload.planned_tool ?? toolName,
+      planned_arguments: liveStatePayload.planned_arguments ?? null,
       planned_action_fingerprint: liveStatePayload.planned_action_fingerprint ?? null,
+      action_rule_registry_version: liveStatePayload.action_rule_registry_version ?? null,
+      winning_path_registry_version: liveStatePayload.winning_path_registry_version ?? null,
+      action_rule_ids: liveStatePayload.action_rule_ids ?? [],
+      prevention_rule_ids: liveStatePayload.prevention_rule_ids ?? [],
       result_ok: result.ok !== false,
+
       result_error: normalizeOperatorMachineKey(result.error ?? result.error_code, "") || null,
       live_state_scopes: liveStatePayload.scopes ?? [],
       brand_key: liveStatePayload.brand_key ?? null,
