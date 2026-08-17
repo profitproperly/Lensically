@@ -17095,7 +17095,6 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
     });
     return {
       oneOf: [
-        stageOnly("n", "Advance exactly one state only when the next state requires no new evidence. Use an absolute stage when new evidence is required."),
         stageOnly("a0", "Contain the active incident. No transition evidence is accepted at this stage."),
         stageOnly("a1", "Classify the contained incident. No transition evidence is accepted at this stage."),
         stageOnly("a2", "Record reproduction of the classified incident. No transition evidence is accepted at this stage."),
