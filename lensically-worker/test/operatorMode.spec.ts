@@ -4234,6 +4234,10 @@ active_checkpoint: none
         planned_action: action,
       });
       expect(step3.isError, JSON.stringify(step3.structuredContent)).not.toBe(true);
+      expect([
+        { action_id: "case_step", effect_class: "mutation" },
+        { action_id: `case_step_${String(arguments_.stage)}`, effect_class: "mutation" },
+      ]).toContainEqual(step3.structuredContent.execution_descriptor);
       const step4 = await mcpToolCallRaw<{
         ok: boolean;
         current_state: string;
