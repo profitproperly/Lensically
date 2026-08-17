@@ -31,6 +31,7 @@ import worker, {
   shouldAutoArmScheduledPostAlarm,
 
 } from "../src";
+import { OPERATOR_ACTION_RULE_REGISTRY_VERSION } from "../src/operatorMcpProtocol";
 import {
   finalizeManifestCycleReceipt,
   recordManifestCycleDefect,
