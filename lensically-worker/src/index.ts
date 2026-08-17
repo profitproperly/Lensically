@@ -17048,6 +17048,12 @@ const OPERATOR_CASE_STEP_STAGES = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7
 
 type OperatorCaseStepStage = typeof OPERATOR_CASE_STEP_STAGES[number];
 
+const OPERATOR_NEUTRAL_EXECUTION_ID_BY_TOOL = new Map<string, string>([
+  ["readMcpToolDefinition", "exec_01"],
+  ["advanceHardeningIncident", "exec_02"],
+  ["runGitHubWorkflow", "exec_03"],
+]);
+
 function operatorPlannedActionIsReadOnlyDryRun(
   toolName: string,
   plannedArguments: Record<string, unknown>,
@@ -17061,13 +17067,15 @@ function operatorClientExecutionDescriptor(
   capability: string,
   plannedArguments: Record<string, unknown> = {},
 ): { action_id: string; effect_class: "read_only" | "mutation" } {
-  let actionId = capability;
+  const actionBaseId = OPERATOR_NEUTRAL_EXECUTION_ID_BY_TOOL.get(toolName) ?? capability;
+  let actionId = actionBaseId;
   if (toolName === "advanceHardeningIncident") {
     const stage = normalizeOperatorMachineKey(plannedArguments.stage, "");
-    if (!OPERATOR_CASE_STEP_STAGES.includes(stage as OperatorCaseStepStage)) {
+    const stageIndex = OPERATOR_CASE_STEP_STAGES.indexOf(stage as OperatorCaseStepStage);
+    if (stageIndex < 0) {
       throw new Error("case_step_execution_descriptor_stage_invalid");
     }
-    actionId = `${capability}_${stage}`;
+    actionId = `${actionBaseId}_${String(stageIndex).padStart(2, "0")}`;
   }
   return {
     action_id: actionId,
