@@ -13,7 +13,8 @@ const required = [
   ['stop after successful or final attempt', '!transientStatuses.has(response.status) || attempt === maxAttempts'],
   ['bounded base64 encoding chunk size', 'const chunkSize = 0x8000;'],
     ['chunked base64 byte conversion', 'String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)))'],
-  ['failed workflow log text reader', 'async function githubText(env: Env, path: string)'],
+    ['failed workflow log text reader', 'async function githubText(env: Env, path: string)'],
+  ['failed workflow log API media type', 'accept: "application/vnd.github+json"'],
   ['failed workflow log endpoint', '/actions/jobs/${jobId}/logs'],
   ['bounded failed workflow log tail', 'failed_log_tail: failedLogText ? failedLogText.slice(-12000) : null'],
 ];

@@ -122,7 +122,7 @@ async function githubText(env: Env, path: string): Promise<{ ok: boolean; status
       response = await fetch(`https://api.github.com${path}`, {
         signal: controller.signal,
         headers: {
-          accept: "text/plain",
+                    accept: "application/vnd.github+json",
           authorization: `Bearer ${env.GITHUB_TOKEN}`,
           "user-agent": "lensically-recovery",
           "x-github-api-version": "2022-11-28",
