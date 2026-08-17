@@ -144,7 +144,11 @@ function isVitestTaskUpdateTransportTimeout(value) {
   const allAssertionsPassed = /\bTests\s+\d+\s+passed(?:\s+\(\d+\))?/i.test(output);
   const semanticFailureReported = /\bTests\s+[^\n]*\bfailed\b/i.test(output)
     || /\bAssertionError\b/.test(output)
-    || /(?:^|\n)\s*(?:FAIL|❯|×)\s/m.test(output);
+    || output.split(/\r?\n/).some((line) => {
+      const trimmed = line.trim();
+      return trimmed.includes(" > ")
+        && (trimmed.includes("FAIL") || trimmed.startsWith("❯") || trimmed.startsWith("×"));
+    });
   return output.includes(VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE)
     && allAssertionsPassed
     && !semanticFailureReported;
