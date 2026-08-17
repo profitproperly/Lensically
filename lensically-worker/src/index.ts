@@ -21473,6 +21473,7 @@ async function handleOperatorMcpEngineeringTool(
     }
     const failedScope = Object.entries(state).find(([, value]) => value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).ok === false);
     if (failedScope) return { ok: false, error: "operator_live_state_provider_failed", scope: failedScope[0], provider_result: failedScope[1] };
+    const executionDescriptor = operatorClientExecutionDescriptor(plannedTool, plannedCapability);
                         const liveStateToken = await issueOperatorLifecycleToken(env, 3, {
       live_state_version: OPERATOR_LIVE_STATE_VERSION,
       mcp_session_id: resolveOperatorLifecycleSessionBinding(
