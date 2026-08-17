@@ -262,6 +262,7 @@ function run(label, command, args, diagnosticTestFiles = []) {
   if (result.status !== 0) {
     if (Array.isArray(diagnosticTestFiles) && diagnosticTestFiles.length > 0) {
       let isolatedFailure = null;
+      let transportRecovered = false;
       for (const testFile of diagnosticTestFiles) {
         const isolated = runCapturedVitest([testFile]);
         if (isolated.stdout) process.stdout.write(isolated.stdout);
