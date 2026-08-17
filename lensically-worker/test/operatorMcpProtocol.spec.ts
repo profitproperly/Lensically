@@ -163,6 +163,17 @@ describe("Operator MCP protocol contract", () => {
     expect(readRules.registry_version).toBe(OPERATOR_ACTION_RULE_REGISTRY_VERSION);
     expect(readRules.rule_ids).toContain("schema.declared_bounds_hard");
     expect(readRules.rule_ids).toContain("repository.known_file_read");
+    expect(readRules.rule_ids).toContain("prevention.typed_profile_exact_contract");
+    expect(readRules.prevention_rule_ids).toContain("typed_profile_exact_contract");
+    const caseStepRules = operatorActionRuleBindingForTool("advanceHardeningIncident", {});
+    expect(caseStepRules.rule_ids).toEqual(expect.arrayContaining([
+      "prevention.typed_profile_exact_contract",
+      "prevention.neutral_case_step_contract",
+    ]));
+    expect(caseStepRules.prevention_rule_ids).toEqual(expect.arrayContaining([
+      "typed_profile_exact_contract",
+      "neutral_case_step_contract",
+    ]));
     const patchRules = operatorActionRuleBindingForTool("applyRepoPatchSet", {});
     expect(patchRules.rule_ids).toContain("repository.contiguous_source_anchor");
     expect(patchRules.rule_ids).toContain("repository.non_whitespace_semantic_anchor");
