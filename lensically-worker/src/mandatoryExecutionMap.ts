@@ -246,6 +246,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       min_input_characters: 3000,
     },
         losing_path: "Force a bounded registered repository patch set onto Recovery solely because its payload exceeds an arbitrary character threshold.",
+        root_cause: "A client-side size heuristic was allowed to override the registered Main patch-set capability even though Main already had the correct atomic execution path.",
         winning_path: {
       surface: "main_gateway",
       route_intent: "apply repo patch set",
