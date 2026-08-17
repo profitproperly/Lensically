@@ -1,6 +1,5 @@
 import {
   CLIENT_SAFETY_BRAND_KEY_DESCRIPTION,
-  CLIENT_SAFETY_GATEWAY_DESCRIPTION,
 } from "./systemDirectory";
 import type { OperatorMcpToolDefinition } from "./operatorMcpToolDefinitions";
 
