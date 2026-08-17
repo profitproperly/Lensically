@@ -68,8 +68,9 @@ import { readCycleObservability } from "./cycleObservabilityService";
 
 
 import {
-                                OPERATOR_GOVERNING_STANDARDS,
+  OPERATOR_GOVERNING_STANDARDS,
   OPERATOR_GOVERNING_STANDARDS_ACK,
+  operatorActionRuleBindingForTool,
   OPERATOR_MCP_VERSION,
   OPERATOR_LIFECYCLE_VERSION,
   OPERATOR_SESSION_MAP_VERSION,
@@ -16753,7 +16754,7 @@ function extractActiveContinuationExcerpt(content: string, activeJobId: string |
   return lines.slice(start, end).join("\n");
 }
 
-const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v4";
+const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v5";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
 const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeOperatorAction";
 const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
@@ -16909,11 +16910,14 @@ async function createOperatorExecutionGuard(
   intendedTool: string,
   args: Record<string, unknown>,
 ): Promise<string> {
+  const actionRuleBinding = operatorActionRuleBindingForTool(intendedTool, args);
   return createSignedOperatorEnvelope(env, {
     kind: "operator_execution_guard",
     version: OPERATOR_EXECUTION_GUARD_VERSION,
     intended_tool: intendedTool,
     args_fingerprint: await operatorExecutionFingerprint(intendedTool, args),
+    action_rule_registry_version: actionRuleBinding.registry_version,
+    action_rule_ids: actionRuleBinding.rule_ids,
     exp: Math.floor(Date.now() / 1000) + OPERATOR_EXECUTION_GUARD_TTL_SECONDS,
   });
 }
@@ -16930,6 +16934,17 @@ async function verifyOperatorExecutionGuard(
   }
   const guardedArgs = { ...args };
   delete guardedArgs.execution_guard;
+  const actionRuleBinding = operatorActionRuleBindingForTool(toolName, guardedArgs);
+  const payloadRuleIds = Array.isArray(payload.action_rule_ids)
+    ? payload.action_rule_ids.filter((value): value is string => typeof value === "string")
+    : [];
+  if (
+    payload.action_rule_registry_version !== actionRuleBinding.registry_version
+    || payloadRuleIds.length !== actionRuleBinding.rule_ids.length
+    || payloadRuleIds.some((ruleId, index) => ruleId !== actionRuleBinding.rule_ids[index])
+  ) {
+    return { ok: false, error: "execution_guard_rule_binding_mismatch" };
+  }
   const fingerprint = await operatorExecutionFingerprint(toolName, guardedArgs);
   if (payload.intended_tool !== toolName || payload.args_fingerprint !== fingerprint) {
     return { ok: false, error: "execution_guard_mismatch" };
@@ -21176,6 +21191,7 @@ async function handleOperatorMcpEngineeringTool(
     const planned = await resolveOperatorPlannedAction(args.planned_action);
     if (!planned.ok) return { ...planned, required_stage: "getOperatorKnowledge", execution_started: false };
     const nodeIds = requiredOperatorKnowledgeNodesForTool(planned.toolName);
+    const actionRuleBinding = operatorActionRuleBindingForTool(planned.toolName, planned.arguments);
     const registryNodes = operatorKnowledgeRegistry.nodes as Record<string, Record<string, unknown>>;
     const nodes = nodeIds.map((nodeId) => {
       if (nodeId === "governance") {
@@ -21205,6 +21221,8 @@ async function handleOperatorMcpEngineeringTool(
       ),
       node_ids: nodeIds,
       knowledge_registry_version: operatorKnowledgeRegistry.version,
+      action_rule_registry_version: actionRuleBinding.registry_version,
+      action_rule_ids: actionRuleBinding.rule_ids,
       planned_capability: planned.capability,
       planned_tool: planned.toolName,
       planned_arguments: planned.arguments,
@@ -21218,6 +21236,7 @@ async function handleOperatorMcpEngineeringTool(
       knowledge_registry_version: operatorKnowledgeRegistry.version,
       node_ids: nodeIds,
       nodes,
+      action_rule_binding: actionRuleBinding,
       action_binding: {
         capability: planned.capability,
         tool_name: planned.toolName,

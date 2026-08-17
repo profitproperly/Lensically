@@ -25,6 +25,7 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
     ruleIds.add("repository.exact_unique_patch");
     ruleIds.add("repository.contiguous_source_anchor");
     ruleIds.add("repository.non_whitespace_semantic_anchor");
+    ruleIds.add("repository.client_safe_commit_text");
   }
   if (toolName === "applyRepoPatchSet") ruleIds.add("repository.exact_head_discipline");
   if (toolName === "runGitHubWorkflow") {
