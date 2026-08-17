@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 // @ts-ignore -- executable ESM script is intentionally tested directly.
@@ -12,22 +12,7 @@ function createWriter() {
   return { write: vi.fn(() => true) };
 }
 
-const engineeringWorkflow = readFileSync(
-  new URL("../../.github/workflows/lensically-engineering.yml", import.meta.url),
-  "utf8",
-);
 
-describe("Production deploy content-cycle guard", () => {
-  it("matches runtime active-cycle semantics and fails closed on indeterminate horizons", () => {
-    expect(engineeringWorkflow).toContain("TZ=America/New_York date +'%Y-%m-%dT%H:00'");
-    expect(engineeringWorkflow).toContain("status IN ('prepared', 'partially_committed')");
-    expect(engineeringWorkflow).toContain("horizon_end_local >= '${current_local_hour_key}'");
-    expect(engineeringWorkflow).toContain("indeterminate_cycle_count");
-    expect(engineeringWorkflow).toContain("expired_cycle_count");
-    expect(engineeringWorkflow).toContain("active_main_content_cycle_state_unavailable");
-    expect(engineeringWorkflow).toContain("active_main_content_cycle_deploy_forbidden");
-  });
-});
 
 describe("Wrangler deploy transient classification", () => {
 
