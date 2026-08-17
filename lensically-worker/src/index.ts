@@ -21905,7 +21905,26 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
+  
+  const validateExactReplacementMatchLocation = (content: string, find: string) => {
+    if (!/^[ \t]+/.test(find)) return null;
+    const matchIndex = content.indexOf(find);
+    if (matchIndex < 0) return null;
+    const lineStart = content.lastIndexOf("\n", matchIndex - 1) + 1;
+    const precedingOnLine = content.slice(lineStart, matchIndex);
+    if (precedingOnLine.length > 0 && /^[ \t]+$/.test(precedingOnLine)) {
+      return {
+        ok: false as const,
+        error: "find_must_start_at_line_boundary_for_indented_match",
+        match_index: matchIndex,
+        preceding_indent_length: precedingOnLine.length,
+      };
+    }
+    return null;
+  };
+
   if (toolName === "applyRepoTextPatch") {
+
     const path = sanitizeRepoPath(args.path);
     const find = normalizeOperatorText(args.find, 20000);
     const replace = typeof args.replace === "string" ? args.replace : "";
@@ -21918,10 +21937,15 @@ async function handleOperatorMcpEngineeringTool(
       return { ok: false, error: "repo_file_read_failed", status: file.status };
     }
     const count = file.content.split(find).length - 1;
-    if (count !== 1) {
+        if (count !== 1) {
       return { ok: false, error: "find_must_match_once", match_count: count };
     }
+    const matchLocationError = validateExactReplacementMatchLocation(file.content, find);
+    if (matchLocationError) {
+      return { ...matchLocationError, path, no_commit_created: true };
+    }
                 const nextContent = file.content.replace(find, replace);
+
     const patchSafety = validateRepositoryPatchContent(path, nextContent);
     if (!patchSafety.ok) {
             return { ...patchSafety, path, no_commit_created: true };
@@ -21971,10 +21995,15 @@ async function handleOperatorMcpEngineeringTool(
       const filePatches = normalizedPatches.filter((patch) => patch.path === entry.path);
       for (const patch of filePatches) {
         const count = content.split(patch.find).length - 1;
-        if (count !== 1) {
+                if (count !== 1) {
           return { ok: false, error: "find_must_match_once", path: entry.path, patch_index: patch.index, match_count: count, no_commit_created: true };
         }
+        const matchLocationError = validateExactReplacementMatchLocation(content, patch.find);
+        if (matchLocationError) {
+          return { ...matchLocationError, path: entry.path, patch_index: patch.index, no_commit_created: true };
+        }
         content = content.replace(patch.find, patch.replace);
+
       }
             nextFiles.push({ path: entry.path, content });
     }
