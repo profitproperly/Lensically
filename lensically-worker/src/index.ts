@@ -16588,11 +16588,14 @@ async function issueOperatorLifecycleToken(
   return reference;
 }
 
-function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, requestSessionId: string | null): string | null {
-  const boundSessionId = typeof payloadSessionId === "string" && payloadSessionId.trim()
+function resolveOperatorLifecycleSessionBinding(payloadSessionId: unknown, _requestSessionId: string | null): string | null {
+  // Step 1 fixes the lifecycle transport-binding mode for the entire action.
+  // A session-bound Step 1 keeps that exact session. A sessionless Step 1 stays
+  // sessionless even if later requests surface different valid MCP session IDs.
+  // Prepared-action fingerprinting remains the action-identity boundary.
+  return typeof payloadSessionId === "string" && payloadSessionId.trim()
     ? payloadSessionId.trim()
     : null;
-  return boundSessionId ?? requestSessionId;
 }
 
 async function verifyOperatorLifecycleToken(
