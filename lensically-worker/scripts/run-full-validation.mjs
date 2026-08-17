@@ -263,18 +263,7 @@ function run(label, command, args, diagnosticTestFiles = []) {
     if (Array.isArray(diagnosticTestFiles) && diagnosticTestFiles.length > 0) {
       let isolatedFailure = null;
       for (const testFile of diagnosticTestFiles) {
-        const isolated = spawnSync(process.execPath, [
-          vitestCli,
-          "--run",
-          testFile,
-          "--no-file-parallelism",
-          "--reporter=dot",
-          "--bail=1",
-        ], {
-          cwd: workerRoot,
-          encoding: "utf8",
-          env: process.env,
-        });
+        const isolated = runCapturedVitest([testFile]);
         if (isolated.stdout) process.stdout.write(isolated.stdout);
         if (isolated.stderr) process.stderr.write(isolated.stderr);
         if (isolated.error || isolated.status !== 0) {
