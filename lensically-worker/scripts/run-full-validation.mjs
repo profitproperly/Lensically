@@ -268,9 +268,18 @@ function run(label, command, args, diagnosticTestFiles = []) {
         if (isolated.stdout) process.stdout.write(isolated.stdout);
         if (isolated.stderr) process.stderr.write(isolated.stderr);
         if (isolated.error || isolated.status !== 0) {
+          const combinedOutput = stripAnsi(`${isolated.stdout ?? ""}\n${isolated.stderr ?? ""}`);
+          if (!isolated.error && isVitestTaskUpdateTransportTimeout(combinedOutput)) {
+            const transportRetry = runCapturedVitest([testFile]);
+            if (transportRetry.stdout) process.stdout.write(transportRetry.stdout);
+            if (transportRetry.stderr) process.stderr.write(transportRetry.stderr);
+            if (!transportRetry.error && transportRetry.status === 0) {
+              transportRecovered = true;
+              console.warn(`::warning title=Vitest transport recovered::${testFile}`);
+              continue;
+            }
+          }
           isolatedFailure = testFile;
-          const combinedOutput = `${isolated.stdout ?? ""}\n${isolated.stderr ?? ""}`
-            .replace(/\u001b\[[0-9;]*m/g, "");
           const failureTitle = combinedOutput
             .split(/\r?\n/)
             .map((line) => line.trim())
