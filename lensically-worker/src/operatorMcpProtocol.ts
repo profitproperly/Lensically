@@ -44,13 +44,7 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
     defect_class: prevention.defect_class,
     failure_history: [...prevention.evidence],
     root_cause: prevention.root_cause ?? prevention.losing_path,
-    losing_path: prevention.losing_path,
-    proven_repair: [...prevention.winning_path.procedure],
-    prevention: {
-      enforcement_point: prevention.enforcement_point,
-      regression_test_id: prevention.regression_test_id,
-      supersession_rule: prevention.supersession_rule,
-    },
+    prevention_rule_id: prevention.id,
   }));
   return {
     registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION,
