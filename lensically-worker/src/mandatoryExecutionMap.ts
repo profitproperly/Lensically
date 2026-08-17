@@ -252,7 +252,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
         evidence: ["The Main gateway exposes bounded exact-head atomic patch sets.", "The fresh-chat acceptance campaign proved the former Recovery-only threshold blocked a valid registered Main request."],
         scope: "universal",
     binding_scope: "action",
-    action_binding: { tool_names: ["applyRepoPatchSet"] },
+    action_binding: { tool_names: ["applyRepoPatchSet"], semantic_routing: true },
         enforcement_point: "Mandatory Execution Map pre-action resolution and exact-head atomic patch validation.",
     regression_test_id: "keeps bounded large repository patch sets on the Main gateway",
     supersession_rule: "Any replacement must keep bounded registered patch sets on Main with atomic validation and zero partial commits.",
