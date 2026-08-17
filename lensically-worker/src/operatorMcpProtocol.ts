@@ -30,7 +30,7 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
     ruleIds.add("repository.client_safe_commit_text");
   }
   if (toolName === "applyRepoPatchSet") ruleIds.add("repository.exact_head_discipline");
-    if (toolName === "runGitHubWorkflow") {
+  if (toolName === "runGitHubWorkflow") {
     ruleIds.add("workflow.declared_task_only");
     if (args.task === "worker-deploy") {
       ruleIds.add("release.exact_validated_head");
@@ -39,11 +39,26 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
   }
   const preventionRules = resolveActionBoundWinningPaths(toolName, args);
   for (const prevention of preventionRules) ruleIds.add(`prevention.${prevention.id}`);
+  const actionIntelligence = preventionRules.map((prevention) => ({
+    intelligence_id: prevention.id,
+    defect_class: prevention.defect_class,
+    failure_history: [...prevention.evidence],
+    root_cause: prevention.root_cause ?? prevention.losing_path,
+    losing_path: prevention.losing_path,
+    proven_repair: [...prevention.winning_path.procedure],
+    prevention: {
+      enforcement_point: prevention.enforcement_point,
+      regression_test_id: prevention.regression_test_id,
+      supersession_rule: prevention.supersession_rule,
+    },
+  }));
   return {
     registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION,
     winning_path_registry_version: WINNING_PATH_PROMOTION_VERSION,
+    action_intelligence_version: ACTION_INTELLIGENCE_BINDING_VERSION,
     rule_ids: [...ruleIds],
     prevention_rule_ids: preventionRules.map((prevention) => prevention.id),
+    action_intelligence_ids: actionIntelligence.map((entry) => entry.intelligence_id),
     prevention_rules: preventionRules.map((prevention) => ({
       id: prevention.id,
       losing_path: prevention.losing_path,
@@ -51,7 +66,8 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
       enforcement_point: prevention.enforcement_point,
       regression_test_id: prevention.regression_test_id,
     })),
-    };
+    action_intelligence: actionIntelligence,
+  };
 }
 
 function exactOperatorRuleIdArray(value: unknown): string[] | null {
