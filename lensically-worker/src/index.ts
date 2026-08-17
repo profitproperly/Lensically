@@ -21487,6 +21487,8 @@ async function handleOperatorMcpEngineeringTool(
       action_rule_ids: actionRuleContinuity.binding.rule_ids,
       prevention_rule_ids: actionRuleContinuity.binding.prevention_rule_ids,
       action_intelligence_ids: actionRuleContinuity.binding.action_intelligence_ids,
+      client_action_id: executionDescriptor.action_id,
+      effect_class: executionDescriptor.effect_class,
       scopes,
 
       brand_key: brandKey,
