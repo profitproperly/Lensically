@@ -33,7 +33,7 @@ type Tool = {
   annotations: Record<string, unknown>;
 };
 
-const VERSION = "1.4.7";
+const VERSION = "1.4.8";
 const JSON_HEADERS = { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" };
 const TOOLS: Tool[] = [
   { name: "recoveryHealth", title: "Recovery health", description: "Verify the independent recovery plane and the main Lensically health endpoint.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, openWorldHint: true } },
@@ -107,8 +107,40 @@ async function github(env: Env, path: string, init: RequestInit = {}): Promise<{
     if (!retryableRead || !transientStatuses.has(response.status) || attempt === maxAttempts) break;
     await new Promise((resolve) => setTimeout(resolve, 75 * (2 ** (attempt - 1))));
   }
-  if (!response) return { ok: false, status: 0, data: { error: "github_transport_failed", safe_message: lastTransportError } };
+    if (!response) return { ok: false, status: 0, data: { error: "github_transport_failed", safe_message: lastTransportError } };
   return { ok: response.ok, status: response.status, data: await response.json().catch(() => null) ?? null };
+}
+
+async function githubText(env: Env, path: string): Promise<{ ok: boolean; status: number; text: string }> {
+  const transientStatuses = new Set([502, 503, 504]);
+  let response: Response | null = null;
+  let lastTransportError = "";
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    try {
+      response = await fetch(`https://api.github.com${path}`, {
+        signal: controller.signal,
+        headers: {
+          accept: "text/plain",
+          authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          "user-agent": "lensically-recovery",
+          "x-github-api-version": "2022-11-28",
+        },
+      });
+      lastTransportError = "";
+    } catch (error) {
+      response = null;
+      lastTransportError = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (response && (!transientStatuses.has(response.status) || attempt === 4)) break;
+    if (!response && attempt === 4) break;
+    await new Promise((resolve) => setTimeout(resolve, 75 * (2 ** (attempt - 1))));
+  }
+  if (!response) return { ok: false, status: 0, text: lastTransportError };
+  return { ok: response.ok, status: response.status, text: await response.text().catch(() => "") };
 }
 
 async function cloudflare(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; result: unknown; errors: unknown }> {
@@ -469,7 +501,11 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       const annotations = failed && jobId > 0
         ? await github(env, `/repos/${config.owner}/${config.repo}/check-runs/${jobId}/annotations?per_page=50`)
         : null;
-      const annotationRows = Array.isArray(annotations?.data) ? annotations.data as Array<Record<string, unknown>> : [];
+            const annotationRows = Array.isArray(annotations?.data) ? annotations.data as Array<Record<string, unknown>> : [];
+      const failedLog = failed && jobId > 0
+        ? await githubText(env, `/repos/${config.owner}/${config.repo}/actions/jobs/${jobId}/logs`)
+        : null;
+      const failedLogText = failedLog?.ok ? failedLog.text : "";
       serializedJobs.push({
         id: job.id,
         name: job.name,
@@ -479,7 +515,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
         steps: Array.isArray(job.steps)
           ? (job.steps as Array<Record<string, unknown>>).map((step) => ({ name: step.name, status: step.status, conclusion: step.conclusion, number: step.number }))
           : [],
-        failure_annotations: annotationRows.slice(0, 50).map((annotation) => ({
+                failure_annotations: annotationRows.slice(0, 50).map((annotation) => ({
           path: annotation.path ?? null,
           start_line: annotation.start_line ?? null,
           end_line: annotation.end_line ?? null,
@@ -487,6 +523,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
           message: annotation.message ?? null,
           raw_details: typeof annotation.raw_details === "string" ? annotation.raw_details.slice(0, 8000) : null,
         })),
+        failed_log_status: failedLog?.status ?? null,
+        failed_log_tail: failedLogText ? failedLogText.slice(-12000) : null,
       });
     }
     return {
