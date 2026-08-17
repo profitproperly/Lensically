@@ -4234,7 +4234,7 @@ active_checkpoint: none
       planned_action: action,
     });
     expect(step2.isError).not.toBe(true);
-    const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+    const step3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
       knowledge_token: step2.structuredContent.knowledge_token,
       planned_action: action,
     });
