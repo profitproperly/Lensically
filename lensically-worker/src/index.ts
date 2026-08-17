@@ -23044,8 +23044,10 @@ async function handleOperatorMcpToolCall(
       planned_action_fingerprint: liveStatePayload.planned_action_fingerprint ?? null,
       action_rule_registry_version: liveStatePayload.action_rule_registry_version ?? null,
       winning_path_registry_version: liveStatePayload.winning_path_registry_version ?? null,
+      action_intelligence_version: liveStatePayload.action_intelligence_version ?? null,
       action_rule_ids: liveStatePayload.action_rule_ids ?? [],
       prevention_rule_ids: liveStatePayload.prevention_rule_ids ?? [],
+      action_intelligence_ids: liveStatePayload.action_intelligence_ids ?? [],
       result_ok: result.ok !== false,
 
       result_error: normalizeOperatorMachineKey(result.error ?? result.error_code, "") || null,
