@@ -47,7 +47,16 @@ export function validateHardeningTransition(current: HardeningState, target: Har
   const atOrAfter = (state: HardeningState) => HARDENING_STATE_ORDER.indexOf(target) >= HARDENING_STATE_ORDER.indexOf(state);
   if (atOrAfter("generalized") && !evidence.root_cause?.trim()) errors.push("root_cause_required");
   if (atOrAfter("generalized") && !evidence.generalized_cause?.trim()) errors.push("generalized_cause_required");
-  if (atOrAfter("prevention_locked") && !evidence.prevention_rule_id?.trim()) errors.push("prevention_rule_required");
+    if (atOrAfter("prevention_locked")) {
+    const preventionRuleId = evidence.prevention_rule_id?.trim();
+    if (!preventionRuleId) {
+      errors.push("prevention_rule_required");
+    } else {
+      const preventionBinding = resolveHardeningPreventionBinding(preventionRuleId);
+      if (!preventionBinding) errors.push("prevention_rule_not_promoted");
+      else if (preventionBinding.binding_scope === "action" && preventionBinding.tool_names.length === 0) errors.push("prevention_action_binding_required");
+    }
+  }
   if (atOrAfter("validated") && !evidence.regression_test_ids?.length) errors.push("regression_evidence_required");
   if (atOrAfter("released") && !evidence.tested_sha?.trim()) errors.push("tested_sha_required");
   if (atOrAfter("live_verified") && !evidence.deployment_id?.trim()) errors.push("deployment_id_required");

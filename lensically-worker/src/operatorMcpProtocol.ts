@@ -1,3 +1,5 @@
+import { WINNING_PATH_PROMOTION_VERSION, resolveActionBoundWinningPaths } from "./mandatoryExecutionMap";
+
 export const OPERATOR_MCP_VERSION = "1.45.4";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
@@ -5,7 +7,7 @@ export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix"
 
 export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v10";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
-export const OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v1";
+export const OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v2";
 
 const OPERATOR_BASE_ACTION_RULE_IDS = [
   "governance.autonomy_efficiency_prevention",
@@ -28,14 +30,28 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
     ruleIds.add("repository.client_safe_commit_text");
   }
   if (toolName === "applyRepoPatchSet") ruleIds.add("repository.exact_head_discipline");
-  if (toolName === "runGitHubWorkflow") {
+    if (toolName === "runGitHubWorkflow") {
     ruleIds.add("workflow.declared_task_only");
     if (args.task === "worker-deploy") {
       ruleIds.add("release.exact_validated_head");
       ruleIds.add("release.no_active_content_cycle");
     }
   }
-  return { registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION, rule_ids: [...ruleIds] };
+  const preventionRules = resolveActionBoundWinningPaths(toolName, args);
+  for (const prevention of preventionRules) ruleIds.add(`prevention.${prevention.id}`);
+  return {
+    registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION,
+    winning_path_registry_version: WINNING_PATH_PROMOTION_VERSION,
+    rule_ids: [...ruleIds],
+    prevention_rule_ids: preventionRules.map((prevention) => prevention.id),
+    prevention_rules: preventionRules.map((prevention) => ({
+      id: prevention.id,
+      losing_path: prevention.losing_path,
+      winning_path: [...prevention.winning_path.procedure],
+      enforcement_point: prevention.enforcement_point,
+      regression_test_id: prevention.regression_test_id,
+    })),
+  };
 }
 
 export const OPERATOR_DISCOVERY_EXECUTION_RULE = "Tool discovery, schema search, and keyword matching return candidates only; they never authorize execution. Before invoking a discovered tool, verify that its declared name, title, description, and side-effect class match the requested operation. Never invoke a mutating or business-execution tool for search, inspection, schema lookup, diagnosis, or explanation merely because discovery returned it. If the purpose does not match, do not call it; discover or invoke the correct read-only or engineering tool instead.";
