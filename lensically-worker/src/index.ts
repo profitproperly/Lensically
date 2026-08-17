@@ -17043,11 +17043,40 @@ function operatorActionCapabilityIdForToolName(toolName: string): string {
   return OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(toolName) ?? operatorPublicProfileIdForToolName(toolName);
 }
 
-function operatorClientExecutionDescriptor(toolName: string, capability: string): { action_id: string; effect_class: "read_only" | "mutation" } {
+const OPERATOR_CASE_STEP_STAGES = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"] as const;
+
+type OperatorCaseStepStage = typeof OPERATOR_CASE_STEP_STAGES[number];
+
+function operatorClientExecutionDescriptor(
+  toolName: string,
+  capability: string,
+  plannedArguments: Record<string, unknown> = {},
+): { action_id: string; effect_class: "read_only" | "mutation" } {
+  let actionId = capability;
+  if (toolName === "advanceHardeningIncident" && plannedArguments.stage !== undefined) {
+    const stage = normalizeOperatorMachineKey(plannedArguments.stage, "");
+    if (!OPERATOR_CASE_STEP_STAGES.includes(stage as OperatorCaseStepStage)) {
+      throw new Error("case_step_execution_descriptor_stage_invalid");
+    }
+    actionId = `${capability}_${stage}`;
+  }
   return {
-    action_id: capability,
+    action_id: actionId,
     effect_class: operatorToolMutatesState(toolName) ? "mutation" : "read_only",
   };
+}
+
+function operatorClientExecutionDescriptorsForTool(
+  toolName: string,
+  capability: string,
+): Array<{ action_id: string; effect_class: "read_only" | "mutation" }> {
+  if (toolName === "advanceHardeningIncident") {
+    return [
+      operatorClientExecutionDescriptor(toolName, capability),
+      ...OPERATOR_CASE_STEP_STAGES.map((stage) => operatorClientExecutionDescriptor(toolName, capability, { stage })),
+    ];
+  }
+  return [operatorClientExecutionDescriptor(toolName, capability)];
 }
 
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
