@@ -248,7 +248,8 @@ jobs:
             description="${first_error:-${terminal_error:-release_preflight_failed}}"
             description="${description:0:140}"
             printf '::error title=Full release preflight::%s\n' "$description"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \              -f state=failure \
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
               -f context='lensically/full-release-preflight' \
               -f description="$description" >/dev/null
             exit "$status"
