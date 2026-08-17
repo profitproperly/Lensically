@@ -7,7 +7,7 @@ export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix"
 
 export const OPERATOR_GOVERNING_STANDARDS_VERSION = "operator-governing-standards-v10";
 export const OPERATOR_GOVERNING_STANDARDS_ACK = "Autonomy. Efficiency. Prevention. Use the fastest complete route; stop on every blocker, fix the root cause, record it, prevent recurrence, and only then continue.";
-export const OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v2";
+export const OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v3";
 
 const OPERATOR_BASE_ACTION_RULE_IDS = [
   "governance.autonomy_efficiency_prevention",
