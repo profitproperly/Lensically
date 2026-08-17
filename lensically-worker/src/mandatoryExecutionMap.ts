@@ -400,7 +400,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     matching_conditions: {
       any_terms: ["case_step", "hardening transition", "neutral hardening", "client-safe hardening"],
     },
-    losing_path: "Expose semantic hardening control-plane names, allow premature transition evidence on a stage that does not require it, or allow the neutral case-step prevention to exist only as closure text without action binding.",
+    losing_path: "Expose semantic hardening control-plane names, retain a generic next-state branch that collapses distinct transitions behind one client-visible mutation identity, allow premature transition evidence on a stage that does not require it, or allow the neutral case-step prevention to exist only as closure text without action binding.",
     root_cause: "The lifecycle exposed semantic hardening transition vocabulary and a cross-stage evidence envelope directly to the client instead of compiling neutral stage-specific inputs server-side.",
     winning_path: {
       surface: "main_gateway",
