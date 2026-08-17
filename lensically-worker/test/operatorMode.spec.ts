@@ -3871,11 +3871,11 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(hardeningStageBranch("n")).toBeUndefined();
     const classifiedBranch = hardeningStageBranch("a1");
-    expect(Object.keys(classifiedBranch?.properties ?? {})).toEqual(["stage", "case"]);
+    expect(Object.keys(classifiedBranch?.properties ?? {})).toEqual(["stage", "case", "dry_run"]);
     expect(classifiedBranch?.required).toEqual(["stage"]);
     expect(classifiedBranch?.additionalProperties).toBe(false);
     const generalizedBranch = hardeningStageBranch("a3");
-    expect(Object.keys(generalizedBranch?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization"]);
+    expect(Object.keys(generalizedBranch?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization", "dry_run"]);
     expect(generalizedBranch?.required).toEqual(["stage", "cause", "generalization"]);
     expect(hardeningStageBranch("a5")?.required).toEqual(["stage", "rule"]);
     expect(hardeningStageBranch("a6")?.required).toEqual(["stage", "tests"]);
