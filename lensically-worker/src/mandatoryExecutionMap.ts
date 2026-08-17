@@ -355,6 +355,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       any_terms: ["repository symbol search", "repository search", "search repository files", "client-safe repository search"],
     },
     losing_path: "Expose searchRepoFiles through the generated search_repo_files capability or let the neutral repository-search lesson remain unbound to the action before execution.",
+    root_cause: "The required client-safe alias mapping omitted searchRepoFiles, so the generated lifecycle surfaced an internal semantic name even though a neutral registered capability already existed.",
     winning_path: {
       surface: "main_gateway",
       route_intent: "search repository symbol",
