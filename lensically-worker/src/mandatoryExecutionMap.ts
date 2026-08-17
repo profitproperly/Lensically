@@ -193,6 +193,7 @@ export type WinningPathPromotion = {
   action_binding?: {
     tool_names: string[];
     argument_equals?: Record<string, string | number | boolean>;
+    semantic_routing?: boolean;
   };
   enforcement_point: string;
   regression_test_id: string;
