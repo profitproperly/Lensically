@@ -402,6 +402,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       any_terms: ["release", "bump", "deploy", "metadata"],
     },
     losing_path: "Maintain the Operator MCP semantic version independently in source code and architecture documentation.",
+    root_cause: "The MCP semantic version had more than one writable authority, allowing documentation and runtime release metadata to diverge.",
     winning_path: {
       surface: "source_control",
       procedure: ["Write the version only in OPERATOR_MCP_VERSION.", "Keep architecture documentation versionless.", "Verify artifact, runtime version, deployment commit, and exact release head."],
