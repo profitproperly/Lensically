@@ -17072,10 +17072,7 @@ function operatorClientExecutionDescriptorsForTool(
   capability: string,
 ): Array<{ action_id: string; effect_class: "read_only" | "mutation" }> {
   if (toolName === "advanceHardeningIncident") {
-    return [
-      operatorClientExecutionDescriptor(toolName, capability),
-      ...OPERATOR_CASE_STEP_STAGES.map((stage) => operatorClientExecutionDescriptor(toolName, capability, { stage })),
-    ];
+    return OPERATOR_CASE_STEP_STAGES.map((stage) => operatorClientExecutionDescriptor(toolName, capability, { stage }));
   }
   return [operatorClientExecutionDescriptor(toolName, capability)];
 }
