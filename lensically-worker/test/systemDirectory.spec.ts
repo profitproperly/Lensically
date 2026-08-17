@@ -1194,6 +1194,53 @@ describe("System Directory foundation", () => {
     });
   });
 
+  it("keeps competence-only action preventions out of unrelated semantic route selection", async () => {
+    const tools: MandatoryExecutionToolDefinition[] = [
+      {
+        name: "recordHardeningIncident",
+        title: "Record hardening incident",
+        description: "Record one hardening incident without advancing its state.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blocked_profile_id: { type: "string" },
+            error_category: { type: "string" },
+          },
+          required: ["blocked_profile_id", "error_category"],
+        },
+      },
+      {
+        name: "advanceHardeningIncident",
+        title: "Advance hardening case",
+        description: "Advance one neutral hardening case step.",
+        inputSchema: {
+          type: "object",
+          properties: { stage: { type: "string" } },
+          required: ["stage"],
+        },
+      },
+    ];
+    const prepared = await prepareMandatoryExecutionMapCall(
+      null as unknown as D1Database,
+      {
+        intent: "record hardening incident",
+        inputs: {
+          blocked_profile_id: "fixture_neutral_case_step",
+          error_category: "fixture_client_pre_dispatch_block",
+        },
+      },
+      tools,
+      { signPermit: async () => "unused", verifyPermit: async () => null },
+    );
+    expect(prepared).toMatchObject({
+      ok: true,
+      tool_name: "recordHardeningIncident",
+      map_execution: {
+        winning_path_promotion: null,
+      },
+    });
+  });
+
   it("blocks incident closure until the winning path is promoted and enforced", () => {
     expect(evaluatePreventableIncidentClosure({
       cause_classified: true,
