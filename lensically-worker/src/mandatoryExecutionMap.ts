@@ -301,6 +301,27 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     supersession_rule: "Remove the explicit timeout only after the test is measurably optimized below the default across repeated deterministic runs.",
   },
   {
+    id: "sessionless_lifecycle_transport_stability",
+    status: "active",
+    priority: 260,
+    defect_class: "known_recurrence",
+    matching_conditions: {
+      all_terms: ["sessionless", "lifecycle"],
+      any_terms: ["mcp session", "session rotation", "session changed", "transport session"],
+    },
+    losing_path: "Bind a lifecycle that began without an MCP session to a later transport session and then fail the same action when the client presents another independently valid deployment-scoped session.",
+    winning_path: {
+      surface: "runtime_guard",
+      procedure: ["Fix lifecycle transport-binding mode at Step 1.", "Keep a Step-1 session-bound lifecycle on that exact session.", "Keep a Step-1 sessionless lifecycle sessionless across all later stages.", "Use the prepared-action fingerprint and opaque lifecycle reference as the action-integrity boundary for sessionless clients.", "Reject cross-session use only when Step 1 established an actual session binding."],
+    },
+    evidence: ["The prior first-session-binding repair allowed a sessionless lifecycle to adopt the first later MCP session.", "The ChatGPT connector subsequently presented different valid deployment-scoped MCP sessions across later lifecycle stages, causing the same prepared action to reject itself as operator_lifecycle_session_changed.", "Focused regression now proves sessionless-origin actions survive valid transport-session rotation while genuinely session-bound actions still reject a different session."],
+    scope: "universal",
+    binding_scope: "runtime_guard",
+    enforcement_point: "Lifecycle token issuance and verification across Steps 1 through 5.",
+    regression_test_id: "keeps a sessionless lifecycle unbound across valid transport-session rotation while preserving strict bound-session mismatch rejection",
+    supersession_rule: "Any replacement must preserve strict session mismatch rejection for Step-1-bound lifecycles while preventing transport-session rotation from invalidating a lifecycle that began sessionless.",
+  },
+  {
     id: "typed_profile_exact_contract",
     status: "active",
     priority: 250,
