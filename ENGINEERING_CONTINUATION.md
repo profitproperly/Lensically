@@ -1248,21 +1248,6 @@ Latest operational notes:
 - The expanded Innovation fixture exposed a real allocation arithmetic defect: for 24 slots, floor(40%) plus ceil(30%) plus ceil(30%) requested 25 allocations. Repair computes winner and development floors, assigns the exact remainder to exploration, then rebalances only for actual tier inventory. Allocation targets now always sum exactly to requested slots.
 - The repaired isolated Innovation cycle completed successfully; its final assertion referenced benchmark count keys not present in the receipt schema. Isolation is authoritatively enforced by the forbidden Main-database proxy and audited provider-read counters. Repair asserts the actual isolation contract before and after full shadow persistence instead of inventing receipt fields.
 
-## Deferred Work — INACTIVE
-
-`manifest-innovation-24-real-generation-speed-optimization`
-
-- Analyze and reduce the 410,464 ms genuine-generation runtime toward six minutes or establish a measured lower bound.
-- Primary target is the 289,847 ms model/client gap; persistence, reconciliation, preparation, and cleanup total approximately 28 seconds.
-- Potential optimizations must preserve genuine model judgment, source fidelity, all deterministic gates, exact post inspectability, and total Main/Threads isolation.
-- Do not begin until the owner and M review the genuine post quality and timing breakdown.
-
-
-
-
-
-
-
 ## Closed Incident — P1 Innovation Live-Path Hardening
 
 incident_id: `0a596193-9f73-4619-8bb3-d6b4fe22c56c`
