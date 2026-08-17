@@ -15581,16 +15581,17 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       actionCapabilityIds.add(capability);
             const requiredKnowledge = requiredOperatorKnowledgeNodesForTool(tool.name);
       const requiredLiveState = requiredOperatorLiveStateScopesForTool(tool.name, tool);
-      const executionDescriptor = operatorClientExecutionDescriptor(tool.name, capability);
-      actionDescriptorBranches.push({
-        type: "object",
-        properties: {
-          action_id: { type: "string", const: executionDescriptor.action_id },
-          effect_class: { type: "string", const: executionDescriptor.effect_class },
-        },
-        required: ["action_id", "effect_class"],
-        additionalProperties: false,
-      });
+      for (const executionDescriptor of operatorClientExecutionDescriptorsForTool(tool.name, capability)) {
+        actionDescriptorBranches.push({
+          type: "object",
+          properties: {
+            action_id: { type: "string", const: executionDescriptor.action_id },
+            effect_class: { type: "string", const: executionDescriptor.effect_class },
+          },
+          required: ["action_id", "effect_class"],
+          additionalProperties: false,
+        });
+      }
             return {
         type: "object",
         description: `Requires Step-2 knowledge nodes: ${requiredKnowledge.join(", ")}. Requires Step-3 live-state scopes: ${requiredLiveState.join(", ")}.`,
