@@ -3788,7 +3788,10 @@ if (!workflow.includes("- name: Publish exact release authority target")
   errors.push("release_workflow_authority_publication_missing");
 }
 if (!workflow.includes("- name: Refuse deployment during active Main content cycle")
-    || !workflow.includes("SELECT COUNT(*) AS active_cycle_count")
+    || !workflow.includes("COUNT(CASE WHEN horizon_end_local IS NOT NULL")
+    || !workflow.includes("indeterminate_cycle_count")
+    || !workflow.includes("expired_cycle_count")
+    || !workflow.includes("horizon_end_local >= '${current_local_hour_key}'")
     || !workflow.includes("latest_active_cycle_id")
     || !workflow.includes("latest_active_cycle_status")
     || !workflow.includes("latest_active_cycle_updated_at")
