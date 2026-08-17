@@ -256,7 +256,34 @@ function run(label, command, args, diagnosticTestFiles = []) {
       if (isolatedFailure) {
         console.error(`::error title=Full validation test file failed::${isolatedFailure}`);
       } else {
-        console.error(`::error title=Full validation batch isolation inconclusive::${label}`);
+        let cumulativeFailure = null;
+        for (let end = 2; end <= diagnosticTestFiles.length; end += 1) {
+          const cumulativeFiles = diagnosticTestFiles.slice(0, end);
+          const cumulative = spawnSync(process.execPath, [
+            vitestCli,
+            "--run",
+            ...cumulativeFiles,
+            "--no-file-parallelism",
+            "--reporter=dot",
+            "--bail=1",
+          ], {
+            cwd: workerRoot,
+            encoding: "utf8",
+            env: process.env,
+          });
+          if (cumulative.stdout) process.stdout.write(cumulative.stdout);
+          if (cumulative.stderr) process.stderr.write(cumulative.stderr);
+          if (cumulative.error || cumulative.status !== 0) {
+            cumulativeFailure = cumulativeFiles;
+            break;
+          }
+        }
+        if (cumulativeFailure) {
+          const interaction = cumulativeFailure.join(",").replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+          console.error(`::error title=Full validation cumulative interaction failed::${interaction}`);
+        } else {
+          console.error(`::error title=Full validation batch isolation inconclusive::${label}`);
+        }
       }
     }
     const annotationLabel = String(label).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
