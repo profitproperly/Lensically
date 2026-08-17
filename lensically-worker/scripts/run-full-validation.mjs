@@ -235,8 +235,8 @@ function validatePlan() {
     fail("full_validation_operator_milestone_plan_invalid");
   }
 
-  const transportTimeoutFixture = `Tests 28 passed (28)\nErrors 1 error\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}`;
-  const semanticFailureFixture = `Tests 27 passed | 1 failed (28)\nAssertionError\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}`;
+  const transportTimeoutFixture = `Tests 28 passed (28)\nErrors 1 error\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}\n ❯ Object.onTimeoutError vitest/dist/rpc.js:53:10`;
+  const semanticFailureFixture = `Tests 27 passed | 1 failed (28)\nAssertionError\n ❯ test/example.spec.ts > suite > rejects invalid input\nError: ${VITEST_TASK_UPDATE_TRANSPORT_SIGNATURE}`;
   if (!isVitestTaskUpdateTransportTimeout(transportTimeoutFixture)
     || isVitestTaskUpdateTransportTimeout(semanticFailureFixture)) {
     fail("full_validation_transport_timeout_classifier_invalid");
