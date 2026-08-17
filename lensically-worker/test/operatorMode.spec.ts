@@ -3864,7 +3864,7 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "case_step";
     }) as { properties?: { arguments?: { oneOf?: Array<{ properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }> } } } | undefined;
     const hardeningArgumentBranches = hardeningCaseBranch?.properties?.arguments?.oneOf ?? [];
-    expect([11, 12]).toContain(hardeningArgumentBranches.length);
+    expect(hardeningArgumentBranches).toHaveLength(11);
     const hardeningStageBranch = (stage: string) => hardeningArgumentBranches.find((branch) => {
       const stageSchema = branch.properties?.stage as { enum?: string[] } | undefined;
       return stageSchema?.enum?.includes(stage) === true;
