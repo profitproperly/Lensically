@@ -3930,7 +3930,7 @@ describe("operator mode MCP endpoint", () => {
       planned_action: { capability: "control_step", arguments: {} },
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
-    const repositorySearchKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
+    const repositorySearchKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { action_intelligence_version: string; prevention_rule_ids: string[]; action_intelligence_ids: string[]; action_intelligence: Array<{ intelligence_id: string; defect_class: string; failure_history: string[]; root_cause: string; proven_repair: string[]; prevention: { enforcement_point: string; regression_test_id: string } }> } }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: {
         capability: "repository_symbol_search",
