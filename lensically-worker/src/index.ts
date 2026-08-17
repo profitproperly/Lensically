@@ -16999,6 +16999,7 @@ const OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL = new Map<string, ClientSafeRequest
     ["getRepoStatus", "repository_status"],
   ["getDatabaseSchemaState", "database_schema"],
     ["readRepoFile", "repository_file_read"],
+  ["searchRepoFiles", "repository_symbol_search"],
   ["applyRepoPatchSet", "repository_patch_set"],
   ["readMcpToolDefinition", "capability_definition"],
   ["recordHardeningIncident", "client_block_intake"],
