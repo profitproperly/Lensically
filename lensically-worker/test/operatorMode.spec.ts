@@ -3848,12 +3848,26 @@ describe("operator mode MCP endpoint", () => {
     const hardeningCaseBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "case_step";
-    }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[] } } } | undefined;
-        expect(hardeningCaseBranch?.properties?.arguments?.required).toEqual(["stage"]);
-    expect(Object.keys(hardeningCaseBranch?.properties?.arguments?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization", "rule", "tests", "ref", "deployment", "proof", "resume", "gain"]);
-        const hardeningCaseStageSchema = hardeningCaseBranch?.properties?.arguments?.properties?.stage as { enum?: string[]; description?: string } | undefined;
-    expect(hardeningCaseStageSchema?.enum).toEqual(["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
-    expect(hardeningCaseStageSchema?.description).toBe("Use n to advance exactly one state from the current server-resolved hardening state. a0 through a10 are absolute target stages: a0=contained, a1=classified, a2=reproduced, a3=generalized, a4=repaired, a5=prevention_locked, a6=validated, a7=released, a8=live_verified, a9=resumed, a10=closed. Do not treat a0 through a10 as relative progression.");
+    }) as { properties?: { arguments?: { oneOf?: Array<{ properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }> } } } | undefined;
+    const hardeningArgumentBranches = hardeningCaseBranch?.properties?.arguments?.oneOf ?? [];
+    expect(hardeningArgumentBranches).toHaveLength(12);
+    const hardeningStageBranch = (stage: string) => hardeningArgumentBranches.find((branch) => {
+      const stageSchema = branch.properties?.stage as { enum?: string[] } | undefined;
+      return stageSchema?.enum?.includes(stage) === true;
+    });
+    const classifiedBranch = hardeningStageBranch("a1");
+    expect(Object.keys(classifiedBranch?.properties ?? {})).toEqual(["stage", "case"]);
+    expect(classifiedBranch?.required).toEqual(["stage"]);
+    expect(classifiedBranch?.additionalProperties).toBe(false);
+    const generalizedBranch = hardeningStageBranch("a3");
+    expect(Object.keys(generalizedBranch?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization"]);
+    expect(generalizedBranch?.required).toEqual(["stage", "cause", "generalization"]);
+    expect(hardeningStageBranch("a5")?.required).toEqual(["stage", "rule"]);
+    expect(hardeningStageBranch("a6")?.required).toEqual(["stage", "tests"]);
+    expect(hardeningStageBranch("a7")?.required).toEqual(["stage", "ref"]);
+    expect(hardeningStageBranch("a8")?.required).toEqual(["stage", "deployment"]);
+    expect(hardeningStageBranch("a9")?.required).toEqual(["stage", "proof"]);
+    expect(hardeningStageBranch("a10")?.required).toEqual(["stage", "resume", "gain"]);
     const checkpointStepBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "checkpoint_step";
