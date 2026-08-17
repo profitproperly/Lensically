@@ -3869,6 +3869,7 @@ describe("operator mode MCP endpoint", () => {
       const stageSchema = branch.properties?.stage as { enum?: string[] } | undefined;
       return stageSchema?.enum?.includes(stage) === true;
     });
+    expect(hardeningStageBranch("n")).toBeUndefined();
     const classifiedBranch = hardeningStageBranch("a1");
     expect(Object.keys(classifiedBranch?.properties ?? {})).toEqual(["stage", "case"]);
     expect(classifiedBranch?.required).toEqual(["stage"]);
