@@ -17034,23 +17034,95 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
     return { type: "object", properties: {}, required: [], additionalProperties: false };
   }
   if (tool.name === "advanceHardeningIncident") {
-    return {
+    const caseProperty = { type: "string", maxLength: 120 };
+    const stageProperty = (stage: string, description: string) => ({ type: "string", enum: [stage], description });
+    const stageOnly = (stage: string, description: string) => ({
       type: "object",
-      properties: {
-                        stage: { type: "string", enum: ["n", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"], description: "Use n to advance exactly one state from the current server-resolved hardening state. a0 through a10 are absolute target stages: a0=contained, a1=classified, a2=reproduced, a3=generalized, a4=repaired, a5=prevention_locked, a6=validated, a7=released, a8=live_verified, a9=resumed, a10=closed. Do not treat a0 through a10 as relative progression." },
-        case: { type: "string", maxLength: 120 },
-        cause: { type: "string", maxLength: 1000 },
-        generalization: { type: "string", maxLength: 1000 },
-        rule: { type: "string", maxLength: 160 },
-        tests: { type: "array", maxItems: 20, items: { type: "string", maxLength: 300 } },
-        ref: { type: "string", maxLength: 120 },
-        deployment: { type: "string", maxLength: 160 },
-        proof: { type: "object", additionalProperties: true },
-        resume: { type: "object", additionalProperties: true },
-        gain: { type: "object", additionalProperties: true },
-      },
+      properties: { stage: stageProperty(stage, description), case: caseProperty },
       required: ["stage"],
       additionalProperties: false,
+    });
+    return {
+      oneOf: [
+        stageOnly("n", "Advance exactly one state only when the next state requires no new evidence. Use an absolute stage when new evidence is required."),
+        stageOnly("a0", "Contain the active incident. No transition evidence is accepted at this stage."),
+        stageOnly("a1", "Classify the contained incident. No transition evidence is accepted at this stage."),
+        stageOnly("a2", "Record reproduction of the classified incident. No transition evidence is accepted at this stage."),
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a3", "Generalize the reproduced incident. Supply only the root cause and generalized cause newly required at this stage."),
+            case: caseProperty,
+            cause: { type: "string", maxLength: 1000 },
+            generalization: { type: "string", maxLength: 1000 },
+          },
+          required: ["stage", "cause", "generalization"],
+          additionalProperties: false,
+        },
+        stageOnly("a4", "Record the repair after the source change exists. Prior cause evidence is carried server-side."),
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a5", "Lock prevention. Supply only the promoted prevention rule identifier newly required at this stage."),
+            case: caseProperty,
+            rule: { type: "string", maxLength: 160 },
+          },
+          required: ["stage", "rule"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a6", "Record validation. Supply only the regression identifiers newly required at this stage."),
+            case: caseProperty,
+            tests: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", maxLength: 300 } },
+          },
+          required: ["stage", "tests"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a7", "Record release. Supply only the exact tested source reference newly required at this stage."),
+            case: caseProperty,
+            ref: { type: "string", maxLength: 120 },
+          },
+          required: ["stage", "ref"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a8", "Record live verification. Supply only the deployment identity newly required at this stage."),
+            case: caseProperty,
+            deployment: { type: "string", maxLength: 160 },
+          },
+          required: ["stage", "deployment"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a9", "Resume the interrupted objective. Supply only the live-verification proof newly required at this stage."),
+            case: caseProperty,
+            proof: { type: "object", additionalProperties: true },
+          },
+          required: ["stage", "proof"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            stage: stageProperty("a10", "Close the incident. Supply only the resume result and autonomy dividend newly required at closure."),
+            case: caseProperty,
+            resume: { type: "object", additionalProperties: true },
+            gain: { type: "object", additionalProperties: true },
+          },
+          required: ["stage", "resume", "gain"],
+          additionalProperties: false,
+        },
+      ],
+      description: "Stage-specific neutral hardening contract. Each stage accepts only evidence newly required at that state; previously stored evidence is carried server-side.",
     };
   }
   if (tool.name === "advanceOperatorWork") {
