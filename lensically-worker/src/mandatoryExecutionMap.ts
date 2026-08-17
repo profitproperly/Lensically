@@ -333,6 +333,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       any_terms: ["typed profile", "typed contract", "public schema", "planned action", "profile contract"],
     },
     losing_path: "Allow the public typed action contract, server-side planned-action validator, and executable handler contract to diverge or rely on a prevention name that is not bound to the action before execution.",
+    root_cause: "The public typed-action schema and runtime validator were generated from separate contract sources, allowing schema drift and leaving named prevention detached from the actual prepared action.",
     winning_path: {
       surface: "source_control",
       procedure: ["Generate and validate the public typed action from the same canonical handler contract.", "Bind the exact typed-contract prevention to every current and future action at Step 2.", "Carry the prepared action fingerprint unchanged through live state and execution.", "Reject any schema, capability, tool, or argument drift before execution."],
