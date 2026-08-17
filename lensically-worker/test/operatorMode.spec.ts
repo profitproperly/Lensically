@@ -3944,8 +3944,10 @@ describe("operator mode MCP endpoint", () => {
     const repositorySearchClientSafety = repositorySearchKnowledge.action_rule_binding.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor");
     expect(repositorySearchClientSafety?.root_cause).toContain("five-stage refactor");
     expect(repositorySearchClientSafety?.failure_history.length).toBeGreaterThan(0);
-    expect(repositorySearchClientSafety?.proven_repair).toEqual(expect.arrayContaining([expect.stringContaining("execution descriptor")]));
-    expect(repositorySearchClientSafety?.prevention.regression_test_id).toBe("preserves client-visible action effect semantics through the token-only five-stage lifecycle");
+    expect(repositorySearchClientSafety?.prevention_rule_id).toBe("client_safe_step4_execution_descriptor");
+    const repositorySearchClientSafetyPrevention = repositorySearchKnowledge.action_rule_binding.prevention_rules.find((entry) => entry.id === repositorySearchClientSafety?.prevention_rule_id);
+    expect(repositorySearchClientSafetyPrevention?.winning_path).toEqual(expect.arrayContaining([expect.stringContaining("execution descriptor")]));
+    expect(repositorySearchClientSafetyPrevention?.regression_test_id).toBe("preserves client-visible action effect semantics through the token-only five-stage lifecycle");
             const step2 = await mcpTool<{ knowledge_token: string; nodes: Array<{ node_id: string; content: Record<string, unknown> }> }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: { capability: "list_accounts", arguments: {} },
