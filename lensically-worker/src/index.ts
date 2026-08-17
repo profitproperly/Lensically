@@ -17048,6 +17048,14 @@ const OPERATOR_CASE_STEP_STAGES = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7
 
 type OperatorCaseStepStage = typeof OPERATOR_CASE_STEP_STAGES[number];
 
+function operatorPlannedActionIsReadOnlyDryRun(
+  toolName: string,
+  plannedArguments: Record<string, unknown>,
+): boolean {
+  return plannedArguments.dry_run === true
+    && (toolName === "advanceHardeningIncident" || toolName === "runGitHubWorkflow");
+}
+
 function operatorClientExecutionDescriptor(
   toolName: string,
   capability: string,
@@ -17063,7 +17071,9 @@ function operatorClientExecutionDescriptor(
   }
   return {
     action_id: actionId,
-    effect_class: operatorToolMutatesState(toolName) ? "mutation" : "read_only",
+    effect_class: operatorPlannedActionIsReadOnlyDryRun(toolName, plannedArguments)
+      ? "read_only"
+      : operatorToolMutatesState(toolName) ? "mutation" : "read_only",
   };
 }
 
@@ -17072,7 +17082,16 @@ function operatorClientExecutionDescriptorsForTool(
   capability: string,
 ): Array<{ action_id: string; effect_class: "read_only" | "mutation" }> {
   if (toolName === "advanceHardeningIncident") {
-    return OPERATOR_CASE_STEP_STAGES.map((stage) => operatorClientExecutionDescriptor(toolName, capability, { stage }));
+    return OPERATOR_CASE_STEP_STAGES.flatMap((stage) => [
+      operatorClientExecutionDescriptor(toolName, capability, { stage }),
+      operatorClientExecutionDescriptor(toolName, capability, { stage, dry_run: true }),
+    ]);
+  }
+  if (toolName === "runGitHubWorkflow") {
+    return [
+      operatorClientExecutionDescriptor(toolName, capability),
+      operatorClientExecutionDescriptor(toolName, capability, { dry_run: true }),
+    ];
   }
   return [operatorClientExecutionDescriptor(toolName, capability)];
 }

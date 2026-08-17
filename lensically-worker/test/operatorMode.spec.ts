@@ -3830,16 +3830,24 @@ describe("operator mode MCP endpoint", () => {
     expect(actionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
     expect(actionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
-    const executionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
-    const caseStepDescriptorIds = (executionDescriptorSchema?.oneOf ?? [])
-      .map((branch) => branch.properties?.action_id?.const ?? "")
-      .filter((actionId) => /^case_step_a(?:10|[0-9])$/.test(actionId));
+        const executionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
+    const executionDescriptorBranches = executionDescriptorSchema?.oneOf ?? [];
+    const caseStepDescriptorBranches = executionDescriptorBranches.filter((branch) => /^case_step_a(?:10|[0-9])$/.test(branch.properties?.action_id?.const ?? ""));
+    expect(caseStepDescriptorBranches).toHaveLength(22);
+    const caseStepDescriptorIds = Array.from(new Set(caseStepDescriptorBranches.map((branch) => branch.properties?.action_id?.const ?? "")));
     expect(caseStepDescriptorIds).toEqual(["case_step_a0", "case_step_a1", "case_step_a2", "case_step_a3", "case_step_a4", "case_step_a5", "case_step_a6", "case_step_a7", "case_step_a8", "case_step_a9", "case_step_a10"]);
-    expect(executionDescriptorSchema?.oneOf?.some((branch) => branch.properties?.action_id?.const === "case_step")).toBe(false);
-    expect(executionDescriptorSchema?.oneOf?.length).toBe((plannedActionSchema?.oneOf?.length ?? 0) + 10);
-    const continuationDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "get_engineering_continuation");
+    for (const actionId of caseStepDescriptorIds) {
+      expect(caseStepDescriptorBranches
+        .filter((branch) => branch.properties?.action_id?.const === actionId)
+        .map((branch) => branch.properties?.effect_class?.const)).toEqual(["mutation", "read_only"]);
+    }
+    expect(executionDescriptorBranches.some((branch) => branch.properties?.action_id?.const === "case_step")).toBe(false);
+    expect(executionDescriptorBranches.length).toBe((plannedActionSchema?.oneOf?.length ?? 0) + 22);
+    const controlStepDescriptors = executionDescriptorBranches.filter((branch) => branch.properties?.action_id?.const === "control_step");
+    expect(controlStepDescriptors.map((branch) => branch.properties?.effect_class?.const)).toEqual(["mutation", "read_only"]);
+    const continuationDescriptor = executionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "get_engineering_continuation");
     expect(continuationDescriptor?.properties?.effect_class?.const).toBe("read_only");
-    const repositoryPatchDescriptor = executionDescriptorSchema?.oneOf?.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
+    const repositoryPatchDescriptor = executionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
     expect(repositoryPatchDescriptor?.properties?.effect_class?.const).toBe("mutation");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("action_execution_token");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("verification");
