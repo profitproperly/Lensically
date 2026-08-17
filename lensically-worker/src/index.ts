@@ -16991,10 +16991,14 @@ function operatorPublicProfileIdForToolName(toolName: string): string {
 }
 
 function operatorActionCapabilityIdForToolName(toolName: string): string {
+  if (toolName === "runGitHubWorkflow") return "control_step";
   return OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(toolName) ?? operatorPublicProfileIdForToolName(toolName);
 }
 
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
+  if (tool.name === "runGitHubWorkflow") {
+    return { type: "object", properties: {}, required: [], additionalProperties: false };
+  }
   if (tool.name === "advanceHardeningIncident") {
     return {
       type: "object",
@@ -17248,6 +17252,16 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       error: "registered_profile_id_required",
       profile_id: null,
       available_profile_hint: "Use startup, account_key_selection, or account_proceed for account initialization; use a registered snake_case capability profile for later work.",
+        };
+  }
+  if (profileId === "control_step") {
+    if (Object.keys(inputs).length > 0) {
+      return { ok: false, error: "control_step_inputs_forbidden", profile_id: profileId };
+    }
+    return {
+      ok: true,
+      profile_id: profileId,
+      request: { objective: "Advance one control step.", intent: "advance control step", inputs: {} },
     };
   }
   const safeProfile = CLIENT_SAFE_REQUEST_PROFILES[profileId as ClientSafeRequestProfileId];
@@ -17439,11 +17453,53 @@ async function prepareOperatorRoutedGatewayCall(
   env: Env,
   gatewayArgs: Record<string, unknown>,
 ): Promise<OperatorRoutedGatewayResult> {
-  const actionIntent = normalizeOperatorText(gatewayArgs.intent ?? gatewayArgs.action_intent, 8000);
+    let actionIntent = normalizeOperatorText(gatewayArgs.intent ?? gatewayArgs.action_intent, 8000);
   const objective = normalizeOperatorText(gatewayArgs.objective, 8000, true);
-  const directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
+  let directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
     : null;
+  if (actionIntent === "advance control step" && directInputs) {
+    if (Object.keys(directInputs).some((key) => key !== "governing_standards_ack")) {
+      return { ok: false, error: "control_step_inputs_forbidden" };
+    }
+    const releaseConfig = githubRepoConfig(env);
+    const branch = await githubRepoApiRetryable(env, `/branches/${encodeURIComponent(releaseConfig.branch)}`);
+    const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
+      ? ((branch.data as Record<string, unknown>).commit as Record<string, unknown> | undefined)
+      : undefined;
+    const latestSha = typeof commit?.sha === "string" ? commit.sha : null;
+    if (!branch.ok || !latestSha || !/^[a-f0-9]{40}$/i.test(latestSha)) {
+      return { ok: false, error: "control_step_repository_state_unavailable" };
+    }
+    const [checkRunsResponse, commitStatusResponse] = await Promise.all([
+      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/check-runs?per_page=100`),
+      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/status`),
+    ]);
+    if (!checkRunsResponse.ok || !commitStatusResponse.ok) {
+      return { ok: false, error: "control_step_validation_state_unavailable" };
+    }
+    const checkRunsData = checkRunsResponse.data && typeof checkRunsResponse.data === "object" && !Array.isArray(checkRunsResponse.data)
+      ? checkRunsResponse.data as Record<string, unknown>
+      : {};
+    const checkRuns = Array.isArray(checkRunsData.check_runs) ? checkRunsData.check_runs as Array<Record<string, unknown>> : [];
+    const commitStatusData = commitStatusResponse.data && typeof commitStatusResponse.data === "object" && !Array.isArray(commitStatusResponse.data)
+      ? commitStatusResponse.data as Record<string, unknown>
+      : {};
+    const statuses = Array.isArray(commitStatusData.statuses) ? commitStatusData.statuses as Array<Record<string, unknown>> : [];
+    const pushValidated = checkRuns.some((run) => run.name === "push-validation" && run.status === "completed" && run.conclusion === "success");
+    const preflightValidated = statuses.some((status) => status.context === "lensically/full-release-preflight" && status.state === "success");
+    const fullValidated = statuses.some((status) => status.context === "lensically/full-validation" && status.state === "success");
+    if (!pushValidated || !preflightValidated || !fullValidated) {
+      return { ok: false, error: "control_step_head_not_validated", validation: { pushValidated, preflightValidated, fullValidated } };
+    }
+    actionIntent = operatorPublicIntentForToolName("runGitHubWorkflow");
+    directInputs = {
+      governing_standards_ack: directInputs.governing_standards_ack,
+      task: "worker-deploy",
+      release_id: `control-${latestSha.slice(0, 12)}`,
+      release_sha: latestSha,
+    };
+  }
   const baseTools = buildOperatorMcpBaseTools(false);
   const directMapped = actionIntent && directInputs
     ? prepareSourceDefinedDirectEngineeringCall(
