@@ -185,8 +185,10 @@ describe("Operator MCP protocol contract", () => {
     const continuityPayload = {
       action_rule_registry_version: readRules.registry_version,
       winning_path_registry_version: readRules.winning_path_registry_version,
+      action_intelligence_version: readRules.action_intelligence_version,
       action_rule_ids: readRules.rule_ids,
       prevention_rule_ids: readRules.prevention_rule_ids,
+      action_intelligence_ids: readRules.action_intelligence_ids,
     };
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, continuityPayload).ok).toBe(true);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }).ok).toBe(false);
