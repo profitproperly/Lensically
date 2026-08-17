@@ -17029,6 +17029,13 @@ function operatorActionCapabilityIdForToolName(toolName: string): string {
   return OPERATOR_REQUIRED_SAFE_PROFILE_BY_TOOL.get(toolName) ?? operatorPublicProfileIdForToolName(toolName);
 }
 
+function operatorClientExecutionDescriptor(toolName: string, capability: string): { action_id: string; effect_class: "read_only" | "mutation" } {
+  return {
+    action_id: capability,
+    effect_class: operatorToolMutatesState(toolName) ? "mutation" : "read_only",
+  };
+}
+
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
   if (tool.name === "runGitHubWorkflow") {
     return { type: "object", properties: {}, required: [], additionalProperties: false };
