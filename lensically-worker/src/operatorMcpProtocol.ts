@@ -88,12 +88,16 @@ export function validateOperatorActionRuleBindingContinuity(
   const binding = operatorActionRuleBindingForTool(toolName, args);
   const observedRuleIds = exactOperatorRuleIdArray(payload.action_rule_ids);
   const observedPreventionRuleIds = exactOperatorRuleIdArray(payload.prevention_rule_ids);
+  const observedActionIntelligenceIds = exactOperatorRuleIdArray(payload.action_intelligence_ids);
   const ok = payload.action_rule_registry_version === binding.registry_version
     && payload.winning_path_registry_version === binding.winning_path_registry_version
+    && payload.action_intelligence_version === binding.action_intelligence_version
     && observedRuleIds !== null
     && observedPreventionRuleIds !== null
+    && observedActionIntelligenceIds !== null
     && exactOperatorRuleIdArraysMatch(observedRuleIds, binding.rule_ids)
-    && exactOperatorRuleIdArraysMatch(observedPreventionRuleIds, binding.prevention_rule_ids);
+    && exactOperatorRuleIdArraysMatch(observedPreventionRuleIds, binding.prevention_rule_ids)
+    && exactOperatorRuleIdArraysMatch(observedActionIntelligenceIds, binding.action_intelligence_ids);
   return {
     ok,
     error: ok ? null : "operator_action_rule_binding_mismatch",
