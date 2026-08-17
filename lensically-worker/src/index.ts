@@ -17078,11 +17078,19 @@ function operatorClientExecutionDescriptorsForTool(
 }
 
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
-  if (tool.name === "runGitHubWorkflow") {
-    return { type: "object", properties: {}, required: [], additionalProperties: false };
+    if (tool.name === "runGitHubWorkflow") {
+    return {
+      type: "object",
+      properties: {
+        dry_run: { type: "boolean", description: "Run the exact release preflight and compile the real workflow dispatch without dispatching it." },
+      },
+      required: [],
+      additionalProperties: false,
+    };
   }
-  if (tool.name === "advanceHardeningIncident") {
+    if (tool.name === "advanceHardeningIncident") {
     const caseProperty = { type: "string", maxLength: 120 };
+    const dryRunProperty = { type: "boolean", description: "Validate the exact hardening transition without persisting incident state." };
     const stageProperty = (stage: string, description: string) => ({ type: "string", enum: [stage], description });
     const stageOnly = (stage: string, description: string) => ({
       type: "object",
@@ -17168,7 +17176,10 @@ function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): 
           required: ["stage", "resume", "gain"],
           additionalProperties: false,
         },
-      ],
+            ].map((branch) => ({
+        ...branch,
+        properties: { ...branch.properties, dry_run: dryRunProperty },
+      })),
       description: "Stage-specific neutral hardening contract. Each stage accepts only evidence newly required at that state; previously stored evidence is carried server-side.",
     };
   }
@@ -17407,14 +17418,19 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       available_profile_hint: "Use startup, account_key_selection, or account_proceed for account initialization; use a registered snake_case capability profile for later work.",
         };
   }
-  if (profileId === "control_step") {
-    if (Object.keys(inputs).length > 0) {
+    if (profileId === "control_step") {
+    const inputKeys = Object.keys(inputs);
+    if (inputKeys.some((key) => key !== "dry_run") || ("dry_run" in inputs && typeof inputs.dry_run !== "boolean")) {
       return { ok: false, error: "control_step_inputs_forbidden", profile_id: profileId };
     }
     return {
       ok: true,
       profile_id: profileId,
-      request: { objective: "Advance one control step.", intent: "advance control step", inputs: {} },
+      request: {
+        objective: "Advance one control step.",
+        intent: "advance control step",
+        inputs: inputs.dry_run === true ? { dry_run: true } : {},
+      },
     };
   }
   const safeProfile = CLIENT_SAFE_REQUEST_PROFILES[profileId as ClientSafeRequestProfileId];
@@ -17535,10 +17551,11 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
         const ordinalMatch = /^(?:a)?(\d+)$/.exec(compactStage);
         const ordinalIndex = ordinalMatch ? Number(ordinalMatch[1]) : -1;
         const targetState = stageMap[stage] ?? stageMap[compactStage] ?? ordinalTargets[ordinalIndex] ?? stage;
-        const transitionInputs: Record<string, unknown> = {
+                const transitionInputs: Record<string, unknown> = {
           incident_id: typeof safeInputs.case === "string" && safeInputs.case.trim() ? safeInputs.case.trim() : "__active__",
           target_state: targetState,
         };
+        if (safeInputs.dry_run === true) transitionInputs.dry_run = true;
         if (typeof safeInputs.cause === "string" && safeInputs.cause.trim()) transitionInputs.root_cause = safeInputs.cause.trim();
         if (typeof safeInputs.generalization === "string" && safeInputs.generalization.trim()) transitionInputs.generalized_cause = safeInputs.generalization.trim();
         if (typeof safeInputs.rule === "string" && safeInputs.rule.trim()) transitionInputs.prevention_rule_id = safeInputs.rule.trim();
@@ -17611,10 +17628,12 @@ async function prepareOperatorRoutedGatewayCall(
   let directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
     : null;
-  if (actionIntent === "advance control step" && directInputs) {
-    if (Object.keys(directInputs).some((key) => key !== "governing_standards_ack")) {
+    if (actionIntent === "advance control step" && directInputs) {
+    const controlInputKeys = Object.keys(directInputs);
+    if (controlInputKeys.some((key) => key !== "governing_standards_ack" && key !== "dry_run") || ("dry_run" in directInputs && typeof directInputs.dry_run !== "boolean")) {
       return { ok: false, error: "control_step_inputs_forbidden" };
     }
+    const dryRun = directInputs.dry_run === true;
     const releaseConfig = githubRepoConfig(env);
     const branch = await githubRepoApiRetryable(env, `/branches/${encodeURIComponent(releaseConfig.branch)}`);
     const commit = branch.data && typeof branch.data === "object" && !Array.isArray(branch.data)
@@ -17646,11 +17665,12 @@ async function prepareOperatorRoutedGatewayCall(
             return { ok: false, error: "control_step_head_not_validated" };
     }
     actionIntent = operatorPublicIntentForToolName("runGitHubWorkflow");
-    directInputs = {
+        directInputs = {
       governing_standards_ack: directInputs.governing_standards_ack,
       task: "worker-deploy",
       release_id: `control-${latestSha.slice(0, 12)}`,
       release_sha: latestSha,
+      ...(dryRun ? { dry_run: true } : {}),
     };
   }
   const baseTools = buildOperatorMcpBaseTools(false);
@@ -18641,9 +18661,22 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     resume_result: resolveHardeningResumeResult(args, supplied, safeParseJsonString(String(row.resume_result_json ?? ""))),
         autonomy_dividend: (args.autonomy_dividend ?? safeParseJsonString(String(row.autonomy_dividend_json ?? ""))) as Record<string, unknown> | null,
   };
-  const validation = validateHardeningTransition(current, target, evidence);
+    const validation = validateHardeningTransition(current, target, evidence);
   if (!validation.allowed) {
     return { ok: false, error: "hardening_transition_blocked", incident_id: incidentId, current_state: current, target_state: target, missing_or_invalid_evidence: validation.errors };
+  }
+  if (args.dry_run === true) {
+    return {
+      ok: true,
+      dry_run: true,
+      validated: true,
+      would_mutate: true,
+      version: CONTINUOUS_HARDENING_VERSION,
+      incident: { id: incidentId, state: current },
+      current_state: current,
+      target_state: target,
+      normal_work_blocked: current !== "closed",
+    };
   }
     await env.DB.prepare(
     `UPDATE operator_hardening_incidents SET
@@ -22552,9 +22585,23 @@ async function handleOperatorMcpEngineeringTool(
     }
     const workflowId = "lensically-engineering.yml";
     const ref = config.branch;
-    const inputs: Record<string, string> = { task };
+        const inputs: Record<string, string> = { task };
     if (releaseId) inputs.release_id = releaseId;
     if (releaseSha) inputs.release_sha = releaseSha;
+    if (args.dry_run === true) {
+      return {
+        ok: true,
+        dry_run: true,
+        validated: true,
+        would_mutate: true,
+        workflow_id: workflowId,
+        ref,
+        inputs,
+        task,
+        release_id: releaseId || null,
+        release_sha: releaseSha ?? null,
+      };
+    }
     const result = await githubRepoApi(env, `/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
       method: "POST",
       headers: { "content-type": "application/json" },

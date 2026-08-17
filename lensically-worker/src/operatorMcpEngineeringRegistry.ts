@@ -167,8 +167,9 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
         deployment_id: { type: "string" },
         live_verification: { type: "object", additionalProperties: true },
         resume_result: { type: "object", additionalProperties: true },
-        autonomy_dividend: { type: "object", additionalProperties: true },
+                autonomy_dividend: { type: "object", additionalProperties: true },
         efficiency_result: { type: "object", additionalProperties: true },
+        dry_run: { type: "boolean" },
       },
       required: ["incident_id", "target_state"],
       additionalProperties: false,
@@ -519,9 +520,10 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "human-free-tests", "worker-deploy"] },
+                task: { type: "string", enum: ["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "human-free-tests", "worker-deploy"] },
         release_id: { type: "string", maxLength: 80 },
         release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+        dry_run: { type: "boolean" },
       },
       required: ["task"],
       additionalProperties: false,

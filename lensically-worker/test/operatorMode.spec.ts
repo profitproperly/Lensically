@@ -3931,11 +3931,12 @@ describe("operator mode MCP endpoint", () => {
     expect(step1).not.toHaveProperty("startup_authority");
     expect(step1).not.toHaveProperty("canonical_continuation");
         expect(step1).not.toHaveProperty("tool_surface");
-    const controlStepKnowledge = await mcpTool<{ knowledge_token: string }>("getOperatorKnowledge", {
+        const controlStepKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      planned_action: { capability: "control_step", arguments: {} },
+      planned_action: { capability: "control_step", arguments: { dry_run: true } },
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
+    expect(controlStepKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["operator_mcp_version_single_source", "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
     const repositorySearchKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { action_intelligence_version: string; prevention_rule_ids: string[]; action_intelligence_ids: string[]; action_intelligence: Array<{ intelligence_id: string; defect_class: string; failure_history: string[]; root_cause: string; prevention_rule_id: string }>; prevention_rules: Array<{ id: string; winning_path: string[]; enforcement_point: string; regression_test_id: string }> } }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
       planned_action: {
@@ -4229,11 +4230,12 @@ active_checkpoint: none
       expectedBlocked = true,
     ) => {
       const action = { capability: "case_step", arguments: arguments_ };
-      const step2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+            const step2 = await mcpToolCallRaw<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
         session_map_token: session.structuredContent.session_map_token,
         planned_action: action,
       });
       expect(step2.isError, JSON.stringify(step2.structuredContent)).not.toBe(true);
+      expect(step2.structuredContent.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["neutral_case_step_contract", "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
       const step3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
         knowledge_token: step2.structuredContent.knowledge_token,
         planned_action: action,
@@ -4243,9 +4245,13 @@ active_checkpoint: none
         action_id: `case_step_${String(arguments_.stage)}`,
         effect_class: "mutation",
       });
-      const step4 = await mcpToolCallRaw<{
+            const step4 = await mcpToolCallRaw<{
         ok: boolean;
+        dry_run?: boolean;
+        validated?: boolean;
+        would_mutate?: boolean;
         current_state: string;
+        target_state?: string;
         normal_work_blocked: boolean;
         incident: { id: string };
         action_execution_token: string;
@@ -4254,12 +4260,25 @@ active_checkpoint: none
         execution_descriptor: step3.structuredContent.execution_descriptor,
       });
       expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
-      expect(step4.structuredContent).toMatchObject({
-        ok: true,
-        current_state: expectedState,
-        normal_work_blocked: expectedBlocked,
-        incident: { id: incidentId },
-      });
+      if (arguments_.dry_run === true) {
+        expect(step4.structuredContent).toMatchObject({
+          ok: true,
+          dry_run: true,
+          validated: true,
+          would_mutate: true,
+          current_state: expectedState,
+          target_state: "contained",
+          normal_work_blocked: expectedBlocked,
+          incident: { id: incidentId },
+        });
+      } else {
+        expect(step4.structuredContent).toMatchObject({
+          ok: true,
+          current_state: expectedState,
+          normal_work_blocked: expectedBlocked,
+          incident: { id: incidentId },
+        });
+      }
       const step5 = await mcpToolCallRaw<{ ok: boolean }>("closeOperatorAction", {
         action_execution_token: step4.structuredContent.action_execution_token,
         verification: {
@@ -4273,6 +4292,7 @@ active_checkpoint: none
       expect(step5.structuredContent.ok).toBe(true);
     };
 
+        await executeCaseStep({ stage: "a0", case: incidentId, dry_run: true }, "detected");
     await executeCaseStep({ stage: "a0", case: incidentId }, "contained");
     await executeCaseStep({ stage: "a1", case: incidentId }, "classified");
     await executeCaseStep({ stage: "a2", case: incidentId }, "reproduced");

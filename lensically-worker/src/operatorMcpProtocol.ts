@@ -20,6 +20,9 @@ const OPERATOR_BASE_ACTION_RULE_IDS = [
 ] as const;
 
 export function operatorActionRuleBindingForTool(toolName: string, args: Record<string, unknown> = {}) {
+  const bindingArgs = toolName === "runGitHubWorkflow" && args.task === undefined
+    ? { ...args, task: "worker-deploy" }
+    : args;
   const ruleIds = new Set<string>(OPERATOR_BASE_ACTION_RULE_IDS);
   if (toolName === "readRepoFile") ruleIds.add("repository.known_file_read");
   if (toolName === "searchRepoFiles") ruleIds.add("repository.exact_known_file_search");
@@ -32,12 +35,12 @@ export function operatorActionRuleBindingForTool(toolName: string, args: Record<
   if (toolName === "applyRepoPatchSet") ruleIds.add("repository.exact_head_discipline");
   if (toolName === "runGitHubWorkflow") {
     ruleIds.add("workflow.declared_task_only");
-    if (args.task === "worker-deploy") {
+    if (bindingArgs.task === "worker-deploy") {
       ruleIds.add("release.exact_validated_head");
       ruleIds.add("release.no_active_content_cycle");
     }
   }
-  const preventionRules = resolveActionBoundWinningPaths(toolName, args);
+  const preventionRules = resolveActionBoundWinningPaths(toolName, bindingArgs);
   for (const prevention of preventionRules) ruleIds.add(`prevention.${prevention.id}`);
   const actionIntelligence = preventionRules.map((prevention) => ({
     intelligence_id: prevention.id,
