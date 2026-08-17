@@ -4376,7 +4376,7 @@ active_checkpoint: none
       planned_action: { capability: "list_accounts", arguments: {} },
     });
     expect(step2.isError).not.toBe(true);
-    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(secondSessionId, "getOperatorLiveState", {
+    const step3 = await callWithSession<{ ok: boolean; live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>(secondSessionId, "getOperatorLiveState", {
       knowledge_token: step2.structuredContent.knowledge_token,
     });
     expect(step3.isError).not.toBe(true);
