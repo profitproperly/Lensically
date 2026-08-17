@@ -193,6 +193,11 @@ describe("Operator MCP protocol contract", () => {
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, continuityPayload).ok).toBe(true);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }).ok).toBe(false);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, prevention_rule_ids: undefined }).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_intelligence_ids: undefined }).ok).toBe(false);
+    expect(readRules.action_intelligence_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract", "client_safe_step4_execution_descriptor"]));
+    expect(readRules.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor")).toMatchObject({
+      prevention_rule_id: "client_safe_step4_execution_descriptor",
+    });
     const futureRules = operatorActionRuleBindingForTool("futureRegisteredTool", {});
     expect(futureRules.prevention_rule_ids).toContain("typed_profile_exact_contract");
     expect(futureRules.rule_ids).toContain("prevention.typed_profile_exact_contract");
