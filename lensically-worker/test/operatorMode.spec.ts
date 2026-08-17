@@ -4490,7 +4490,7 @@ active_checkpoint: none
     expect(crossSession.isError).toBe(true);
     expect(crossSession.structuredContent).toMatchObject({ ok: false, error: "operator_lifecycle_token_invalid_or_expired" });
 
-    const step3 = await callWithSession<{ ok: boolean; live_state_token: string }>(sessionId, "getOperatorLiveState", {
+    const step3 = await callWithSession<{ ok: boolean; live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>(sessionId, "getOperatorLiveState", {
       knowledge_token: corruptedKnowledgeToken,
     });
     expect(step3.isError).not.toBe(true);
