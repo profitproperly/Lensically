@@ -3899,7 +3899,8 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "control_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean } } } | undefined;
     expect(controlStepBranch?.properties?.arguments?.required).toEqual([]);
-    expect(controlStepBranch?.properties?.arguments?.properties).toEqual({});
+    expect(Object.keys(controlStepBranch?.properties?.arguments?.properties ?? {})).toEqual(["dry_run"]);
+    expect(controlStepBranch?.properties?.arguments?.properties).toHaveProperty("dry_run");
     expect(controlStepBranch?.properties?.arguments?.additionalProperties).toBe(false);
     const actionCapabilities = (plannedActionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
         expect(actionCapabilities.every(Boolean)).toBe(true);
