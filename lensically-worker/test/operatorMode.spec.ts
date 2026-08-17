@@ -3831,7 +3831,7 @@ describe("operator mode MCP endpoint", () => {
     expect(closeTool?.inputSchema?.properties).not.toHaveProperty("action");
     const knownFileSearchBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "search_repo_files";
+      return branch.properties?.capability?.const === "repository_symbol_search";
     }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
         expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
     const mcpCampaignBranch = plannedActionSchema?.oneOf?.find((item) => {
