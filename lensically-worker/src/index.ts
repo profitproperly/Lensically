@@ -42,7 +42,6 @@ import {
   assertClientSafetyRegistry,
     buildClientSafeGatewayRequest,
     CLIENT_SAFE_REQUEST_PROFILES,
-  CLIENT_SAFETY_GATEWAY_DESCRIPTION,
   CLIENT_SAFETY_STARTUP_INSTRUCTION,
   getClientSafetyRegistrySummary,
   getLensicallySystemDirectorySummary,
