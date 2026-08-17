@@ -183,6 +183,7 @@ export type WinningPathPromotion = {
     min_input_characters?: number;
   };
   losing_path: string;
+  root_cause?: string;
   winning_path: {
     surface: WinningPathSurface;
     route_intent?: string;
