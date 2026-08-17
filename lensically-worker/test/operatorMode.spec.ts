@@ -4147,6 +4147,7 @@ active_checkpoint: none
         action_execution_token: string;
       }>("executeOperatorAction", {
         live_state_token: step3.structuredContent.live_state_token,
+        execution_descriptor: step3.structuredContent.execution_descriptor,
       });
       expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
       expect(step4.structuredContent).toMatchObject({
