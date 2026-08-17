@@ -159,12 +159,13 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
     planned_action: plannedAction,
   });
   if (step2.isError) return step2 as unknown as { structuredContent: T; isError?: boolean };
-  const step3 = await mcpToolCallRaw<{ live_state_token: string }>("getOperatorLiveState", {
+  const step3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
     knowledge_token: step2.structuredContent.knowledge_token,
   });
   if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
   const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>("executeOperatorAction", {
     live_state_token: step3.structuredContent.live_state_token,
+    execution_descriptor: step3.structuredContent.execution_descriptor,
   });
   if (step4.isError || !step4.structuredContent.action_execution_token) return step4;
   const step5 = await mcpToolCallRaw("closeOperatorAction", {
