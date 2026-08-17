@@ -3431,7 +3431,7 @@ if (!router.includes('WINNING_PATH_PROMOTION_VERSION = "winning-path-promotion-v
     || !router.includes("evaluatePreventableIncidentClosure")
     || !router.includes("promoted_winning_path_external_surface_required")
     || !router.includes('id: "client_safe_step4_execution_descriptor"')
-    || !operatorMcpProtocol.includes('OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v3"')
+    || !operatorMcpProtocol.includes('OPERATOR_ACTION_RULE_REGISTRY_VERSION = "operator-action-rule-registry-v4"')
     || !operatorMcpProtocol.includes("action_intelligence_version")
     || !operatorMcpProtocol.includes("action_intelligence_ids")
     || !operatorMcpProtocol.includes("prevention_rule_id")
