@@ -1,18 +1,36 @@
 # Lensically Continuation Ledger
 
 status: active
-updated_at: 2026-08-15
+updated_at: 2026-08-17
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: operator-lifecycle-architecture-refactor-20260814
-active_checkpoint: neutral-hardening-case-step-public-schema-refresh
+active_job_id: post-wiring-ecl-clearance-20260817
+active_checkpoint: refresh-verify-control-step-then-close-client-hardening
 
-## ACTIVE — Operator Lifecycle Architecture Refactor
+## ACTIVE — Post-Wiring ECL Clearance
+
+job_id: `post-wiring-ecl-clearance-20260817`
+status: active
+opened_at: 2026-08-17
+objective: Finish the client-safe release hardening closure, verify the refreshed public schema, then systematically clear every remaining ECL item until no ACTIVE current action remains.
+rules_to_actions_wiring: complete_live_verified
+production_commit: `55a6998b4f52736218154e7561f789f25caa6e49`
+deployment_id: `dccac78e-2210-4b32-bf76-ea19648ca4f1`
+release_run: `32041925387`
+validation: push run `32041505159` success; focused Operator run `32041694042` success 8/8; parse-engineering-workflow success.
+live_verification: Production Step 2 binds action-specific competence before execution; Step 3 carries the exact action_rule_binding; Step 4 verifies and executes the prepared action; Step 5 returns the same binding and closes successfully.
+bootstrap_exception: retired after live verification; strict first-failure preemption is restored unchanged.
+current_blocker: The current chat is provably schema-stale after the live release. Its surfaced Step-2 union still advertises raw `run_git_hub_workflow` instead of neutral `control_step`, and its stale Step-4 contract replays semantic action data; a `get_engineering_continuation` Step-4 call was blocked by the client before Lensically dispatch. This is stale-client evidence, not a production server failure.
+current_action: Refresh Lensically Operator Mode. In the fresh chat call `getOperatorSessionMap` first, then read this ECL through the refreshed lifecycle. Verify `control_step` is surfaced, raw `run_git_hub_workflow` is absent, and Step 4 is token-only. Then finish hardening incident `bb311077-56ac-485a-9d14-98c206f5d502`, resume strict queue execution, and clear the ECL to a true blank slate.
+surviving_hardening_incident: `bb311077-56ac-485a-9d14-98c206f5d502` — client-safe release prevention regression; currently contained. Root repair is live in Recovery: semantic `worker-deploy` removed from the public task values and neutral `typecheck + release` compiles server-side to exact-head deployment.
+
+## SUPERSEDED — Operator Lifecycle Architecture Refactor
 
 job_id: `operator-lifecycle-architecture-refactor-20260814`
-status: active
+status: superseded
 reopened_at: 2026-08-14
+
 architecture_contract: Lensically Operator Mode is normalized around the five public lifecycle tools `getOperatorSessionMap`, `getOperatorKnowledge`, `getOperatorLiveState`, `executeOperatorAction`, and `closeOperatorAction`; Step 0 remains tiny initialization only, durable knowledge is deployment-local, mutable state is server-derived from the prepared action, Step 4 is the typed execution choke point, and Step 5 owns explicit verification closure.
 resolved_interrupt_id: `dfa3d5ea-51d2-45ab-b81c-34ef1284a8ce`
 root_repairs: Migrated deployed-version verification and release gates to the exact five-tool lifecycle; repaired first-session binding without weakening mismatch rejection; classified expected lifecycle controls correctly; made Step 2 advertise the same typed action union as Step 4; aligned zero-history typed contracts; migrated stale regressions away from retired direct/generic forms; moved release-authority publication into the exact-SHA release workflow so dispatch plane cannot change authority semantics; hardened complete validation into bounded six-file serial Vitest processes and made release preflight enforce the same harness contract.
