@@ -191,6 +191,29 @@ export async function dispatchOperatorMcpToolCall(
       }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
     }
     lifecycleLiveStatePayload = lifecycleCheck.payload;
+    const requestedExecutionDescriptor = asRecord(governedRequestedArgs.execution_descriptor);
+    const expectedClientActionId = typeof lifecycleCheck.payload.client_action_id === "string" ? lifecycleCheck.payload.client_action_id.trim() : "";
+    const expectedEffectClass = lifecycleCheck.payload.effect_class === "read_only" || lifecycleCheck.payload.effect_class === "mutation"
+      ? lifecycleCheck.payload.effect_class
+      : "";
+    const requestedClientActionId = typeof requestedExecutionDescriptor?.action_id === "string" ? requestedExecutionDescriptor.action_id.trim() : "";
+    const requestedEffectClass = requestedExecutionDescriptor?.effect_class === "read_only" || requestedExecutionDescriptor?.effect_class === "mutation"
+      ? requestedExecutionDescriptor.effect_class
+      : "";
+    if (!expectedClientActionId || !expectedEffectClass || requestedClientActionId !== expectedClientActionId || requestedEffectClass !== expectedEffectClass) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_execution_descriptor_mismatch",
+        expected_execution_descriptor: expectedClientActionId && expectedEffectClass
+          ? { action_id: expectedClientActionId, effect_class: expectedEffectClass }
+          : null,
+        received_execution_descriptor: requestedExecutionDescriptor,
+        required_stage: "getOperatorLiveState",
+        required_tool: "getOperatorLiveState",
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the client-safe execution descriptor did not exactly match the action prepared by Step 3.", true);
+    }
     const capability = typeof lifecycleCheck.payload.planned_capability === "string" ? lifecycleCheck.payload.planned_capability.trim() : "";
     const actionArguments = asRecord(lifecycleCheck.payload.planned_arguments);
     if (!capability || !actionArguments) {
