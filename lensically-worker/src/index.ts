@@ -21482,8 +21482,10 @@ async function handleOperatorMcpEngineeringTool(
             knowledge_node_ids: tokenCheck.payload.node_ids ?? [],
       action_rule_registry_version: actionRuleContinuity.binding.registry_version,
       winning_path_registry_version: actionRuleContinuity.binding.winning_path_registry_version,
+      action_intelligence_version: actionRuleContinuity.binding.action_intelligence_version,
       action_rule_ids: actionRuleContinuity.binding.rule_ids,
       prevention_rule_ids: actionRuleContinuity.binding.prevention_rule_ids,
+      action_intelligence_ids: actionRuleContinuity.binding.action_intelligence_ids,
       scopes,
 
       brand_key: brandKey,
