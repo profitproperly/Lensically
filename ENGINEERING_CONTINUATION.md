@@ -1,13 +1,22 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-18
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
-ecl_active_count: 0
+active_job_id: lom-white-label-product-parity-20260818
+active_checkpoint: design_and_implement_product_parity_injector
+ecl_active_count: 1
+
+## ACTIVE — LOM → White-Label Product Parity Injector
+
+job_id: `lom-white-label-product-parity-20260818`
+status: active
+opened_at: 2026-08-18
+objective: Keep the commercial white-label product repository current with verified product-grade Lensically Operator Mode improvements without mirroring LOM internals or making either repository depend on the other.
+current_action: Implement product applicability classification, push synchronization after verified material LOM changes, pull/catch-up drift detection before white-label work/release, a product-owned parity manifest/watermark with SYNCED/EXCLUDED/PENDING classification, bounded collision-aware transplant/merge, white-label-native validation, and watermark advancement only after verification.
+completion_condition: Source implementation and regressions prove product-grade LOM deltas are detected, classified, ported or intentionally excluded, validated in the white-label repository, and parity state advances only after successful verification while internal-only LOM changes remain excluded.
 
 ## COMPLETED — Rules-to-Actions Wiring Coverage Completion
 
