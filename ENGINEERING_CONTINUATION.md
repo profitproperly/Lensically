@@ -1,12 +1,24 @@
 # Lensically Continuation Ledger
 
-status: completed
+status: active
 updated_at: 2026-08-17
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-closed_at: 2026-08-17
-closure_reason: Owner narrowed continuation to rules-to-actions wiring only; the canonical ledger already proves that wiring complete and live-verified.
+active_job_id: rules-to-actions-wiring-coverage-20260817
+active_checkpoint: implement-coverage-complete-action-competency-binding
+
+## ACTIVE — Rules-to-Actions Wiring Coverage Completion
+
+job_id: `rules-to-actions-wiring-coverage-20260817`
+status: active
+opened_at: 2026-08-17
+objective: Make rules-to-actions wiring coverage-complete across the full live MCP tool/action surface, with deterministic source-controlled learned prevention/action intelligence and regression-enforced coverage.
+baseline_tool_count: 128
+baseline_targeted_action_bound_tools: 4
+baseline_universal_action_bound_promotions: 2
+defect: The prior lifecycle wiring proved that action_rule_binding moves through Steps 2→5, but it did not prove complete action coverage. Source inspection shows only four concrete tool targets receive specialized action-bound learned promotions; most tools receive only generic lifecycle protections.
+current_action: Reconcile the full 128-tool live surface against all source-controlled learned prevention/action intelligence; implement a coverage-complete deterministic binding model, add a regression that fails on unmapped tool/lesson drift, validate the exact head, release, live-verify representative tool classes, then close this job and return the ECL to zero.
 
 ## COMPLETED — Rules-to-Actions Wiring and ECL Clearance
 
