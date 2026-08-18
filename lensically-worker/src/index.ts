@@ -18492,16 +18492,19 @@ async function closeResolvedHardeningIncidentsForRequest(
 }
 
 function hardeningRecurrenceFamily(boundary: string, category: string): string {
-  if (boundary === "client" && (
-                category === "openai_client_safety_block"
-    || category === "openai_client_safety_pre_dispatch"
-        || category === "openai_predispatch_safety_block"
-    || category === "openai_safety_predispatch_block"
-    || category === "openai_safety_checks_pre_dispatch"
-    || category === "client_pre_dispatch_block"
-    || category.startsWith("openai_safety_check_blocked_")
-  )) {
-        return "client:openai_safety_predispatch";
+  const normalizedCategory = category.toLowerCase();
+  const isOpenAiSafetyPredispatch = boundary === "client" && (
+    normalizedCategory === "openai_client_safety_block"
+    || normalizedCategory === "client_pre_dispatch_block"
+    || normalizedCategory.startsWith("openai_safety_check_blocked_")
+    || (
+      normalizedCategory.includes("openai")
+      && normalizedCategory.includes("safety")
+      && (normalizedCategory.includes("predispatch") || normalizedCategory.includes("pre_dispatch"))
+    )
+  );
+  if (isOpenAiSafetyPredispatch) {
+    return "client:openai_safety_predispatch";
   }
   if (boundary === "client" && (
     category === "client_schema_validation_failure"

@@ -6447,10 +6447,40 @@ active_checkpoint: none
     const currentAlias = currentAliasCall.structuredContent;
     expect(currentAliasCall.isError).not.toBe(true);
     expect(currentAlias.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
-    expect(currentAlias.recurrence).toMatchObject({
+        expect(currentAlias.recurrence).toMatchObject({
       status: "known_active_recurrence",
       recurrence_family: "client:openai_safety_predispatch",
     });
+
+    for (const errorCategory of [
+      "openai_client_predispatch_safety_block",
+      "openai_client_predispatch_safety_status_undetermined",
+    ]) {
+      const variantCall = await mcpToolRaw<{
+        ok: boolean;
+        created: boolean;
+        incident: { id: string; classification: string; severity: string };
+        recurrence: { status: string; recurrence_family: string };
+      }>("recordHardeningIncident", {
+        boundary: "client",
+        blocked_profile_id: "case_step_a1",
+        request_fingerprint: `fixture-${errorCategory}`,
+        error_category: errorCategory,
+        operation_class: "engineering_hardening_transition",
+        observed_outcome: { client_blocked: true, lensically_receipt: false },
+      });
+      const variant = variantCall.structuredContent;
+      expect(variantCall.isError).not.toBe(true);
+      expect(variant.incident).toMatchObject({ classification: "known_prevention", severity: "P1" });
+      expect(variant.recurrence).toMatchObject({
+        status: "known_active_recurrence",
+        recurrence_family: "client:openai_safety_predispatch",
+      });
+      await env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(variant.incident.id).run();
+    }
+
     for (const incidentId of [alias.incident.id, currentAlias.incident.id]) {
       await env.DB.prepare(
         `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
