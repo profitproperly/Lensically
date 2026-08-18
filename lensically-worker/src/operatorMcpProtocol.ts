@@ -88,17 +88,21 @@ export function validateOperatorActionRuleBindingContinuity(
   toolName: string,
   args: Record<string, unknown>,
   payload: Record<string, unknown>,
+  competencyNodeIds: readonly string[] = [],
 ) {
-  const binding = operatorActionRuleBindingForTool(toolName, args);
+  const binding = operatorActionRuleBindingForTool(toolName, args, competencyNodeIds);
+  const observedCompetencyIds = exactOperatorRuleIdArray(payload.competency_ids);
   const observedRuleIds = exactOperatorRuleIdArray(payload.action_rule_ids);
   const observedPreventionRuleIds = exactOperatorRuleIdArray(payload.prevention_rule_ids);
   const observedActionIntelligenceIds = exactOperatorRuleIdArray(payload.action_intelligence_ids);
   const ok = payload.action_rule_registry_version === binding.registry_version
     && payload.winning_path_registry_version === binding.winning_path_registry_version
     && payload.action_intelligence_version === binding.action_intelligence_version
+    && observedCompetencyIds !== null
     && observedRuleIds !== null
     && observedPreventionRuleIds !== null
     && observedActionIntelligenceIds !== null
+    && exactOperatorRuleIdArraysMatch(observedCompetencyIds, binding.competency_ids)
     && exactOperatorRuleIdArraysMatch(observedRuleIds, binding.rule_ids)
     && exactOperatorRuleIdArraysMatch(observedPreventionRuleIds, binding.prevention_rule_ids)
     && exactOperatorRuleIdArraysMatch(observedActionIntelligenceIds, binding.action_intelligence_ids);
