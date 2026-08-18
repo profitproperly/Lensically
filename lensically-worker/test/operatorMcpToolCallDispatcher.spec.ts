@@ -210,7 +210,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 2,
-      params: { name: "executeOperatorAction", arguments: {} },
+      params: { name: "executeOperatorReadAction", arguments: {} },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
