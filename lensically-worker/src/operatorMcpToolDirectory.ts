@@ -29,6 +29,7 @@ export const FORBIDDEN_RETIRED_TOOL_NAMES = new Set<string>([
 export const RETIRED_HUMAN_GUIDANCE_TOOL_NAMES = new Set<string>([
   "start_workflow_session",
   "admit_context",
+  "get_production_board",
   "getWorkflowStatus",
   "updateWorkflowRequirement",
   "advanceWorkflowStage",
