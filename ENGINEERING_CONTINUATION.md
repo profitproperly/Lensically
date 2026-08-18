@@ -1,18 +1,20 @@
 # Lensically Continuation Ledger
 
-status: active
-updated_at: 2026-08-17
+status: completed
+updated_at: 2026-08-18
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: rules-to-actions-wiring-coverage-20260817
-active_checkpoint: refresh-and-live-prove-competency-coverage
+active_job_id: none
+active_checkpoint: none
+ecl_active_count: 0
 
-## ACTIVE — Rules-to-Actions Wiring Coverage Completion
+## COMPLETED — Rules-to-Actions Wiring Coverage Completion
 
 job_id: `rules-to-actions-wiring-coverage-20260817`
-status: active
+status: completed
 opened_at: 2026-08-17
+closed_at: 2026-08-18
 objective: Make rules-to-actions wiring coverage-complete across the full live MCP tool/action surface, with deterministic source-controlled learned prevention/action intelligence and regression-enforced coverage.
 baseline_tool_count: 128
 baseline_targeted_action_bound_tools: 4
@@ -25,10 +27,11 @@ mcp_version: `1.45.10`
 tested_source_sha: `a86df0ee7a2fcc0d9fb75deeb1f89354e753e219`
 validation: exact-head typecheck/lifecycle run `32100162717` success; comprehensive push-validation run `32100148716` success.
 release_run: `32100473369`
-live_deployment_version: `0a9438ad-7d09-48e8-9954-be8b475c2717`
-live_deployment_commit: `a86df0ee7a2fcc0d9fb75deeb1f89354e753e219`
-refresh_required: true — current chat still surfaces the pre-release five-tool contract and cannot invoke executeOperatorReadAction.
-current_action: Refresh Lensically Operator Mode, start a fresh chat, call getOperatorSessionMap first, read this ECL, then live-prove the new schema and representative competency bindings across account, repository/release, hardening, Manifest, and commerce classes. Close the current client-predispatch hardening incident with the deployed split-gateway evidence. Only after those live proofs pass, mark wiring complete and return the ECL to zero.
+live_deployment_version: `46c5c49a-6a59-4760-ba9a-8436abd1952a`
+live_deployment_commit: `e4e35e08270e9cc25aa62f4f94a34baf521418e3`
+refresh_required: false — this chat surfaces and successfully uses executeOperatorReadAction and the effect-specific five-stage lifecycle contract.
+final_live_verification: The 123 non-lifecycle action competency-construction contract is source-enforced and live representative bindings completed through Steps 2→5 for account (`governance + account_runtime`), repository/release (`governance + repository_engineering + release_infrastructure`), hardening (`governance + repository_engineering + hardening_safety`), Manifest (`governance + account_runtime + manifest_content`), and commerce (`governance + commercial_product + account_runtime`). Harmless reads succeeded through executeOperatorReadAction, wrong-gateway execution was proven fail-closed, and the client-predispatch hardening incident `a2e83209-6025-49e9-891e-fae38279648b` is closed with `normal_work_blocked:false`.
+current_action: None. Rules-to-actions wiring is complete_live_verified and the ECL is closed.
 
 ## COMPLETED — Rules-to-Actions Wiring and ECL Clearance
 
