@@ -4235,7 +4235,7 @@ active_checkpoint: none
       path: string;
       content: string;
       action_execution_token: string;
-    }>("executeOperatorAction", {
+    }>("executeOperatorReadAction", {
       live_state_token: step3.structuredContent.live_state_token,
       execution_descriptor: step3.structuredContent.execution_descriptor,
     });
