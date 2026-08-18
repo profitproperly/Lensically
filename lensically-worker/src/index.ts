@@ -23176,6 +23176,7 @@ async function handleOperatorMcpToolCall(
       action_rule_registry_version: liveStatePayload.action_rule_registry_version ?? null,
       winning_path_registry_version: liveStatePayload.winning_path_registry_version ?? null,
       action_intelligence_version: liveStatePayload.action_intelligence_version ?? null,
+      competency_ids: liveStatePayload.competency_ids ?? [],
       action_rule_ids: liveStatePayload.action_rule_ids ?? [],
       prevention_rule_ids: liveStatePayload.prevention_rule_ids ?? [],
       action_intelligence_ids: liveStatePayload.action_intelligence_ids ?? [],
