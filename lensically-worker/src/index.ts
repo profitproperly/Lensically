@@ -23147,7 +23147,12 @@ async function handleOperatorMcpToolCall(
             if (!resolved || !toolName || resolved.toolName !== toolName || !actionArguments || !fingerprint || recomputedFingerprint !== fingerprint) {
         return { ok: false, error: "operator_live_state_action_binding_invalid" };
       }
-      const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(toolName, actionArguments, check.payload);
+      const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(
+        toolName,
+        actionArguments,
+        check.payload,
+        requiredOperatorKnowledgeNodesForTool(toolName),
+      );
       if (!actionRuleContinuity.ok) {
         return { ok: false, error: "operator_live_state_action_competence_invalid" };
       }
