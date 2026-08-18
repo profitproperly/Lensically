@@ -365,7 +365,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     scope: "universal",
     binding_scope: "action",
     action_binding: { tool_names: ["*"] },
-    enforcement_point: "Step-3 server-derived execution descriptor, Step-4 closed descriptor schema and exact-match guard, action-intelligence binding, and live ChatGPT lifecycle regression.",
+    enforcement_point: "Step-3 server-derived execution descriptor, effect-specific Step-4 public tool metadata and closed schemas, gateway/effect exact-match guard, action-intelligence binding, and live ChatGPT lifecycle regression.",
     regression_test_id: "preserves client-visible action effect semantics through the token-only five-stage lifecycle",
     supersession_rule: "Any replacement must preserve honest client-visible effect semantics for the prepared action without replaying raw internal handler arguments and must fail closed when the descriptor does not match server-bound state.",
   },
