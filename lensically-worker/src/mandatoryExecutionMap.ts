@@ -355,7 +355,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
       any_terms: ["step 4", "execute operator action", "client predispatch", "execution descriptor", "client-safe execution"],
     },
     losing_path: "Collapse every prepared read and mutation behind one opaque Step-4 call while leaving the client only a static mutating tool classification or retired gateway semantics, so the client cannot distinguish the bound action's effect before dispatch.",
-    root_cause: "The five-stage refactor preserved server-side action binding but failed to migrate action-specific client-safety semantics to the new execution choke point: executeOperatorAction remained statically non-read-only and inherited retired gateway wording even for harmless reads such as getEngineeringContinuation.",
+    root_cause: "The five-stage refactor preserved server-side action binding and later added a neutral execution descriptor, but executeOperatorAction still advertised static readOnlyHint:false for every Step-4 call. Client safety evaluates the public tool before Lensically can inspect the descriptor, so harmless reads remained indistinguishable from mutations at pre-dispatch time.",
     winning_path: {
       surface: "main_gateway",
       route_intent: "execute prepared action",
