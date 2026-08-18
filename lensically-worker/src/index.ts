@@ -17692,11 +17692,8 @@ async function prepareOperatorRoutedGatewayCall(
       ? commitStatusResponse.data as Record<string, unknown>
       : {};
     const statuses = Array.isArray(commitStatusData.statuses) ? commitStatusData.statuses as Array<Record<string, unknown>> : [];
-    const pushValidated = checkRuns.some((run) => run.name === "push-validation" && run.status === "completed" && run.conclusion === "success");
-    const preflightValidated = statuses.some((status) => status.context === "lensically/full-release-preflight" && status.state === "success");
-    const fullValidated = statuses.some((status) => status.context === "lensically/full-validation" && status.state === "success");
-    if (!pushValidated || !preflightValidated || !fullValidated) {
-            return { ok: false, error: "control_step_head_not_validated" };
+    if (!isOperatorControlStepHeadValidated(checkRuns, statuses)) {
+      return { ok: false, error: "control_step_head_not_validated" };
     }
     actionIntent = operatorPublicIntentForToolName("runGitHubWorkflow");
         directInputs = {
