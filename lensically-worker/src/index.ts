@@ -21402,7 +21402,7 @@ async function handleOperatorMcpEngineeringTool(
     const planned = await resolveOperatorPlannedAction(args.planned_action);
     if (!planned.ok) return { ...planned, required_stage: "getOperatorKnowledge", execution_started: false };
     const nodeIds = requiredOperatorKnowledgeNodesForTool(planned.toolName);
-    const actionRuleBinding = operatorActionRuleBindingForTool(planned.toolName, planned.arguments);
+    const actionRuleBinding = operatorActionRuleBindingForTool(planned.toolName, planned.arguments, nodeIds);
     const registryNodes = operatorKnowledgeRegistry.nodes as Record<string, Record<string, unknown>>;
     const nodes = nodeIds.map((nodeId) => {
       if (nodeId === "governance") {
