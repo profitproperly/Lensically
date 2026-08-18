@@ -161,7 +161,8 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("server-side evidence");
     expect(OPERATOR_GOVERNING_STANDARDS.client_predispatch_block_rule).toBe(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE);
     expect(OPERATOR_GOVERNING_STANDARDS.standards.map((standard) => standard.key)).toEqual(["autonomy", "efficiency", "prevention"]);
-    const readRules = operatorActionRuleBindingForTool("readRepoFile", { path: "lensically-worker/src/index.ts", max_lines: 400 });
+    const readCompetencies = ["governance", "repository_engineering"];
+    const readRules = operatorActionRuleBindingForTool("readRepoFile", { path: "lensically-worker/src/index.ts", max_lines: 400 }, readCompetencies);
     expect(readRules.registry_version).toBe(OPERATOR_ACTION_RULE_REGISTRY_VERSION);
     expect(readRules.rule_ids).toContain("schema.declared_bounds_hard");
     expect(readRules.rule_ids).toContain("repository.known_file_read");
