@@ -196,7 +196,7 @@ describe("Operator MCP protocol contract", () => {
       action_intelligence_ids: readRules.action_intelligence_ids,
     };
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, continuityPayload, readCompetencies).ok).toBe(true);
-    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }, readCompetencies).ok).toBe(false);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, prevention_rule_ids: undefined }).ok).toBe(false);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_intelligence_ids: undefined }).ok).toBe(false);
     expect(readRules.action_intelligence_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract", "client_safe_step4_execution_descriptor"]));
