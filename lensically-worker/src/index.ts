@@ -18640,33 +18640,33 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   }
   const priorIncident = priorClosedRow ? serializeHardeningIncident(priorClosedRow) : null;
   const priorActiveIncident = priorActiveRow ? serializeHardeningIncident(priorActiveRow) : null;
-  const preventionRegression = Boolean(priorIncident);
   const knownActiveRecurrence = Boolean(priorActiveIncident);
-  const classification: HardeningClassification = preventionRegression
-    ? "prevention_breach"
-    : knownActiveRecurrence ? "known_prevention" : rule ? "prevention_breach" : "novel_failure";
+  const preventionRegression = !knownActiveRecurrence && Boolean(priorIncident);
+  const classification: HardeningClassification = knownActiveRecurrence
+    ? "known_prevention"
+    : (preventionRegression || rule) ? "prevention_breach" : "novel_failure";
   const severity: HardeningSeverity = boundary === "efficiency"
     ? preventionRegression ? "P1" : "P2"
-    : preventionRegression ? "P0" : knownActiveRecurrence ? "P1" : rule ? "P0" : "P1";
-  const recurrence = priorIncident
+    : knownActiveRecurrence ? "P1" : (preventionRegression || rule) ? "P0" : "P1";
+  const recurrence = priorActiveIncident
     ? {
-        status: "prevention_regression",
-        prior_incident_id: priorIncident.id,
-        prior_root_cause: priorIncident.root_cause,
-        prior_generalized_cause: priorIncident.generalized_cause,
-        prior_prevention_rule_id: priorIncident.prevention_rule_id,
-        prior_regression_test_ids: priorIncident.regression_test_ids,
-        prior_tested_sha: priorIncident.tested_sha,
-        prior_deployment_id: priorIncident.deployment_id,
+        status: "known_active_recurrence",
+        prior_incident_id: priorActiveIncident.id,
         recurrence_family: recurrenceFamily,
-        required_response: "Investigate why the prior prevention failed, strengthen or replace it, validate the stronger prevention, then resume the interrupted objective.",
+        required_response: "Continue from the already-known active failure class, preserve this occurrence as new evidence, and strengthen the same investigation before resuming.",
       }
-    : priorActiveIncident
+    : priorIncident
       ? {
-          status: "known_active_recurrence",
-          prior_incident_id: priorActiveIncident.id,
+          status: "prevention_regression",
+          prior_incident_id: priorIncident.id,
+          prior_root_cause: priorIncident.root_cause,
+          prior_generalized_cause: priorIncident.generalized_cause,
+          prior_prevention_rule_id: priorIncident.prevention_rule_id,
+          prior_regression_test_ids: priorIncident.regression_test_ids,
+          prior_tested_sha: priorIncident.tested_sha,
+          prior_deployment_id: priorIncident.deployment_id,
           recurrence_family: recurrenceFamily,
-          required_response: "Continue from the already-known active failure class, preserve this occurrence as new evidence, and strengthen the same investigation before resuming.",
+          required_response: "Investigate why the prior prevention failed, strengthen or replace it, validate the stronger prevention, then resume the interrupted objective.",
         }
       : rule
         ? { status: "known_prevention_breach", promoted_rule_id: rule.id, recurrence_family: recurrenceFamily, required_response: "Repair the breach of the promoted winning path before resuming." }
