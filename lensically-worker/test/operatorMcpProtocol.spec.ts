@@ -190,6 +190,7 @@ describe("Operator MCP protocol contract", () => {
       action_rule_registry_version: readRules.registry_version,
       winning_path_registry_version: readRules.winning_path_registry_version,
       action_intelligence_version: readRules.action_intelligence_version,
+      competency_ids: readRules.competency_ids,
       action_rule_ids: readRules.rule_ids,
       prevention_rule_ids: readRules.prevention_rule_ids,
       action_intelligence_ids: readRules.action_intelligence_ids,
