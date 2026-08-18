@@ -197,6 +197,19 @@ export async function dispatchOperatorMcpToolCall(
     const expectedEffectClass = lifecycleCheck.payload.effect_class === "read_only" || lifecycleCheck.payload.effect_class === "mutation"
       ? lifecycleCheck.payload.effect_class
       : "";
+    const expectedGateway = expectedEffectClass === "read_only"
+      ? dependencies.readOnlyRoutedExecutionGateway
+      : dependencies.routedExecutionGateway;
+    if (expectedEffectClass && requestedToolName !== expectedGateway) {
+      return mcpToolResultResponse(id, {
+        ok: false,
+        error: "operator_execution_gateway_effect_mismatch",
+        expected_effect_class: expectedEffectClass,
+        required_tool: expectedGateway,
+        execution_started: false,
+        account_data_loaded: gatewayAccountDataLoaded,
+      }, "Lensically blocked Step 4 because the selected public gateway does not match the server-bound action effect.", true);
+    }
     const requestedClientActionId = typeof requestedExecutionDescriptor?.action_id === "string" ? requestedExecutionDescriptor.action_id.trim() : "";
     const requestedEffectClass = requestedExecutionDescriptor?.effect_class === "read_only" || requestedExecutionDescriptor?.effect_class === "mutation"
       ? requestedExecutionDescriptor.effect_class
