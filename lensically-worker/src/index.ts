@@ -20524,7 +20524,7 @@ async function handleOperatorMcpAdminTool(
     if (lower.includes("unauthorized") || lower.includes("invalid_client")) {
       likelyCause = "auth_or_oauth_configuration";
       recommendedFix = ["Verify OAuth app configuration and MCP bearer token environment binding."];
-    } else if (lower.includes("draft_not_showable") || lower.includes("gate")) {
+    } else if (lower.includes("draft_not_showable") || /(^|[^a-z])gate([^a-z]|$)/.test(lower)) {
       likelyCause = "draft_gate_blocker";
       recommendedFix = ["Use runGateSuite to inspect blockers, updateGate if the gate itself is wrong, otherwise regenerate the draft."];
     } else if (lower.includes("approved_before_schedule") || lower.includes("approved")) {
