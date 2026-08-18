@@ -3828,6 +3828,7 @@ describe("operator mode MCP endpoint", () => {
     expect(listed.tools.every((tool) => tool.inputSchema?.additionalProperties === false)).toBe(true);
         const knowledgeTool = listed.tools.find((tool) => tool.name === "getOperatorKnowledge");
     const liveStateTool = listed.tools.find((tool) => tool.name === "getOperatorLiveState");
+    const readActionTool = listed.tools.find((tool) => tool.name === "executeOperatorReadAction");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
     const closeTool = listed.tools.find((tool) => tool.name === "closeOperatorAction");
     const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
