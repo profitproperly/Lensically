@@ -17096,6 +17096,26 @@ function operatorPlannedActionIsReadOnlyDryRun(
     && (toolName === "advanceHardeningIncident" || toolName === "runGitHubWorkflow");
 }
 
+const OPERATOR_GITHUB_REPOSITORY_READ_OPERATIONS = new Set([
+  "list_repositories",
+  "get_repository",
+  "list_files",
+  "read_file",
+  "search_file",
+  "list_workflow_runs",
+  "get_workflow_run",
+]);
+
+function operatorPlannedActionIsReadOnlyGitHubRepositoryOperation(
+  toolName: string,
+  plannedArguments: Record<string, unknown>,
+): boolean {
+  if (toolName !== "operateGitHubRepositories") return false;
+  const operation = normalizeOperatorMachineKey(plannedArguments.operation, "");
+  return OPERATOR_GITHUB_REPOSITORY_READ_OPERATIONS.has(operation);
+}
+
+
 function operatorClientExecutionDescriptor(
   toolName: string,
   capability: string,
@@ -17113,9 +17133,11 @@ function operatorClientExecutionDescriptor(
   }
   return {
     action_id: actionId,
-    effect_class: operatorPlannedActionIsReadOnlyDryRun(toolName, plannedArguments)
+        effect_class: operatorPlannedActionIsReadOnlyDryRun(toolName, plannedArguments)
+      || operatorPlannedActionIsReadOnlyGitHubRepositoryOperation(toolName, plannedArguments)
       ? "read_only"
       : operatorToolMutatesState(toolName) ? "mutation" : "read_only",
+
   };
 }
 
@@ -17129,13 +17151,20 @@ function operatorClientExecutionDescriptorsForTool(
       operatorClientExecutionDescriptor(toolName, capability, { stage, dry_run: true }),
     ]);
   }
-  if (toolName === "runGitHubWorkflow") {
+    if (toolName === "runGitHubWorkflow") {
     return [
       operatorClientExecutionDescriptor(toolName, capability),
       operatorClientExecutionDescriptor(toolName, capability, { dry_run: true }),
     ];
   }
+  if (toolName === "operateGitHubRepositories") {
+    return [
+      operatorClientExecutionDescriptor(toolName, capability, { operation: "read_file" }),
+      operatorClientExecutionDescriptor(toolName, capability, { operation: "upsert_file" }),
+    ];
+  }
   return [operatorClientExecutionDescriptor(toolName, capability)];
+
 }
 
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {

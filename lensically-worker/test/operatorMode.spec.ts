@@ -3859,8 +3859,11 @@ describe("operator mode MCP endpoint", () => {
     expect(descriptorActionIds).not.toContain("capability_definition");
     expect(descriptorActionIds).not.toContain("control_step");
     expect(descriptorActionIds.some((actionId) => actionId === "case_step" || actionId.startsWith("case_step_"))).toBe(false);
-    expect(executionDescriptorBranches.length).toBe((plannedActionSchema?.oneOf?.length ?? 0) + 22);
+        expect(executionDescriptorBranches.length).toBe((plannedActionSchema?.oneOf?.length ?? 0) + 23);
+    const gitHubRepositoryDescriptors = executionDescriptorBranches.filter((branch) => branch.properties?.action_id?.const === "operate_git_hub_repositories");
+    expect(gitHubRepositoryDescriptors.map((branch) => branch.properties?.effect_class?.const).sort()).toEqual(["mutation", "read_only"]);
     const capabilityDefinitionDescriptors = readExecutionDescriptorBranches.filter((branch) => branch.properties?.action_id?.const === "exec_01");
+
     expect(capabilityDefinitionDescriptors.map((branch) => branch.properties?.effect_class?.const)).toEqual(["read_only"]);
     const controlStepDescriptors = executionDescriptorBranches.filter((branch) => branch.properties?.action_id?.const === "exec_03");
     expect(controlStepDescriptors.map((branch) => branch.properties?.effect_class?.const).sort()).toEqual(["mutation", "read_only"]);
