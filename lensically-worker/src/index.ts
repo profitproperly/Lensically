@@ -20993,7 +20993,7 @@ async function handleOperatorMcpAdminTool(
     }
     const liveReadFailures = liveReadRows.filter((row) => row.passed !== true);
     const checks = [
-      { name: "single_gateway_registered", passed: names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
+      { name: "effect_specific_step4_gateways_registered", passed: names.has(OPERATOR_READ_EXECUTION_GATEWAY) && names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
       { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
       { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
       { name: "workflow_requirements_seeded", passed: DEFAULT_OPERATOR_WORKFLOW_REQUIREMENTS.every((item) => requirements.some((row) => row.stage === item.stage && row.completion_rule === item.completion_rule)) },
