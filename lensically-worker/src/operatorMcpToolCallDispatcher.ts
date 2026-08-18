@@ -278,7 +278,7 @@ export async function dispatchOperatorMcpToolCall(
       return mcpToolResultResponse(id, {
         ...prepared,
         profile_id: compiledProfile.profile_id,
-        required_tool: dependencies.routedExecutionGateway,
+        required_tool: expectedGateway,
         account_data_loaded: gatewayAccountDataLoaded,
       }, `Lensically could not resolve registered profile ${compiledProfile.profile_id}: ${String(prepared.error ?? "unknown_error")}.`, true);
     }
