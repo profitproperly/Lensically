@@ -4153,6 +4153,34 @@ active_checkpoint: none
   }, 30000);
 
   it("preserves client-visible read semantics for engineering continuation through Step 4", async () => {
+    const continuationContent = "# Lensically Continuation Ledger\nstatus: active\n";
+    let continuationReads = 0;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (
+        request.method === "GET"
+        && url.origin === "https://api.github.com"
+        && url.pathname === "/repos/profitproperly/Lensically/contents/ENGINEERING_CONTINUATION.md"
+        && url.searchParams.get("ref") === "main"
+      ) {
+        continuationReads += 1;
+        if (continuationReads === 1) {
+          return new Response(JSON.stringify({ message: "edge timeout" }), {
+            status: 522,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({
+          sha: "vitest-continuation-sha",
+          size: continuationContent.length,
+          content: btoa(continuationContent),
+          encoding: "base64",
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+    });
+
     const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
     const step2 = await mcpToolCallRaw<{
       knowledge_token: string;
