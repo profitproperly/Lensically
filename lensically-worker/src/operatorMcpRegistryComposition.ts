@@ -57,6 +57,7 @@ export const OPERATOR_MCP_DIRECT_PRIORITIES = new Map<string, number>([
     ["getOperatorSessionMap", 0],
   ["getOperatorKnowledge", 1],
   ["getOperatorLiveState", 2],
+  ["executeOperatorReadAction", 3],
   ["executeOperatorAction", 3],
   ["closeOperatorAction", 4],
   ["getEngineeringContinuation", 10],
