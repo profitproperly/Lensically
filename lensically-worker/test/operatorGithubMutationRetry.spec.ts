@@ -5,6 +5,7 @@ import {
   isAmbiguousGithubWorkflowDispatchStatus,
   isTransientGithubWorkflowReadStatus,
   shouldRetryGithubMutationResponse,
+  shouldRetryGithubReadResponse,
 } from "../src/operatorGithubMutationRetry";
 
 describe("operator GitHub mutation retry policy", () => {
