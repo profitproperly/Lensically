@@ -18592,7 +18592,10 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
       && candidateCategory === category;
   });
     const priorActiveRow = relatedPriorRows.find((candidate) => String(candidate.state) !== "closed") ?? null;
-  const priorClosedRow = relatedPriorRows.find((candidate) => String(candidate.state) === "closed") ?? null;
+  const priorClosedRow = relatedPriorRows.find((candidate) =>
+    String(candidate.state) === "closed"
+    && String(candidate.prevention_rule_id ?? "").trim().length > 0
+  ) ?? null;
   const handledExternalPriorRow = recurrenceFamily === "client:openai_safety_predispatch"
     ? relatedPriorRows.find((candidate) =>
         String(candidate.state) === "closed"
