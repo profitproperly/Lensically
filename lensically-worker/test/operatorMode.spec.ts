@@ -4226,7 +4226,7 @@ active_checkpoint: none
       execution_descriptor: { action_id: "get_engineering_continuation", effect_class: "mutation" },
     });
     expect(mismatch.isError).toBe(true);
-    expect(mismatch.structuredContent).toMatchObject({ ok: false, error: "operator_execution_descriptor_mismatch", execution_started: false });
+    expect(mismatch.structuredContent).toMatchObject({ ok: false, error: "operator_execution_gateway_effect_mismatch", required_tool: "executeOperatorReadAction", execution_started: false });
 
     const step4 = await mcpToolCallRaw<{
       ok: boolean;
