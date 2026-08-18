@@ -299,7 +299,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     const response = await dispatchOperatorMcpToolCall({
       request: new Request("https://lensically.test/mcp", { method: "POST" }),
       id: 31,
-      params: { name: "executeOperatorAction", arguments: { live_state_token: "live-token" } },
+      params: { name: "executeOperatorReadAction", arguments: { live_state_token: "live-token" } },
     }, dependencies);
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
