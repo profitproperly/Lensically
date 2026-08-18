@@ -5921,6 +5921,7 @@ active_checkpoint: none
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
+      "executeOperatorReadAction",
       "executeOperatorAction",
       "closeOperatorAction",
       "persist_manifest_autonomous_post",
