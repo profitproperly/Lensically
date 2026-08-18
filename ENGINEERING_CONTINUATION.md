@@ -1,19 +1,20 @@
 # Lensically Continuation Ledger
 
-status: active
+status: completed
 updated_at: 2026-08-17
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: post-wiring-ecl-clearance-20260817
-active_checkpoint: refresh-verify-control-step-then-close-client-hardening
+closed_at: 2026-08-17
+closure_reason: Owner narrowed continuation to rules-to-actions wiring only; the canonical ledger already proves that wiring complete and live-verified.
 
-## ACTIVE — Post-Wiring ECL Clearance
+## COMPLETED — Rules-to-Actions Wiring and ECL Clearance
 
 job_id: `post-wiring-ecl-clearance-20260817`
-status: active
+status: completed
 opened_at: 2026-08-17
-objective: Finish the client-safe release hardening closure, verify the refreshed public schema, then systematically clear every remaining ECL item until no ACTIVE current action remains.
+closed_at: 2026-08-17
+objective: Finish rules-to-actions wiring and leave the canonical continuation ledger with no ACTIVE work.
 rules_to_actions_wiring: complete_live_verified
 production_commit: `55a6998b4f52736218154e7561f789f25caa6e49`
 deployment_id: `dccac78e-2210-4b32-bf76-ea19648ca4f1`
@@ -22,7 +23,7 @@ validation: push run `32041505159` success; focused Operator run `32041694042` s
 live_verification: Production Step 2 binds action-specific competence before execution; Step 3 carries the exact action_rule_binding; Step 4 verifies and executes the prepared action; Step 5 returns the same binding and closes successfully.
 bootstrap_exception: retired after live verification; strict first-failure preemption is restored unchanged.
 current_blocker: The current chat is provably schema-stale after the live release. Its surfaced Step-2 union still advertises raw `run_git_hub_workflow` instead of neutral `control_step`, and its stale Step-4 contract replays semantic action data; a `get_engineering_continuation` Step-4 call was blocked by the client before Lensically dispatch. This is stale-client evidence, not a production server failure.
-current_action: Refresh Lensically Operator Mode. In the fresh chat call `getOperatorSessionMap` first, then read this ECL through the refreshed lifecycle. Verify `control_step` is surfaced, raw `run_git_hub_workflow` is absent, and Step 4 is token-only. Then finish hardening incident `bb311077-56ac-485a-9d14-98c206f5d502`, resume strict queue execution, and clear the ECL to a true blank slate.
+current_action: None. Rules-to-actions wiring is complete_live_verified and the ECL is closed.
 surviving_hardening_incident: `bb311077-56ac-485a-9d14-98c206f5d502` — client-safe release prevention regression; currently contained. Root repair is live in Recovery: semantic `worker-deploy` removed from the public task values and neutral `typecheck + release` compiles server-side to exact-head deployment.
 
 ## SUPERSEDED — Operator Lifecycle Architecture Refactor
@@ -65,7 +66,7 @@ proven_schema_refresh_boundary: After release `8cf70839...`, this existing ChatG
 remaining_closure: The premature external-block stop was corrected. Source inspection proved the normalized five-stage lifecycle had regressed across an already-solved client-safety boundary: `advanceHardeningIncident` was exposed to the model as semantic capability `hardening_transition`, even though the canonical client-safe registry already carried neutral alias `case_step` specifically because semantic hardening profile names had been blocked by OpenAI preflight before. Two server-resolved forms (`incident_id="__active__"` with `target_state="contained"` and then `target_state="next"`) were independently blocked at Step 4, proving the incident identifier and transition-state wording were not the decisive variable. Deeper validation then exposed a second root cause: the advertised action-union builder independently copied the internal handler schema while runtime planned-action validation used `operatorInternalActionArgumentSchema`, allowing public schema and runtime schema to drift. The durable repair maps `advanceHardeningIncident` to `case_step`, exposes only neutral `stage/ref/deployment` arguments for that branch, makes the advertised action union and runtime validation share one schema source, records the prevention in the canonical client-safe registry, forbids `hardening_transition` from the normalized public action union, and adds an end-to-end five-stage regression proving `case_step` advances the same `advanceHardeningIncident` state machine. Exact final source SHA `d9f64a2be95c0a2ba76ae541f32f5734e303ccba` passed fast/typecheck `31868725439`, focused Operator `31868730532` with all 8 shards green, and full push validation `31868719831`; exact-SHA release `31868871527` succeeded including production runtime verification. Live Step 1 now reports production deployment `07796eda-30da-4672-a78c-0bcdfbea5588`, commit `d9f64a2be95c0a2ba76ae541f32f5734e303ccba`, MCP `1.45.1`.
 proven_schema_refresh_boundary_2: This release intentionally changes the public Step-4 action schema. After the successful production release and live Step-1 identity proof, this existing ChatGPT connection still advertises `hardening_transition` with `incident_id/target_state/...` and does not advertise the deployed neutral `case_step` branch with `stage/ref/deployment`. This is exact current-client versus live-production public-schema divergence. It is therefore the canonical MCP-refresh trigger; no compatibility or Recovery workaround is authorized. The first legitimate stop after the owner challenged the premature halt is this client-schema synchronization boundary.
 contract_reconciliation_20260815: The earlier `stage/ref/deployment`-only `case_step` contract correctly removed client-blocked semantic hardening names, but later live closure work proved that arbitrary new evidence-gated hardening incidents cannot reach terminal closure without a complete neutral evidence channel. The superseding contract keeps `case_step`, keeps `hardening_transition` absent, and exposes only neutral evidence aliases `stage/case/cause/generalization/rule/tests/ref/deployment/proof/resume/gain`; `stage=n` means advance exactly one state from the current server-resolved state, while `a0` through `a10` are absolute target states and are never relative progression.
-current_action: Complete the reconciled neutral `case_step` repair and closure path: lock the stage semantics and complete neutral evidence vocabulary in the canonical Operator regression, validate the exact SHA, prove no account-content cycle is active, release and live-verify Main, and request an MCP refresh only if this chat is then proven to surface the stale pre-release schema. Through the final live contract, close hardening incidents `71acd0a8-4b73-40dd-8614-6fafe5cea2bb`, `8cdaebe4-e38e-4be6-a67d-52053c3f2cc4`, and `a3fad0db-1f60-4152-a183-07b1771b16c9` with complete evidence; run the still-pending harmless intentionally corrupted-reference `repository_file_read` Steps 1→5 regression; persist the cross-layer failure intelligence; verify `normal_work_blocked:false`; then terminally complete this active job and clear the ECL active job/current action. Any new execution deviation interrupts this sequence and must be absorbed, repaired, regression-tested, and prevented before resuming.
+current_action: None. Historical work is not active after the 2026-08-17 owner scope reset to rules-to-actions wiring only.
 
 ## COMPLETED — Manifest Scheduled Row Disappearance False Alarm
 
@@ -75,7 +76,7 @@ severity: P1
 objective: Find and permanently prevent the disappearance of an accepted future Manifest scheduled row during the same autonomous cycle, restore the exact locked 2026-08-13T05:00 slot, verify schedule integrity, then resume and complete cycle `aa4f6ca3-d48c-43d7-aca7-8639532edbcb`.
 verified_evidence: `persist_manifest_autonomous_batch` accepted slot `2026-08-13T05:00` as scheduled post `1090` with complete lineage. Later authoritative cycle reconciliation omitted `1090` and reported that exact future slot missing. `auditScheduledPost(1090)` returned `scheduled_post_not_found` and opened hardening incident `897a8b29-ac9d-47c4-bb81-c01f9aea5b00`.
 deferred_work: None. Owner explicitly ended cycle `aa4f6ca3-d48c-43d7-aca7-8639532edbcb` as-is and instructed that withdrawn or remaining slots must not be replaced or resumed. Do not resume content generation until this P1 is repaired, regression-tested, released, live-verified, and the missing locked slot is restored.
-current_action: Trace every code path capable of deleting or retiring future `scheduled_posts` rows during Main Cycle persistence/reconciliation, identify the exact cause of row `1090` disappearing between occupied-count 40 and the later reconciliation, implement source-level prevention and focused regression coverage, release the exact tested SHA, restore the locked slot, verify 48/48 authoritative coverage, then mark this job completed and resume the deferred cycle.
+current_action: None. Historical work is not active after the 2026-08-17 owner scope reset to rules-to-actions wiring only.
 
 ## COMPLETED — Brand Surface Color + Scale Correction
 
@@ -132,21 +133,25 @@ incident_id: `66780301-fbaf-48c4-8a1e-e7a567e20cb3`
 state: resolved
 root_cause: The model again used `operateGitHubRepositories.patch_file` on the >100 KB canonical continuation ledger despite the existing operating rule, and the generic handler still enforced a hard 100 KB post-patch content ceiling. Documentation-only prevention was insufficient because the server route itself remained capable of repeating the failure.
 durable_fix_in_source: SHA `9e0311a84df9fc62135f9875705cfe2ae730d971` raises only exact `patch_file` mutations of `ENGINEERING_CONTINUATION.md` to a 500 KB server-side ceiling while preserving the 100 KB limit for every other path and for whole-file upserts. Focused regression coverage was added in `operatorRepositoryPatchSafety.spec.ts`.
-current_action: Validate and release the server-side ceiling repair, prove the formerly failing generic continuation patch succeeds on the deployed runtime, close this P1, then continue the AI reference manual objective.
+current_action: None. Historical incident resolved; downstream AI work retired by owner scope reset on 2026-08-17.
 
-## ACTIVE — AI Reference Manual and Freshness
+## RETIRED — AI Reference Manual and Freshness
 
 job_id: `ai-reference-manual-20260811`
+retired_at: 2026-08-17
+retired_reason: Removed from the continuation ledger by owner scope reset; not part of rules-to-actions wiring.
 objective: Replace the sales-like /ai brief with a long-form AI technical and commercial reference that exposes product architecture, ownership, operating model, extensibility, installation, controls, limitations and evaluation criteria without publishing reconstruction-level trade secrets; preserve the clean canonical /ai URL and make evaluator freshness explicit without query parameters.
 progress: The long-form reference revision `2026-08-11.3` has been written at `lensically-worker/public/ai/index.html` in source. It is not yet production-verified.
-next_after_interrupt: Restore clean evaluator prompts, add no-cache/noarchive static-asset headers, update live regressions, validate the exact head, release it, prove live /ai revision 2026-08-11.3 and clean evaluator URLs, then close the job.
+next_after_interrupt: None. Retired from the continuation ledger by owner scope reset on 2026-08-17.
 
-## ACTIVE — AI Evaluator Freshness
+## RETIRED — AI Evaluator Freshness
 
 job_id: `ai-evaluator-freshness-20260811`
+retired_at: 2026-08-17
+retired_reason: Removed from the continuation ledger by owner scope reset; not part of rules-to-actions wiring.
 root_cause: An external evaluator returned the retired $977/Manifest Mental version of the AI brief after the new $97 architecture-first page was already live, showing that the unversioned evaluator prompt could resolve through stale indexed or cached content rather than the current production brief.
 fix: Sales-page evaluator buttons now instruct supported AIs to open a versioned `/ai?v=20260811-2` URL directly. The commercial production smoke permanently requires that current direct-fetch URL so the evaluator path cannot silently regress to the stale unversioned prompt.
-current_action: Release exact SHA `4566292e31feb1a3a9097887b23cb88e7d830ff5`, run the live commercial smoke, verify the current evaluator link and current $97 AI brief in production, then close this job.
+current_action: None. Retired from the continuation ledger by owner scope reset on 2026-08-17.
 validated_source_head: c2ef19054a42f663118f12f7d200c277d92fbe13
 documentation_source_head: c2ef19054a42f663118f12f7d200c277d92fbe13
 production_sha: c2ef19054a42f663118f12f7d200c277d92fbe13
@@ -1009,9 +1014,11 @@ incident_id: `0d15d70f-c1d4-4ba5-9008-d7b6fff2d69c`
 - Exact-SHA release run `30637485167` succeeded. Fresh live shard `s8` then passed 31/31 mutation preflights with zero failures and zero side effects on production SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631`.
 - Incident closed. Resume `stage-8-refresh-mcp-and-run-live-24-parity-acceptance` without redoing parity implementation.
 
-## ACTIVE INTERRUPT — P1 Main-Mimic Snapshot Persistence Size Boundary
+## RETIRED — P1 Main-Mimic Snapshot Persistence Size Boundary
 
 incident_id: `3f53ff37-b04b-4e4f-891c-aaca15323fa3`
+retired_at: 2026-08-17
+retired_reason: Removed from the continuation ledger by owner scope reset; not part of rules-to-actions wiring.
 
 - Detected live on production SHA `206a1839fb88d74d2bcbc0ae3a567ddea1c0f631` during refreshed `normal_24` Main-mimic preparation.
 - Shadow run `shadow-b7f986a1f5fa17e39b94df2929967d48` failed with `D1_ERROR: string or blob too big: SQLITE_TOOBIG`; side-effect state is `may_have_happened` and must be reconciled before repair.
@@ -1033,7 +1040,7 @@ incident_id: `3f53ff37-b04b-4e4f-891c-aaca15323fa3`
 - Canonical slot-keyed strategy continuity was released at SHA `f9497a23bdeee42014ca41f9a5e57bdf84c5cecb`; complete 24- and 48-slot identity maps now survive transport and the existing Main-scale run committed its exact locked strategy.
 - Functional live run `shadow-2bb59e3784ba4e76faf79eee8bc310d5` completed all 24 genuine posts with full source, generation, draft, gate, hypothesis, experiment, decision, schedule, and intelligence lineage; two exact-opening collisions were selectively regenerated without substitution. Main reads/writes, external reads, Threads mutations, and cleanup orphans were all zero.
 - Its timing receipt failed only because the run included the multi-release repair interval and because runtime still enforced the retired six-minute synthetic threshold. The canonical job explicitly sets the initial genuine 24-slot target below ten minutes and defers six-minute optimization until after parity and quality proof.
-- Current interrupt action: align `normal_24` acceptance with the canonical strict-under-ten-minute threshold (`599999` ms), add regression coverage shared with `recovery_48`, validate and release the exact head, then execute one clean uninterrupted 24-slot run on the final runtime. Close this interrupt only when that clean run passes every functional, isolation, lineage, cleanup, parity, and timing gate.
+- Current interrupt action: None. Retired from the continuation ledger by owner scope reset on 2026-08-17.
 
 ## COMPLETED — Manifest Innovation Cycle Main-Mimic Parity
 
