@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  OPERATOR_ENGINEERING_WORKFLOW_ID,
   OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
   OPERATOR_MCP_ENGINEERING_TOOLS,
+  resolveOperatorEngineeringWorkflowId,
 } from "../src/operatorMcpEngineeringRegistry";
 
 describe("Operator MCP engineering registry", () => {
@@ -70,6 +72,14 @@ describe("Operator MCP engineering registry", () => {
     });
     expect(byName.get("operateGitHubRepositories")?.annotations).toMatchObject({ destructiveHint: true, openWorldHint: true });
 
+  });
+
+    it("normalizes engineering workflow identity before GitHub workflow reads", () => {
+    expect(OPERATOR_ENGINEERING_WORKFLOW_ID).toBe("lensically-engineering.yml");
+    expect(resolveOperatorEngineeringWorkflowId("push-validation")).toBe(OPERATOR_ENGINEERING_WORKFLOW_ID);
+    expect(resolveOperatorEngineeringWorkflowId("lensically-engineering.yml")).toBe(OPERATOR_ENGINEERING_WORKFLOW_ID);
+    expect(resolveOperatorEngineeringWorkflowId("other-workflow.yml")).toBe("other-workflow.yml");
+    expect(resolveOperatorEngineeringWorkflowId(undefined)).toBeNull();
   });
 
   it("preserves exact workflow and deployment controls", () => {

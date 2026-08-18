@@ -46,6 +46,17 @@ export const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
 
 export type OperatorMcpEngineeringToolName = typeof OPERATOR_MCP_ENGINEERING_TOOL_NAMES[number];
 
+export const OPERATOR_ENGINEERING_WORKFLOW_ID = "lensically-engineering.yml";
+
+export function resolveOperatorEngineeringWorkflowId(workflowId: unknown): string | null {
+  const raw = typeof workflowId === "string" ? workflowId.trim() : "";
+  if (!raw) return null;
+  if (raw.toLowerCase() === "push-validation" || raw.toLowerCase() === OPERATOR_ENGINEERING_WORKFLOW_ID) {
+    return OPERATOR_ENGINEERING_WORKFLOW_ID;
+  }
+  return raw;
+}
+
 const BRAND_KEY_SCHEMA = {
   type: "string",
   enum: ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"],

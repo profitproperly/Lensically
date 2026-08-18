@@ -105,7 +105,11 @@ import {
   findOperatorMcpToolDefinition,
   isOperatorPublicDirectToolName,
 } from "./operatorMcpToolDirectory";
-import { type OperatorMcpEngineeringToolName } from "./operatorMcpEngineeringRegistry";
+import {
+  OPERATOR_ENGINEERING_WORKFLOW_ID,
+  resolveOperatorEngineeringWorkflowId,
+  type OperatorMcpEngineeringToolName,
+} from "./operatorMcpEngineeringRegistry";
 import { type OperatorMcpAdminToolName } from "./operatorMcpAdminRegistry";
 import {
     OPERATOR_MCP_ACCOUNT_TOOLS,
@@ -22766,7 +22770,7 @@ async function handleOperatorMcpEngineeringTool(
     if (task === "worker-deploy" && (!releaseSha || !/^[a-fA-F0-9]{40}$/.test(releaseSha))) {
       return { ok: false, error: "exact_release_sha_required" };
     }
-    const workflowId = "lensically-engineering.yml";
+        const workflowId = OPERATOR_ENGINEERING_WORKFLOW_ID;
     const ref = config.branch;
         const inputs: Record<string, string> = { task };
     if (releaseId) inputs.release_id = releaseId;
@@ -22806,8 +22810,8 @@ async function handleOperatorMcpEngineeringTool(
     };
   }
 
-  if (toolName === "listGitHubWorkflowRuns") {
-    const workflowId = normalizeOperatorText(args.workflow_id, 160, true);
+    if (toolName === "listGitHubWorkflowRuns") {
+    const workflowId = resolveOperatorEngineeringWorkflowId(normalizeOperatorText(args.workflow_id, 160, true));
     const limit = Math.min(Math.max(Number(args.limit ?? 10), 1), 20);
     const path = workflowId
       ? `/actions/workflows/${encodeURIComponent(workflowId)}/runs?per_page=${limit}`
