@@ -188,14 +188,16 @@ function validatePlan() {
   }
 
   const operatorKnowledgeRegistryText = readFileSync(resolve(workerRoot, "src/operatorKnowledgeRegistry.json"), "utf8");
-  const hardeningSafetyV3Markers = [
-    '"version": "hardening-safety-v3"',
+    const hardeningSafetyV4Markers = [
+    '"version": "hardening-safety-v4"',
     "Once raw failure evidence is durably stored in the incident, later hardening transitions carry only new transition-specific delta evidence.",
     "Do not replay raw blocked payloads, prior error text, or previously stored evidence through the client.",
+    "controlled verification replay",
+    "a successful replay is required before closure",
   ];
-  const missingHardeningSafetyV3Markers = hardeningSafetyV3Markers.filter((marker) => !operatorKnowledgeRegistryText.includes(marker));
-  if (missingHardeningSafetyV3Markers.length > 0) {
-    fail(`full_validation_hardening_safety_v3_missing:${missingHardeningSafetyV3Markers.join("|")}`);
+  const missingHardeningSafetyV4Markers = hardeningSafetyV4Markers.filter((marker) => !operatorKnowledgeRegistryText.includes(marker));
+  if (missingHardeningSafetyV4Markers.length > 0) {
+    fail(`full_validation_hardening_safety_v4_missing:${missingHardeningSafetyV4Markers.join("|")}`);
   }
 
   const selectorRegressionPath = resolve(workerRoot, "test/sourceFamilySelection.spec.ts");
