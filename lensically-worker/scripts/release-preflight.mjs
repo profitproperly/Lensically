@@ -1070,8 +1070,11 @@ if (source.includes("const OPERATOR_MCP_ACCOUNT_TOOLS:")
 }
 if (!source.includes("assertClientSafetyRegistry();")
     || !source.includes("const tools = buildComposedOperatorMcpTools(includeScopedWrappers);")
-    || !source.includes("const actionGateway = tools.find((tool) => tool.name === \"executeOperatorAction\")")
+    || !source.includes("const readActionGateway = tools.find((tool) => tool.name === OPERATOR_READ_EXECUTION_GATEWAY)")
+    || !source.includes("const actionGateway = tools.find((tool) => tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY)")
     || !source.includes("const actionBranches = tools")
+    || !source.includes("readActionDescriptorBranches")
+    || !source.includes("mutationActionDescriptorBranches")
     || !source.includes("oneOf: actionBranches")
     || !source.includes("OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES")) {
   lifecycleErrors.push("operator_mcp_registry_runtime_boundary_incomplete");
