@@ -112,6 +112,7 @@ const TEST_LIFECYCLE_TOOL_NAMES = new Set([
   "getOperatorSessionMap",
   "getOperatorKnowledge",
   "getOperatorLiveState",
+  "executeOperatorReadAction",
   "executeOperatorAction",
   "closeOperatorAction",
 ]);
