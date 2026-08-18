@@ -7043,7 +7043,7 @@ active_checkpoint: none
     expect(campaign.structuredContent.campaign).toMatchObject({
             segment: "routes",
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 total_internal_capabilities: 95,
-                        total_read_only_capabilities: 46,
+                        total_read_only_capabilities: 45,
       route_only: true,
       mutations_executed: 0,
       live_reads: { eligible: 0, failed: 0 },
