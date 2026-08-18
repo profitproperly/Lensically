@@ -4251,12 +4251,14 @@ active_checkpoint: none
       expectedBlocked = true,
     ) => {
       const action = { capability: "case_step", arguments: arguments_ };
-            const step2 = await mcpToolCallRaw<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
+            const step2 = await mcpToolCallRaw<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[]; prevention_rules: Array<{ id: string; winning_path: string[] }> } }>("getOperatorKnowledge", {
         session_map_token: session.structuredContent.session_map_token,
         planned_action: action,
       });
       expect(step2.isError, JSON.stringify(step2.structuredContent)).not.toBe(true);
       expect(step2.structuredContent.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining(["neutral_case_step_contract", "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
+      const neutralCaseStepRule = step2.structuredContent.action_rule_binding.prevention_rules.find((rule) => rule.id === "neutral_case_step_contract");
+      expect(neutralCaseStepRule?.winning_path).toEqual(expect.arrayContaining(["Derive stable opaque Step-4 action identities exec_02_00 through exec_02_10 from the immutable prepared stage so consecutive transitions remain client-distinguishable without exposing hardening semantics."]));
       const step3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
         knowledge_token: step2.structuredContent.knowledge_token,
         planned_action: action,
