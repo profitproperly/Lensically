@@ -6229,6 +6229,7 @@ active_checkpoint: none
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
+      "executeOperatorReadAction",
       "executeOperatorAction",
       "closeOperatorAction",
     ]);
