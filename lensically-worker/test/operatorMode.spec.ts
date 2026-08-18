@@ -4262,9 +4262,10 @@ active_checkpoint: none
         planned_action: action,
       });
       expect(step3.isError, JSON.stringify(step3.structuredContent)).not.toBe(true);
+      const stageIndex = String(arguments_.stage).slice(1).padStart(2, "0");
       expect(step3.structuredContent.execution_descriptor).toEqual({
-        action_id: `case_step_${String(arguments_.stage)}`,
-        effect_class: "mutation",
+        action_id: `exec_02_${stageIndex}`,
+        effect_class: arguments_.dry_run === true ? "read_only" : "mutation",
       });
             const step4 = await mcpToolCallRaw<{
         ok: boolean;
