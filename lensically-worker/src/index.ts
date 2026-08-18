@@ -21637,7 +21637,12 @@ async function handleOperatorMcpEngineeringTool(
     if (!closurePlannedTool || !closurePlannedArguments) {
       return { ok: false, error: "operator_action_closure_competence_invalid", required_stage: "executeOperatorAction" };
     }
-    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(closurePlannedTool, closurePlannedArguments, tokenCheck.payload);
+    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(
+      closurePlannedTool,
+      closurePlannedArguments,
+      tokenCheck.payload,
+      requiredOperatorKnowledgeNodesForTool(closurePlannedTool),
+    );
     if (!actionRuleContinuity.ok) {
       return { ok: false, error: "operator_action_closure_competence_invalid", action_rule_error: actionRuleContinuity.error, required_stage: "executeOperatorAction" };
     }
