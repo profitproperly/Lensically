@@ -15583,6 +15583,14 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       actionCapabilityIds.add(capability);
             const requiredKnowledge = requiredOperatorKnowledgeNodesForTool(tool.name);
       const requiredLiveState = requiredOperatorLiveStateScopesForTool(tool.name, tool);
+      const competencyBinding = operatorActionRuleBindingForTool(tool.name, {}, requiredKnowledge);
+      if (
+        requiredKnowledge.length === 0
+        || competencyBinding.competency_ids.length !== requiredKnowledge.length
+        || requiredKnowledge.some((nodeId, index) => competencyBinding.competency_ids[index] !== nodeId)
+      ) {
+        throw new Error(`operator_action_competency_coverage_invalid:${tool.name}`);
+      }
       for (const executionDescriptor of operatorClientExecutionDescriptorsForTool(tool.name, capability)) {
         actionDescriptorBranches.push({
           type: "object",
