@@ -4000,11 +4000,9 @@ describe("operator mode MCP endpoint", () => {
         expect(governanceNode).toMatchObject({ version: OPERATOR_GOVERNING_STANDARDS_VERSION });
     const governanceText = String(governanceNode.exact_owner_approved_text ?? "");
     const failureRepairRule = String(governanceNode.failure_repair_rule ?? "");
-    expect(governanceText).toContain("The operating target is 100% positive execution and zero errors.");
-    expect(governanceText).toContain("There is no minimum severity threshold.");
-    expect(governanceText).toContain("Before choosing a fix, retrieve prior failure and hardening intelligence");
-    expect(governanceText).toContain("if previously encountered");
-    expect(governanceText).toContain("if novel");
+    expect(governanceText).toContain("# LENSICALLY OPERATOR MODE — STARTUP AUTHORITY");
+    expect(governanceText).toContain("# 1. AUTONOMY");
+    expect(governanceText).toContain("# 2. EFFICIENCY");
     expect(failureRepairRule).toContain("There is no severity floor.");
     expect(failureRepairRule).toContain("before selecting a fix, retrieve prior failure and hardening intelligence");
     expect(failureRepairRule).toContain("treat recurrence as evidence");
