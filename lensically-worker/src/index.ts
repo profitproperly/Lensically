@@ -15594,7 +15594,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
         throw new Error(`operator_action_competency_coverage_invalid:${tool.name}`);
       }
       for (const executionDescriptor of operatorClientExecutionDescriptorsForTool(tool.name, capability)) {
-        actionDescriptorBranches.push({
+        const descriptorBranch = {
           type: "object",
           properties: {
             action_id: { type: "string", const: executionDescriptor.action_id },
@@ -15602,7 +15602,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
           },
           required: ["action_id", "effect_class"],
           additionalProperties: false,
-        });
+        };
+        if (executionDescriptor.effect_class === "read_only") readActionDescriptorBranches.push(descriptorBranch);
+        else mutationActionDescriptorBranches.push(descriptorBranch);
       }
             return {
         type: "object",
