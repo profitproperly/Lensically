@@ -18,7 +18,7 @@ const required = [
   ['failed workflow log endpoint', '/actions/jobs/${jobId}/logs'],
   ['bounded failed workflow log tail', 'failed_log_tail: failedLogText ? failedLogText.slice(-12000) : null'],
   ['client-safe recovery release contract', 'const clientSafeRelease = publicTask === "typecheck" && rawRequestedRef === "release";'],
-  ['direct semantic worker deploy not public', 'if (!["typecheck", "operator-tests", "gpt-memory-tests"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };'],
+  ['direct semantic worker deploy public', 'if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };'],
   ['Recovery smoke reads Step-3 execution descriptor', 'const executionDescriptor = liveStateContent?.execution_descriptor'],
   ['Recovery smoke forwards Step-4 execution descriptor', 'execution_descriptor: executionDescriptor'],
 ];
