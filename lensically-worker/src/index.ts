@@ -16647,8 +16647,7 @@ async function verifyOperatorLifecycleToken(
 ): Promise<{ ok: true; payload: Record<string, unknown> } | { ok: false; error: string }> {
   const reference = normalizeOperatorLifecycleReference(token);
   const now = Math.floor(Date.now() / 1000);
-  const dbSession = env.DB.withSession("first-primary");
-  const readReference = (candidate: string) => dbSession.prepare(
+  const readReference = (candidate: string) => env.DB.prepare(
     `SELECT id, payload_json, expires_at FROM operator_continuity_refs
      WHERE id = ? AND kind = ? AND expires_at >= ?
      LIMIT 1`,
