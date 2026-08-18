@@ -204,7 +204,9 @@ describe("Operator MCP protocol contract", () => {
     expect(readRules.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor")).toMatchObject({
       prevention_rule_id: "client_safe_step4_execution_descriptor",
     });
-    const futureRules = operatorActionRuleBindingForTool("futureRegisteredTool", {});
+    const futureRules = operatorActionRuleBindingForTool("futureRegisteredTool", {}, ["governance", "account_runtime"]);
+    expect(futureRules.competency_ids).toEqual(["governance", "account_runtime"]);
+    expect(futureRules.rule_ids).toContain("competency.account_runtime");
     expect(futureRules.prevention_rule_ids).toContain("typed_profile_exact_contract");
     expect(futureRules.rule_ids).toContain("prevention.typed_profile_exact_contract");
 
