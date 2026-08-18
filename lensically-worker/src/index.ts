@@ -21503,7 +21503,12 @@ async function handleOperatorMcpEngineeringTool(
     )) {
       return { ok: false, error: "operator_lifecycle_action_changed_after_preparation", required_stage: "getOperatorKnowledge" };
     }
-    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(plannedTool, plannedArguments, tokenCheck.payload);
+    const actionRuleContinuity = validateOperatorActionRuleBindingContinuity(
+      plannedTool,
+      plannedArguments,
+      tokenCheck.payload,
+      requiredOperatorKnowledgeNodesForTool(plannedTool),
+    );
     if (!actionRuleContinuity.ok) {
       return { ok: false, error: "operator_knowledge_action_competence_invalid", required_stage: "getOperatorKnowledge", action_rule_error: actionRuleContinuity.error };
     }
