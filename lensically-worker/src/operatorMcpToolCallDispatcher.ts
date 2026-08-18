@@ -261,7 +261,7 @@ export async function dispatchOperatorMcpToolCall(
     if (!compiledProfile.ok) {
       return mcpToolResultResponse(id, {
         ...compiledProfile,
-        required_tool: dependencies.routedExecutionGateway,
+        required_tool: expectedGateway,
         account_data_loaded: gatewayAccountDataLoaded,
         freehand_gateway_payload_allowed: false,
       }, `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.`, true);
