@@ -4724,7 +4724,7 @@ active_checkpoint: none
     expect(step3.structuredContent.live_state_token).toBeTruthy();
 
     const corruptedLiveStateToken = `olr_${"e".repeat(32)}`;
-    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(sessionId, "executeOperatorAction", {
+    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(sessionId, "executeOperatorReadAction", {
       live_state_token: corruptedLiveStateToken,
       execution_descriptor: step3.structuredContent.execution_descriptor,
     });
