@@ -5,14 +5,28 @@ updated_at: 2026-08-18
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: lom-white-label-product-parity-20260818
-active_checkpoint: design_and_implement_product_parity_injector
+active_job_id: lom-full-callable-wiring-certification-20260818
+active_checkpoint: refresh_client_schema_then_resume_remaining_read_proofs
 ecl_active_count: 1
 
-## ACTIVE — LOM → White-Label Product Parity Injector
+## ACTIVE — Full Callable LOM Wiring Certification
+
+job_id: `lom-full-callable-wiring-certification-20260818`
+status: active
+opened_at: 2026-08-18
+objective: Prove every current callable LOM action is synchronized with its canonical rule binding and completes the exact winning-path contract with zero unexplained errors; reads execute live, mutations prove exact live preflight with side effects suppressed unless a harmless effect-free execution proof is available.
+current_surface: 95 current internal capabilities = 45 read-only + 50 mutation-class after canonical retirement filters; raw 129-handler registration is not the callable surface.
+completed_proof: All 50 mutation-class capabilities passed exact winning-path preflight across engineering/admin/account segments with zero failures and zero side effects. Bounded read campaigns produced 38 successful live reads; direct account_key_selection/selectOperatorKey adds one more successful read. Two genuine surface defects were repaired and released: run_mcp_tests now excludes the canonical retired-human-guidance set and fails closed on re-entry; get_production_board is retired because its persistence is intentionally removed by the authoritative migration contract. inspectMcpFailure gate-vs-gateway misclassification was also repaired.
+blocking_evidence: This ChatGPT developer-tool registry is provably schema-stale after the public callable-surface changes. Fresh tool discovery still advertises get_production_board even though current production excludes it. Two later Step-3 failures consumed 36-character Step-2 references whose SHA-256 fingerprints have no matching OPERATOR_LIFECYCLE_TOKEN_ISSUED event anywhere in the preceding 12-hour production telemetry window; only verification-failure events exist. Therefore those references were supplied by the client/tool layer without a corresponding current Worker Step-2 request. D1 token persistence is not the proven cause. The speculative first-primary lifecycle-read patch was live-tested, falsified, and reverted.
+refresh_required: true — this is the canonical public-schema divergence boundary. Refresh Lensically Operator Mode and continue in a new ChatGPT conversation before any further certification claim.
+remaining_read_proofs_after_refresh: prepare_manifest_source_card_backfill; scheduled_post_audit using a real existing scheduled_post_id; database_schema against operator_source_cards; get_stripe_account_state; read_stripe_objects operation=account; get_manifest_intelligence_audit summary limit=1. Re-run the affected Step-2→Step-3 path first with fresh transport and verify its issuance fingerprint exists before consuming it.
+remaining_public_gateway_proof: executeOperatorAction still needs a fresh server-received harmless/effect-free mutation-gateway winning-path proof; prior generic mutation calls were blocked by OpenAI before Lensically receipt and must not be retried from frozen tokens.
+completion_condition: Every one of the 45 current reads has successful live call-function proof, all 50 current mutations retain zero-error winning-path preflight proof, the generic mutation Step-4 gateway has one fresh server-received safe proof or an explicitly isolated provider-only blocker, all rule/prevention bindings are respected, and no unexplained error remains.
+
+## DEFERRED — LOM → White-Label Product Parity Injector
 
 job_id: `lom-white-label-product-parity-20260818`
-status: active
+status: deferred
 opened_at: 2026-08-18
 objective: Keep the commercial white-label product repository current with verified product-grade Lensically Operator Mode improvements without mirroring LOM internals or making either repository depend on the other.
 current_action: Implement product applicability classification, push synchronization after verified material LOM changes, pull/catch-up drift detection before white-label work/release, a product-owned parity manifest/watermark with SYNCED/EXCLUDED/PENDING classification, bounded collision-aware transplant/merge, white-label-native validation, and watermark advancement only after verification.
