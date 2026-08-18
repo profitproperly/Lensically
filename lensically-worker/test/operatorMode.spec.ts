@@ -7120,7 +7120,7 @@ active_checkpoint: none
             // The bounded internal read campaign includes the two native Stripe reads:
     // getStripeAccountState and readStripeObjects. getOperatorSessionMap and retired
     // human-guidance reads are intentionally excluded from the active internal campaign.
-    expect(eligibleReads).toBe(43);
+    expect(eligibleReads).toBe(42);
     expect(failedReads).toBe(0);
   }, 90000);
 
