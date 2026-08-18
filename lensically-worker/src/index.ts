@@ -173,6 +173,7 @@ import {
   isAmbiguousGithubWorkflowDispatchStatus,
   isTransientGithubWorkflowReadStatus,
   shouldRetryGithubMutationResponse,
+  shouldRetryGithubReadResponse,
 } from "./operatorGithubMutationRetry";
 import { reviewOperatorManifestScheduledPost } from "./operatorManifestScheduledReviewService";
 import {
