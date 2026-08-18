@@ -59,6 +59,7 @@ export function operatorActionRuleBindingForTool(
     registry_version: OPERATOR_ACTION_RULE_REGISTRY_VERSION,
     winning_path_registry_version: WINNING_PATH_PROMOTION_VERSION,
     action_intelligence_version: ACTION_INTELLIGENCE_BINDING_VERSION,
+    competency_ids: competencyIds,
     rule_ids: [...ruleIds],
     prevention_rule_ids: preventionRules.map((prevention) => prevention.id),
     action_intelligence_ids: actionIntelligence.map((entry) => entry.intelligence_id),
