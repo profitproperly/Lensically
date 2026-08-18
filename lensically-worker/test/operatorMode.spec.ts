@@ -4234,6 +4234,8 @@ active_checkpoint: none
       live_state_token: step3.structuredContent.live_state_token,
       execution_descriptor: step3.structuredContent.execution_descriptor,
     });
+    fetchSpy.mockRestore();
+    expect(continuationReads).toBe(2);
     expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
     expect(step4.structuredContent).toMatchObject({
       ok: true,
