@@ -16657,7 +16657,7 @@ async function verifyOperatorLifecycleToken(
   let reconciledReference: string | null = null;
   let reconciliationMode: string | null = null;
   if (!row && expectedSessionId) {
-    const canonicalRow = await env.DB.prepare(
+    const canonicalRow = await dbSession.prepare(
       `SELECT id, payload_json, expires_at FROM operator_continuity_refs
        WHERE kind = ?
          AND expires_at >= ?
