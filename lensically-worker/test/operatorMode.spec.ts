@@ -3930,8 +3930,10 @@ describe("operator mode MCP endpoint", () => {
       return branch.properties?.capability?.const === "control_step";
     }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean } } } | undefined;
     expect(controlStepBranch?.properties?.arguments?.required).toEqual([]);
-    expect(Object.keys(controlStepBranch?.properties?.arguments?.properties ?? {})).toEqual(["dry_run"]);
+        expect(Object.keys(controlStepBranch?.properties?.arguments?.properties ?? {})).toEqual(["dry_run", "release_sha"]);
     expect(controlStepBranch?.properties?.arguments?.properties).toHaveProperty("dry_run");
+    expect(controlStepBranch?.properties?.arguments?.properties).toHaveProperty("release_sha");
+
     expect(controlStepBranch?.properties?.arguments?.additionalProperties).toBe(false);
     const actionCapabilities = (plannedActionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
         expect(actionCapabilities.every(Boolean)).toBe(true);
@@ -3966,7 +3968,8 @@ describe("operator mode MCP endpoint", () => {
         expect(step1).not.toHaveProperty("tool_surface");
         const controlStepKnowledge = await mcpTool<{ knowledge_token: string; action_rule_binding: { prevention_rule_ids: string[] } }>("getOperatorKnowledge", {
       session_map_token: step1.session_map_token,
-      planned_action: { capability: "control_step", arguments: { dry_run: true } },
+            planned_action: { capability: "control_step", arguments: { dry_run: true, release_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
     const controlStepSingleSourceRuleId = ["operator", "mcp", "version", "single", "source"].join("_");

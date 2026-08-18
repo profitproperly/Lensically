@@ -17163,17 +17163,27 @@ function operatorClientExecutionDescriptorsForTool(
       operatorClientExecutionDescriptor(toolName, capability, { operation: "upsert_file" }),
     ];
   }
-  return [operatorClientExecutionDescriptor(toolName, capability)];
+    return [operatorClientExecutionDescriptor(toolName, capability)];
 
 }
 
+function operatorGitHubWorkflowTask(args: Record<string, unknown>): string {
+  const releaseSha = normalizeOperatorText(args.release_sha, 40, true);
+  const requestedTask = normalizeOperatorText(args.task, 160, true)
+    ?? (releaseSha ? "worker-deploy" : "typecheck");
+  return requestedTask.replace(/_/g, "-");
+}
+
 function operatorInternalActionArgumentSchema(tool: OperatorMcpToolDefinition): Record<string, unknown> {
+
     if (tool.name === "runGitHubWorkflow") {
     return {
       type: "object",
-      properties: {
+            properties: {
         dry_run: { type: "boolean", description: "Run the exact release preflight and compile the real workflow dispatch without dispatching it." },
+        release_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$", description: "Exact validated repository SHA to release. Supplying it binds control_step to worker-deploy." },
       },
+
       required: [],
       additionalProperties: false,
     };
@@ -18251,7 +18261,8 @@ function resolveOperatorKnownPath(toolName: string, args: Record<string, unknown
     };
   }
   
-    if ((toolName === "runGitHubWorkflow" && normalizeOperatorText(args.task, 80, true) === "worker-deploy") || toolName === "deployBackend") {
+        if ((toolName === "runGitHubWorkflow" && operatorGitHubWorkflowTask(args) === "worker-deploy") || toolName === "deployBackend") {
+
     return {
       rule_key: "explicit_exact_sha_release_dispatch",
       mandatory_route: "dispatch worker-deploy only with the final exact 40-character release_sha after validation",
@@ -22723,14 +22734,14 @@ async function handleOperatorMcpEngineeringTool(
     return { ok: result.ok, status: result.status, path };
   }
 
-    if (toolName === "runGitHubWorkflow") {
-    const requestedTask = normalizeOperatorText(args.task, 160, true) ?? "typecheck";
-    const task = requestedTask.replace(/_/g, "-");
+        if (toolName === "runGitHubWorkflow") {
+    const releaseSha = normalizeOperatorText(args.release_sha, 40, true);
+    const task = operatorGitHubWorkflowTask(args);
         const allowedWorkflowTasks = new Set(["typecheck", "operator-smoke", "operator-tests", "system-directory-tests", "threads-publish-tests", "human-free-tests", "worker-deploy"]);
     if (!allowedWorkflowTasks.has(task)) {
       return { ok: false, error: "workflow_task_required", allowed_tasks: [...allowedWorkflowTasks] };
     }
-    const releaseSha = normalizeOperatorText(args.release_sha, 40, true);
+
         const releaseId = normalizeOperatorText(args.release_id, 80, true) ?? releaseSha?.slice(0, 12) ?? "";
     if (task === "worker-deploy" && (!releaseSha || !/^[a-fA-F0-9]{40}$/.test(releaseSha))) {
       return { ok: false, error: "exact_release_sha_required" };
