@@ -16950,7 +16950,11 @@ async function createOperatorExecutionGuard(
   intendedTool: string,
   args: Record<string, unknown>,
 ): Promise<string> {
-  const actionRuleBinding = operatorActionRuleBindingForTool(intendedTool, args);
+  const actionRuleBinding = operatorActionRuleBindingForTool(
+    intendedTool,
+    args,
+    requiredOperatorKnowledgeNodesForTool(intendedTool),
+  );
   return createSignedOperatorEnvelope(env, {
     kind: "operator_execution_guard",
     version: OPERATOR_EXECUTION_GUARD_VERSION,
