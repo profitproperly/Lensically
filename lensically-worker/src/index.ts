@@ -16687,7 +16687,7 @@ async function verifyOperatorLifecycleToken(
     }
   }
   if (!row && !expectedSessionId && expectedActionFingerprint) {
-    const canonicalRow = await dbSession.prepare(
+    const canonicalRow = await env.DB.prepare(
       `SELECT id, payload_json, expires_at FROM operator_continuity_refs
        WHERE kind = ?
          AND expires_at >= ?
