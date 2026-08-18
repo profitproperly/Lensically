@@ -3816,6 +3816,7 @@ describe("operator mode MCP endpoint", () => {
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
+      "executeOperatorReadAction",
       "executeOperatorAction",
       "closeOperatorAction",
     ]);
