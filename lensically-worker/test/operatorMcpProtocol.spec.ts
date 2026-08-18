@@ -154,7 +154,12 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("copy-only atomic value");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("never retry the corrupted reference");
     expect(OPERATOR_GOVERNING_STANDARDS.opaque_lifecycle_token_rule).toBe(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE);
-        expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("before it reaches Lensically");
+            expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("before it reaches Lensically");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("do not blindly retry");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("controlled verification replay");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("same semantic operation");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("did not execute");
+    expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("successful replay is required before closure");
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).not.toContain("fresh MCP/client transport");
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("never authorizes an MCP refresh or a new-chat instruction");
     expect(OPERATOR_CLIENT_PREDISPATCH_BLOCK_RULE).toContain("current chat is surfacing a stale public schema and cannot use the newly deployed contract");
