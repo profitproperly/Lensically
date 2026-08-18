@@ -4622,7 +4622,7 @@ active_checkpoint: none
     expect(persistedLiveStatePayload.prevention_rule_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract", "client_safe_step4_execution_descriptor"]));
     expect(persistedLiveStatePayload.action_intelligence_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract", "client_safe_step4_execution_descriptor"]));
 
-    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorAction", {
+    const step4 = await callWithSession<{ ok: boolean; action_execution_token: string }>(firstSessionId, "executeOperatorReadAction", {
       live_state_token: step3.structuredContent.live_state_token,
       execution_descriptor: step3.structuredContent.execution_descriptor,
     });
