@@ -18642,12 +18642,12 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const priorActiveIncident = priorActiveRow ? serializeHardeningIncident(priorActiveRow) : null;
   const preventionRegression = Boolean(priorIncident);
   const knownActiveRecurrence = Boolean(priorActiveIncident);
-  const classification: HardeningClassification = (rule || preventionRegression)
+  const classification: HardeningClassification = preventionRegression
     ? "prevention_breach"
-    : knownActiveRecurrence ? "known_prevention" : "novel_failure";
+    : knownActiveRecurrence ? "known_prevention" : rule ? "prevention_breach" : "novel_failure";
   const severity: HardeningSeverity = boundary === "efficiency"
     ? preventionRegression ? "P1" : "P2"
-    : (rule || preventionRegression) ? "P0" : "P1";
+    : preventionRegression ? "P0" : knownActiveRecurrence ? "P1" : rule ? "P0" : "P1";
   const recurrence = priorIncident
     ? {
         status: "prevention_regression",
@@ -18661,15 +18661,15 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
         recurrence_family: recurrenceFamily,
         required_response: "Investigate why the prior prevention failed, strengthen or replace it, validate the stronger prevention, then resume the interrupted objective.",
       }
-    : rule
-      ? { status: "known_prevention_breach", promoted_rule_id: rule.id, recurrence_family: recurrenceFamily, required_response: "Repair the breach of the promoted winning path before resuming." }
-      : priorActiveIncident
-        ? {
-            status: "known_active_recurrence",
-            prior_incident_id: priorActiveIncident.id,
-            recurrence_family: recurrenceFamily,
-            required_response: "Continue from the already-known active failure class, preserve this occurrence as new evidence, and strengthen the same investigation before resuming.",
-          }
+    : priorActiveIncident
+      ? {
+          status: "known_active_recurrence",
+          prior_incident_id: priorActiveIncident.id,
+          recurrence_family: recurrenceFamily,
+          required_response: "Continue from the already-known active failure class, preserve this occurrence as new evidence, and strengthen the same investigation before resuming.",
+        }
+      : rule
+        ? { status: "known_prevention_breach", promoted_rule_id: rule.id, recurrence_family: recurrenceFamily, required_response: "Repair the breach of the promoted winning path before resuming." }
         : { status: "first_occurrence", recurrence_family: recurrenceFamily, required_response: "Root-cause, repair, generalize, and create durable prevention before resuming." };
   const id = crypto.randomUUID();
   await env.DB.prepare(
