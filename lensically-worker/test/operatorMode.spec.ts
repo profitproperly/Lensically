@@ -4167,6 +4167,37 @@ active_checkpoint: none
     });
   }, 30000);
 
+  it("binds explicit domain competencies to every constructed Operator action", async () => {
+    const step1 = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    const accountStep2 = await mcpToolCallRaw<{
+      action_rule_binding: { competency_ids: string[]; rule_ids: string[]; prevention_rule_ids: string[] };
+    }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "list_accounts", arguments: {} },
+    });
+    expect(accountStep2.isError, JSON.stringify(accountStep2.structuredContent)).not.toBe(true);
+    expect(accountStep2.structuredContent.action_rule_binding.competency_ids).toEqual(["governance", "account_runtime"]);
+    expect(accountStep2.structuredContent.action_rule_binding.rule_ids).toEqual(expect.arrayContaining([
+      "competency.governance",
+      "competency.account_runtime",
+    ]));
+    expect(accountStep2.structuredContent.action_rule_binding.prevention_rule_ids).toContain("action_competency_coverage_complete");
+
+    const repositoryStep2 = await mcpToolCallRaw<{
+      action_rule_binding: { competency_ids: string[]; rule_ids: string[] };
+    }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "repository_status", arguments: {} },
+    });
+    expect(repositoryStep2.isError, JSON.stringify(repositoryStep2.structuredContent)).not.toBe(true);
+    expect(repositoryStep2.structuredContent.action_rule_binding.competency_ids).toEqual(["governance", "repository_engineering", "release_infrastructure"]);
+    expect(repositoryStep2.structuredContent.action_rule_binding.rule_ids).toEqual(expect.arrayContaining([
+      "competency.governance",
+      "competency.repository_engineering",
+      "competency.release_infrastructure",
+    ]));
+  });
+
   it("preserves client-visible read semantics for engineering continuation through Step 4", async () => {
     const continuationContent = "# Lensically Continuation Ledger\nstatus: active\n";
     let continuationReads = 0;
