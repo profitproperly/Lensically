@@ -6242,6 +6242,7 @@ active_checkpoint: none
         root: Record<string, unknown>;
         durable_knowledge_loader: string;
         live_state_loader: string;
+        read_action_executor: string;
         action_executor: string;
         action_closer: string;
       };
