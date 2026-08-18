@@ -4526,7 +4526,7 @@ active_checkpoint: none
     expect(changedStep4.isError).toBe(true);
     expect(changedStep4.structuredContent.ok).toBe(false);
 
-    const step4 = await mcpToolCallRaw<{ ok: boolean; action_execution_token: string }>("executeOperatorAction", {
+    const step4 = await mcpToolCallRaw<{ ok: boolean; action_execution_token: string }>("executeOperatorReadAction", {
       live_state_token: step3.structuredContent.live_state_token,
       execution_descriptor: step3.structuredContent.execution_descriptor,
     });
