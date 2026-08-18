@@ -197,8 +197,9 @@ describe("Operator MCP protocol contract", () => {
     };
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, continuityPayload, readCompetencies).ok).toBe(true);
     expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_rule_ids: [...readRules.rule_ids].reverse() }, readCompetencies).ok).toBe(false);
-    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, prevention_rule_ids: undefined }).ok).toBe(false);
-    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_intelligence_ids: undefined }).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, prevention_rule_ids: undefined }, readCompetencies).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, action_intelligence_ids: undefined }, readCompetencies).ok).toBe(false);
+    expect(validateOperatorActionRuleBindingContinuity("readRepoFile", { path: "lensically-worker/src/index.ts" }, { ...continuityPayload, competency_ids: undefined }, readCompetencies).ok).toBe(false);
     expect(readRules.action_intelligence_ids).toEqual(expect.arrayContaining(["typed_profile_exact_contract", "client_safe_step4_execution_descriptor"]));
     expect(readRules.action_intelligence.find((entry) => entry.intelligence_id === "client_safe_step4_execution_descriptor")).toMatchObject({
       prevention_rule_id: "client_safe_step4_execution_descriptor",
