@@ -6493,6 +6493,9 @@ active_checkpoint: none
         closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
     ).bind(second.incident.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
 
     const thirdCall = await mcpToolRaw<{
       ok: boolean;
