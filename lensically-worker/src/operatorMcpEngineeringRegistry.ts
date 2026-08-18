@@ -252,9 +252,23 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
       {
+    name: "executeOperatorReadAction",
+    title: "Execute read-only operator action",
+    description: "Read-only Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound read-only action prepared in Steps 2 and 3. The dispatcher rejects any mutation-bound live-state token on this gateway.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        live_state_token: { type: "string", minLength: 16 },
+      },
+      required: ["live_state_token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+      {
     name: "executeOperatorAction",
-    title: "Execute operator action",
-    description: "Step 4 of the canonical Operator lifecycle. Execute exactly the server-bound action prepared in Steps 2 and 3. Repeat the exact client-safe execution_descriptor returned by Step 3 so the client can see the neutral action identity and whether the prepared action is read-only or mutating. Raw internal handler names and action arguments remain server-side and are never replayed at the execution choke point.",
+    title: "Execute mutating operator action",
+    description: "Mutating Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound mutating action prepared in Steps 2 and 3. Read-only actions must use executeOperatorReadAction so client-visible tool metadata matches the prepared effect before dispatch.",
     inputSchema: {
       type: "object",
       properties: {
