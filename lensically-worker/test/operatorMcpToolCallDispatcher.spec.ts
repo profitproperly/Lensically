@@ -13,6 +13,7 @@ function baseDependencies(
   overrides: Partial<OperatorMcpToolCallDependencies> = {},
 ): OperatorMcpToolCallDependencies {
   const dependencies: OperatorMcpToolCallDependencies = {
+    readOnlyRoutedExecutionGateway: "executeOperatorReadAction",
         routedExecutionGateway: "executeOperatorAction",
     mandatoryExecutionMapVersion: "map-v1",
     preCallRoutingVersion: "pre-call-v1",
