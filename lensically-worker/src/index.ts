@@ -16290,9 +16290,10 @@ async function buildOperatorSessionMap(request: Request, env: Env): Promise<Reco
     ok: true,
     lifecycle: {
       version: OPERATOR_LIFECYCLE_VERSION,
-      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
-      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"],
-      rule: "Step 0 initializes only. Step 1 maps. Step 2 loads durable knowledge. Step 3 loads live state. Step 4 executes. Step 5 verifies and closes.",
+      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
+      step4_gateways: { read_only: OPERATOR_READ_EXECUTION_GATEWAY, mutation: OPERATOR_ROUTED_EXECUTION_GATEWAY },
+      rule: "Step 0 initializes only. Step 1 maps. Step 2 loads durable knowledge. Step 3 loads live state and chooses the effect-matched Step-4 gateway. Step 4 executes. Step 5 verifies and closes.",
     },
     session_map: {
       version: OPERATOR_SESSION_MAP_VERSION,
