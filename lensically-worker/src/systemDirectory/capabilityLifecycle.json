@@ -218,6 +218,17 @@
       "compatibility_bridge": false
     },
     {
+      "capability_id": "operating.operator_read_action_execution",
+      "directory_entry_id": "operating.read_action_execution",
+      "canonical_handler": "executeOperatorReadAction",
+      "route_intent": "execute read-only operator action",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed read-only Step-4 gateway accepts only server-bound actions whose Step-3 effect class is read_only, rejects mutation-bound tokens, and advertises static read-only metadata before client dispatch.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "operating.operator_action_execution",
       "directory_entry_id": "operating.action_execution",
       "canonical_handler": "executeOperatorAction",
