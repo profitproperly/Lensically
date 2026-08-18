@@ -5,11 +5,11 @@ import {
 } from "../src/operatorMcpEngineeringRegistry";
 
 describe("Operator MCP engineering registry", () => {
-        it("preserves the exact 37-tool engineering registry without duplicates", () => {
-    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(37);
-    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(37);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(37);
-    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(37);
+        it("preserves the exact 38-tool engineering registry without duplicates", () => {
+    expect(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).toHaveLength(38);
+    expect(OPERATOR_MCP_ENGINEERING_TOOLS).toHaveLength(38);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES).size).toBe(38);
+    expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name)).size).toBe(38);
     expect(new Set(OPERATOR_MCP_ENGINEERING_TOOLS.map((tool) => tool.name))).toEqual(
       new Set(OPERATOR_MCP_ENGINEERING_TOOL_NAMES),
     );
