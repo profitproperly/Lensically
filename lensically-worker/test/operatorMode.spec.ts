@@ -4115,7 +4115,7 @@ active_checkpoint: none
         required_tool: string;
         turn_close_gate: { mode: string; must_continue: boolean; normal_turn_close_allowed: boolean };
       };
-    }>("executeOperatorAction", {
+    }>("executeOperatorReadAction", {
       live_state_token: step3.live_state_token,
       execution_descriptor: step3.execution_descriptor,
     });
