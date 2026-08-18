@@ -75,6 +75,26 @@ function buildOperatorActionRuleBinding(
 
 const OPERATOR_ACTION_RULE_BINDING_CACHE = new Map<string, ReturnType<typeof buildOperatorActionRuleBinding>>();
 
+type OperatorActionRuleBinding = ReturnType<typeof buildOperatorActionRuleBinding>;
+
+function cloneOperatorActionRuleBinding(binding: OperatorActionRuleBinding): OperatorActionRuleBinding {
+  return {
+    ...binding,
+    competency_ids: [...binding.competency_ids],
+    rule_ids: [...binding.rule_ids],
+    prevention_rule_ids: [...binding.prevention_rule_ids],
+    action_intelligence_ids: [...binding.action_intelligence_ids],
+    prevention_rules: binding.prevention_rules.map((prevention) => ({
+      ...prevention,
+      winning_path: [...prevention.winning_path],
+    })),
+    action_intelligence: binding.action_intelligence.map((entry) => ({
+      ...entry,
+      failure_history: [...entry.failure_history],
+    })),
+  };
+}
+
 export function operatorActionRuleBindingForTool(
   toolName: string,
   args: Record<string, unknown> = {},
@@ -85,11 +105,12 @@ export function operatorActionRuleBindingForTool(
     ? String(args.task ?? "worker-deploy")
     : "";
   const cacheKey = `${toolName}\u0000${workflowTask}\u0000${competencyIds.join("\u0001")}`;
-  const cached = OPERATOR_ACTION_RULE_BINDING_CACHE.get(cacheKey);
-  if (cached) return cached;
-  const binding = buildOperatorActionRuleBinding(toolName, args, competencyIds);
-  OPERATOR_ACTION_RULE_BINDING_CACHE.set(cacheKey, binding);
-  return binding;
+  let cached = OPERATOR_ACTION_RULE_BINDING_CACHE.get(cacheKey);
+  if (!cached) {
+    cached = buildOperatorActionRuleBinding(toolName, args, competencyIds);
+    OPERATOR_ACTION_RULE_BINDING_CACHE.set(cacheKey, cached);
+  }
+  return cloneOperatorActionRuleBinding(cached);
 }
 
 function exactOperatorRuleIdArray(value: unknown): string[] | null {
