@@ -450,7 +450,7 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
   }
   if (name === "runGitHubWorkflow") {
     const publicTask = String(args.task || "");
-        if (!["typecheck", "operator-tests", "gpt-memory-tests"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };
+        if (!["typecheck", "operator-tests", "gpt-memory-tests", "worker-deploy"].includes(publicTask)) return { ok: false, error: "invalid_workflow_task" };
     const rawRequestedRef = String(args.ref || "").trim();
     const clientSafeRelease = publicTask === "typecheck" && rawRequestedRef === "release";
     const workflowTask = clientSafeRelease ? "worker-deploy" : publicTask;
