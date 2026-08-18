@@ -4304,7 +4304,10 @@ active_checkpoint: none
         action_id: `exec_02_${stageIndex}`,
         effect_class: arguments_.dry_run === true ? "read_only" : "mutation",
       });
-            const step4 = await mcpToolCallRaw<{
+            const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
+        ? "executeOperatorReadAction"
+        : "executeOperatorAction";
+      const step4 = await mcpToolCallRaw<{
         ok: boolean;
         dry_run?: boolean;
         validated?: boolean;
@@ -4314,7 +4317,7 @@ active_checkpoint: none
         normal_work_blocked: boolean;
         incident: { id: string };
         action_execution_token: string;
-      }>("executeOperatorAction", {
+      }>(step4Gateway, {
         live_state_token: step3.structuredContent.live_state_token,
         execution_descriptor: step3.structuredContent.execution_descriptor,
       });
