@@ -354,14 +354,14 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     matching_conditions: {
       any_terms: ["rules to actions", "action competency", "competency coverage", "knowledge wiring", "action rule binding"],
     },
-    losing_path: "Treat knowledge-node loading or a few successful action-rule samples as proof that the full executable tool surface is wired, allowing most actions to receive domain knowledge without an explicit, continuity-checked competency binding.",
-    root_cause: "The lifecycle loaded per-tool durable knowledge through requiredOperatorKnowledgeNodesForTool, but operatorActionRuleBindingForTool did not encode those domains as action competencies and there was no full-surface coverage assertion. A completion marker therefore overstated wiring correctness.",
+    losing_path: "Mistake knowledge loading or sampled bindings for complete action wiring.",
+    root_cause: "Per-tool knowledge domains were loaded but not part of the immutable action binding, and full-surface coverage was never asserted.",
     winning_path: {
       surface: "source_control",
       route_intent: "bind action competencies",
-      procedure: ["Derive competency IDs from the same requiredOperatorKnowledgeNodesForTool classifier that drives Step-2 knowledge loading.", "Promote every competency into the immutable action-rule binding before Step 3.", "Carry and exact-match competency IDs through Steps 2, 3, 4, and 5.", "Build the closed action union from the canonical tool constructor and fail immediately if any constructed action has empty or drifting competency coverage.", "Layer action-specific promoted failure prevention on top of the domain competencies rather than replacing them.", "Regression-test an ordinary tool without a specialized promotion so future coverage cannot be inferred from cherry-picked examples."],
+      procedure: ["Derive competency IDs from the canonical per-tool knowledge classifier.", "Exact-match those IDs through Steps 2-5.", "Fail tool construction when any action lacks matching competency coverage."],
     },
-    evidence: ["Live listMcpTools exposed a 128-tool surface while source inspection found only four concrete tools with targeted action-bound promotions plus two universal promotions.", "requiredOperatorKnowledgeNodesForTool already classified every action by governance and relevant repository, release, hardening, commercial, account, or Manifest domains, but those classifications were not part of the action-rule continuity contract.", "The canonical ECL had been closed as complete_live_verified even though full-surface coverage had never been measured."],
+    evidence: ["The live surface had 128 tools while only four concrete tools had targeted learned promotions; domain classification existed separately from the binding."],
     scope: "universal",
     binding_scope: "action",
     action_binding: { tool_names: ["*"] },
