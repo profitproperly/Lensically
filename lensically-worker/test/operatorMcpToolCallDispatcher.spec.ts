@@ -221,6 +221,30 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(compilePublicProfileRequest).not.toHaveBeenCalled();
   });
 
+  it("rejects a read-only prepared action on the mutating Step-4 gateway", async () => {
+    const compilePublicProfileRequest = vi.fn();
+    const dependencies = baseDependencies({ compilePublicProfileRequest });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 20,
+      params: {
+        name: "executeOperatorAction",
+        arguments: {
+          live_state_token: "live-token",
+          execution_descriptor: { action_id: "repository_status", effect_class: "read_only" },
+        },
+      },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      expected_effect_class: "read_only",
+      required_tool: "executeOperatorReadAction",
+      execution_started: false,
+    });
+    expect(compilePublicProfileRequest).not.toHaveBeenCalled();
+  });
+
     it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
         const dependencies = baseDependencies({
       verifyLifecycleExecutionToken: vi.fn(async () => ({
