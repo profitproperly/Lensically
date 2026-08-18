@@ -16978,7 +16978,11 @@ async function verifyOperatorExecutionGuard(
   }
   const guardedArgs = { ...args };
   delete guardedArgs.execution_guard;
-  const actionRuleBinding = operatorActionRuleBindingForTool(toolName, guardedArgs);
+  const actionRuleBinding = operatorActionRuleBindingForTool(
+    toolName,
+    guardedArgs,
+    requiredOperatorKnowledgeNodesForTool(toolName),
+  );
   const payloadRuleIds = Array.isArray(payload.action_rule_ids)
     ? payload.action_rule_ids.filter((value): value is string => typeof value === "string")
     : [];
