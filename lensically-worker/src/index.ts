@@ -167,6 +167,7 @@ import {
 } from "./operatorManifestPersistenceService";
 import { persistOperatorManifestBatch } from "./operatorManifestBatchPersistenceService";
 import { getRepositoryMutationMaxBytes, validateRepositoryPatchContent } from "./operatorRepositoryPatchSafety";
+import { isOperatorControlStepHeadValidated } from "./operatorControlStepValidation";
 import {
     classifyGithubWorkflowRunLookup404,
     githubMutationRetryDelayMs,
