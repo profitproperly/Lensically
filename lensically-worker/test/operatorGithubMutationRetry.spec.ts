@@ -54,6 +54,16 @@ describe("operator GitHub mutation retry policy", () => {
     }
   });
 
+  it("retries transient repository reads without replaying ambiguous mutations", () => {
+    const transient522 = { status: 522, data: { message: "edge timeout" } };
+    expect(shouldRetryGithubReadResponse("GET", transient522, 0)).toBe(true);
+    expect(shouldRetryGithubReadResponse("HEAD", transient522, 2)).toBe(true);
+    expect(shouldRetryGithubReadResponse("GET", transient522, 3)).toBe(false);
+    expect(shouldRetryGithubReadResponse("POST", transient522, 0)).toBe(false);
+    expect(shouldRetryGithubReadResponse("PUT", transient522, 0)).toBe(false);
+    expect(shouldRetryGithubMutationResponse("/git/commits", transient522, 0)).toBe(false);
+  });
+
   it("classifies workflow-run 404s from a reconciled authoritative list", () => {
     expect(classifyGithubWorkflowRunLookup404(123, [125, 123, 120])).toEqual({
       error: "workflow_run_temporarily_unreadable",
