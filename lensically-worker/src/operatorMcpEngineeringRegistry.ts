@@ -268,7 +268,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "executeOperatorAction",
     title: "Execute mutating operator action",
-    description: "Mutating Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound mutating action prepared in Steps 2 and 3. Read-only actions must use executeOperatorReadAction so client-visible tool metadata matches the prepared effect before dispatch.",
+    description: "Mutating Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound mutating action prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. Read-only actions must use executeOperatorReadAction so client-visible tool metadata matches the prepared effect before dispatch.",
     inputSchema: {
       type: "object",
       properties: {
