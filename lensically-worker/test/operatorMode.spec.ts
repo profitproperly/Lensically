@@ -5933,6 +5933,7 @@ active_checkpoint: none
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
+      "executeOperatorReadAction",
       "executeOperatorAction",
     ]);
     expect(incomplete.lifecycle_surface_exact).toBe(false);
