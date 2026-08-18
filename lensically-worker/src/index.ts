@@ -21588,6 +21588,7 @@ async function handleOperatorMcpEngineeringTool(
       action_rule_registry_version: actionRuleContinuity.binding.registry_version,
       winning_path_registry_version: actionRuleContinuity.binding.winning_path_registry_version,
       action_intelligence_version: actionRuleContinuity.binding.action_intelligence_version,
+      competency_ids: actionRuleContinuity.binding.competency_ids,
       action_rule_ids: actionRuleContinuity.binding.rule_ids,
       prevention_rule_ids: actionRuleContinuity.binding.prevention_rule_ids,
       action_intelligence_ids: actionRuleContinuity.binding.action_intelligence_ids,
