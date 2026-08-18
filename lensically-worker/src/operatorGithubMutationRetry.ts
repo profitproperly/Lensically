@@ -37,6 +37,22 @@ export function isTransientGithubWorkflowReadStatus(status: number): boolean {
   return [502, 503, 504, 520, 521, 522, 523, 524].includes(Math.trunc(status));
 }
 
+/**
+ * Repository GET/HEAD requests share the same transient edge-status family as
+ * workflow reads. Keep this separate from mutation retry policy so ambiguous
+ * 52x mutation responses are never blindly replayed.
+ */
+export function shouldRetryGithubReadResponse(
+  method: string,
+  result: GithubApiResult,
+  attempt: number,
+): boolean {
+  if (attempt >= 3) return false;
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (normalizedMethod !== "GET" && normalizedMethod !== "HEAD") return false;
+  return isTransientGithubWorkflowReadStatus(result.status);
+}
+
 export function classifyGithubWorkflowRunLookup404(
   requestedRunId: number,
   recentRunIds: number[],
