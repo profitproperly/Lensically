@@ -19,11 +19,17 @@ const OPERATOR_BASE_ACTION_RULE_IDS = [
   "lifecycle.explicit_close",
 ] as const;
 
-export function operatorActionRuleBindingForTool(toolName: string, args: Record<string, unknown> = {}) {
+export function operatorActionRuleBindingForTool(
+  toolName: string,
+  args: Record<string, unknown> = {},
+  competencyNodeIds: readonly string[] = [],
+) {
   const bindingArgs = toolName === "runGitHubWorkflow" && args.task === undefined
     ? { ...args, task: "worker-deploy" }
     : args;
+  const competencyIds = [...new Set(competencyNodeIds.map((value) => String(value).trim()).filter(Boolean))];
   const ruleIds = new Set<string>(OPERATOR_BASE_ACTION_RULE_IDS);
+  for (const competencyId of competencyIds) ruleIds.add(`competency.${competencyId}`);
   if (toolName === "readRepoFile") ruleIds.add("repository.known_file_read");
   if (toolName === "searchRepoFiles") ruleIds.add("repository.exact_known_file_search");
   if (toolName === "applyRepoTextPatch" || toolName === "applyRepoPatchSet") {
