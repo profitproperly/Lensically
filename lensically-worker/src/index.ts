@@ -16829,6 +16829,7 @@ const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
   "getOperatorLiveState",
   "closeOperatorAction",
   "guardLensicallyCall",
+  OPERATOR_READ_EXECUTION_GATEWAY,
   OPERATOR_ROUTED_EXECUTION_GATEWAY,
 ]);
 
