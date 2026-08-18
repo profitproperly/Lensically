@@ -251,7 +251,7 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(await structuredContent(response)).toMatchObject({
       ok: false,
       error: "unknown_profile",
-      required_tool: "executeOperatorAction",
+      required_tool: "executeOperatorReadAction",
       freehand_gateway_payload_allowed: false,
     });
   });
