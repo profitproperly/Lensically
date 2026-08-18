@@ -20568,7 +20568,9 @@ async function handleOperatorMcpAdminTool(
         const tools = await buildOperatorMcpTools(env, true, false);
     const names = new Set(tools.map((tool) => tool.name));
     const requirements = await listOperatorWorkflowRequirements(env, null);
-        const campaignTools = tools.filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name));
+        const campaignTools = tools
+      .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
+      .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name));
     const rawCampaignSegment = normalizeOperatorText(args.segment, 80, true) ?? "routes";
     const campaignSegmentAliases: Record<string, string> = {
       s0: "routes",
