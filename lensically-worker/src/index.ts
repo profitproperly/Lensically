@@ -15652,13 +15652,13 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       planned_action: typedActionSchema,
     },
   };
-  actionGateway.inputSchema = {
+  const buildStep4InputSchema = (descriptorBranches: Record<string, unknown>[]) => ({
     type: "object",
     properties: {
       live_state_token: { type: "string", minLength: 16 },
       execution_descriptor: {
-        oneOf: actionDescriptorBranches,
-        description: "Repeat the exact server-derived Step-3 client-safe descriptor. It exposes only the neutral action identity and effect class; raw internal handlers and arguments remain server-side.",
+        oneOf: descriptorBranches,
+        description: "Repeat the exact server-derived Step-3 client-safe descriptor. This effect-specific gateway accepts only descriptors whose effect class matches its static tool metadata.",
       },
       governing_standards_ack: {
         type: "string",
@@ -15668,7 +15668,9 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     },
     required: ["live_state_token", "execution_descriptor", "governing_standards_ack"],
     additionalProperties: false,
-  };
+  });
+  readActionGateway.inputSchema = buildStep4InputSchema(readActionDescriptorBranches);
+  actionGateway.inputSchema = buildStep4InputSchema(mutationActionDescriptorBranches);
   return tools;
 }
 
