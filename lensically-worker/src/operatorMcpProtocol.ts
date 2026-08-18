@@ -1,6 +1,6 @@
 import { ACTION_INTELLIGENCE_BINDING_VERSION, WINNING_PATH_PROMOTION_VERSION, resolveActionBoundWinningPaths } from "./mandatoryExecutionMap";
 
-export const OPERATOR_MCP_VERSION = "1.45.8";
+export const OPERATOR_MCP_VERSION = "1.45.9";
 export const OPERATOR_MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 export type OperatorMcpBrandKey = "manifest_mental" | "opmg_deadman" | "vectrix";
