@@ -165,7 +165,10 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
     knowledge_token: step2.structuredContent.knowledge_token,
   });
   if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
-  const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>("executeOperatorAction", {
+  const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
+    ? "executeOperatorReadAction"
+    : "executeOperatorAction";
+  const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>(step4Gateway, {
     live_state_token: step3.structuredContent.live_state_token,
     execution_descriptor: step3.structuredContent.execution_descriptor,
   });
