@@ -254,7 +254,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
       {
     name: "executeOperatorReadAction",
     title: "Execute read-only operator action",
-    description: "Read-only Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound read-only action prepared in Steps 2 and 3. The dispatcher rejects any mutation-bound live-state token on this gateway.",
+    description: "Read-only Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound read-only action prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. The dispatcher rejects any mutation-bound live-state token on this gateway.",
     inputSchema: {
       type: "object",
       properties: {
