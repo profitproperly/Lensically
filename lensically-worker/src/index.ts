@@ -18591,8 +18591,53 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
       && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "")
       && candidateCategory === category;
   });
-  const priorActiveRow = relatedPriorRows.find((candidate) => String(candidate.state) !== "closed") ?? null;
+    const priorActiveRow = relatedPriorRows.find((candidate) => String(candidate.state) !== "closed") ?? null;
   const priorClosedRow = relatedPriorRows.find((candidate) => String(candidate.state) === "closed") ?? null;
+  const handledExternalPriorRow = recurrenceFamily === "client:openai_safety_predispatch"
+    ? relatedPriorRows.find((candidate) =>
+        String(candidate.state) === "closed"
+        && String(candidate.prevention_rule_id ?? "") === "openai_predispatch_external_recurrence_convergence"
+      ) ?? null
+    : null;
+  if (!priorActiveRow && handledExternalPriorRow) {
+    const handledExternalIncident = serializeHardeningIncident(handledExternalPriorRow);
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(handledExternalIncident.id),
+      env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, 'closed', 'closed', ?)`,
+      ).bind(
+        crypto.randomUUID(), handledExternalIncident.id,
+        normalizeOperatorJson({
+          error_category: category,
+          recurrence_family: recurrenceFamily,
+          recurrence_status: "handled_external_recurrence",
+          handled_by_prevention_rule_id: "openai_predispatch_external_recurrence_convergence",
+          blocked_profile_id: profile,
+          blocked_tool_name: blockedTool ?? null,
+          request_fingerprint: fingerprint ?? null,
+          observed_outcome: args.observed_outcome ?? null,
+          resume_capsule: args.resume_capsule ?? null,
+        }, {}),
+      ),
+    ]);
+    return {
+      ok: true,
+      created: false,
+      incident: handledExternalIncident,
+      normal_work_blocked: false,
+      recurrence: {
+        status: "handled_external_recurrence",
+        prior_incident_id: handledExternalIncident.id,
+        prior_prevention_rule_id: handledExternalIncident.prevention_rule_id,
+        recurrence_family: recurrenceFamily,
+        required_response: "Preserve the blocked action as not received, keep the provider occurrence as durable evidence, and do not reopen hardening solely because the externally controlled provider event recurred. Resume that action only after fresh independent dispatchability evidence.",
+      },
+      required_next_state: "closed",
+    };
+  }
   const priorIncident = priorClosedRow ? serializeHardeningIncident(priorClosedRow) : null;
   const priorActiveIncident = priorActiveRow ? serializeHardeningIncident(priorActiveRow) : null;
   const preventionRegression = Boolean(priorIncident);

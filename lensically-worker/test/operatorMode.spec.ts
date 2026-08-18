@@ -6518,11 +6518,44 @@ active_checkpoint: none
       prior_prevention_rule_id: "fixture_client_prevention",
       recurrence_family: "client:openai_safety_predispatch",
     });
-    for (const incidentId of [first.incident.id, third.incident.id]) {
-      await env.DB.prepare(
-        `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      ).bind(incidentId).run();
-    }
+        await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET
+        state = 'closed', root_cause = 'fixture external provider root cause', generalized_cause = 'fixture external provider generalization',
+        prevention_rule_id = 'openai_predispatch_external_recurrence_convergence', regression_test_ids_json = '["fixture-external-convergence"]',
+        tested_sha = 'fixture-external-sha', deployment_id = 'fixture-external-deployment',
+        closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(third.incident.id).run();
+
+    const handledCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; severity: string; state: string };
+      recurrence: { status: string; prior_incident_id: string; prior_prevention_rule_id: string; recurrence_family: string };
+      normal_work_blocked: boolean;
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "case_step_a10",
+      request_fingerprint: "fixture-openai-client-block-handled-external",
+      error_category: "openai_client_predispatch_safety_block",
+      operation_class: "engineering_hardening_transition",
+      observed_outcome: { client_blocked: true, lensically_receipt: false },
+      resume_capsule: { prepared_action_preserved: true },
+    });
+    const handled = handledCall.structuredContent;
+    expect(handledCall.isError).not.toBe(true);
+    expect(handled.created).toBe(false);
+    expect(handled.incident).toMatchObject({ id: third.incident.id, state: "closed" });
+    expect(handled.recurrence).toMatchObject({
+      status: "handled_external_recurrence",
+      prior_incident_id: third.incident.id,
+      prior_prevention_rule_id: "openai_predispatch_external_recurrence_convergence",
+      recurrence_family: "client:openai_safety_predispatch",
+    });
+    expect(handled.normal_work_blocked).toBe(false);
   }, 30000);
 
     it("classifies a repeated resolved failure as a prevention regression", async () => {
