@@ -19,15 +19,14 @@ const OPERATOR_BASE_ACTION_RULE_IDS = [
   "lifecycle.explicit_close",
 ] as const;
 
-export function operatorActionRuleBindingForTool(
+function buildOperatorActionRuleBinding(
   toolName: string,
-  args: Record<string, unknown> = {},
-  competencyNodeIds: readonly string[] = [],
+  args: Record<string, unknown>,
+  competencyIds: string[],
 ) {
   const bindingArgs = toolName === "runGitHubWorkflow" && args.task === undefined
     ? { ...args, task: "worker-deploy" }
     : args;
-  const competencyIds = [...new Set(competencyNodeIds.map((value) => String(value).trim()).filter(Boolean))];
   const ruleIds = new Set<string>(OPERATOR_BASE_ACTION_RULE_IDS);
   for (const competencyId of competencyIds) ruleIds.add(`competency.${competencyId}`);
   if (toolName === "readRepoFile") ruleIds.add("repository.known_file_read");
@@ -72,6 +71,25 @@ export function operatorActionRuleBindingForTool(
     })),
     action_intelligence: actionIntelligence,
   };
+}
+
+const OPERATOR_ACTION_RULE_BINDING_CACHE = new Map<string, ReturnType<typeof buildOperatorActionRuleBinding>>();
+
+export function operatorActionRuleBindingForTool(
+  toolName: string,
+  args: Record<string, unknown> = {},
+  competencyNodeIds: readonly string[] = [],
+) {
+  const competencyIds = [...new Set(competencyNodeIds.map((value) => String(value).trim()).filter(Boolean))];
+  const workflowTask = toolName === "runGitHubWorkflow"
+    ? String(args.task ?? "worker-deploy")
+    : "";
+  const cacheKey = `${toolName}\u0000${workflowTask}\u0000${competencyIds.join("\u0001")}`;
+  const cached = OPERATOR_ACTION_RULE_BINDING_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const binding = buildOperatorActionRuleBinding(toolName, args, competencyIds);
+  OPERATOR_ACTION_RULE_BINDING_CACHE.set(cacheKey, binding);
+  return binding;
 }
 
 function exactOperatorRuleIdArray(value: unknown): string[] | null {
