@@ -17518,9 +17518,14 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       available_profile_hint: "Use startup, account_key_selection, or account_proceed for account initialization; use a registered snake_case capability profile for later work.",
         };
   }
-    if (profileId === "control_step") {
+      if (profileId === "control_step") {
     const inputKeys = Object.keys(inputs);
-    if (inputKeys.some((key) => key !== "dry_run") || ("dry_run" in inputs && typeof inputs.dry_run !== "boolean")) {
+    const releaseSha = typeof inputs.release_sha === "string" ? inputs.release_sha : null;
+    if (
+      inputKeys.some((key) => key !== "dry_run" && key !== "release_sha")
+      || ("dry_run" in inputs && typeof inputs.dry_run !== "boolean")
+      || (releaseSha !== null && !/^[a-fA-F0-9]{40}$/.test(releaseSha))
+    ) {
       return { ok: false, error: "control_step_inputs_forbidden", profile_id: profileId };
     }
     return {
@@ -17529,7 +17534,10 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       request: {
         objective: "Advance one control step.",
         intent: "advance control step",
-        inputs: inputs.dry_run === true ? { dry_run: true } : {},
+        inputs: {
+          ...(inputs.dry_run === true ? { dry_run: true } : {}),
+          ...(releaseSha ? { release_sha: releaseSha } : {}),
+        },
       },
     };
   }
@@ -17728,9 +17736,14 @@ async function prepareOperatorRoutedGatewayCall(
   let directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
     : null;
-    if (actionIntent === "advance control step" && directInputs) {
+      if (actionIntent === "advance control step" && directInputs) {
     const controlInputKeys = Object.keys(directInputs);
-    if (controlInputKeys.some((key) => key !== "governing_standards_ack" && key !== "dry_run") || ("dry_run" in directInputs && typeof directInputs.dry_run !== "boolean")) {
+    const requestedReleaseSha = typeof directInputs.release_sha === "string" ? directInputs.release_sha : null;
+    if (
+      controlInputKeys.some((key) => key !== "governing_standards_ack" && key !== "dry_run" && key !== "release_sha")
+      || ("dry_run" in directInputs && typeof directInputs.dry_run !== "boolean")
+      || (requestedReleaseSha !== null && !/^[a-fA-F0-9]{40}$/.test(requestedReleaseSha))
+    ) {
       return { ok: false, error: "control_step_inputs_forbidden" };
     }
     const dryRun = directInputs.dry_run === true;
@@ -17743,9 +17756,13 @@ async function prepareOperatorRoutedGatewayCall(
     if (!branch.ok || !latestSha || !/^[a-f0-9]{40}$/i.test(latestSha)) {
       return { ok: false, error: "control_step_repository_state_unavailable" };
     }
+    if (requestedReleaseSha && requestedReleaseSha.toLowerCase() !== latestSha.toLowerCase()) {
+      return { ok: false, error: "control_step_release_sha_not_head", requested_release_sha: requestedReleaseSha, latest_sha: latestSha };
+    }
+    const releaseSha = requestedReleaseSha ?? latestSha;
     const [checkRunsResponse, commitStatusResponse] = await Promise.all([
-      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/check-runs?per_page=100`),
-      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(latestSha)}/status`),
+      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(releaseSha)}/check-runs?per_page=100`),
+      githubRepoApiRetryable(env, `/commits/${encodeURIComponent(releaseSha)}/status`),
     ]);
     if (!checkRunsResponse.ok || !commitStatusResponse.ok) {
       return { ok: false, error: "control_step_validation_state_unavailable" };
@@ -17762,11 +17779,11 @@ async function prepareOperatorRoutedGatewayCall(
       return { ok: false, error: "control_step_head_not_validated" };
     }
     actionIntent = operatorPublicIntentForToolName("runGitHubWorkflow");
-        directInputs = {
+    directInputs = {
       governing_standards_ack: directInputs.governing_standards_ack,
       task: "worker-deploy",
-      release_id: `control-${latestSha.slice(0, 12)}`,
-      release_sha: latestSha,
+      release_id: `control-${releaseSha.slice(0, 12)}`,
+      release_sha: releaseSha,
       ...(dryRun ? { dry_run: true } : {}),
     };
   }
