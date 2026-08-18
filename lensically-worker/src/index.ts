@@ -17761,7 +17761,7 @@ async function prepareOperatorRoutedGatewayCall(
       return { ok: false, error: "control_step_repository_state_unavailable" };
     }
     if (requestedReleaseSha && requestedReleaseSha.toLowerCase() !== latestSha.toLowerCase()) {
-      return { ok: false, error: "control_step_release_sha_not_head", requested_release_sha: requestedReleaseSha, latest_sha: latestSha };
+      return { ok: false, error: "control_step_release_sha_not_head" };
     }
     const releaseSha = requestedReleaseSha ?? latestSha;
     const [checkRunsResponse, commitStatusResponse] = await Promise.all([
