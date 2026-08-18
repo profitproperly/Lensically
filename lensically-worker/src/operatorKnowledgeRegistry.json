@@ -139,6 +139,8 @@
         "A related active failure class is known recurrence, not a novel failure. Continue from accumulated evidence instead of restarting diagnosis.",
         "A repeat of a resolved failure is a prevention regression, not a fresh bug.",
         "Prevention-regression handling starts from the prior incident, root cause, prevention, and regressions and asks why that prevention failed; strengthen or replace it before closure.",
+        "Once a winning path is verified for a failure class, compile that path as the exclusive permitted route before the next comparable action; merely naming, logging, or classifying a known recurrence does not satisfy prevention.",
+        "A prevention regression cannot close until the failed action class is replayed through the strengthened winning path and a real successful call/result verifies the route; source text, incident notes, or classification alone are insufficient closure evidence.",
         "Causal-family generalization must remain narrow and evidence-based. OpenAI client safety pre-dispatch blocks are one family even when blocked profile or specific category wording changes; unrelated client failures remain separate.",
         "First occurrence earns investigation and permanent prevention. Recurrence indicts the prevention or unresolved active repair path."
       ],
