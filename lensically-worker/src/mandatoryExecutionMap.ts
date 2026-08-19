@@ -1442,7 +1442,11 @@ export function prepareSourceDefinedDirectEngineeringCall(
   inputs: Record<string, unknown>,
   tools: MandatoryExecutionToolDefinition[],
 ): MandatoryExecutionPrepared | null {
-  return prepareStaticCall(actionIntent, objective, null, inputs, tools, true);
+  const boundOperation = machineKey(inputs.operation, "");
+  const boundIntent = CROSS_REPOSITORY_GITHUB_OPERATIONS.has(boundOperation)
+    ? "operate git hub repositories"
+    : actionIntent;
+  return prepareStaticCall(boundIntent, objective, null, inputs, tools, true);
 }
 
 export async function prepareMandatoryExecutionMapCall(
