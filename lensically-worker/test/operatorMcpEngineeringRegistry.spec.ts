@@ -43,7 +43,9 @@ describe("Operator MCP engineering registry", () => {
     expect(byName.get("executeOperatorCaseAction")?.inputSchema).toMatchObject({ required: ["live_state_token"], additionalProperties: false });
     expect(byName.get("executeOperatorCaseAction")?.annotations).toMatchObject({ readOnlyHint: false });
     expect(byName.get("executeOperatorCaseAction")?.inputSchema?.properties).not.toHaveProperty("action");
-    expect(byName.get("executeOperatorCaseAction")?.description).toContain("case_step");
+    expect(byName.get("executeOperatorCaseAction")?.inputSchema?.properties).not.toHaveProperty("execution_descriptor");
+    expect(byName.get("executeOperatorCaseAction")?.description).not.toContain("case_step");
+    expect(byName.get("executeOperatorCaseAction")?.description).toContain("opaque live-state token");
     expect(byName.get("closeOperatorAction")?.inputSchema).toMatchObject({ required: ["action_execution_token", "verification"], additionalProperties: false });
     expect(byName.get("closeOperatorAction")?.inputSchema?.properties).not.toHaveProperty("action");
     expect(byName.get("applyRepoPatchSet")?.inputSchema).toMatchObject({
