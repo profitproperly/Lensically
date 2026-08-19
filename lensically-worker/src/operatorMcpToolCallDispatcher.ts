@@ -288,6 +288,9 @@ export async function dispatchOperatorMcpToolCall(
     if (capability === "operate_git_hub_repositories") {
       governedCompiledRequest.intent = "operate git hub repositories";
       governedCompiledRequest.objective = "Execute the server-bound cross-repository GitHub operation without semantic reinterpretation.";
+    } else if (capability === "upsert_git_hub_repository_file") {
+      governedCompiledRequest.intent = "upsert git hub repository file";
+      governedCompiledRequest.objective = "Execute the server-bound bounded GitHub file upsert without semantic reinterpretation.";
     }
     const prepared = await dependencies.prepareRoutedGatewayCall(governedCompiledRequest);
     if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
