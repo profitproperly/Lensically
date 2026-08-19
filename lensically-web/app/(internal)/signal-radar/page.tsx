@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { buildWorkerUrl } from "@/lib/api";
+import { buildWorkerUrl } from "@/lib/apiClient";
 
 type Source = {
   source_id: string;
