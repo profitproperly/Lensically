@@ -22,14 +22,17 @@ refresh_required: false — the refreshed ChatGPT connection surfaces and succes
 completion_evidence: Production commit 93de3644b9b2cddf04dc776b140f41b09f5a1717, deployment 3ef0a381-3dbe-42a5-a10f-cbeba9031ae9, MCP 1.45.10. Validation and release evidence: push-validation 32210374104 success, typecheck 32210427548 success, full Operator 8-shard run 32210428851 success, worker-deploy 32210580791 success, mutation-gateway worker-deploy 32211152847 success. All rule/prevention bindings respected through Step 2, Step 3, Step 4, and Step 5 closure; no unexplained callable-surface error remains.
 current_action: None. Full callable LOM wiring certification is complete_live_verified.
 
-## DEFERRED — LOM → White-Label Product Parity Injector
+## COMPLETED — LOM → White-Label Product Parity Injector
 
 job_id: `lom-white-label-product-parity-20260818`
-status: deferred
+status: completed
 opened_at: 2026-08-18
+closed_at: 2026-08-19
 objective: Keep the commercial white-label product repository current with verified product-grade Lensically Operator Mode improvements without mirroring LOM internals or making either repository depend on the other.
-current_action: Implement product applicability classification, push synchronization after verified material LOM changes, pull/catch-up drift detection before white-label work/release, a product-owned parity manifest/watermark with SYNCED/EXCLUDED/PENDING classification, bounded collision-aware transplant/merge, white-label-native validation, and watermark advancement only after verification.
-completion_condition: Source implementation and regressions prove product-grade LOM deltas are detected, classified, ported or intentionally excluded, validated in the white-label repository, and parity state advances only after successful verification while internal-only LOM changes remain excluded.
+implemented_source_contract: Lensically main now owns `config/white-label-parity.config.json`, `scripts/white-label-parity.mjs`, `scripts/test-white-label-parity.mjs`, and scheduled workflow `.github/workflows/lensically-white-label-parity.yml`. The automation clones `profitproperly/Lensically-Operator-Threads`, classifies every delta as SYNCED, EXCLUDED, or PENDING, copies only allowlisted product-safe files, rejects seller-only/private content, runs the product repository validation commands, commits `.lensically-parity/latest-report.json` and `.lensically-parity/state.json`, and advances the product watermark only after validation succeeds.
+autonomous_operation: Workflow `lensically-white-label-parity.yml` runs every six hours and supports manual dispatch. It requires `WHITE_LABEL_PARITY_TOKEN` with write access to `profitproperly/Lensically-Operator-Threads`; local live proof also validated the same write path through Git Credential Manager.
+completion_evidence: Lensically source commit `fef89355c3a1838b73a65bbecb794823cb21b5c7` pushed to `profitproperly/Lensically` main. Focused validation `node scripts/test-white-label-parity.mjs` passed. Dry-run classification succeeded. Disposable apply proof copied six safe files, ran product validation, wrote parity state/report, and committed. Live product apply+push then copied four safe current files, ran product validation, wrote `.lensically-parity/state.json` and `.lensically-parity/latest-report.json`, and pushed product commit `61fc7ae4b153becf2c0de4ff6abd8a1fe84d1681` to `profitproperly/Lensically-Operator-Threads` main. Product state records source watermark `fef89355c3a1838b73a65bbecb794823cb21b5c7`, synced_count 7, copied_count 4, pending_count 256, report SHA-256 `3e7ada985153a108f5c0a61d48cf1dcf7995aac10e3d4cc1072ad00bd8010740`.
+current_action: None. White-label parity is wired, operational, and writing validated product parity state. The current PENDING backlog is intentionally visible in the product report and requires future product-native transplant rules before those files may be synced.
 
 ## COMPLETED — Rules-to-Actions Wiring Coverage Completion
 
