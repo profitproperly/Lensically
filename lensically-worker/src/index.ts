@@ -22341,7 +22341,22 @@ async function handleOperatorMcpEngineeringTool(
     const [runResult, jobsResult] = await Promise.all([repoApi(`/actions/runs/${runId}`), repoApi(`/actions/runs/${runId}/jobs?per_page=100`)]);
     const runRecord = runResult.data && typeof runResult.data === "object" && !Array.isArray(runResult.data) ? runResult.data as Record<string, unknown> : {};
     const jobsRecord = jobsResult.data && typeof jobsResult.data === "object" && !Array.isArray(jobsResult.data) ? jobsResult.data as Record<string, unknown> : {};
-    const jobs = Array.isArray(jobsRecord.jobs) ? (jobsRecord.jobs as Array<Record<string, unknown>>).map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion, started_at: job.started_at, completed_at: job.completed_at })) : [];
+    const jobs = Array.isArray(jobsRecord.jobs) ? (jobsRecord.jobs as Array<Record<string, unknown>>).map((job) => ({
+      id: job.id,
+      name: job.name,
+      status: job.status,
+      conclusion: job.conclusion,
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      steps: Array.isArray(job.steps)
+        ? (job.steps as Array<Record<string, unknown>>).map((step) => ({
+            number: step.number,
+            name: step.name,
+            status: step.status,
+            conclusion: step.conclusion,
+          }))
+        : [],
+    })) : [];
     return { ok: runResult.ok, status: runResult.status, jobs_ok: jobsResult.ok, jobs_status: jobsResult.status, repository: target.full_name, run: { id: runRecord.id, name: runRecord.name, event: runRecord.event, status: runRecord.status, conclusion: runRecord.conclusion, head_branch: runRecord.head_branch, head_sha: runRecord.head_sha, html_url: runRecord.html_url }, jobs };
   }
 
