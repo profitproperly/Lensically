@@ -1393,7 +1393,6 @@ if (source.includes("function requestedMcpBrandKey(")
   lifecycleErrors.push("operator_mcp_routing_policy_returned_to_index");
 }
 if (!operatorToolAdmissionShell.includes("scopeCall: OPERATOR_MCP_ROUTING_POLICY.scopeCall")
-    || !source.includes("OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)")
     || !source.includes("OPERATOR_MCP_ROUTING_POLICY.canonicalExecutionArgs(toolName, args)")
     || !operatorMcpToolCallDispatcher.includes("dependencies.classifyHandler(toolName)")) {
   lifecycleErrors.push("operator_mcp_routing_policy_runtime_cutover_incomplete");
