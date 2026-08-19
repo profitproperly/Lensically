@@ -278,11 +278,15 @@ export async function dispatchOperatorMcpToolCall(
         freehand_gateway_payload_allowed: false,
       }, `Lensically rejected an unregistered public request profile: ${compiledProfile.error}.`, true);
     }
-        const governedCompiledRequest: JsonRecord = {
+        const serverBoundPlannedTool = typeof lifecycleCheck.payload.planned_tool === "string"
+      ? lifecycleCheck.payload.planned_tool.trim()
+      : "";
+    const governedCompiledRequest: JsonRecord = {
       ...compiledProfile.request,
       inputs: {
         governing_standards_ack: OPERATOR_GOVERNING_STANDARDS_ACK,
         ...(asRecord(compiledProfile.request.inputs) ?? {}),
+        ...(serverBoundPlannedTool ? { prepared_tool_name: serverBoundPlannedTool } : {}),
       },
     };
     if (capability === "operate_git_hub_repositories") {
