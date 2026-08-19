@@ -68,19 +68,21 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-                                                                it("preserves the six-tool, five-stage public lifecycle surface while keeping capabilities internal", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(6);
+                                                                it("preserves the seven-tool, five-stage public lifecycle surface while keeping capabilities internal", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(7);
     expect([...OPERATOR_PUBLIC_DIRECT_TOOL_NAMES]).toEqual([
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
       "executeOperatorReadAction",
       "executeOperatorAction",
+      "executeOperatorCaseAction",
       "closeOperatorAction",
     ]);
     expect(isOperatorPublicDirectToolName("getOperatorSessionMap")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorReadAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorAction")).toBe(true);
+    expect(isOperatorPublicDirectToolName("executeOperatorCaseAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("getRepoStatus")).toBe(false);
     expect(isOperatorPublicDirectToolName("searchRepoFiles")).toBe(false);
     expect(isOperatorPublicDirectToolName("operateStripe")).toBe(false);
