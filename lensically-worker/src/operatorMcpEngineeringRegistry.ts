@@ -318,8 +318,8 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   },
   {
     name: "executeOperatorCaseAction",
-    title: "Execute hardening case action",
-    description: "Mutating Step 4 for the neutral hardening case lifecycle only. Execute exactly one server-bound case_step mutation prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. This gateway rejects every non-case mutation.",
+    title: "Execute operator checkpoint action",
+    description: "Mutating Step 4 for one bounded server-prepared checkpoint transition. Forward only the opaque live-state token from Step 3; the server derives and verifies the exact bound checkpoint identity and rejects every non-checkpoint mutation.",
     inputSchema: {
       type: "object",
       properties: {
