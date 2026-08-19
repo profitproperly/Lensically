@@ -15576,18 +15576,21 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   if (!knowledgeGateway || !liveStateGateway || !readActionGateway || !actionGateway || !closeGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
+  const plannedActionCapabilityEnums: string[] = [];
+  const plannedActionContracts: Record<string, unknown>[] = [];
   const readActionDescriptorBranches: Record<string, unknown>[] = [];
   const mutationActionDescriptorBranches: Record<string, unknown>[] = [];
-  const actionBranches = tools
+  tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
-        .map((tool) => {
+        .forEach((tool) => {
       const actionArgumentSchema = operatorInternalActionArgumentSchema(tool);
             const capability = operatorActionCapabilityIdForToolName(tool.name);
       if (actionCapabilityIds.has(capability)) {
         throw new Error(`operator_action_capability_collision:${capability}`);
       }
       actionCapabilityIds.add(capability);
+      plannedActionCapabilityEnums.push(capability);
             const requiredKnowledge = requiredOperatorKnowledgeNodesForTool(tool.name);
       const requiredLiveState = requiredOperatorLiveStateScopesForTool(tool.name, tool);
       const competencyBinding = operatorActionRuleBindingForTool(tool.name, {}, requiredKnowledge);
@@ -15598,6 +15601,13 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
       ) {
         throw new Error(`operator_action_competency_coverage_invalid:${tool.name}`);
       }
+      plannedActionContracts.push({
+        capability,
+        tool_name: tool.name,
+        argument_schema: actionArgumentSchema,
+        knowledge_node_ids: requiredKnowledge,
+        live_state_scopes: requiredLiveState,
+      });
       for (const executionDescriptor of operatorClientExecutionDescriptorsForTool(tool.name, capability)) {
         const descriptorBranch = {
           type: "object",
@@ -15611,25 +15621,27 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
         if (executionDescriptor.effect_class === "read_only") readActionDescriptorBranches.push(descriptorBranch);
         else mutationActionDescriptorBranches.push(descriptorBranch);
       }
-            return {
-        type: "object",
-        description: `Requires Step-2 knowledge nodes: ${requiredKnowledge.join(", ")}. Requires Step-3 live-state scopes: ${requiredLiveState.join(", ")}.`,
-        x_lensically_prerequisites: {
-          knowledge_node_ids: requiredKnowledge,
-          live_state_scopes: requiredLiveState,
-        },
-        properties: {
-          capability: { type: "string", const: capability },
-                    arguments: actionArgumentSchema,
-        },
-        required: ["capability", "arguments"],
-        additionalProperties: false,
-      };
     });
 
     const typedActionSchema = {
-    oneOf: actionBranches,
-    description: "Exactly one registered internal capability with its closed typed argument schema.",
+    type: "object",
+    description: "Exactly one registered internal capability. The public connector schema keeps capability selection stable; the server validates the selected capability against its exact closed typed argument contract before binding the action.",
+    properties: {
+      capability: {
+        type: "string",
+        enum: plannedActionCapabilityEnums,
+        description: "Registered internal capability id.",
+      },
+      arguments: {
+        type: "object",
+        description: "Arguments for the selected capability. Server-side validation applies the selected capability's exact closed argument schema before execution.",
+        maxProperties: 32,
+        additionalProperties: true,
+      },
+    },
+    required: ["capability", "arguments"],
+    additionalProperties: false,
+    x_lensically_action_contracts: plannedActionContracts,
   };
   const knowledgeInputSchema = knowledgeGateway.inputSchema && typeof knowledgeGateway.inputSchema === "object" && !Array.isArray(knowledgeGateway.inputSchema)
     ? knowledgeGateway.inputSchema as Record<string, unknown>
