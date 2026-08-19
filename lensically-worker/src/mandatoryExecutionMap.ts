@@ -373,14 +373,14 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     id: "optional_nonnull_field_omission_contract",
     status: "active",
     priority: 259,
-    defect_class: "client_schema_contract",
+        defect_class: "contract_drift",
     matching_conditions: {
       any_terms: ["optional null", "optional field", "nonnull", "invalid arguments", "client schema", "nullable"],
     },
     losing_path: "Serialize null into an optional typed field whose declared schema does not permit null, treating optional as implicitly nullable and causing client-side rejection before Lensically can receive the operation.",
     root_cause: "Invocation construction conflated field absence with nullability. An optional field may be omitted, but explicit null is valid only when the declared type or union includes null.",
     winning_path: {
-      surface: "client_invocation",
+            surface: "runtime_guard",
       procedure: ["Inspect the exact surfaced typed schema before invocation.", "When an optional field has no value and its declared type is non-null, omit the key entirely.", "Send explicit null only when the schema explicitly permits null.", "Never add placeholder null values merely because a field is optional.", "If the client rejects such a payload before Lensically receipt, preserve the semantic operation and replay only after authoritative nonexecution proof with the invalid optional field omitted."],
     },
     evidence: ["closeOperatorAction was rejected client-side when optional verification.durable_learning was explicitly serialized as null even though the surfaced field type permits only string when present.", "Omitting the absent optional field satisfies the existing schema without weakening validation or changing action semantics."],
