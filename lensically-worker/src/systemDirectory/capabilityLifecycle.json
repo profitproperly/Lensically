@@ -229,6 +229,17 @@
       "compatibility_bridge": false
     },
     {
+      "capability_id": "operating.operator_case_action_execution",
+      "directory_entry_id": "operating.case_action_execution",
+      "canonical_handler": "executeOperatorCaseAction",
+      "route_intent": "execute hardening case action",
+      "implementation_mode": "new_handler",
+      "focused_regression": "enforces the normalized Operator lifecycle from session map through explicit closure",
+      "release_scope": "operator-engineering",
+      "live_verification": "The deployed dedicated case Step-4 gateway accepts only server-bound case_step mutations, rejects non-case mutation tokens, and keeps case dry-runs on the read-only gateway before client dispatch.",
+      "compatibility_bridge": false
+    },
+    {
       "capability_id": "operating.operator_action_execution",
       "directory_entry_id": "operating.action_execution",
       "canonical_handler": "executeOperatorAction",
