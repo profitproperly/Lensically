@@ -8,7 +8,9 @@
     "agent:context": "node ./scripts/lensically-agent-api.mjs context",
     "agent:schedule-plan": "node ./scripts/lensically-agent-api.mjs schedule-plan",
     "parity:white-label": "node ./scripts/white-label-parity.mjs",
-    "test:white-label-parity": "node ./scripts/test-white-label-parity.mjs"
+    "test:white-label-parity": "node ./scripts/test-white-label-parity.mjs",
+    "mbrain:delta": "node ./scripts/mbrain-delta-writer.mjs",
+    "test:mbrain-delta": "node ./scripts/test-mbrain-delta-writer.mjs"
   },
   "repository": {
     "type": "git",

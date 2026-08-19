@@ -30,6 +30,7 @@ lensically-worker/.cloudflare-validation-receipt.json
 lensically-web/.next
 lensically-web/.open-next
 lensically-worker/.cloudflare.deploy.ps1
+.mbrain-delta/
 .github.deploy.ps1
 manifest-mental-vault/Daily/*.md
 manifest-mental-vault/Reports/*.md

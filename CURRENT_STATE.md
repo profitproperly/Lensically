@@ -122,6 +122,12 @@
 - `config/white-label-parity.config.json` is the parity policy. It excludes private continuation/state files, seller-only public/commercial surfaces, production database/migration surfaces, Manifest vault content, and forbidden seller values. Product-relevant changes outside the allowlist are reported as `PENDING` rather than mirrored.
 - The scheduled workflow runs every six hours and can also be manually dispatched. It requires the `WHITE_LABEL_PARITY_TOKEN` repository secret with write access to `profitproperly/Lensically-Operator-Threads`; without that token it fails closed and does not pretend parity was written.
 
+### M-BRAIN Durable Delta Writer
+
+- `config/mbrain-delta-writer.config.json` and `scripts/mbrain-delta-writer.mjs` are the Lensically-owned bridge from verified repository/product state into M-BRAIN Gateway state.
+- The writer derives `/M-BRAIN/PROJECTS/LENSICALLY/01_STATE.md` and `/M-BRAIN/SYSTEMS/DURABLE_DELTA_WRITER.md` payloads from `ENGINEERING_CONTINUATION.md`, product parity state, and current Git heads; it rejects known stale phrases before producing `.mbrain-delta/latest.json`.
+- The Gateway write itself remains version-checked through `writeDurableDelta`. M-BRAIN is durable continuity only; fresher repository/runtime/product state remains authoritative and must be reflected through this writer rather than overwritten by memory.
+
 ### Manifest Innovation Cycle
 
 - Manifest now has two cycle-level rails. The **Innovation Cycle** is the permanent upstream engineering rail; the **Main Cycle** is the protected downstream production rail and authoritative historical truth.

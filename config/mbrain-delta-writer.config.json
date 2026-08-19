@@ -1,0 +1,23 @@
+{
+  "version": "mbrain-delta-writer-v1",
+  "project": "Lensically",
+  "canonical_project_state_path": "/M-BRAIN/PROJECTS/LENSICALLY/01_STATE.md",
+  "canonical_system_contract_path": "/M-BRAIN/SYSTEMS/DURABLE_DELTA_WRITER.md",
+  "outbox_path": ".mbrain-delta/latest.json",
+  "source_authorities": {
+    "continuation": "ENGINEERING_CONTINUATION.md",
+    "current_state": "CURRENT_STATE.md",
+    "operating_memory": "OPERATING_MEMORY.md",
+    "white_label_parity_config": "config/white-label-parity.config.json"
+  },
+  "required_project_state_phrases": [
+    "LOM callable certification is complete-live-verified",
+    "White-label parity is now wired, operational, and writing validated product parity state.",
+    "M-BRAIN stores durable model-side continuity and must follow fresher verified Lensically truth."
+  ],
+  "forbidden_stale_phrases": [
+    "Do not resume the deferred white-label parity job first.",
+    "active_job_id: lom-full-callable-wiring-certification-20260818",
+    "six direct read proofs remain after refresh"
+  ]
+}
