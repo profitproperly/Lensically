@@ -1442,18 +1442,26 @@ export function prepareSourceDefinedDirectEngineeringCall(
   inputs: Record<string, unknown>,
   tools: MandatoryExecutionToolDefinition[],
 ): MandatoryExecutionPrepared | null {
+  const preparedToolName = typeof inputs.prepared_tool_name === "string" ? inputs.prepared_tool_name.trim() : "";
+  const preparedDirectTool = preparedToolName && SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS.has(preparedToolName)
+    && tools.some((tool) => tool.name === preparedToolName)
+    ? preparedToolName
+    : "";
   const boundOperation = machineKey(inputs.operation, "");
   const isBoundGitHubFileUpsert = typeof inputs.repository === "string"
     && typeof inputs.path === "string"
     && typeof inputs.content === "string"
     && typeof inputs.message === "string"
     && typeof inputs.operation_id === "string";
-  const boundIntent = CROSS_REPOSITORY_GITHUB_OPERATIONS.has(boundOperation)
-    ? "operate git hub repositories"
-    : isBoundGitHubFileUpsert
-      ? "upsert git hub repository file"
-      : actionIntent;
-  return prepareStaticCall(boundIntent, objective, null, inputs, tools, true);
+  const boundIntent = preparedDirectTool
+    || (CROSS_REPOSITORY_GITHUB_OPERATIONS.has(boundOperation)
+      ? "operate git hub repositories"
+      : isBoundGitHubFileUpsert
+        ? "upsert git hub repository file"
+        : actionIntent);
+  const routedInputs = { ...inputs };
+  delete routedInputs.prepared_tool_name;
+  return prepareStaticCall(boundIntent, objective, null, routedInputs, tools, true);
 }
 
 export async function prepareMandatoryExecutionMapCall(
