@@ -15570,14 +15570,16 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     const liveStateGateway = tools.find((tool) => tool.name === "getOperatorLiveState");
     const readActionGateway = tools.find((tool) => tool.name === OPERATOR_READ_EXECUTION_GATEWAY);
     const actionGateway = tools.find((tool) => tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY);
+    const caseActionGateway = tools.find((tool) => tool.name === OPERATOR_CASE_EXECUTION_GATEWAY);
     const closeGateway = tools.find((tool) => tool.name === "closeOperatorAction");
-  if (!knowledgeGateway || !liveStateGateway || !readActionGateway || !actionGateway || !closeGateway) return tools;
+  if (!knowledgeGateway || !liveStateGateway || !readActionGateway || !actionGateway || !caseActionGateway || !closeGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
   const plannedActionCapabilityEnums: string[] = [];
   const plannedActionContracts: Record<string, unknown>[] = [];
   const readActionDescriptorBranches: Record<string, unknown>[] = [];
   const mutationActionDescriptorBranches: Record<string, unknown>[] = [];
+  const caseMutationActionDescriptorBranches: Record<string, unknown>[] = [];
   tools
     .filter((tool) => !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(tool.name))
     .filter((tool) => !FORBIDDEN_RETIRED_TOOL_NAMES.has(tool.name) && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name))
