@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveActionBoundWinningPaths, WINNING_PATH_PROMOTIONS } from "../src/mandatoryExecutionMap";
+import { prepareSourceDefinedDirectEngineeringCall, resolveActionBoundWinningPaths, WINNING_PATH_PROMOTIONS } from "../src/mandatoryExecutionMap";
 
 describe("mandatory execution map", () => {
   it("binds the neutral case-step prevention to opaque Step-4 identities", () => {
