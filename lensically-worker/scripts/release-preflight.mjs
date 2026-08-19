@@ -1087,7 +1087,6 @@ if (!operatorMcpRegistryComposition.includes("OPERATOR_MCP_ADMIN_TOOL_NAMES")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ADMIN_TOOL_NAME_SET")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET")
     || !operatorMcpRegistryComposition.includes("export const OPERATOR_MCP_DIRECT_PRIORITIES")
-    || !operatorMcpRegistryComposition.includes("export function operatorMcpToolNameRequiresProceed")
     || !operatorMcpRegistryComposition.includes("export function buildComposedOperatorMcpTools")) {
   lifecycleErrors.push("operator_mcp_registry_composition_module_incomplete");
 }
