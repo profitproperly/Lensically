@@ -22713,8 +22713,8 @@ async function handleOperatorMcpEngineeringTool(
     const putRecord = put.data && typeof put.data === "object" && !Array.isArray(put.data) ? put.data as Record<string, unknown> : {};
     const commitRecord = putRecord.commit && typeof putRecord.commit === "object" && !Array.isArray(putRecord.commit) ? putRecord.commit as Record<string, unknown> : {};
     const commitSha = normalizeOperatorText(commitRecord.sha, 80, true);
-    await recordEngineeringAudit(env, { action: "upsertGitHubRepositoryFile", filesChanged: [`${repository}:${path}`], diffSummary: put.ok ? `Upserted ${config.owner}/${repository}:${path}.` : `Failed to upsert ${config.owner}/${repository}:${path}.`, result: put.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, status: put.status, commit_sha: commitSha } });
-    return { ok: put.ok, status: put.status, created: !existing.ok, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, commit_sha: commitSha };
+    await recordEngineeringAudit(env, { action: "upsertGitHubRepositoryFile", filesChanged: [`${target.full_name}:${path}`], diffSummary: put.ok ? `Upserted ${target.full_name}:${path}.` : `Failed to upsert ${target.full_name}:${path}.`, result: put.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: target.full_name, branch, path, status: put.status, commit_sha: commitSha } });
+    return { ok: put.ok, status: put.status, created: !existing.ok, operation_id: operationId, repository: target.full_name, branch, path, commit_sha: commitSha };
   }
 
   if (toolName === "deployCloudflarePagesProject") {
