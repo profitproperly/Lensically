@@ -6428,6 +6428,54 @@ active_checkpoint: none
     }
   }, 30000);
 
+  it("converges recurrences into an already-advanced active hardening incident", async () => {
+    const firstCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "control_step",
+      request_fingerprint: "fixture-advanced-active-recurrence-a",
+      error_category: "openai_client_predispatch_safety_block",
+      operation_class: "engineering_hardening_transition",
+      observed_outcome: { client_blocked: true, lensically_receipt: false },
+    });
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).not.toBe(true);
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'prevention_locked', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
+
+    const secondCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; state: string };
+      recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "client",
+      blocked_profile_id: "case_step_a6",
+      request_fingerprint: "fixture-advanced-active-recurrence-b",
+      error_category: "openai_client_predispatch_safety_block",
+      operation_class: "engineering_hardening_transition",
+      observed_outcome: { client_blocked: true, lensically_receipt: false },
+    });
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).not.toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.incident.id).toBe(first.incident.id);
+    expect(second.incident.state).toBe("prevention_locked");
+    expect(second.recurrence).toMatchObject({
+      status: "known_active_recurrence",
+      prior_incident_id: first.incident.id,
+      recurrence_family: "client:openai_safety_predispatch",
+    });
+
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
+  }, 30000);
+
   it("generalizes OpenAI client safety blocks across active and closed related incidents", async () => {
     const firstCall = await mcpToolRaw<{
       ok: boolean;
