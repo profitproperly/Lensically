@@ -16816,12 +16816,14 @@ const OPERATOR_EXECUTION_GUARD_VERSION = "operator-execution-guard-v5";
 const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
 const OPERATOR_READ_EXECUTION_GATEWAY = "executeOperatorReadAction";
 const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeOperatorAction";
+const OPERATOR_CASE_EXECUTION_GATEWAY = "executeOperatorCaseAction";
 const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
   "getOperatorSessionMap",
   "getOperatorKnowledge",
   "getOperatorLiveState",
   OPERATOR_READ_EXECUTION_GATEWAY,
   OPERATOR_ROUTED_EXECUTION_GATEWAY,
+  OPERATOR_CASE_EXECUTION_GATEWAY,
   "closeOperatorAction",
 ]);
 
