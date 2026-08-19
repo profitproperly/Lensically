@@ -526,6 +526,27 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
         supersession_rule: "Any replacement must keep semantic hardening controls off the client surface, forbid evidence before its required stage, and preserve complete server-side hardening transitions with pre-execution action binding.",
   },
   {
+    id: "server_owned_resumed_hardening_closure",
+    status: "active",
+    priority: 262,
+    defect_class: "known_recurrence",
+    matching_conditions: {
+      any_terms: ["resumed hardening closure", "case_step a10", "client finalization dependency", "hardening closure predispatch", "server-owned hardening closure"],
+    },
+    losing_path: "Require an already-resumed hardening incident to depend on one final client-dispatched a10 mutation for closure, allowing provider pre-dispatch rejection to strand a fully verified incident and globally block normal work after the original objective has already resumed.",
+    root_cause: "The hardening state machine correctly required resume and autonomy evidence but final closure remained reachable only through the public case_step mutation surface, so a provider rejection before Lensically receipt could strand an incident after successful validation, release, live verification, and resume.",
+    winning_path: {
+      surface: "runtime_guard",
+      procedure: ["Keep the public a0-a10 case_step contract unchanged.", "Consider only incidents already in resumed state; never server-advance an incident that has not passed the explicit resume gate.", "Require durable stored root cause, generalized cause, prevention rule, non-empty regression evidence, tested SHA, deployment ID, and live-verification evidence before server-owned closure.", "Treat the incident's stored tested SHA and deployment ID as the exact verified release evidence even if a later Worker deployment is running when closure bookkeeping occurs.", "Close through advanceHardeningIncident so the existing transition validator and atomic state guard remain authoritative; never update hardening state directly.", "Generate explicit resume-result, autonomy-dividend, and efficiency evidence showing that only client-finalization dependency was removed.", "Run the bounded reconciliation from the existing scheduled server control point and log failures without bypassing business cron execution.", "Gate release on source assertions and regression coverage for the resumed-only, stored-verification contract."],
+    },
+    evidence: ["A live exec_02_10 closure was blocked by OpenAI before Lensically receipt after the same incident had successfully reached live_verified and resumed.", "Complete source inspection proved advanceHardeningIncident had no server-owned caller and final closure therefore depended entirely on a client-dispatched mutation.", "The resumed state already proves the original objective passed the resume gate; closure requires only durable resume-result and autonomy-dividend evidence under the existing validator."],
+    scope: "universal",
+    binding_scope: "runtime_guard",
+    enforcement_point: "Scheduled server-owned hardening reconciliation, resumed-state-only query, durable stored release/live-verification prerequisites, advanceHardeningIncident transition validation, and release preflight regression assertions.",
+    regression_test_id: "closes stored-verified resumed hardening incidents without client finalization",
+    supersession_rule: "Any replacement must preserve every pre-resume hardening gate, require durable stored release and live-verification evidence, close through the existing transition validator, and remove dependence on a client-dispatched finalization mutation without directly rewriting incident state.",
+  },
+  {
     id: "manifest_shadow_minimum_family_single_source_contract",
     status: "active",
     priority: 235,
