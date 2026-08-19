@@ -6872,7 +6872,7 @@ active_checkpoint: none
     expect(forbidden.structuredContent.error).toBe("direct_typed_tool_required");
   }, 30000);
 
-  it("server-blocks selected account context until explicit proceed", async () => {
+  it("serves selected account context without generic Proceed", async () => {
     await mcpRequest("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
@@ -6886,16 +6886,11 @@ active_checkpoint: none
     expect(selected.structuredContent.selected_key).toBe(BRAND_KEY);
     expect(selected.structuredContent.account_data_loaded).toBe(false);
 
-        const blocked = await mcpToolRaw<{ error: string; selected_key: string; account_data_loaded: boolean; required_next_tool: string }>("get_account_state", {
+        const accountState = await mcpToolRaw<{ ok?: boolean; error?: string; selected_key?: string; account_data_loaded?: boolean; brand_key?: string }>("get_account_state", {
       brand_key: BRAND_KEY,
     });
-    expect(blocked.isError).toBe(true);
-    expect(blocked.structuredContent).toMatchObject({
-      error: "explicit_proceed_required",
-      selected_key: BRAND_KEY,
-      account_data_loaded: false,
-      required_next_tool: "confirmOperatorProceed",
-    });
+    expect(accountState.isError).not.toBe(true);
+    expect(JSON.stringify(accountState.structuredContent)).not.toContain("confirmOperatorProceed");
 
                                                 const proceeded = await mcpToolRaw<{ proceeded: boolean; account_data_loaded: boolean; continuity_loaded: boolean; continuation_choice_required: boolean; continuity_capsule: { brand_key: string }; next_call_requirement: { brand_key: string; proceed_confirmed: boolean; continuity_loaded?: unknown } }>("confirmOperatorProceed", { brand_key: BRAND_KEY });
     expect(proceeded.isError).not.toBe(true);
