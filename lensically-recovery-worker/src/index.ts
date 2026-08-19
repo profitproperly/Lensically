@@ -662,7 +662,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const closureContent = structured(closure);
     const tools = Array.isArray((listed.body?.result as Record<string, unknown> | undefined)?.tools) ? (listed.body?.result as { tools: Array<Record<string, unknown>> }).tools : [];
     const toolNames = tools.map((tool) => String(tool.name || ""));
-    const requiredLifecycleTools = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorAction", "closeOperatorAction"];
+    const requiredLifecycleTools = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction", "executeOperatorAction", "executeOperatorCaseAction", "closeOperatorAction"];
+    const requiredLifecycleSequence = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"];
     const schemasClosed = tools.every((tool) => {
       const schema = tool.inputSchema && typeof tool.inputSchema === "object" && !Array.isArray(tool.inputSchema)
         ? tool.inputSchema as Record<string, unknown>
