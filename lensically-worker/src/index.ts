@@ -19219,7 +19219,7 @@ async function buildOperatorActionClosure(env: Env, toolName: string, result: Re
       ? `Record the verified P0/P1 interrupt and its precedence in ${canonicalContinuationPath}, then follow ${canonicalContinuationTool}.`
       : canonicalContinuationNextAction);
   const ownerActionRequired = result.owner_action_required === true
-    || ["explicit_proceed_required", "owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
+    || ["owner_ratification_required", "growth_plan_approval_required"].includes(normalizeOperatorMachineKey(result.error ?? result.error_code, ""));
   const temporaryDependency = normalizeOperatorText(result.temporary_dependency, 500, true);
   const retirementCondition = normalizeOperatorText(result.retirement_condition, 1000, true);
   const embeddedActiveOutcome = operatorRecord(result.active_outcome);
