@@ -3921,17 +3921,13 @@ describe("operator mode MCP endpoint", () => {
     expect(knowledgeTool?.inputSchema?.properties).not.toHaveProperty("node_ids");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("scopes");
     expect(liveStateTool?.inputSchema?.properties).not.toHaveProperty("brand_key");
-        const controlStepBranch = plannedActionSchema?.oneOf?.find((item) => {
-      const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "control_step";
-    }) as { properties?: { arguments?: { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean } } } | undefined;
-    expect(controlStepBranch?.properties?.arguments?.required).toEqual([]);
-        expect(Object.keys(controlStepBranch?.properties?.arguments?.properties ?? {})).toEqual(["dry_run", "release_sha"]);
-    expect(controlStepBranch?.properties?.arguments?.properties).toHaveProperty("dry_run");
-    expect(controlStepBranch?.properties?.arguments?.properties).toHaveProperty("release_sha");
+        const controlStepContract = plannedActionContracts.find((contract) => contract.capability === "control_step");
+        expect(Object.keys(controlStepContract?.argument_schema?.properties ?? {})).toEqual(["dry_run", "release_sha"]);
+    expect(controlStepContract?.argument_schema?.properties).toHaveProperty("dry_run");
+    expect(controlStepContract?.argument_schema?.properties).toHaveProperty("release_sha");
 
-    expect(controlStepBranch?.properties?.arguments?.additionalProperties).toBe(false);
-    const actionCapabilities = (plannedActionSchema?.oneOf ?? []).map((branch) => (((branch as { properties?: { capability?: { const?: string } } }).properties?.capability?.const) ?? ""));
+    expect(controlStepContract?.argument_schema?.additionalProperties).toBe(false);
+    const actionCapabilities = plannedCapabilityEnums;
         expect(actionCapabilities.every(Boolean)).toBe(true);
     expect(new Set(actionCapabilities).size).toBe(actionCapabilities.length);
     expect(actionCapabilities).toContain("case_step");
