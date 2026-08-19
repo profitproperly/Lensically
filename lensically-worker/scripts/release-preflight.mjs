@@ -1421,7 +1421,7 @@ if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorM
 }
 if (!operatorMcpRoutingPolicyTests.includes("preserves scoped wrapper canonicalization and account injection")
     || !operatorMcpRoutingPolicyTests.includes("preserves scoped precedence and direct brand alias normalization")
-    || !operatorMcpRoutingPolicyTests.includes("preserves guided Proceed requirements and autonomous exemptions")
+    || !operatorMcpRoutingPolicyTests.includes("exposes no generic Proceed routing gate")
     || !operatorMcpRoutingPolicyTests.includes("preserves nested alias canonicalization and strips execution metadata")
     || !operatorMcpRoutingPolicyTests.includes("preserves autonomy canonical names and handler classification")
     || !operatorMcpRoutingPolicyTests.includes("binds injected normalizers into one deterministic routing policy")
