@@ -17480,7 +17480,8 @@ function resolveExactCapabilityToolName(value: unknown): string | null {
   };
   if (aliases[key]) return aliases[key];
   return buildOperatorMcpBaseTools(false).find((tool) =>
-    operatorPublicProfileIdForToolName(tool.name) === key
+    operatorActionCapabilityIdForToolName(tool.name) === key
+    || operatorPublicProfileIdForToolName(tool.name) === key
     || normalizeOperatorMachineKey(tool.title, "") === key,
   )?.name ?? null;
 }
