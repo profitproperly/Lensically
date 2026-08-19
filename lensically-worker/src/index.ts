@@ -18406,7 +18406,7 @@ const HARDENING_BOUNDARY_VALUES = new Set<HardeningBoundary>(["client", "gateway
 const HARDENING_STATE_VALUES = new Set<HardeningState>(["detected", "contained", "classified", "reproduced", "generalized", "repaired", "prevention_locked", "validated", "released", "live_verified", "resumed", "closed"]);
 const HARDENING_CONTROLLER_TOOLS = new Set<string>(["recordHardeningIncident", "getHardeningStatus", "advanceHardeningIncident", "recordOperationalObservation", "getOperatorWorkState", "intakeOperatorWork", "advanceOperatorWork"]);
 const HARDENING_EXPECTED_CONTROL_ERRORS = new Set<string>([
-  "explicit_proceed_required", "continuity_context_required", "continuity_session_mismatch", "growth_plan_approval_required",
+  "continuity_context_required", "growth_plan_approval_required",
   "owner_ratification_required", "hardening_incident_active", "operation_already_in_progress", "idempotency_key_payload_mismatch",
   "large_file_requires_chunked_write", "file_already_exists", "file_missing_for_replace", "write_session_not_found",
   "find_must_match_once", "path_find_message_required", "patches_1_to_20_and_message_required", "patch_path_and_find_required",
