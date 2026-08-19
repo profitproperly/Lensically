@@ -16796,8 +16796,21 @@ async function verifyOperatorLifecycleToken(
     return { ok: false, error: "operator_lifecycle_deployment_changed" };
   }
   const boundSessionId = resolveOperatorLifecycleSessionBinding(payload.mcp_session_id, null);
-  if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId) {
+  const sessionChanged = Boolean(expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId);
+  const actionBoundSessionDrift = sessionChanged
+    && minimumStage >= 2
+    && Boolean(expectedActionFingerprint)
+    && payload.planned_action_fingerprint === expectedActionFingerprint;
+  if (sessionChanged && !actionBoundSessionDrift) {
     return { ok: false, error: "operator_lifecycle_session_changed" };
+  }
+  if (actionBoundSessionDrift) {
+    logWorkerEvent("OPERATOR_LIFECYCLE_SESSION_DRIFT_RECONCILED", {
+      minimum_stage: minimumStage,
+      expected_action_fingerprint_present: true,
+      bound_session_present: Boolean(boundSessionId),
+      request_session_present: Boolean(expectedSessionId),
+    });
   }
   if (expectedActionFingerprint && payload.planned_action_fingerprint !== expectedActionFingerprint) {
     return { ok: false, error: "operator_lifecycle_action_changed_after_preparation" };
