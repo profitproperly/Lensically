@@ -28,7 +28,7 @@ describe("Operator MCP account foundation registry", () => {
     expect(byName.get("read_lensically_ui_surface")?.inputSchema).toMatchObject({
       required: ["brand_key", "surface"],
       properties: {
-        surface: { enum: ["dashboard", "followers", "insights", "post_archive", "saved_patterns"] },
+        surface: { enum: ["dashboard", "signal_radar", "followers", "insights", "post_archive", "saved_patterns"] },
         order: { enum: ["recent", "top", "newest", "likes"] },
         limit: { minimum: 1, maximum: 200, default: 100 },
         cursor_depth: { minimum: 1, maximum: 250 },
