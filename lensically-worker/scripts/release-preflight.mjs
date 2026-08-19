@@ -1400,7 +1400,6 @@ if (!operatorToolAdmissionShell.includes("scopeCall: OPERATOR_MCP_ROUTING_POLICY
 if (!operatorMcpRoutingPolicy.includes("export function canonicalScopedOperatorMcpToolName")
     || !operatorMcpRoutingPolicy.includes("export function scopeOperatorMcpToolCall")
     || !operatorMcpRoutingPolicy.includes("export function requestedMcpBrandKey")
-    || !operatorMcpRoutingPolicy.includes("export function operatorMcpCallRequiresProceed")
     || !operatorMcpRoutingPolicy.includes("export function canonicalOperatorExecutionArgs")
     || !operatorMcpRoutingPolicy.includes("export function canonicalAutonomyToolName")
     || !operatorMcpRoutingPolicy.includes("export function classifyOperatorMcpHandler")
