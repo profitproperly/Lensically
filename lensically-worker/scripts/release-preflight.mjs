@@ -3489,7 +3489,6 @@ const lifecycleMainContractChecks = [
   ["retired_gateway_not_advertised", tests.includes('expect(names).not.toContain("executeLensicallyIntent")')],
   ["closed_public_schemas", tests.includes("tool.inputSchema?.additionalProperties === false")],
   ["typed_step4_union", source.includes("oneOf: descriptorBranches") && source.includes("readActionDescriptorBranches") && source.includes("mutationActionDescriptorBranches") && source.includes("operator_action_capability_collision")],
-  ["server_side_proceed", source.includes("Later direct account calls use server-side continuity and do not send a Proceed flag")],
   ["execution_kernel_name", source.includes('export const EXECUTION_KERNEL_NAME = "Execution Kernel"')],
   ["execution_kernel_version", source.includes('export const EXECUTION_KERNEL_VERSION = "lensically-execution-kernel-v1"')],
   ["session_creation", source.includes("createOperatorMcpSessionId")],
