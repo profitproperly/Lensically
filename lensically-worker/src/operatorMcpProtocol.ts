@@ -415,6 +415,5 @@ export function buildOperatorKeyHandshakeLines(
     "Lensically Operator Mode MCP is active.",
     `Selected key: ${brandKey}`,
     `Full tool surface loaded: ${toolCount} tools available and usable.`,
-    "Proceed to the next step?",
   ];
 }
