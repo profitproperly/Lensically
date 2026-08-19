@@ -22158,7 +22158,20 @@ async function handleOperatorMcpEngineeringTool(
     const repositoryEndpoint = `/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
     const repositoryResult = await githubApi(env, repositoryEndpoint);
     if (!repositoryResult.ok) {
-      return { ok: false, error: "github_repository_access_failed", status: repositoryResult.status, repository: target.full_name };
+      const identityResult = await githubApi(env, "/user");
+      const identityRecord = identityResult.ok && identityResult.data && typeof identityResult.data === "object" && !Array.isArray(identityResult.data)
+        ? identityResult.data as Record<string, unknown>
+        : {};
+      const authenticatedLogin = normalizeOperatorText(identityRecord.login, 120, true);
+      return {
+        ok: false,
+        error: "github_repository_access_failed",
+        status: repositoryResult.status,
+        repository: target.full_name,
+        authenticated_login: authenticatedLogin,
+        target_visibility: repositoryResult.status === 404 ? "not_visible_to_configured_token_or_not_found" : "access_failed",
+        credential_diagnostic: identityResult.ok ? "authenticated_identity_resolved" : "authenticated_identity_unavailable",
+      };
     }
     if (operation === "get_repository") {
       return { ok: true, repository: summarizeRepository(repositoryResult.data) };
