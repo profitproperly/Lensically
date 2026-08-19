@@ -50,12 +50,12 @@ export const OPERATOR_MCP_ACCOUNT_FOUNDATION_TOOLS: OperatorMcpToolDefinition[] 
   {
     name: "read_lensically_ui_surface",
     title: "Read Lensically UI surface",
-    description: "Read the same authoritative account data used by Lensically Dashboard, Followers, Insights, Post Archive, or Saved Patterns. Every paginated record remains reachable through page, cursor, limit, and order inputs.",
+    description: "Read the same authoritative data used by Lensically Dashboard, Signal Radar, Followers, Insights, Post Archive, or Saved Patterns. Every paginated record remains reachable through page, cursor, limit, and order inputs.",
     inputSchema: {
       type: "object",
       properties: {
         brand_key: BRAND_KEY_SCHEMA,
-        surface: { type: "string", enum: ["dashboard", "followers", "insights", "post_archive", "saved_patterns"] },
+        surface: { type: "string", enum: ["dashboard", "signal_radar", "followers", "insights", "post_archive", "saved_patterns"] },
         order: { type: "string", enum: ["recent", "top", "newest", "likes"] },
         page: { type: "integer", minimum: 1, default: 1 },
         limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },

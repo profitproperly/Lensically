@@ -12704,7 +12704,8 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
         const account = await getThreadsAccountForAppUser(env, WORKSPACE_APP_USER_ID, threadsUserId);
         return account as unknown as Record<string, unknown> | null;
       },
-      buildDashboard: (account) => buildThreadsDashboardPayload(env, account as unknown as ThreadsAccount),
+            buildDashboard: (account) => buildThreadsDashboardPayload(env, account as unknown as ThreadsAccount),
+      readSignalRadarOverview: (limit) => readSignalRadarOverview(env.DB, limit),
       refreshFollowerSnapshot: (account, timezone) => refreshCurrentThreadsFollowerSnapshot(
         env,
         account as unknown as ThreadsAccount,

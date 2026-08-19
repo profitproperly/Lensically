@@ -18,7 +18,8 @@ export interface OperatorLensicallyUiSurfaceDependencies {
   maxPostsCursorDepth: number;
   normalizeText(value: unknown, maxLength: number, allowEmpty?: boolean): string | null;
   getThreadsAccount(threadsUserId: string): Promise<JsonRecord | null>;
-  buildDashboard(account: JsonRecord): Promise<JsonRecord>;
+    buildDashboard(account: JsonRecord): Promise<JsonRecord>;
+  readSignalRadarOverview(limit: number): Promise<JsonRecord>;
   refreshFollowerSnapshot(account: JsonRecord, timezone: string): Promise<unknown>;
   countFollowerSnapshots(threadsUserId: string): Promise<number>;
   listFollowerSnapshots(threadsUserId: string, limit: number, offset: number): Promise<FollowerSnapshotRow[]>;
@@ -51,8 +52,21 @@ export async function readOperatorLensicallyUiSurface(
   dependencies: OperatorLensicallyUiSurfaceDependencies,
 ): Promise<OperatorLensicallyUiSurfaceResult> {
   const surface = dependencies.normalizeText(input.payload.surface, 40, true);
-  const page = Math.max(Math.trunc(Number(input.payload.page ?? 1)), 1);
+    const page = Math.max(Math.trunc(Number(input.payload.page ?? 1)), 1);
   const limit = Math.min(Math.max(Math.trunc(Number(input.payload.limit ?? 100)), 1), 200);
+
+  if (surface === "signal_radar") {
+    return {
+      status: 200,
+      body: {
+        success: true,
+        surface,
+        brand_key: input.brandKey,
+        data: await dependencies.readSignalRadarOverview(limit),
+      },
+    };
+  }
+
   const account = await dependencies.getThreadsAccount(input.threadsUserId);
   if (!account?.threads_user_id) {
     return { status: 404, body: { success: false, error: "threads_account_not_connected" } };
