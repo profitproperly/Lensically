@@ -3887,27 +3887,15 @@ describe("operator mode MCP endpoint", () => {
     expect(closeTool?.inputSchema?.properties).toHaveProperty("action_execution_token");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("verification");
     expect(closeTool?.inputSchema?.properties).not.toHaveProperty("action");
-    const knownFileSearchBranch = plannedActionSchema?.oneOf?.find((item) => {
-      const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "repository_symbol_search";
-    }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
-        expect(knownFileSearchBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-    const mcpCampaignBranch = plannedActionSchema?.oneOf?.find((item) => {
-      const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "run_mcp_tests";
-    }) as { x_lensically_prerequisites?: { live_state_scopes?: string[] } } | undefined;
-    expect(mcpCampaignBranch?.x_lensically_prerequisites?.live_state_scopes).toEqual(["runtime"]);
-        const autonomousPrepareBranch = plannedActionSchema?.oneOf?.find((item) => {
-      const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "prepare_manifest_autonomous_cycle";
-    }) as { properties?: { arguments?: { properties?: Record<string, unknown> } } } | undefined;
-    expect(autonomousPrepareBranch?.properties?.arguments?.properties).toHaveProperty("operation_id");
-    expect(autonomousPrepareBranch?.properties?.arguments?.properties).not.toHaveProperty("proceed_confirmed");
-    const hardeningCaseBranch = plannedActionSchema?.oneOf?.find((item) => {
-      const branch = item as { properties?: { capability?: { const?: string } } };
-      return branch.properties?.capability?.const === "case_step";
-    }) as { properties?: { arguments?: { oneOf?: Array<{ properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }> } } } | undefined;
-    const hardeningArgumentBranches = hardeningCaseBranch?.properties?.arguments?.oneOf ?? [];
+    const knownFileSearchContract = plannedActionContracts.find((contract) => contract.capability === "repository_symbol_search");
+        expect(knownFileSearchContract?.live_state_scopes).toEqual(["runtime"]);
+    const mcpCampaignContract = plannedActionContracts.find((contract) => contract.capability === "run_mcp_tests");
+    expect(mcpCampaignContract?.live_state_scopes).toEqual(["runtime"]);
+        const autonomousPrepareContract = plannedActionContracts.find((contract) => contract.capability === "prepare_manifest_autonomous_cycle");
+    expect(autonomousPrepareContract?.argument_schema?.properties).toHaveProperty("operation_id");
+    expect(autonomousPrepareContract?.argument_schema?.properties).not.toHaveProperty("proceed_confirmed");
+    const hardeningCaseContract = plannedActionContracts.find((contract) => contract.capability === "case_step");
+    const hardeningArgumentBranches = hardeningCaseContract?.argument_schema?.oneOf ?? [];
     expect(hardeningArgumentBranches).toHaveLength(11);
     const hardeningStageBranch = (stage: string) => hardeningArgumentBranches.find((branch) => {
       const stageSchema = branch.properties?.stage as { enum?: string[] } | undefined;
