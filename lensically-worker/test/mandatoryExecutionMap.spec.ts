@@ -136,6 +136,7 @@ describe("mandatory execution map", () => {
         content: "export const ok = true;",
         message: "Add MCP bootstrap",
         operation_id: "signal-radar-mcp-bootstrap-v0",
+        prepared_tool_name: "upsertGitHubRepositoryFile",
       },
       tools,
     );
