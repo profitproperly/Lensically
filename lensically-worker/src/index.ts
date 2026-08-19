@@ -15689,6 +15689,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   });
   readActionGateway.inputSchema = buildStep4InputSchema(readActionDescriptorBranches);
   actionGateway.inputSchema = buildStep4InputSchema(mutationActionDescriptorBranches);
+  caseActionGateway.inputSchema = buildStep4InputSchema(caseMutationActionDescriptorBranches);
   return tools;
 }
 
