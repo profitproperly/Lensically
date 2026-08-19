@@ -1,9 +1,16 @@
 import { strict as assert } from "node:assert";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const config = JSON.parse(readFileSync(new URL("../config/mbrain-delta-writer.config.json", import.meta.url), "utf8"));
 const script = readFileSync(new URL("./mbrain-delta-writer.mjs", import.meta.url), "utf8");
+const writerPath = fileURLToPath(new URL("./mbrain-delta-writer.mjs", import.meta.url));
+const syntaxCheck = spawnSync(process.execPath, ["--check", writerPath], {
+  encoding: "utf8",
+});
 
+assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr || syntaxCheck.stdout);
 assert.equal(config.version, "mbrain-delta-writer-v1");
 assert.equal(config.canonical_project_state_path, "/M-BRAIN/PROJECTS/LENSICALLY/01_STATE.md");
 assert.equal(config.canonical_system_contract_path, "/M-BRAIN/SYSTEMS/DURABLE_DELTA_WRITER.md");

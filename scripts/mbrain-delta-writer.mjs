@@ -149,7 +149,7 @@ Owner prompting is not required for routine adoption, sync, repair, or closure. 
 ## GPT/Chat Durable Preservation Mandate
 This obligation applies to GPT/ChatGPT work, not only Codex repository sessions. Across any chat, project, build, analysis, design, automation, or operating discussion, the model must preserve durable facts, decisions, fixes, blockers, owner preferences, architecture changes, and reusable mistakes without waiting for the owner to say what to write, save, preserve, fix, or remember.
 
-When a source repository exists, preserve through the source-owned writer. When no repository exists, preserve through M-BRAIN Gateway directly with `writeDurableDelta` for canonical state or `appendBrainEvent` for provenance-only events. If the correct canonical node does not exist, create the smallest correct node under the appropriate `/M-BRAIN` domain and record the authority/source boundary. Chat text alone is never durable preservation.
+When a source repository exists, preserve through the source-owned writer. When no repository exists, preserve through M-BRAIN Gateway directly with \`writeDurableDelta\` for canonical state or \`appendBrainEvent\` for provenance-only events. If the correct canonical node does not exist, create the smallest correct node under the appropriate \`/M-BRAIN\` domain and record the authority/source boundary. Chat text alone is never durable preservation.
 
 ## Required Writer Shape
 For each project/domain, the writer must:
