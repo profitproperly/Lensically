@@ -22341,7 +22341,8 @@ async function handleOperatorMcpEngineeringTool(
     const [runResult, jobsResult] = await Promise.all([repoApi(`/actions/runs/${runId}`), repoApi(`/actions/runs/${runId}/jobs?per_page=100`)]);
     const runRecord = runResult.data && typeof runResult.data === "object" && !Array.isArray(runResult.data) ? runResult.data as Record<string, unknown> : {};
     const jobsRecord = jobsResult.data && typeof jobsResult.data === "object" && !Array.isArray(jobsResult.data) ? jobsResult.data as Record<string, unknown> : {};
-    const jobs = Array.isArray(jobsRecord.jobs) ? (jobsRecord.jobs as Array<Record<string, unknown>>).map((job) => ({
+    const rawJobs = Array.isArray(jobsRecord.jobs) ? jobsRecord.jobs as Array<Record<string, unknown>> : [];
+    const jobs = rawJobs.map((job) => ({
       id: job.id,
       name: job.name,
       status: job.status,
@@ -22356,8 +22357,29 @@ async function handleOperatorMcpEngineeringTool(
             conclusion: step.conclusion,
           }))
         : [],
-    })) : [];
-    return { ok: runResult.ok, status: runResult.status, jobs_ok: jobsResult.ok, jobs_status: jobsResult.status, repository: target.full_name, run: { id: runRecord.id, name: runRecord.name, event: runRecord.event, status: runRecord.status, conclusion: runRecord.conclusion, head_branch: runRecord.head_branch, head_sha: runRecord.head_sha, html_url: runRecord.html_url }, jobs };
+    }));
+    const failedJob = rawJobs.find((job) => job.conclusion === "failure" && Number.isSafeInteger(Number(job.id)));
+    let failedJobLogStatus: number | null = null;
+    let failedJobLogTail: string | null = null;
+    if (failedJob && config.token) {
+      const failedJobId = Number(failedJob.id);
+      const logResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/actions/jobs/${failedJobId}/logs`, {
+        headers: {
+          accept: "application/vnd.github+json",
+          authorization: `Bearer ${config.token}`,
+          "user-agent": "lensically-engineering-mcp",
+          "x-github-api-version": "2022-11-28",
+        },
+      });
+      failedJobLogStatus = logResponse.status;
+      if (logResponse.ok) {
+        const logText = await logResponse.text();
+        failedJobLogTail = logText.slice(-8000)
+          .replace(/(CLOUDFLARE_API_TOKEN\s*[=:]\s*)\S+/gi, "$1[redacted]")
+          .replace(/(authorization:\s*bearer\s+)\S+/gi, "$1[redacted]");
+      }
+    }
+    return { ok: runResult.ok, status: runResult.status, jobs_ok: jobsResult.ok, jobs_status: jobsResult.status, repository: target.full_name, run: { id: runRecord.id, name: runRecord.name, event: runRecord.event, status: runRecord.status, conclusion: runRecord.conclusion, head_branch: runRecord.head_branch, head_sha: runRecord.head_sha, html_url: runRecord.html_url }, jobs, failed_job_log_status: failedJobLogStatus, failed_job_log_tail: failedJobLogTail };
   }
 
   if (toolName === "listRepoFiles") {
