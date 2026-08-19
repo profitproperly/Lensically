@@ -5952,13 +5952,14 @@ active_checkpoint: none
     expect(operatorOperationLeaseMs("schedule_approved_draft")).toBe(120000);
   });
 
-  it("treats exactly six public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {
+  it("treats exactly seven public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {
     const exact = evaluateOperatorPublicLifecycleBoundary([
       "getOperatorSessionMap",
       "getOperatorKnowledge",
       "getOperatorLiveState",
       "executeOperatorReadAction",
       "executeOperatorAction",
+      "executeOperatorCaseAction",
       "closeOperatorAction",
     ]);
     expect(exact).toMatchObject({
