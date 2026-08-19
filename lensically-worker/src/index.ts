@@ -23148,6 +23148,7 @@ async function handleOperatorMcpToolCall(
   return dispatchOperatorMcpToolCall({ request, id, params }, {
     readOnlyRoutedExecutionGateway: OPERATOR_READ_EXECUTION_GATEWAY,
     routedExecutionGateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
+    caseRoutedExecutionGateway: OPERATOR_CASE_EXECUTION_GATEWAY,
     mandatoryExecutionMapVersion: MANDATORY_EXECUTION_MAP_VERSION,
     preCallRoutingVersion: OPERATOR_PRE_CALL_ROUTING_VERSION,
     executionPolicyVersion: OPERATOR_EXECUTION_POLICY_VERSION,
