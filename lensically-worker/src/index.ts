@@ -15928,6 +15928,20 @@ async function githubApi(env: Env, path: string, init: RequestInit = {}): Promis
   return { ok: response.ok, status: response.status, data };
 }
 
+async function githubApiRetryable(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
+  const method = String(init.method ?? "GET").toUpperCase();
+  let result = await githubApi(env, path, init);
+  for (
+    let attempt = 0;
+    shouldRetryGithubReadResponse(method, result, attempt) || shouldRetryGithubMutationResponse(path, result, attempt);
+    attempt += 1
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, githubMutationRetryDelayMs(attempt)));
+    result = await githubApi(env, path, init);
+  }
+  return result;
+}
+
 async function githubRepoApi(env: Env, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: unknown }> {
   const config = githubRepoConfig(env);
   return githubApi(env, `/repos/${config.owner}/${config.repo}${path}`, init);
