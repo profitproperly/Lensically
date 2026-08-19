@@ -317,6 +317,20 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
+    name: "executeOperatorCaseAction",
+    title: "Execute hardening case action",
+    description: "Mutating Step 4 for the neutral hardening case lifecycle only. Execute exactly one server-bound case_step mutation prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. This gateway rejects every non-case mutation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        live_state_token: { type: "string", minLength: 16 },
+      },
+      required: ["live_state_token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: "closeOperatorAction",
     title: "Close operator action",
     description: "Step 5 of the canonical Operator lifecycle. Consume the server-bound Step-4 execution proof, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before closure. The executed action is not replayed through the client.",
