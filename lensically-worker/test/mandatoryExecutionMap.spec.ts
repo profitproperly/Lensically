@@ -17,6 +17,22 @@ describe("mandatory execution map", () => {
     expect(prevention?.enforcement_point).toContain("executeOperatorCaseAction");
   });
 
+  it("closes stored-verified resumed hardening incidents without client finalization", () => {
+    const prevention = WINNING_PATH_PROMOTIONS
+      .find((candidate) => candidate.id === "server_owned_resumed_hardening_closure");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.status).toBe("active");
+    expect(prevention?.binding_scope).toBe("runtime_guard");
+    expect(prevention?.action_binding).toBeUndefined();
+    expect(prevention?.winning_path.procedure).toContain(
+      "Consider only incidents already in resumed state; never server-advance an incident that has not passed the explicit resume gate.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Treat the incident's stored tested SHA and deployment ID as the exact verified release evidence even if a later Worker deployment is running when closure bookkeeping occurs.",
+    );
+  });
+
   it("binds declared first-party workflow inputs before GitHub dispatch", () => {
     const prevention = resolveActionBoundWinningPaths("operateGitHubRepositories")
       .find((candidate) => candidate.id === "workflow_dispatch_declared_input_contract");
