@@ -80,6 +80,23 @@ describe("mandatory execution map", () => {
         },
       },
       {
+        name: "upsertGitHubRepositoryFile",
+        title: "Upsert GitHub repository file",
+        description: "Create or replace one bounded text file in an accessible GitHub repository.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            repository: { type: "string" },
+            path: { type: "string" },
+            content: { type: "string" },
+            message: { type: "string" },
+            operation_id: { type: "string" },
+          },
+          required: ["repository", "path", "content", "message", "operation_id"],
+          additionalProperties: false,
+        },
+      },
+      {
         name: "applyRepoPatchSet",
         title: "Apply atomic repo patch set",
         description: "Apply exact replacements in the configured Lensically repository.",
