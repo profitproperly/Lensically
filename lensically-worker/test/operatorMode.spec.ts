@@ -8599,6 +8599,7 @@ active_checkpoint: none
       "getOperatorLiveState",
       "executeOperatorReadAction",
       "executeOperatorAction",
+      "executeOperatorCaseAction",
       "closeOperatorAction",
     ]);
     expect(names).not.toContain("getOperatorStartupContext");
