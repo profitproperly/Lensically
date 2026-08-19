@@ -146,6 +146,11 @@ M-BRAIN must handle future endeavours for any project without waiting for the ow
 
 Owner prompting is not required for routine adoption, sync, repair, or closure. Protected destructive/business boundaries still retain their normal ratification rules.
 
+## GPT/Chat Durable Preservation Mandate
+This obligation applies to GPT/ChatGPT work, not only Codex repository sessions. Across any chat, project, build, analysis, design, automation, or operating discussion, the model must preserve durable facts, decisions, fixes, blockers, owner preferences, architecture changes, and reusable mistakes without waiting for the owner to say what to write, save, preserve, fix, or remember.
+
+When a source repository exists, preserve through the source-owned writer. When no repository exists, preserve through M-BRAIN Gateway directly with `writeDurableDelta` for canonical state or `appendBrainEvent` for provenance-only events. If the correct canonical node does not exist, create the smallest correct node under the appropriate `/M-BRAIN` domain and record the authority/source boundary. Chat text alone is never durable preservation.
+
 ## Required Writer Shape
 For each project/domain, the writer must:
 - name the canonical M-BRAIN node path;
@@ -167,7 +172,7 @@ Latest verified Lensically source head at generation time: \`${input.lensicallyH
 Latest verified white-label product head at generation time: \`${input.productHead}\`.
 
 ## Boundary
-This contract makes durable M-BRAIN wiring a default obligation for future project work. It is not a claim that a background daemon acts while no Codex/project session is running.
+This contract makes durable M-BRAIN wiring a default obligation for future GPT and Codex work. It is not a claim that a background daemon acts while no chat/project session is running.
 `;
 }
 

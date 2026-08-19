@@ -14,6 +14,8 @@ assert.ok(script.includes("buildProjectState"), "writer must build project state
 assert.ok(script.includes("buildSystemContract"), "writer must build system contract payload");
 assert.ok(script.includes("Default Future-Project Mandate"), "system contract must make future project adoption mandatory");
 assert.ok(script.includes("Owner prompting is not required for routine adoption"), "system contract must not depend on owner reminders");
+assert.ok(script.includes("GPT/Chat Durable Preservation Mandate"), "system contract must apply beyond Codex repository sessions");
+assert.ok(script.includes("what to write, save, preserve, fix, or remember"), "system contract must remove owner prompting for preservation");
 assert.ok(script.includes("mbrain_delta_stale_phrase_present"), "writer must reject stale content");
 assert.ok(script.includes("writeFileSync(outboxPath"), "writer must produce an outbox");
 
