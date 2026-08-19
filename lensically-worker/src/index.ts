@@ -20099,43 +20099,6 @@ async function getOperatorMcpBoundaryBlock(
       ...releaseGate,
     };
   }
-    if (!OPERATOR_MCP_ROUTING_POLICY.callRequiresProceed(toolName, args)) {
-    return null;
-  }
-    const requestedBrand = OPERATOR_MCP_ROUTING_POLICY.requestedBrandKey(toolName, args);
-  const serverContinuity = requestedBrand
-    ? await readLatestOperatorContinuityState(env, "continuity_context", requestedBrand)
-    : null;
-  const legacyCredential = operatorMcpLegacyContinuityCredential(args);
-  const legacyReference = serverContinuity ? null : await readOperatorContinuityReference(env, legacyCredential, "continuity_context", requestedBrand);
-  const legacyContinuity = serverContinuity || legacyReference ? null : await verifyOperatorContinuityToken(env, legacyCredential, requestedBrand);
-  const continuity = serverContinuity ?? legacyReference ?? legacyContinuity;
-  if (!continuity) {
-    const toolCount = await operatorPublicMcpToolCount(env);
-    return {
-      ok: false,
-      error: "explicit_proceed_required",
-      selected_key: requestedBrand,
-      account_data_loaded: false,
-      handshake: requestedBrand ? operatorKeyHandshakeLines(toolCount, requestedBrand) : null,
-      required_next_tool: "confirmOperatorProceed",
-      required_arguments: requestedBrand ? { brand_key: requestedBrand } : {},
-      message: "Wait for explicit user approval, then call confirmOperatorProceed once for the selected key. Later direct account calls use server-side continuity and do not send a Proceed flag.",
-    };
-  }
-  const tokenSession = normalizeOperatorText(continuity.workflow_session_id, 120, true);
-  const requestedSession = normalizeOperatorText(args.workflow_session_id, 120, true);
-  if (tokenSession && requestedSession && tokenSession !== requestedSession) {
-    return {
-      ok: false,
-      error: "continuity_session_mismatch",
-      selected_key: requestedBrand,
-      account_data_loaded: false,
-      continuity_workflow_session_id: tokenSession,
-      requested_workflow_session_id: requestedSession,
-            message: "The call targets a different workflow than the current server-side continuity capsule.",
-    };
-  }
   return null;
 }
 
