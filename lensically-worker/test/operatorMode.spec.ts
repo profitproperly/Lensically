@@ -4318,6 +4318,30 @@ active_checkpoint: none
     const session = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
     expect(session.isError).not.toBe(true);
 
+    const nonCaseAction = { capability: "operational_observation", arguments: { capability: "fixture_non_case", outcome: "prepared" } };
+    const nonCaseStep2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: session.structuredContent.session_map_token,
+      planned_action: nonCaseAction,
+    });
+    expect(nonCaseStep2.isError, JSON.stringify(nonCaseStep2.structuredContent)).not.toBe(true);
+    const nonCaseStep3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
+      knowledge_token: nonCaseStep2.structuredContent.knowledge_token,
+      planned_action: nonCaseAction,
+    });
+    expect(nonCaseStep3.isError, JSON.stringify(nonCaseStep3.structuredContent)).not.toBe(true);
+    expect(nonCaseStep3.structuredContent.execution_descriptor.effect_class).toBe("mutation");
+    const nonCaseGatewayMismatch = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorCaseAction", {
+      live_state_token: nonCaseStep3.structuredContent.live_state_token,
+      execution_descriptor: nonCaseStep3.structuredContent.execution_descriptor,
+    });
+    expect(nonCaseGatewayMismatch.isError).toBe(true);
+    expect(nonCaseGatewayMismatch.structuredContent).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorAction",
+      execution_started: false,
+    });
+
     const executeCaseStep = async (
       arguments_: Record<string, unknown>,
       expectedState: string,
