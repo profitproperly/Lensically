@@ -37345,6 +37345,15 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     cron,
   });
 
+  try {
+    const hardeningClosure = await closeExactRuntimeResumedHardeningIncidents(env);
+    if (hardeningClosure.closed > 0 || hardeningClosure.skipped > 0) {
+      logWorkerEvent("SERVER_OWNED_HARDENING_CLOSURE_COMPLETED", hardeningClosure);
+    }
+  } catch (error) {
+    logWorkerEvent("SERVER_OWNED_HARDENING_CLOSURE_FAILED", { error: getErrorMessage(error) }, "error");
+  }
+
             if (cron === SCHEDULED_POST_PUBLISH_CRON) {
     await activateNextApprovedScheduledPostCanary(env);
     await executeScheduledPostSchedulerTrigger(env, "cron");
