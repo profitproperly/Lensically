@@ -113,8 +113,11 @@ Current model-side parity scope includes:
 - current pending parity backlog visible
 - source-owned M-BRAIN delta outbox generator installed
 
+## Future Project Default
+Future project work must adopt this durable delta contract automatically when a project-specific writer or node is missing. The model must not wait for the owner to request M-BRAIN wiring for a new project; project startup and closure must either use an existing source-owned writer or create the smallest correct project writer/node pair and then apply the version-checked delta through Gateway.
+
 ## Remaining Boundary
-This closes the Lensically-to-M-BRAIN durable delta wiring gap. It does not claim universal all-project automation unless each project either adopts this policy/outbox contract or a separate global scheduler applies equivalent source-owned policies.
+This closes the Lensically-to-M-BRAIN durable delta wiring gap and makes future project adoption mandatory during Codex work. It is not a claim that a background daemon is polling every repository outside an active session.
 `;
 }
 
@@ -128,6 +131,20 @@ Canonical Path: ${input.config.canonical_system_contract_path}
 
 ## Contract
 Durable model-side state changes must be written through source-owned policy or an explicitly version-checked Gateway call. Chat-only memory is not a durable delta writer.
+
+## Default Future-Project Mandate
+M-BRAIN must handle future endeavours for any project without waiting for the owner to ask for brain wiring. At every project startup and before final closure of meaningful project work, the model must:
+- boot/read M-BRAIN Gateway;
+- identify the current project/domain and canonical project node path;
+- read existing project instructions and source authorities;
+- use an existing project delta writer when present;
+- if no writer or node exists, create the smallest source-owned writer/node contract needed for that project;
+- generate a machine-readable outbox or receipt from verified source/runtime state;
+- apply canonical state through \`writeDurableDelta\` with the current \`expected_version\`;
+- append provenance-only events through \`appendBrainEvent\` when state replacement is not appropriate;
+- update local/project bootstrap shims only when needed so future sessions repeat the same path automatically.
+
+Owner prompting is not required for routine adoption, sync, repair, or closure. Protected destructive/business boundaries still retain their normal ratification rules.
 
 ## Required Writer Shape
 For each project/domain, the writer must:
@@ -150,7 +167,7 @@ Latest verified Lensically source head at generation time: \`${input.lensicallyH
 Latest verified white-label product head at generation time: \`${input.productHead}\`.
 
 ## Boundary
-This contract makes M-BRAIN writable and repeatable for projects that adopt it. It is not a claim that every project has already adopted the writer.
+This contract makes durable M-BRAIN wiring a default obligation for future project work. It is not a claim that a background daemon acts while no Codex/project session is running.
 `;
 }
 
