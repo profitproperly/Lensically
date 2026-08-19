@@ -710,8 +710,8 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
     const lifecycleSucceeded = sessionMap.status === 200
       && sessionMapContent?.ok === true
       && lifecycle?.version === "operator-lifecycle-v1"
-      && initialSequence.length === requiredLifecycleTools.length
-      && initialSequence.every((name, index) => name === requiredLifecycleTools[index])
+      && initialSequence.length === requiredLifecycleSequence.length
+      && initialSequence.every((name, index) => name === requiredLifecycleSequence[index])
       && knowledge.status === 200
       && knowledgeContent?.ok === true
       && liveState.status === 200
