@@ -22680,18 +22680,19 @@ async function handleOperatorMcpEngineeringTool(
   }
 
         if (toolName === "upsertGitHubRepositoryFile") {
-    const repository = normalizeOperatorText(args.repository, 100, true);
+    const repository = normalizeOperatorText(args.repository, 220, true);
     const path = sanitizeRepoPath(args.path);
     const content = typeof args.content === "string" ? args.content : "";
     const message = normalizeOperatorText(args.message, 200);
     const branch = normalizeOperatorText(args.branch, 120, true) ?? "main";
     const operationId = normalizeOperatorText(args.operation_id, 120, true);
     if (!repository || !path || !message || !operationId) return { ok: false, error: "repository_path_message_operation_id_required" };
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(repository) || repository.endsWith(".git")) return { ok: false, error: "invalid_repository_name" };
+    const target = resolveGitHubRepositoryTarget(config.owner, repository);
+    if (!target) return { ok: false, error: "invalid_repository_name", accepted_formats: ["repository", "owner/repository"] };
     if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.includes("..") || branch.startsWith("/") || branch.endsWith("/")) return { ok: false, error: "invalid_repository_branch" };
     if (new TextEncoder().encode(content).length > 100000) return { ok: false, error: "repository_file_content_too_large" };
     const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
-    const endpoint = `/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(repository)}/contents/${encodedPath}`;
+    const endpoint = `/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/contents/${encodedPath}`;
     const existing = await githubApi(env, `${endpoint}?ref=${encodeURIComponent(branch)}`);
     let existingSha: string | undefined;
     if (existing.ok) {
