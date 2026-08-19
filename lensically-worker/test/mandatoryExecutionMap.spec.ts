@@ -11,6 +11,10 @@ describe("mandatory execution map", () => {
         expect(prevention?.winning_path.procedure).toContain(
       "Derive stable opaque Step-4 action identities exec_02_00 through exec_02_10 from the immutable prepared stage so consecutive transitions remain client-distinguishable without exposing hardening semantics.",
     );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Route mutating case_step descriptors only through the dedicated executeOperatorCaseAction public Step-4 gateway; keep case dry-runs on executeOperatorReadAction and reject case tokens on executeOperatorAction.",
+    );
+    expect(prevention?.enforcement_point).toContain("executeOperatorCaseAction");
   });
 
   it("binds declared first-party workflow inputs before GitHub dispatch", () => {
