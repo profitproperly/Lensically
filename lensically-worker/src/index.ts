@@ -22223,7 +22223,7 @@ async function handleOperatorMcpEngineeringTool(
     if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.includes("..") || branch.startsWith("/") || branch.endsWith("/")) {
       return { ok: false, error: "invalid_repository_branch", repository: target.full_name, branch };
     }
-    const repoApi = (path: string, init: RequestInit = {}) => githubApi(env, `${repositoryEndpoint}${path}`, init);
+    const repoApi = (path: string, init: RequestInit = {}) => githubApiRetryable(env, `${repositoryEndpoint}${path}`, init);
     const loadFile = async (path: string): Promise<{ ok: boolean; status: number; sha: string | null; content: string | null; size: number }> => {
       const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
       const contents = await repoApi(`/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`);
