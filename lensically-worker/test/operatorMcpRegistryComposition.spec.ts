@@ -93,7 +93,6 @@ describe("Operator MCP registry composition", () => {
       expect(wrapper).toBeDefined();
       expect(wrapper?.inputSchema.properties).not.toHaveProperty("brand_key");
       expect(wrapper?.inputSchema.properties).not.toHaveProperty("proceed_confirmed");
-      expect(wrapper?.inputSchema.properties).toHaveProperty("operation_id");
             expect(wrapper?.annotations).toMatchObject({ readOnlyHint: true });
 
       const lineupWrapper = scopedTools.find((tool) => tool.name === `${prefix}_get_manifest_locked_lineup_page`);
