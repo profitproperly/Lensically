@@ -3953,6 +3953,10 @@ describe("operator mode MCP endpoint", () => {
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("inputs");
     expect(actionTool?.description).toContain("execution_descriptor");
     expect(actionTool?.description).not.toContain("profile_id");
+    expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("profile_id");
+    expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("inputs");
+    expect(caseActionTool?.description).toContain("case_step");
+    expect(caseActionTool?.description).toContain("execution_descriptor");
     expect(initialized.instructions.split("\n")).toEqual([
       "Governing standards: Autonomy. Efficiency. Prevention.",
       "Do not rush. Do not skip. Do not bypass. Do not work around unresolved problems. Use the fastest complete route, fix the actual problem, prevent recurrence, and then continue.",
