@@ -9,10 +9,10 @@ describe("mandatory execution map", () => {
     expect(prevention).toBeDefined();
     expect(prevention?.action_binding?.tool_names).toContain("advanceHardeningIncident");
         expect(prevention?.winning_path.procedure).toContain(
-      "Derive stable opaque Step-4 action identities exec_02_00 through exec_02_10 from the immutable prepared stage so consecutive transitions remain client-distinguishable without exposing hardening semantics.",
+      "Mutating case Step 4 forwards only the opaque token through executeOperatorCaseAction.",
     );
     expect(prevention?.winning_path.procedure).toContain(
-      "Route mutating case_step descriptors only through the dedicated executeOperatorCaseAction public Step-4 gateway; keep case dry-runs on executeOperatorReadAction and reject case tokens on executeOperatorAction.",
+      "Derive the exact case descriptor server-side and reject non-case tokens.",
     );
     expect(prevention?.enforcement_point).toContain("executeOperatorCaseAction");
   });
