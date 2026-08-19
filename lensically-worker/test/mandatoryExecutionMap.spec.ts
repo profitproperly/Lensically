@@ -60,6 +60,57 @@ describe("mandatory execution map", () => {
     );
   });
 
+  it("routes cross-repository GitHub mutations through the generic GitHub operator without reinterpretation", () => {
+    const tools = [
+      {
+        name: "operateGitHubRepositories",
+        title: "Operate GitHub repositories",
+        description: "Perform bounded operations against explicitly named accessible repositories.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string" },
+            repository: { type: "string" },
+            path: { type: "string" },
+            content: { type: "string" },
+            message: { type: "string" },
+          },
+          required: ["operation"],
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "applyRepoPatchSet",
+        title: "Apply atomic repo patch set",
+        description: "Apply exact replacements in the configured Lensically repository.",
+        inputSchema: {
+          type: "object",
+          properties: { patches: { type: "array" }, message: { type: "string" } },
+          required: ["patches", "message"],
+          additionalProperties: false,
+        },
+      },
+    ];
+
+    const prepared = prepareSourceDefinedDirectEngineeringCall(
+      "operate git hub repositories",
+      "Write one bounded file in an explicitly named accessible repository.",
+      {
+        operation: "upsert_file",
+        repository: "opmgdeadman/signal-radar",
+        path: "src/mcp.ts",
+        content: "export const ok = true;",
+        message: "Add MCP bootstrap",
+      },
+      tools,
+    );
+
+    expect(prepared?.ok).toBe(true);
+    expect(prepared?.tool_name).toBe("operateGitHubRepositories");
+    expect(prepared?.arguments?.operation).toBe("upsert_file");
+    expect(prepared?.arguments?.repository).toBe("opmgdeadman/signal-radar");
+  });
+
   it("omits absent optional non-null fields instead of serializing null", () => {
     const prevention = resolveActionBoundWinningPaths("closeOperatorAction")
       .find((candidate) => candidate.id === "optional_nonnull_field_omission_contract");
