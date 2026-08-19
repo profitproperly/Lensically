@@ -18346,10 +18346,11 @@ function buildOperatorExecutionPolicy(toolName: string, args: Record<string, unk
       ? normalizeOperatorText(args.tool_name, 160, true)
       : null;
   const canonicalTool = nestedTool || toolName;
-    const handlerClass = OPERATOR_MCP_ROUTING_POLICY.classifyHandler(canonicalTool);
+  const handlerClass = OPERATOR_MCP_ROUTING_POLICY.classifyHandler(canonicalTool);
   const engineering = handlerClass === "engineering";
   const admin = handlerClass === "admin";
-  const accountScoped = operatorMcpToolNameRequiresProceed(canonicalTool);
+  const accountScoped = handlerClass === "account"
+    || ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(canonicalTool);
   const search = canonicalTool === "searchRepoFiles";
     const workflowPoll = canonicalTool === "getGitHubWorkflowRun";
   const canonicalArgs = nestedTool && args.arguments && typeof args.arguments === "object" && !Array.isArray(args.arguments)
