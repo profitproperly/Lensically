@@ -28,6 +28,18 @@ describe("mandatory execution map", () => {
     );
   });
 
+    it("binds the Manifest shadow minimum-family single-source prevention to preparation", () => {
+    const prevention = resolveActionBoundWinningPaths("prepareManifestShadowCycle")
+      .find((candidate) => candidate.id === "manifest_shadow_minimum_family_single_source_contract");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.status).toBe("active");
+    expect(prevention?.action_binding?.tool_names).toContain("prepareManifestShadowCycle");
+    expect(prevention?.winning_path.procedure).toContain(
+      "Define the minimum eligible-family threshold only in operatorManifestShadowRuntimeService; composition roots must not inject a second threshold.",
+    );
+  });
+
   it("omits absent optional non-null fields instead of serializing null", () => {
     const prevention = resolveActionBoundWinningPaths("closeOperatorAction")
       .find((candidate) => candidate.id === "optional_nonnull_field_omission_contract");

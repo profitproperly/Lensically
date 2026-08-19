@@ -819,7 +819,8 @@ if (!operatorMcpToolDirectoryTests.includes("preserves the six-tool, five-stage 
 }
 if (!source.includes("snapshotDb: env.DB")
     || !source.includes("shadowDb: env.SHADOW_DB")
-    || !source.includes("minimumEligibleFamilies: 100")
+    || source.includes("minimumEligibleFamilies:")
+    || !operatorManifestShadowRuntimeService.includes("dependencies.minimumEligibleFamilies ?? 24")
     || !source.includes('from "./operatorManifestDecisionSnapshotService"')
     || !source.includes('from "./operatorManifestShadowService"')
     || source.includes("snapshotDb: env.SHADOW_DB")
