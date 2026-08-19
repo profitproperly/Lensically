@@ -22185,9 +22185,18 @@ async function handleOperatorMcpEngineeringTool(
     const target = resolveGitHubRepositoryTarget(config.owner, args.repository);
     if (!target) return { ok: false, error: "valid_repository_required", accepted_formats: ["repository", "owner/repository"] };
     const repositoryEndpoint = `/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
-    const repositoryResult = await githubApi(env, repositoryEndpoint);
+    const repositoryResult = await githubApiRetryable(env, repositoryEndpoint);
     if (!repositoryResult.ok) {
-      const identityResult = await githubApi(env, "/user");
+      if (![401, 403, 404].includes(repositoryResult.status)) {
+        return {
+          ok: false,
+          error: "github_repository_transport_failed",
+          status: repositoryResult.status,
+          repository: target.full_name,
+          retry_classification: "transient_or_upstream_transport",
+        };
+      }
+      const identityResult = await githubApiRetryable(env, "/user");
       const identityRecord = identityResult.ok && identityResult.data && typeof identityResult.data === "object" && !Array.isArray(identityResult.data)
         ? identityResult.data as Record<string, unknown>
         : {};
@@ -22198,7 +22207,7 @@ async function handleOperatorMcpEngineeringTool(
         status: repositoryResult.status,
         repository: target.full_name,
         authenticated_login: authenticatedLogin,
-        target_visibility: repositoryResult.status === 404 ? "not_visible_to_configured_token_or_not_found" : "access_failed",
+        target_visibility: repositoryResult.status === 404 ? "not_visible_to_configured_token_or_not_found" : "access_denied",
         credential_diagnostic: identityResult.ok ? "authenticated_identity_resolved" : "authenticated_identity_unavailable",
       };
     }
