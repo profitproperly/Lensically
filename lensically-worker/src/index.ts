@@ -2104,8 +2104,8 @@ const OPERATOR_OWNER_INTERACTION_CONTRACT = {
   },
   source_card_presentation_contract: SOURCE_CARD_OWNER_PRESENTATION_CONTRACT,
     rules: [
-    "After confirmOperatorProceed succeeds, automatically load canonical continuity, the active autonomy profile, pending decisions, hourly calendar coverage, and the Growth Mission Brief. Never ask resume or start fresh.",
-    "Proceed begins a discussion cycle. Present the mission, diagnostic, current bottleneck, proposed objectives, experiments, risks, and recommendation before any account mutation.",
+    "Automatically load canonical continuity, the active autonomy profile, pending decisions, hourly calendar coverage, and the Growth Mission Brief when account state is needed. Never ask resume or start fresh.",
+    "Account work begins from restored state. Present the mission, diagnostic, current bottleneck, proposed objectives, experiments, risks, and recommendation before any protected account mutation.",
     "The model selects the next priority from evidence and asks the owner to discuss, revise, or approve the proposed plan. Never ask the owner to invent the next routine action.",
     "For Manifest, create or reuse source cards silently, generate and gate four posts internally, then show four numbered Source / Generated post pairs.",
     "Do not expose source-card, source-selection, generation-run, draft, claim, or review-batch identifiers to the owner.",
