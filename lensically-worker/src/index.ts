@@ -18977,6 +18977,8 @@ async function closeExactRuntimeResumedHardeningIncidents(env: Env): Promise<{ c
   let skipped = 0;
   for (const row of result.results ?? []) {
     const incidentId = normalizeOperatorText(row.id, 120, true);
+    const verifiedSha = normalizeOperatorText(row.tested_sha, 120, true);
+    const verifiedDeploymentId = normalizeOperatorText(row.deployment_id, 160, true);
     const rootCause = normalizeOperatorText(row.root_cause, 4000, true);
     const generalizedCause = normalizeOperatorText(row.generalized_cause, 4000, true);
     const preventionRuleId = normalizeOperatorMachineKey(row.prevention_rule_id, "");
@@ -18984,6 +18986,8 @@ async function closeExactRuntimeResumedHardeningIncidents(env: Env): Promise<{ c
     const liveVerification = safeParseJsonString(String(row.live_verification_json ?? ""));
     const resumeCapsule = safeParseJsonString(String(row.resume_capsule_json ?? ""));
     if (!incidentId
+      || !verifiedSha
+      || !verifiedDeploymentId
       || !rootCause
       || !generalizedCause
       || !preventionRuleId
