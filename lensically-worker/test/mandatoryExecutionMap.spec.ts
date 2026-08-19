@@ -145,6 +145,7 @@ describe("mandatory execution map", () => {
     expect(safePrepared?.tool_name).toBe("upsertGitHubRepositoryFile");
     expect(safePrepared?.arguments?.repository).toBe("opmgdeadman/signal-radar");
     expect(safePrepared?.arguments?.operation_id).toBe("signal-radar-mcp-bootstrap-v0");
+    expect(safePrepared?.arguments).not.toHaveProperty("prepared_tool_name");
   });
 
   it("omits absent optional non-null fields instead of serializing null", () => {
