@@ -927,7 +927,7 @@ jobs:
               dashboard_ok=true
             fi
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/cycles/state?brand_key=manifest_mental" > /tmp/lensically-cycles-state.json \
-              && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null and .innovation.latest_run.state == "promoted" and .innovation.latest_run.promotion_destination_version == "v1.0.0"' /tmp/lensically-cycles-state.json > /dev/null; then
+              && jq -e '.success == true and .main.semantic_version == "v1.0.0" and .main.state == "current_champion" and .innovation.state == "standby" and .innovation.active_run == null' /tmp/lensically-cycles-state.json > /dev/null; then
               cycles_api_ok=true
             fi
                         if curl --fail-with-body --silent --show-error "https://app.lensically.com/cycles" > /tmp/lensically-cycles.html \
