@@ -3800,7 +3800,7 @@ if (!tests.includes('capability: "repository_file_read"')
 }
 if (!workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"')
     || !workflow.includes('.execution_kernel.public_contract == "operator-lifecycle-v1"')
-    || !workflow.includes('(.live_tool_count == 6)')) {
+    || !workflow.includes('(.live_tool_count == 7)')) {
   errors.push("release_workflow_normalized_lifecycle_runtime_gate_missing");
 }
 if (!workflow.includes("- name: Publish exact release authority target")
