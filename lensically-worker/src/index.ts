@@ -21913,7 +21913,7 @@ async function handleOperatorMcpEngineeringTool(
             session_lifecycle: {
         version: OPERATOR_LIFECYCLE_VERSION,
         session_map_tool: "getOperatorSessionMap",
-        recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
+        recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"],
         rule: "Step 0 initializes and Step 1 maps once per fresh session; Steps 2-5 are the recurring meaningful-task lifecycle.",
       },
       status_kind: "compact_engineering_precheck",
