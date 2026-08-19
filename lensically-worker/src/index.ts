@@ -18956,6 +18956,74 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
   };
 }
 
+async function closeExactRuntimeResumedHardeningIncidents(env: Env): Promise<{ checked: number; closed: number; skipped: number }> {
+  await ensureOperatorMcpAdminTables(env);
+  const runtimeSha = normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 120, true);
+  const runtimeDeploymentId = normalizeOperatorText(env.CF_VERSION_METADATA?.id, 160, true);
+  if (!runtimeSha || !runtimeDeploymentId) return { checked: 0, closed: 0, skipped: 0 };
+
+  const result = await env.DB.prepare(
+    `SELECT * FROM operator_hardening_incidents
+     WHERE state = 'resumed'
+       AND severity IN ('P0', 'P1')
+       AND tested_sha = ?
+       AND deployment_id = ?
+     ORDER BY datetime(updated_at) ASC
+     LIMIT 5`,
+  ).bind(runtimeSha, runtimeDeploymentId).all<Record<string, unknown>>();
+
+  let closed = 0;
+  let skipped = 0;
+  for (const row of result.results ?? []) {
+    const incidentId = normalizeOperatorText(row.id, 120, true);
+    const rootCause = normalizeOperatorText(row.root_cause, 4000, true);
+    const generalizedCause = normalizeOperatorText(row.generalized_cause, 4000, true);
+    const preventionRuleId = normalizeOperatorMachineKey(row.prevention_rule_id, "");
+    const regressionIds = safeParseJsonString(String(row.regression_test_ids_json ?? "[]"));
+    const liveVerification = safeParseJsonString(String(row.live_verification_json ?? ""));
+    const resumeCapsule = safeParseJsonString(String(row.resume_capsule_json ?? ""));
+    if (!incidentId
+      || !rootCause
+      || !generalizedCause
+      || !preventionRuleId
+      || !Array.isArray(regressionIds)
+      || regressionIds.length === 0
+      || !liveVerification
+      || typeof liveVerification !== "object"
+      || Array.isArray(liveVerification)) {
+      skipped += 1;
+      continue;
+    }
+
+    const finalized = await advanceHardeningIncident(env, {
+      incident_id: incidentId,
+      target_state: "closed",
+      resume_result: {
+        status: "resumed_after_exact_runtime_verification",
+        source: "server_owned_resumed_hardening_closure",
+        tested_sha: runtimeSha,
+        deployment_id: runtimeDeploymentId,
+        resume_capsule: resumeCapsule ?? null,
+        live_verification: liveVerification,
+      },
+      autonomy_dividend: {
+        source: "server_owned_resumed_hardening_closure",
+        owner_action_required: false,
+        client_finalization_dependency_removed: true,
+        prevention_rule_id: preventionRuleId,
+      },
+      efficiency_result: {
+        source: "server_owned_resumed_hardening_closure",
+        client_round_trip_required: false,
+      },
+    });
+    if (finalized.ok === true && finalized.current_state === "closed") closed += 1;
+    else skipped += 1;
+  }
+
+  return { checked: (result.results ?? []).length, closed, skipped };
+}
+
 async function recordOperationalObservation(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
   const capability = normalizeOperatorText(args.capability, 160, true) ?? "unknown";
