@@ -285,6 +285,10 @@ export async function dispatchOperatorMcpToolCall(
         ...(asRecord(compiledProfile.request.inputs) ?? {}),
       },
     };
+    if (capability === "operate_git_hub_repositories") {
+      governedCompiledRequest.intent = "operate git hub repositories";
+      governedCompiledRequest.objective = "Execute the server-bound cross-repository GitHub operation without semantic reinterpretation.";
+    }
     const prepared = await dependencies.prepareRoutedGatewayCall(governedCompiledRequest);
     if (!prepared.ok || !prepared.tool_name || !prepared.arguments) {
       return mcpToolResultResponse(id, {
