@@ -3773,6 +3773,15 @@ if (!source.includes("resolveOperatorLifecycleSessionBinding")
     || !source.includes("if (sessionChanged && !actionBoundSessionDrift)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
+if (!source.includes("closeExactRuntimeResumedHardeningIncidents")
+    || !source.includes("WHERE state = 'resumed'")
+    || !source.includes("AND tested_sha IS NOT NULL")
+    || !source.includes("AND deployment_id IS NOT NULL")
+    || !source.includes('target_state: "closed"')
+    || !source.includes('source: "server_owned_resumed_hardening_closure"')
+    || !source.includes("await closeExactRuntimeResumedHardeningIncidents(env)")) {
+  errors.push("server_owned_resumed_hardening_closure_missing");
+}
 if (!operatorMcpProtocol.includes("exactly one operational trigger")
     || !operatorMcpProtocol.includes("still advertises the pre-change public schema")
     || !operatorMcpProtocol.includes("cannot correctly use the newly deployed invocation contract")
