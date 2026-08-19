@@ -68,7 +68,7 @@ describe("Operator MCP registry composition", () => {
       "operateStripe",
     ]));
 
-            const lifecycleOrder = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction", "executeOperatorAction", "closeOperatorAction"];
+            const lifecycleOrder = ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction", "executeOperatorAction", "executeOperatorCaseAction", "closeOperatorAction"];
     for (let index = 1; index < lifecycleOrder.length; index += 1) {
       expect(names.indexOf(lifecycleOrder[index - 1])).toBeLessThan(names.indexOf(lifecycleOrder[index]));
     }
