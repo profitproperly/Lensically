@@ -57,6 +57,31 @@ export function resolveOperatorEngineeringWorkflowId(workflowId: unknown): strin
   return raw;
 }
 
+const OPERATOR_ENGINEERING_WORKFLOW_TASKS = new Set([
+  "typecheck",
+  "operator-smoke",
+  "operator-tests",
+  "system-directory-tests",
+  "threads-publish-tests",
+  "human-free-tests",
+  "architecture-baseline",
+  "worker-deploy",
+]);
+const OPERATOR_ENGINEERING_WORKFLOW_INPUT_KEYS = new Set(["task", "release_id", "release_sha"]);
+
+export function operatorEngineeringWorkflowDispatchInputsValid(
+  workflowId: unknown,
+  inputs: Record<string, unknown>,
+): boolean {
+  if (resolveOperatorEngineeringWorkflowId(workflowId) !== OPERATOR_ENGINEERING_WORKFLOW_ID) return true;
+  if (Object.keys(inputs).some((key) => !OPERATOR_ENGINEERING_WORKFLOW_INPUT_KEYS.has(key))) return false;
+  if (inputs.task !== undefined && (typeof inputs.task !== "string" || !OPERATOR_ENGINEERING_WORKFLOW_TASKS.has(inputs.task))) return false;
+  if (inputs.release_id !== undefined && typeof inputs.release_id !== "string") return false;
+  if (inputs.release_sha !== undefined && (typeof inputs.release_sha !== "string" || (inputs.release_sha !== "" && !/^[a-fA-F0-9]{40}$/.test(inputs.release_sha)))) return false;
+  if (inputs.task === "worker-deploy" && (typeof inputs.release_sha !== "string" || !/^[a-fA-F0-9]{40}$/.test(inputs.release_sha))) return false;
+  return true;
+}
+
 const BRAND_KEY_SCHEMA = {
   type: "string",
   enum: ["manifest_mental", "manifestmental", "opmg_deadman", "opmgdeadman", "vectrix"],

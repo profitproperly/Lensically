@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   OPERATOR_ENGINEERING_WORKFLOW_ID,
   OPERATOR_MCP_ENGINEERING_TOOL_NAMES,
-  OPERATOR_MCP_ENGINEERING_TOOLS,
+    OPERATOR_MCP_ENGINEERING_TOOLS,
+  operatorEngineeringWorkflowDispatchInputsValid,
   resolveOperatorEngineeringWorkflowId,
 } from "../src/operatorMcpEngineeringRegistry";
 
@@ -74,12 +75,31 @@ describe("Operator MCP engineering registry", () => {
 
   });
 
-    it("normalizes engineering workflow identity before GitHub workflow reads", () => {
+      it("normalizes engineering workflow identity before GitHub workflow reads", () => {
     expect(OPERATOR_ENGINEERING_WORKFLOW_ID).toBe("lensically-engineering.yml");
     expect(resolveOperatorEngineeringWorkflowId("push-validation")).toBe(OPERATOR_ENGINEERING_WORKFLOW_ID);
     expect(resolveOperatorEngineeringWorkflowId("lensically-engineering.yml")).toBe(OPERATOR_ENGINEERING_WORKFLOW_ID);
     expect(resolveOperatorEngineeringWorkflowId("other-workflow.yml")).toBe("other-workflow.yml");
     expect(resolveOperatorEngineeringWorkflowId(undefined)).toBeNull();
+  });
+
+  it("rejects undeclared Lensically Engineering workflow dispatch inputs before GitHub transport", () => {
+    const releaseSha = "a".repeat(40);
+    expect(operatorEngineeringWorkflowDispatchInputsValid(OPERATOR_ENGINEERING_WORKFLOW_ID, {
+      task: "worker-deploy",
+      release_id: "release-a",
+      release_sha: releaseSha,
+    })).toBe(true);
+    expect(operatorEngineeringWorkflowDispatchInputsValid(OPERATOR_ENGINEERING_WORKFLOW_ID, {
+      task: "worker-deploy",
+      release_id: "release-a",
+      release_sha: releaseSha,
+      dry_run: false,
+    })).toBe(false);
+    expect(operatorEngineeringWorkflowDispatchInputsValid(OPERATOR_ENGINEERING_WORKFLOW_ID, {
+      task: "worker-deploy",
+      release_id: "release-a",
+    })).toBe(false);
   });
 
   it("preserves exact workflow and deployment controls", () => {

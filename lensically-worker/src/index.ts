@@ -107,6 +107,7 @@ import {
 } from "./operatorMcpToolDirectory";
 import {
   OPERATOR_ENGINEERING_WORKFLOW_ID,
+  operatorEngineeringWorkflowDispatchInputsValid,
   resolveOperatorEngineeringWorkflowId,
   type OperatorMcpEngineeringToolName,
 } from "./operatorMcpEngineeringRegistry";
@@ -22181,13 +22182,14 @@ async function handleOperatorMcpEngineeringTool(
       return { ok: result.ok, status: result.status, repository: target.full_name, workflow_id: workflowId ?? null, runs, returned_count: runs.length };
     }
 
-    if (operation === "dispatch_workflow") {
-      const workflowId = normalizeOperatorText(args.workflow_id, 200, true);
+        if (operation === "dispatch_workflow") {
+      const workflowId = resolveOperatorEngineeringWorkflowId(normalizeOperatorText(args.workflow_id, 200, true));
       const ref = normalizeOperatorText(args.ref, 120, true) ?? branch;
       const operationId = normalizeOperatorText(args.operation_id, 120, true);
       if (!workflowId || !operationId) return { ok: false, error: "workflow_id_and_operation_id_required", repository: target.full_name };
       if (!/^[A-Za-z0-9._/-]+$/.test(ref) || ref.includes("..") || ref.startsWith("/") || ref.endsWith("/")) return { ok: false, error: "invalid_workflow_ref", repository: target.full_name, ref };
       const rawInputs = args.inputs && typeof args.inputs === "object" && !Array.isArray(args.inputs) ? args.inputs as Record<string, unknown> : {};
+      if (!operatorEngineeringWorkflowDispatchInputsValid(workflowId, rawInputs)) return { ok: false, error: "workflow_dispatch_inputs_invalid", repository: target.full_name, workflow_id: workflowId };
       const inputs = Object.fromEntries(Object.entries(rawInputs).slice(0, 50).map(([key, value]) => [key, String(value)]));
       const result = await repoApi(`/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref, inputs }) });
       await recordEngineeringAudit(env, { action: "operateGitHubRepositories:dispatch_workflow", filesChanged: [], diffSummary: `Dispatched ${workflowId} in ${target.full_name} at ${ref}.`, result: result.ok ? "ok" : "failed", metadata: { operation_id: operationId, repository: target.full_name, workflow_id: workflowId, ref, status: result.status } });
