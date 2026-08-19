@@ -225,7 +225,6 @@ describe("Operator MCP protocol contract", () => {
       "Lensically Operator Mode MCP is active.",
       "Selected key: manifest_mental",
       "Full tool surface loaded: 75 tools available and usable.",
-      "Proceed to the next step?",
     ]);
   });
 });
