@@ -3831,8 +3831,21 @@ describe("operator mode MCP endpoint", () => {
     const readActionTool = listed.tools.find((tool) => tool.name === "executeOperatorReadAction");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
     const closeTool = listed.tools.find((tool) => tool.name === "closeOperatorAction");
-    const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as { oneOf?: unknown[] } | undefined;
-    expect(plannedActionSchema?.oneOf?.length ?? 0).toBeGreaterThan(50);
+    const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as {
+      properties?: { capability?: { enum?: string[] } };
+      x_lensically_action_contracts?: Array<{
+        capability?: string;
+        argument_schema?: { properties?: Record<string, unknown>; oneOf?: Array<{ properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }> };
+        live_state_scopes?: string[];
+      }>;
+    } | undefined;
+    const plannedCapabilityEnums = plannedActionSchema?.properties?.capability?.enum ?? [];
+    const plannedActionContracts = plannedActionSchema?.x_lensically_action_contracts ?? [];
+    expect(plannedCapabilityEnums.length).toBeGreaterThan(50);
+    expect(plannedCapabilityEnums).toContain("get_engineering_continuation");
+    expect(plannedCapabilityEnums).toContain("repository_symbol_search");
+    expect(plannedCapabilityEnums).toContain("run_mcp_tests");
+    expect(plannedActionSchema).not.toHaveProperty("oneOf");
     expect(readActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
     expect(readActionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(readActionTool?.inputSchema?.properties).not.toHaveProperty("action");
