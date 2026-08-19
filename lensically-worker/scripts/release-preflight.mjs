@@ -3768,7 +3768,9 @@ if (!source.includes("const boundaryTest = evaluateOperatorPublicLifecycleBounda
   errors.push("live_normalized_lifecycle_boundary_check_missing");
 }
 if (!source.includes("resolveOperatorLifecycleSessionBinding")
-    || !source.includes("if (expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId)")) {
+    || !source.includes("const sessionChanged = Boolean(expectedSessionId && boundSessionId && boundSessionId !== expectedSessionId);")
+    || !source.includes("const actionBoundSessionDrift = sessionChanged")
+    || !source.includes("if (sessionChanged && !actionBoundSessionDrift)")) {
   errors.push("lifecycle_session_binding_guard_missing");
 }
 if (!operatorMcpProtocol.includes("exactly one operational trigger")
