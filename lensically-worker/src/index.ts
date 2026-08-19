@@ -16856,6 +16856,7 @@ const OPERATOR_EXECUTION_GUARD_EXEMPT_TOOLS = new Set<string>([
   "guardLensicallyCall",
   OPERATOR_READ_EXECUTION_GATEWAY,
   OPERATOR_ROUTED_EXECUTION_GATEWAY,
+  OPERATOR_CASE_EXECUTION_GATEWAY,
 ]);
 
 type OperatorGuardCorrection = { path: string; from: unknown; to: unknown; reason: string };
