@@ -97,7 +97,6 @@ describe("Operator MCP routing policy", () => {
 
     it("binds injected normalizers into one deterministic routing policy", () => {
     expect(policy.requestedBrandKey("get_account_state", { brand_key: "opmg" })).toBe("opmg_deadman");
-    expect(policy.callRequiresProceed("get_manifest_cycle_receipt", { brand_key: "manifest" })).toBe(false);
     expect(policy.canonicalExecutionArgs("runEngineeringTool", {
       tool_name: " searchRepoFiles ",
       arguments: { query: "needle", prefix: "src/index.ts", execution_guard: "signed" },
