@@ -127,8 +127,7 @@ export function buildOperatorMcpToolDefinitions(
       const acceptsBrandContext = Object.prototype.hasOwnProperty.call(properties, "brand_key");
       return addOperatorExecutionMetadataSchema(
         tool,
-        options.requiresProceed(tool.name)
-          || acceptsBrandContext
+        acceptsBrandContext
           || tool.name === "updateWorkflowRequirement",
       );
     })
