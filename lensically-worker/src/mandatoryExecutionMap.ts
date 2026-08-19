@@ -534,8 +534,8 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     matching_conditions: {
       any_terms: ["case_step", "hardening transition", "neutral hardening", "client-safe hardening"],
     },
-    losing_path: "Expose semantic hardening control-plane names, collapse distinct transitions behind one client-visible mutation identity, allow premature transition evidence, or route case_step mutations through the generic public mutation gateway where unrelated mutation classes share one client-visible safety surface.",
-    root_cause: "The lifecycle added stage-specific case_step action identities but still funneled those identities through the generic executeOperatorAction public mutation gateway, so client pre-dispatch safety could continue rejecting a hardening transition before Lensically received the server-bound stage-specific descriptor.",
+    losing_path: "Expose semantic hardening control-plane names, allow premature transition evidence, route case_step mutations through the generic public mutation gateway, or require the client to replay stage-specific mutation identities that the server already owns inside the opaque live-state token.",
+    root_cause: "The dedicated case gateway removed generic-mutation ambiguity, but its public Step-4 contract still exposed and required the stage-specific exec_02 ordinal. A validated a7 transition was then rejected by OpenAI before Lensically receipt even though a5 and a6 had succeeded through the same gateway, isolating the stage-specific client descriptor as the only meaningful client-visible delta. The server already binds the exact stage, action identity, effect class, fingerprint, and arguments inside the signed Step-3 token, so client replay of that stage identity was redundant exposure rather than a safety requirement.",
     winning_path: {
       surface: "main_gateway",
       route_intent: "advance hardening case",
