@@ -20,7 +20,6 @@ export type BuildOperatorMcpToolDefinitionsOptions = {
   accountTools: readonly OperatorMcpToolDefinition[];
   includeScopedWrappers: boolean;
   directPriorities: ReadonlyMap<string, number>;
-  requiresProceed: (toolName: string) => boolean;
 };
 
 const SCOPED_WRAPPERS: readonly ScopedWrapperDefinition[] = [
