@@ -6310,14 +6310,16 @@ active_checkpoint: none
     const sessionMap = step1.structuredContent;
     expect(sessionMap.lifecycle).toMatchObject({
       version: "operator-lifecycle-v1",
-      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
-      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
-      step4_gateways: { read_only: "executeOperatorReadAction", mutation: "executeOperatorAction" },
+      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"],
+      step4_gateways: { read_only: "executeOperatorReadAction", case_mutation: "executeOperatorCaseAction", mutation: "executeOperatorAction" },
     });
     expect(sessionMap.session_map).toMatchObject({
       architecture: "recursive_pointer_tree_v1",
       durable_knowledge_loader: "getOperatorKnowledge",
       live_state_loader: "getOperatorLiveState",
+      read_action_executor: "executeOperatorReadAction",
+      case_action_executor: "executeOperatorCaseAction",
       action_executor: "executeOperatorAction",
       action_closer: "closeOperatorAction",
     });
