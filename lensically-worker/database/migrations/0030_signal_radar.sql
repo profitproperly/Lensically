@@ -1,3 +1,7 @@
+-- lensically-migration-class: schema
+-- lensically-migration-owner: signal-radar
+-- lensically-migration-risk: low
+
 CREATE TABLE IF NOT EXISTS signal_radar_sources (
   source_id TEXT PRIMARY KEY,
   vendor TEXT NOT NULL,
