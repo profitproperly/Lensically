@@ -62,16 +62,9 @@ describe("Operator MCP routing policy", () => {
     expect(requestedMcpBrandKey("get_account_state", {}, normalizeBrandKey)).toBeNull();
   });
 
-  it("preserves guided Proceed requirements and autonomous exemptions", () => {
-    expect(MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS.has("prepare_manifest_autonomous_cycle")).toBe(true);
-    expect(operatorMcpCallRequiresProceed("prepare_manifest_autonomous_cycle", { brand_key: "manifest_mental" }, normalizeBrandKey)).toBe(false);
-    expect(operatorMcpCallRequiresProceed("get_account_state", { brand_key: "manifest_mental" }, normalizeBrandKey)).toBe(true);
-    expect(operatorMcpCallRequiresProceed("mm_get_account_state", {}, normalizeBrandKey)).toBe(true);
-    expect(operatorMcpCallRequiresProceed("list_accounts", {}, normalizeBrandKey)).toBe(false);
-    expect(operatorMcpCallRequiresProceed("updateWorkflowRequirement", { brand_key: "manifest" }, normalizeBrandKey)).toBe(true);
-    expect(operatorMcpCallRequiresProceed("updateWorkflowRequirement", {}, normalizeBrandKey)).toBe(false);
-    expect(operatorMcpProceedConfirmed("get_account_state", { proceed_confirmed: true })).toBe(true);
-    expect(operatorMcpProceedConfirmed("get_account_state", { proceed_confirmed: false })).toBe(false);
+  it("exposes no generic Proceed routing gate", () => {
+    expect(policy).not.toHaveProperty("callRequiresProceed");
+    expect(policy).not.toHaveProperty("proceedConfirmed");
   });
 
   it("preserves nested alias canonicalization and strips execution metadata", () => {
