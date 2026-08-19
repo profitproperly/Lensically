@@ -3893,6 +3893,10 @@ describe("operator mode MCP endpoint", () => {
     expect(continuationDescriptor?.properties?.effect_class?.const).toBe("read_only");
     const repositoryPatchDescriptor = mutationExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
     expect(repositoryPatchDescriptor?.properties?.effect_class?.const).toBe("mutation");
+    const safeGitHubUpsertContract = plannedActionContracts.find((contract) => contract.capability === "upsert_git_hub_repository_file");
+    const safeGitHubRepositorySchema = safeGitHubUpsertContract?.argument_schema?.properties?.repository as { pattern?: string; maxLength?: number } | undefined;
+    expect(safeGitHubRepositorySchema?.maxLength).toBe(220);
+    expect(new RegExp(safeGitHubRepositorySchema?.pattern ?? "").test("opmgdeadman/signal-radar")).toBe(true);
     expect(closeTool?.inputSchema?.properties).toHaveProperty("action_execution_token");
     expect(closeTool?.inputSchema?.properties).toHaveProperty("verification");
     expect(closeTool?.inputSchema?.properties).not.toHaveProperty("action");
