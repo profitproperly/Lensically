@@ -121,6 +121,5 @@ export function buildComposedOperatorMcpTools(
     accountTools: OPERATOR_MCP_ACCOUNT_TOOLS,
     includeScopedWrappers,
     directPriorities: OPERATOR_MCP_DIRECT_PRIORITIES,
-    requiresProceed: operatorMcpToolNameRequiresProceed,
   });
 }
