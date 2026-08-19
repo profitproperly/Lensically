@@ -472,11 +472,11 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
   {
     name: "upsertGitHubRepositoryFile",
     title: "Upsert GitHub repository file",
-    description: "Create or replace one bounded text file in a named repository under the configured GitHub owner, with idempotent content reconciliation and compact audit output.",
+    description: "Create or replace one bounded text file in a named accessible GitHub repository, with idempotent content reconciliation and compact audit output. Bare names use the configured owner; explicit owner/repository targets are also accepted.",
     inputSchema: {
       type: "object",
       properties: {
-        repository: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+        repository: { type: "string", minLength: 1, maxLength: 220, pattern: "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$", description: "Repository name under the configured owner or an explicit owner/repository target." },
         path: REPO_PATH_SCHEMA,
         content: { type: "string", maxLength: 100000 },
         message: { type: "string", minLength: 1, maxLength: 200 },
