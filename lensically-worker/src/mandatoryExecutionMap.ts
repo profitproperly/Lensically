@@ -858,6 +858,7 @@ const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
     "createRepoFile",
     "createGitHubRepository",
   "upsertGitHubRepositoryFile",
+  "operateGitHubRepositories",
   "createCloudflarePagesProject",
   "deployCloudflarePagesProject",
   "deleteRepoFile",
