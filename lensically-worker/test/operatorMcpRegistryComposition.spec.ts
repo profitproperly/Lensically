@@ -6,7 +6,6 @@ import {
   buildComposedOperatorMcpTools,
   isOperatorMcpAdminToolName,
   isOperatorMcpEngineeringToolName,
-  operatorMcpToolNameRequiresProceed,
 } from "../src/operatorMcpRegistryComposition";
 
 describe("Operator MCP registry composition", () => {
