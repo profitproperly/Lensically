@@ -74,27 +74,6 @@ export function requestedMcpBrandKey(
   return normalizeBrandKey(args.brand_key);
 }
 
-export function operatorMcpCallRequiresProceed(
-  toolName: string,
-  args: Record<string, unknown>,
-  normalizeBrandKey: OperatorMcpBrandNormalizer,
-): boolean {
-  if (MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS.has(toolName)) {
-    return false;
-  }
-  if (operatorMcpToolNameRequiresProceed(toolName)) {
-    return true;
-  }
-  return toolName === "updateWorkflowRequirement"
-    && requestedMcpBrandKey(toolName, args, normalizeBrandKey) !== null;
-}
-
-export function operatorMcpProceedConfirmed(
-  _toolName: string,
-  args: Record<string, unknown>,
-): boolean {
-  return args.proceed_confirmed === true;
-}
 
 export function canonicalAutonomyToolName(toolName: string): string {
   const scoped = toolName.match(/^(?:mm|om|vx)_(.+)$/);
