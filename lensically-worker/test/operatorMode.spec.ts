@@ -6777,7 +6777,6 @@ active_checkpoint: none
         "Lensically Operator Mode MCP is active.",
         `Selected key: ${key}`,
         `Full tool surface loaded: ${publicToolCount} tools available and usable.`,
-        "Proceed to the next step?",
       ]);
     }
   }, 30000);
