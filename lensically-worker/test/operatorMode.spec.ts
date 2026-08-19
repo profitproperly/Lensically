@@ -4346,7 +4346,6 @@ active_checkpoint: none
     expect(nonCaseStep3.structuredContent.execution_descriptor.effect_class).toBe("mutation");
     const nonCaseGatewayMismatch = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorCaseAction", {
       live_state_token: nonCaseStep3.structuredContent.live_state_token,
-      execution_descriptor: nonCaseStep3.structuredContent.execution_descriptor,
     });
     expect(nonCaseGatewayMismatch.isError).toBe(true);
     expect(nonCaseGatewayMismatch.structuredContent).toMatchObject({
