@@ -23,8 +23,23 @@ describe("mandatory execution map", () => {
     expect(prevention?.winning_path.procedure).toContain(
       "Reject unknown or missing known-workflow inputs locally before the GitHub workflow dispatch POST.",
     );
-    expect(prevention?.regression_test_id).toBe(
+        expect(prevention?.regression_test_id).toBe(
       "enforces declared Lensically Engineering workflow dispatch inputs before GitHub transport",
+    );
+  });
+
+  it("omits absent optional non-null fields instead of serializing null", () => {
+    const prevention = resolveActionBoundWinningPaths("closeOperatorAction")
+      .find((candidate) => candidate.id === "optional_nonnull_field_omission_contract");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.status).toBe("active");
+    expect(prevention?.action_binding?.tool_names).toContain("*");
+    expect(prevention?.winning_path.procedure).toContain(
+      "When an optional field has no value and its declared type is non-null, omit the key entirely.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Send explicit null only when the schema explicitly permits null.",
     );
   });
 });
