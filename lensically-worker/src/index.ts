@@ -22701,13 +22701,13 @@ async function handleOperatorMcpEngineeringTool(
       const encoded = typeof record.content === "string" ? record.content : "";
       if (encoded) {
         try {
-          if (base64ToTextUtf8(encoded) === content) return { ok: true, no_change: true, created: false, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path, commit_sha: existingSha ?? null };
+          if (base64ToTextUtf8(encoded) === content) return { ok: true, no_change: true, created: false, operation_id: operationId, repository: target.full_name, branch, path, commit_sha: existingSha ?? null };
         } catch {
-          return { ok: false, error: "existing_repository_file_decode_failed", operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path };
+          return { ok: false, error: "existing_repository_file_decode_failed", operation_id: operationId, repository: target.full_name, branch, path };
         }
       }
     } else if (existing.status !== 404) {
-      return { ok: false, error: "github_repository_file_lookup_failed", status: existing.status, operation_id: operationId, repository: `${config.owner}/${repository}`, branch, path };
+      return { ok: false, error: "github_repository_file_lookup_failed", status: existing.status, operation_id: operationId, repository: target.full_name, branch, path };
     }
     const put = await githubApi(env, endpoint, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, content: textToBase64Utf8(content), branch, ...(existingSha ? { sha: existingSha } : {}) }) });
     const putRecord = put.data && typeof put.data === "object" && !Array.isArray(put.data) ? put.data as Record<string, unknown> : {};
