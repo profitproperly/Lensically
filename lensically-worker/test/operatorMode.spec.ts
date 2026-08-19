@@ -4156,7 +4156,7 @@ active_checkpoint: none
     });
     expect(step5).toMatchObject({ ok: true, lifecycle_stage: 5 });
     expect(step5.closure_token).toBeTruthy();
-    expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"]);
+    expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"]);
     expect(step5.operator_action_closure.turn_close_gate).toMatchObject({
       must_continue: true,
       normal_turn_close_allowed: false,
