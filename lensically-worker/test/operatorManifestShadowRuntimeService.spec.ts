@@ -180,8 +180,7 @@ function dependencyHarness(
     const deps: OperatorManifestShadowRuntimeDependencies = {
     snapshotDb: forbiddenSnapshotDb,
     shadowDb: env.DB,
-    codeSha: "a".repeat(40),
-    minimumEligibleFamilies: 100,
+        codeSha: "a".repeat(40),
         buildDecisionSnapshot: async () => {
       audit.source_provider_reads += 1;
       audit.evidence_provider_reads += 1;
@@ -400,8 +399,21 @@ describe("operatorManifestShadowRuntimeService", () => {
     expect(new Set(fallback.map((candidate) => candidate.source_card_family_id)).size).toBe(96);
     expect(fallback.every((candidate) => candidate.source_type === "source_card")).toBe(true);
 
-    const existing = candidates(2);
+        const existing = candidates(2);
     expect(resolveManifestShadowSourceCandidates(existing, "manifest_mental")).toBe(existing);
+  });
+
+  it("uses the runtime-owned minimum for a live-sized 55-family normal cycle", async () => {
+    const harness = dependencyHarness(new Date("2026-07-30T18:30:00.000Z"), candidates(55));
+    const prepared = await prepareRun({
+      deps: harness.deps,
+      scenario: "normal_24",
+      suffix: "minimum-default-55",
+      horizonHours: 48,
+    });
+
+    expect(prepared.status).toBe(200);
+    expect(prepared.body.success).toBe(true);
   });
 
         it("uses unified lifecycle lanes without cooldown suppression in an isolated 24-slot Innovation cycle", async () => {

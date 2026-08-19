@@ -12524,8 +12524,7 @@ async function handleOperatorTool(request: Request, env: Env, toolName: string):
       snapshotDb: env.DB,
       shadowDb: env.SHADOW_DB,
       codeSha: normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 80, true) ?? "unreleased",
-      requireFrozenSeed: false,
-      minimumEligibleFamilies: 100,
+            requireFrozenSeed: false,
       now: () => new Date(),
       buildSlots: async (input) => buildManifestShadowScenarioSlots({
         now: new Date(),
