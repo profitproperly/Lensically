@@ -6650,7 +6650,7 @@ active_checkpoint: none
         expect(direct.continuity_contract.version).toBe("operator-continuity-v2");
     expect(direct.continuity_contract.scope).toBe("universal");
     expect(direct.continuity_contract.source_of_truth).toContain("canonical database state");
-    expect(direct.continuity_contract.required_sequence).toContain("confirmOperatorProceed_and_auto_resolve_canonical_continuity");
+    expect(direct.continuity_contract.required_sequence).toContain("server-side continuity restoration on account-scoped calls");
     expect(direct.execution_policy_contract.version).toBe("operator-execution-policy-v2");
     expect(direct.execution_policy_contract.scope).toBe("universal");
     expect(direct.execution_policy_contract.authority_order.slice(0, 2)).toEqual(["backend enforcement", "mandatory known-path registry"]);
