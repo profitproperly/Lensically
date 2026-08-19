@@ -21814,7 +21814,7 @@ async function handleOperatorMcpEngineeringTool(
         prevention_required: verification.prevention_required === true,
       },
       closure_token: closureToken,
-      next_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorAction", "closeOperatorAction"],
+      next_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"],
     };
   }
 
