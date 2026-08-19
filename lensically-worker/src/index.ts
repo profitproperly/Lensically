@@ -19006,8 +19006,10 @@ async function closeExactRuntimeResumedHardeningIncidents(env: Env): Promise<{ c
       resume_result: {
         status: "resumed_after_exact_runtime_verification",
         source: "server_owned_resumed_hardening_closure",
-        tested_sha: runtimeSha,
-        deployment_id: runtimeDeploymentId,
+        tested_sha: verifiedSha,
+        deployment_id: verifiedDeploymentId,
+        current_runtime_sha: currentRuntimeSha ?? null,
+        current_runtime_deployment_id: currentRuntimeDeploymentId ?? null,
         resume_capsule: resumeCapsule ?? null,
         live_verification: liveVerification,
       },
