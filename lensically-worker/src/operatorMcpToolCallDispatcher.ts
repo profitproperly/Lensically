@@ -202,9 +202,14 @@ export async function dispatchOperatorMcpToolCall(
     const expectedEffectClass = lifecycleCheck.payload.effect_class === "read_only" || lifecycleCheck.payload.effect_class === "mutation"
       ? lifecycleCheck.payload.effect_class
       : "";
+    const preparedCapabilityForGateway = typeof lifecycleCheck.payload.planned_capability === "string"
+      ? lifecycleCheck.payload.planned_capability.trim()
+      : "";
     const expectedGateway = expectedEffectClass === "read_only"
       ? dependencies.readOnlyRoutedExecutionGateway
-      : dependencies.routedExecutionGateway;
+      : preparedCapabilityForGateway === "case_step"
+        ? dependencies.caseRoutedExecutionGateway
+        : dependencies.routedExecutionGateway;
     if (expectedEffectClass && requestedToolName !== expectedGateway) {
       return mcpToolResultResponse(id, {
         ok: false,
