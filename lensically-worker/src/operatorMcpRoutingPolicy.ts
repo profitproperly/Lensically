@@ -22,19 +22,6 @@ export type ScopedOperatorMcpCall = {
   scoped_brand_key: OperatorMcpBrandKey | null;
 };
 
-export const MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS = new Set<string>([
-    "prepare_manifest_autonomous_cycle",
-  "persist_manifest_autonomous_post",
-  "persist_manifest_autonomous_batch",
-  "get_hourly_coverage",
-  "get_manifest_cycle_receipt",
-  "get_manifest_intelligence_audit",
-    "get_manifest_intelligence_foundation",
-  "prepare_manifest_shadow_cycle",
-  "commit_manifest_shadow_cycle_strategy",
-  "persist_manifest_shadow_batch",
-  "get_manifest_shadow_cycle_receipt",
-]);
 
 export function canonicalScopedOperatorMcpToolName(toolName: string): string {
   return toolName.replace(/^(?:mm_|om_|vx_)/, "");
