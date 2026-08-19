@@ -3856,28 +3856,26 @@ describe("operator mode MCP endpoint", () => {
     expect(actionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
     expect(caseActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
-    expect(caseActionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
+    expect(caseActionTool?.inputSchema?.properties).toHaveProperty("governing_standards_ack");
+    expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("execution_descriptor");
     expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("action");
+    expect(caseActionTool?.inputSchema?.required).toEqual(expect.arrayContaining(["live_state_token", "governing_standards_ack"]));
     const readExecutionDescriptorSchema = readActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const mutationExecutionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
-    const caseMutationExecutionDescriptorSchema = caseActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const readExecutionDescriptorBranches = readExecutionDescriptorSchema?.oneOf ?? [];
     const mutationExecutionDescriptorBranches = mutationExecutionDescriptorSchema?.oneOf ?? [];
-    const caseMutationExecutionDescriptorBranches = caseMutationExecutionDescriptorSchema?.oneOf ?? [];
     expect(readExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "read_only")).toBe(true);
     expect(mutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);
-    expect(caseMutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);
-    expect(caseMutationExecutionDescriptorBranches).toHaveLength(11);
     expect(mutationExecutionDescriptorBranches.some((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""))).toBe(false);
-    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...caseMutationExecutionDescriptorBranches, ...readExecutionDescriptorBranches];
+    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...readExecutionDescriptorBranches];
     const caseStepDescriptorBranches = executionDescriptorBranches.filter((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""));
-    expect(caseStepDescriptorBranches).toHaveLength(22);
+    expect(caseStepDescriptorBranches).toHaveLength(11);
     const caseStepDescriptorIds = Array.from(new Set(caseStepDescriptorBranches.map((branch) => branch.properties?.action_id?.const ?? "")));
     expect(caseStepDescriptorIds).toEqual(["exec_02_00", "exec_02_01", "exec_02_02", "exec_02_03", "exec_02_04", "exec_02_05", "exec_02_06", "exec_02_07", "exec_02_08", "exec_02_09", "exec_02_10"]);
     for (const actionId of caseStepDescriptorIds) {
       expect(caseStepDescriptorBranches
         .filter((branch) => branch.properties?.action_id?.const === actionId)
-        .map((branch) => branch.properties?.effect_class?.const).sort()).toEqual(["mutation", "read_only"]);
+        .map((branch) => branch.properties?.effect_class?.const)).toEqual(["read_only"]);
     }
     const descriptorActionIds = executionDescriptorBranches.map((branch) => branch.properties?.action_id?.const ?? "");
     expect(descriptorActionIds).not.toContain("capability_definition");
