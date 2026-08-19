@@ -15691,7 +15691,22 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   });
   readActionGateway.inputSchema = buildStep4InputSchema(readActionDescriptorBranches);
   actionGateway.inputSchema = buildStep4InputSchema(mutationActionDescriptorBranches);
-  caseActionGateway.inputSchema = buildStep4InputSchema(caseMutationActionDescriptorBranches);
+  if (caseMutationActionIds.size !== OPERATOR_CASE_STEP_STAGES.length) {
+    throw new Error(`operator_case_action_descriptor_coverage_invalid:${caseMutationActionIds.size}`);
+  }
+  caseActionGateway.inputSchema = {
+    type: "object",
+    properties: {
+      live_state_token: { type: "string", minLength: 16 },
+      governing_standards_ack: {
+        type: "string",
+        const: OPERATOR_GOVERNING_STANDARDS_ACK,
+        description: "Mandatory pre-action acknowledgment.",
+      },
+    },
+    required: ["live_state_token", "governing_standards_ack"],
+    additionalProperties: false,
+  };
   return tools;
 }
 
