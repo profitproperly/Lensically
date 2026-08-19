@@ -3,7 +3,6 @@ import type { OperatorMcpBrandKey } from "./operatorMcpProtocol";
 import {
   isOperatorMcpAdminToolName,
   isOperatorMcpEngineeringToolName,
-  operatorMcpToolNameRequiresProceed,
 } from "./operatorMcpRegistryComposition";
 
 export type OperatorMcpBrandNormalizer = (
