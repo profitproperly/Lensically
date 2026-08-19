@@ -49,19 +49,12 @@ describe("Operator MCP registry composition", () => {
     expect(isOperatorMcpEngineeringToolName("get_monthly_growth_review")).toBe(false);
   });
 
-  it("preserves guided Proceed membership without blocking list_accounts", () => {
-        expect(operatorMcpToolNameRequiresProceed("list_accounts")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("seed_manifest_shadow_snapshot")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("prepare_manifest_shadow_cycle")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("commit_manifest_shadow_cycle_strategy")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("persist_manifest_shadow_batch")).toBe(false);
-                expect(operatorMcpToolNameRequiresProceed("get_manifest_shadow_cycle_receipt")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("get_manifest_shadow_posts")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("persist_manifest_autonomous_batch")).toBe(false);
-    expect(operatorMcpToolNameRequiresProceed("get_account_state")).toBe(true);
-    expect(operatorMcpToolNameRequiresProceed("getGrowthMission")).toBe(true);
-    expect(operatorMcpToolNameRequiresProceed("mm_get_account_state")).toBe(true);
-    expect(operatorMcpToolNameRequiresProceed("readRepoFile")).toBe(false);
+  it("removes generic Proceed metadata from the callable surface", () => {
+    const tools = buildComposedOperatorMcpTools(true);
+    for (const tool of tools) {
+      const properties = tool.inputSchema.properties as Record<string, unknown> | undefined;
+      expect(properties ?? {}).not.toHaveProperty("proceed_confirmed");
+    }
   });
 
                   it("builds the exact 129 internal typed tools with deterministic priority ordering", () => {
