@@ -1,0 +1,63 @@
+{
+  "version": "white-label-parity-v1",
+  "source_repository": "profitproperly/Lensically",
+  "target_repository": "profitproperly/Lensically-Operator-Threads",
+  "target_branch": "main",
+  "state_path": ".lensically-parity/state.json",
+  "report_path": ".lensically-parity/latest-report.json",
+  "validation_commands": [
+    "npm ci",
+    "npm run check:template"
+  ],
+  "sync_allow": [
+    "lensically-worker/src/systemDirectory/**",
+    "lensically-worker/test/systemDirectory.spec.ts",
+    "lensically-worker/src/manifestIntelligence.ts",
+    "lensically-worker/src/manifestIntelligenceEngine.ts",
+    "lensically-worker/src/manifestMeasurementAudit.ts",
+    "lensically-worker/test/gptMemoryRoutes.spec.ts",
+    "lensically-worker/test/patternsImport.spec.ts",
+    "lensically-worker/test/threadsPublishService.spec.ts",
+    "lensically-worker/test/threadsProfileLookupService.spec.ts"
+  ],
+  "exclude": [
+    ".github/**",
+    ".wrangler/**",
+    "ENGINEERING_CONTINUATION.md",
+    "CURRENT_STATE.md",
+    "OPERATING_MEMORY.md",
+    "AGENTS.md",
+    "lensically-worker/public/**",
+    "lensically-worker/database/**",
+    "lensically-worker/migrations/**",
+    "lensically-worker/src/commercial*.ts",
+    "lensically-worker/src/operatorManifestShadow*.ts",
+    "manifest-mental-vault/**"
+  ],
+  "product_relevant": [
+    "lensically-worker/src/**",
+    "lensically-worker/test/**",
+    "lensically-worker/scripts/**",
+    "lensically-web/app/**",
+    "lensically-web/components/**",
+    "lensically-web/lib/**",
+    "lensically-web/public/**",
+    "docs/**",
+    "README.md",
+    "package.json",
+    "package-lock.json"
+  ],
+  "forbidden_content_patterns": [
+    "api.lensically.com",
+    "app.lensically.com",
+    "lensically.com",
+    "manifest_mental",
+    "manifest-mental",
+    "opmg_deadman",
+    "plink_",
+    "price_",
+    "prod_",
+    "THREADS_TOKEN_MANIFEST_MENTAL",
+    "CLOUDFLARE_ACCOUNT_ID=42ea358a42af1def2087ba93a2391b3d"
+  ]
+}

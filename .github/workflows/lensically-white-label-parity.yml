@@ -1,0 +1,51 @@
+name: Lensically white-label parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Write validated product parity changes"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lensically-white-label-parity
+  cancel-in-progress: false
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Lensically source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run white-label parity
+        env:
+          WHITE_LABEL_PARITY_TOKEN: ${{ secrets.WHITE_LABEL_PARITY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WHITE_LABEL_PARITY_TOKEN:-}" ]; then
+            echo "WHITE_LABEL_PARITY_TOKEN is required so this repository can write profitproperly/Lensically-Operator-Threads."
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.apply }}" = "false" ]; then
+            node scripts/white-label-parity.mjs
+          else
+            node scripts/white-label-parity.mjs --apply --push
+          fi

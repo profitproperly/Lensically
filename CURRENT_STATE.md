@@ -115,6 +115,13 @@
 
 ## Engineering and Release
 
+### White-Label Product Parity
+
+- `lensically-white-label-parity.yml` is the source-owned automation that keeps `profitproperly/Lensically-Operator-Threads` aligned with product-safe Lensically deltas.
+- `scripts/white-label-parity.mjs` clones the product repository, classifies source changes as `SYNCED`, `EXCLUDED`, or `PENDING`, copies only allowlisted product-safe files, runs the product repository validation commands, and advances `.lensically-parity/state.json` only after validation succeeds.
+- `config/white-label-parity.config.json` is the parity policy. It excludes private continuation/state files, seller-only public/commercial surfaces, production database/migration surfaces, Manifest vault content, and forbidden seller values. Product-relevant changes outside the allowlist are reported as `PENDING` rather than mirrored.
+- The scheduled workflow runs every six hours and can also be manually dispatched. It requires the `WHITE_LABEL_PARITY_TOKEN` repository secret with write access to `profitproperly/Lensically-Operator-Threads`; without that token it fails closed and does not pretend parity was written.
+
 ### Manifest Innovation Cycle
 
 - Manifest now has two cycle-level rails. The **Innovation Cycle** is the permanent upstream engineering rail; the **Main Cycle** is the protected downstream production rail and authoritative historical truth.
