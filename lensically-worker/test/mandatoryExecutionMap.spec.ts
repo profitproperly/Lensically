@@ -126,6 +126,24 @@ describe("mandatory execution map", () => {
     expect(prepared?.tool_name).toBe("operateGitHubRepositories");
     expect(prepared?.arguments?.operation).toBe("upsert_file");
     expect(prepared?.arguments?.repository).toBe("opmgdeadman/signal-radar");
+
+    const safePrepared = prepareSourceDefinedDirectEngineeringCall(
+      "apply repo patch set",
+      "Write one bounded file through the dedicated non-destructive GitHub upsert.",
+      {
+        repository: "opmgdeadman/signal-radar",
+        path: "src/mcp.ts",
+        content: "export const ok = true;",
+        message: "Add MCP bootstrap",
+        operation_id: "signal-radar-mcp-bootstrap-v0",
+      },
+      tools,
+    );
+
+    expect(safePrepared?.ok).toBe(true);
+    expect(safePrepared?.tool_name).toBe("upsertGitHubRepositoryFile");
+    expect(safePrepared?.arguments?.repository).toBe("opmgdeadman/signal-radar");
+    expect(safePrepared?.arguments?.operation_id).toBe("signal-radar-mcp-bootstrap-v0");
   });
 
   it("omits absent optional non-null fields instead of serializing null", () => {
