@@ -197,11 +197,13 @@ export async function dispatchOperatorMcpToolCall(
       }, "Lensically blocked Step 4 because current Step-3 live-state proof was missing, invalid, expired, or deployment-stale.", true);
     }
     lifecycleLiveStatePayload = lifecycleCheck.payload;
-    const requestedExecutionDescriptor = asRecord(governedRequestedArgs.execution_descriptor);
     const expectedClientActionId = typeof lifecycleCheck.payload.client_action_id === "string" ? lifecycleCheck.payload.client_action_id.trim() : "";
     const expectedEffectClass = lifecycleCheck.payload.effect_class === "read_only" || lifecycleCheck.payload.effect_class === "mutation"
       ? lifecycleCheck.payload.effect_class
       : "";
+    const requestedExecutionDescriptor = requestedToolName === dependencies.caseRoutedExecutionGateway
+      ? { action_id: expectedClientActionId, effect_class: expectedEffectClass }
+      : asRecord(governedRequestedArgs.execution_descriptor);
     const preparedCapabilityForGateway = typeof lifecycleCheck.payload.planned_capability === "string"
       ? lifecycleCheck.payload.planned_capability.trim()
       : "";
