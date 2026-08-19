@@ -93,7 +93,7 @@ describe("mandatory execution map", () => {
     ];
 
     const prepared = prepareSourceDefinedDirectEngineeringCall(
-      "operate git hub repositories",
+      "apply repo patch set",
       "Write one bounded file in an explicitly named accessible repository.",
       {
         operation: "upsert_file",
