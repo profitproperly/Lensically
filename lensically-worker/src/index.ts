@@ -16321,6 +16321,7 @@ async function buildOperatorSessionMap(request: Request, env: Env): Promise<Reco
       durable_knowledge_loader: "getOperatorKnowledge",
       live_state_loader: "getOperatorLiveState",
       read_action_executor: OPERATOR_READ_EXECUTION_GATEWAY,
+      case_action_executor: OPERATOR_CASE_EXECUTION_GATEWAY,
       action_executor: OPERATOR_ROUTED_EXECUTION_GATEWAY,
       action_closer: "closeOperatorAction",
       canonical_knowledge_source: "OPERATOR_COMPETENCY.md",
