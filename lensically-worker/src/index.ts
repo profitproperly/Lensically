@@ -18958,19 +18958,20 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
 
 async function closeExactRuntimeResumedHardeningIncidents(env: Env): Promise<{ checked: number; closed: number; skipped: number }> {
   await ensureOperatorMcpAdminTables(env);
-  const runtimeSha = normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 120, true);
-  const runtimeDeploymentId = normalizeOperatorText(env.CF_VERSION_METADATA?.id, 160, true);
-  if (!runtimeSha || !runtimeDeploymentId) return { checked: 0, closed: 0, skipped: 0 };
+  const currentRuntimeSha = normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 120, true);
+  const currentRuntimeDeploymentId = normalizeOperatorText(env.CF_VERSION_METADATA?.id, 160, true);
 
   const result = await env.DB.prepare(
     `SELECT * FROM operator_hardening_incidents
      WHERE state = 'resumed'
        AND severity IN ('P0', 'P1')
-       AND tested_sha = ?
-       AND deployment_id = ?
+       AND tested_sha IS NOT NULL
+       AND TRIM(tested_sha) <> ''
+       AND deployment_id IS NOT NULL
+       AND TRIM(deployment_id) <> ''
      ORDER BY datetime(updated_at) ASC
      LIMIT 5`,
-  ).bind(runtimeSha, runtimeDeploymentId).all<Record<string, unknown>>();
+  ).all<Record<string, unknown>>();
 
   let closed = 0;
   let skipped = 0;
