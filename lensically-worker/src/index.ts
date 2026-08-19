@@ -64,6 +64,7 @@ import {
 } from "./operatorOperationReceiptInsert";
 import { readOptionalLegacyWorkflowSession } from "./operatorOptionalLegacyWorkflowSession";
 import { readCycleObservability } from "./cycleObservabilityService";
+import { pollSignalRadar, readSignalRadarOverview } from "./signalRadar";
 
 
 import {
@@ -34395,6 +34396,19 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       });
     }
 
+                if (url.pathname === "/api/signal-radar/overview" && request.method === "GET") {
+          const requestedLimit = Number(url.searchParams.get("limit") ?? "60");
+          const overview = await readSignalRadarOverview(env.DB, requestedLimit);
+          return new Response(JSON.stringify(overview), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store",
+              ...requestCorsHeaders,
+            },
+          });
+        }
+
         if (url.pathname.startsWith("/api/cycles/") && request.method === "GET") {
       const actionByPath: Record<string, "state" | "history" | "summary" | "selections" | "selection_detail"> = {
         "/api/cycles/state": "state",
@@ -37303,8 +37317,16 @@ async function handleScheduled(event: ScheduledController, env: Env, ctx: Execut
     return;
   }
 
-    if (cron === THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON) {
+        if (cron === THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON) {
     const scheduledTime = typeof event.scheduledTime === "number" ? event.scheduledTime : Date.now();
+
+    try {
+      const radar = await pollSignalRadar(env.DB, scheduledTime);
+      logWorkerEvent("SIGNAL_RADAR_POLL_COMPLETED", radar);
+    } catch (error) {
+      logWorkerEvent("SIGNAL_RADAR_POLL_FAILED", { error: getErrorMessage(error) }, "error");
+    }
+
     if (!isSixHourInsightsRefreshWindow(scheduledTime)) {
       logWorkerEvent("THREADS_SIX_HOUR_INSIGHTS_REFRESH_SKIPPED", {
         cron,
