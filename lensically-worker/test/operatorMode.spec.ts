@@ -5975,6 +5975,7 @@ active_checkpoint: none
       "getOperatorLiveState",
       "executeOperatorReadAction",
       "executeOperatorAction",
+      "executeOperatorCaseAction",
       "closeOperatorAction",
       "persist_manifest_autonomous_post",
     ]);
