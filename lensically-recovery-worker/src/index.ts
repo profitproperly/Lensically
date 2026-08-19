@@ -648,7 +648,13 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       ? liveStateContent.execution_descriptor as Record<string, unknown>
       : null;
     if (!liveStateToken || !executionDescriptor) return { ok: false, phase: "get_operator_live_state", status: liveState.status, content: liveStateContent };
-    const execution = await mainMcpRequest(origin, token, 7, "tools/call", { name: "executeOperatorAction", arguments: { live_state_token: liveStateToken, execution_descriptor: executionDescriptor, governing_standards_ack: governingAck } }, sessionId);
+    const executionEffect = String(executionDescriptor.effect_class || "");
+    const executionGateway = executionEffect === "read_only"
+      ? "executeOperatorReadAction"
+      : plannedAction.capability === "case_step"
+        ? "executeOperatorCaseAction"
+        : "executeOperatorAction";
+    const execution = await mainMcpRequest(origin, token, 7, "tools/call", { name: executionGateway, arguments: { live_state_token: liveStateToken, execution_descriptor: executionDescriptor, governing_standards_ack: governingAck } }, sessionId);
     const executionContent = structured(execution);
     const actionExecutionToken = typeof executionContent?.action_execution_token === "string" ? executionContent.action_execution_token : "";
     if (!actionExecutionToken) return { ok: false, phase: "execute_operator_action", status: execution.status, content: executionContent };
