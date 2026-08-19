@@ -18677,6 +18677,48 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
     String(candidate.state) === "closed"
     && String(candidate.prevention_rule_id ?? "").trim().length > 0
   ) ?? null;
+  if (priorActiveRow && String(priorActiveRow.state ?? "detected") !== "detected") {
+    const priorActiveState = String(priorActiveRow.state ?? "detected");
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE operator_hardening_incidents
+         SET classification = CASE WHEN classification = 'novel_failure' THEN 'known_prevention' ELSE classification END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      ).bind(priorActiveRow.id),
+      env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), priorActiveRow.id, priorActiveState, priorActiveState,
+        normalizeOperatorJson({
+          error_category: category,
+          recurrence_family: recurrenceFamily,
+          recurrence_status: "known_active_recurrence_converged",
+          blocked_profile_id: profile,
+          blocked_tool_name: blockedTool ?? null,
+          request_fingerprint: fingerprint ?? null,
+          observed_outcome: args.observed_outcome ?? null,
+          resume_capsule: args.resume_capsule ?? null,
+        }, {}),
+      ),
+    ]);
+    const updated = await env.DB.prepare(`SELECT * FROM operator_hardening_incidents WHERE id = ?`).bind(priorActiveRow.id).first<Record<string, unknown>>();
+    const incident = serializeHardeningIncident(updated ?? priorActiveRow);
+    return {
+      ok: true,
+      created: false,
+      incident,
+      normal_work_blocked: ["P0", "P1"].includes(String(incident.severity)),
+      recurrence: {
+        status: "known_active_recurrence",
+        prior_incident_id: incident.id,
+        recurrence_family: recurrenceFamily,
+        required_response: "Continue the existing advanced hardening investigation from accumulated evidence; do not create a sibling blocker or restart diagnosis.",
+      },
+      required_next_state: "next",
+    };
+  }
   const handledExternalPriorRow = recurrenceFamily === "client:openai_safety_predispatch"
     ? relatedPriorRows.find((candidate) =>
         String(candidate.state) === "closed"
