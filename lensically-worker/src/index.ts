@@ -15621,7 +15621,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
           additionalProperties: false,
         };
         if (executionDescriptor.effect_class === "read_only") readActionDescriptorBranches.push(descriptorBranch);
-        else if (tool.name === "advanceHardeningIncident") caseMutationActionDescriptorBranches.push(descriptorBranch);
+        else if (tool.name === "advanceHardeningIncident") caseMutationActionIds.add(executionDescriptor.action_id);
         else mutationActionDescriptorBranches.push(descriptorBranch);
       }
     });
