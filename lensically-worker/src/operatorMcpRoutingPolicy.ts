@@ -140,12 +140,6 @@ export function createOperatorMcpRoutingPolicy(dependencies: {
       args,
       dependencies.normalizeBrandKey,
     ),
-    callRequiresProceed: (toolName: string, args: Record<string, unknown>) => operatorMcpCallRequiresProceed(
-      toolName,
-      args,
-      dependencies.normalizeBrandKey,
-    ),
-    proceedConfirmed: operatorMcpProceedConfirmed,
     canonicalAutonomyToolName,
     canonicalExecutionArgs: (toolName: string, args: Record<string, unknown>) => canonicalOperatorExecutionArgs(
       toolName,
