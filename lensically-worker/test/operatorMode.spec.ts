@@ -4344,9 +4344,22 @@ active_checkpoint: none
         action_id: `exec_02_${stageIndex}`,
         effect_class: arguments_.dry_run === true ? "read_only" : "mutation",
       });
-            const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
+      if (step3.structuredContent.execution_descriptor.effect_class === "mutation") {
+        const wrongGateway = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorAction", {
+          live_state_token: step3.structuredContent.live_state_token,
+          execution_descriptor: step3.structuredContent.execution_descriptor,
+        });
+        expect(wrongGateway.isError).toBe(true);
+        expect(wrongGateway.structuredContent).toMatchObject({
+          ok: false,
+          error: "operator_execution_gateway_effect_mismatch",
+          required_tool: "executeOperatorCaseAction",
+          execution_started: false,
+        });
+      }
+      const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
         ? "executeOperatorReadAction"
-        : "executeOperatorAction";
+        : "executeOperatorCaseAction";
       const step4 = await mcpToolCallRaw<{
         ok: boolean;
         dry_run?: boolean;
