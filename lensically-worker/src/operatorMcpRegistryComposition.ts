@@ -111,27 +111,6 @@ export function isOperatorMcpEngineeringToolName(
   return OPERATOR_MCP_ENGINEERING_TOOL_NAME_SET.has(value);
 }
 
-const PROCEED_EXEMPT_ACCOUNT_TOOL_NAMES = new Set<string>([
-  "list_accounts",
-  "seed_manifest_shadow_snapshot",
-  "prepare_manifest_shadow_cycle",
-  "commit_manifest_shadow_cycle_strategy",
-    "persist_manifest_shadow_batch",
-  "get_manifest_shadow_cycle_receipt",
-  "get_manifest_shadow_posts",
-  "persist_manifest_autonomous_batch",
-]);
-
-export function operatorMcpToolNameRequiresProceed(toolName: string): boolean {
-  if (toolName.startsWith("mm_") || toolName.startsWith("om_") || toolName.startsWith("vx_")) {
-    return true;
-  }
-    if (PROCEED_EXEMPT_ACCOUNT_TOOL_NAMES.has(toolName)) return false;
-  if (OPERATOR_MCP_ACCOUNT_TOOLS.some((tool) => tool.name === toolName)) {
-    return true;
-  }
-  return ACCOUNT_SCOPED_MCP_ADMIN_TOOLS.has(toolName);
-}
 
 export function buildComposedOperatorMcpTools(
   includeScopedWrappers: boolean,
