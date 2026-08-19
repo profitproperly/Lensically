@@ -836,6 +836,20 @@ const ROUTER_EXCLUDED_TOOLS = new Set([
   "recordPreCallRoute",
 ]);
 
+const CROSS_REPOSITORY_GITHUB_OPERATIONS = new Set([
+  "list_repositories",
+  "get_repository",
+  "list_files",
+  "read_file",
+  "search_file",
+  "upsert_file",
+  "patch_file",
+  "delete_file",
+  "list_workflow_runs",
+  "dispatch_workflow",
+  "get_workflow_run",
+]);
+
 const SOURCE_DEFINED_DIRECT_ENGINEERING_TOOLS = new Set([
   "engineeringPrecheck",
     "getEngineeringAccessState",
