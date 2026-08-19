@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-    MANIFEST_AUTONOMOUS_PROCEED_EXEMPT_TOOLS,
   admitOperatorRuntimeToolCall,
   canonicalAutonomyToolName,
   canonicalOperatorExecutionArgs,
@@ -10,8 +9,6 @@ import {
   dispatchOperatorKeyedResponseTool,
   dispatchOperatorKeyedRuntimeTool,
   dispatchOperatorManifestRuntimeTool,
-  operatorMcpCallRequiresProceed,
-  operatorMcpProceedConfirmed,
   requestedMcpBrandKey,
   scopeOperatorMcpToolCall,
 } from "../src/operatorMcpRoutingPolicy";
