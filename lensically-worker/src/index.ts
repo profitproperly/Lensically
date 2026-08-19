@@ -2016,10 +2016,9 @@ const OPERATOR_CONTINUITY_CONTRACT = {
     "getOperatorKnowledge",
     "getOperatorLiveState",
     "selectOperatorKey_when_guided_account_scope_requires_it",
-    "confirmOperatorProceed_and_auto_resolve_canonical_continuity_when_required",
     "executeOperatorAction",
     "closeOperatorAction",
-    "server-side continuity verification on every later account-scoped call",
+    "server-side continuity restoration on account-scoped calls",
   ],
     capsule_sections: [
     "autonomy_governance",
