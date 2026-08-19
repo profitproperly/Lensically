@@ -915,7 +915,7 @@ jobs:
 
 
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/health" > /tmp/lensically-runtime-health.json \
-              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "operator_lifecycle" and .execution_kernel.public_contract == "operator-lifecycle-v1" and (.live_tool_count == 6)' /tmp/lensically-runtime-health.json > /dev/null; then
+              && jq -e --arg sha "${expected_sha}" '.status == "ok" and .commit_sha == $sha and .execution_kernel.public_gateway == "operator_lifecycle" and .execution_kernel.public_contract == "operator-lifecycle-v1" and (.live_tool_count == 7)' /tmp/lensically-runtime-health.json > /dev/null; then
               runtime_ok=true
             fi
             if curl --fail-with-body --silent --show-error "https://api.lensically.com/api/operator/scheduler-health" > /tmp/lensically-scheduler-health.json \
