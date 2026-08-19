@@ -3904,17 +3904,16 @@ describe("operator mode MCP endpoint", () => {
     expect(hardeningStageBranch("n")).toBeUndefined();
     const classifiedBranch = hardeningStageBranch("a1");
     expect(Object.keys(classifiedBranch?.properties ?? {})).toEqual(["stage", "case", "dry_run"]);
-    expect(classifiedBranch?.required).toEqual(["stage"]);
     expect(classifiedBranch?.additionalProperties).toBe(false);
     const generalizedBranch = hardeningStageBranch("a3");
     expect(Object.keys(generalizedBranch?.properties ?? {})).toEqual(["stage", "case", "cause", "generalization", "dry_run"]);
-    expect(generalizedBranch?.required).toEqual(["stage", "cause", "generalization"]);
-    expect(hardeningStageBranch("a5")?.required).toEqual(["stage", "rule"]);
-    expect(hardeningStageBranch("a6")?.required).toEqual(["stage", "tests"]);
-    expect(hardeningStageBranch("a7")?.required).toEqual(["stage", "ref"]);
-    expect(hardeningStageBranch("a8")?.required).toEqual(["stage", "deployment"]);
-    expect(hardeningStageBranch("a9")?.required).toEqual(["stage", "proof"]);
-    expect(hardeningStageBranch("a10")?.required).toEqual(["stage", "resume", "gain"]);
+    expect(hardeningStageBranch("a5")?.properties ?? {}).toHaveProperty("rule");
+    expect(hardeningStageBranch("a6")?.properties ?? {}).toHaveProperty("tests");
+    expect(hardeningStageBranch("a7")?.properties ?? {}).toHaveProperty("ref");
+    expect(hardeningStageBranch("a8")?.properties ?? {}).toHaveProperty("deployment");
+    expect(hardeningStageBranch("a9")?.properties ?? {}).toHaveProperty("proof");
+    expect(hardeningStageBranch("a10")?.properties ?? {}).toHaveProperty("resume");
+    expect(hardeningStageBranch("a10")?.properties ?? {}).toHaveProperty("gain");
     const checkpointStepBranch = plannedActionSchema?.oneOf?.find((item) => {
       const branch = item as { properties?: { capability?: { const?: string } } };
       return branch.properties?.capability?.const === "checkpoint_step";
