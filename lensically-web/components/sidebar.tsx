@@ -18,6 +18,7 @@ import {
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/signal-radar", label: "Signal Radar" },
   { href: "/cycles", label: "Cycles" },
     { href: "/insights", label: "Insights" },
   { href: "/source-cards", label: "Source Cards" },
