@@ -4398,6 +4398,14 @@ active_checkpoint: none
       const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
         ? "executeOperatorReadAction"
         : "executeOperatorCaseAction";
+      const step4Args = step3.structuredContent.execution_descriptor.effect_class === "read_only"
+        ? {
+            live_state_token: step3.structuredContent.live_state_token,
+            execution_descriptor: step3.structuredContent.execution_descriptor,
+          }
+        : {
+            live_state_token: step3.structuredContent.live_state_token,
+          };
       const step4 = await mcpToolCallRaw<{
         ok: boolean;
         dry_run?: boolean;
@@ -4408,10 +4416,7 @@ active_checkpoint: none
         normal_work_blocked: boolean;
         incident: { id: string };
         action_execution_token: string;
-      }>(step4Gateway, {
-        live_state_token: step3.structuredContent.live_state_token,
-        execution_descriptor: step3.structuredContent.execution_descriptor,
-      });
+      }>(step4Gateway, step4Args);
       expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
       if (arguments_.dry_run === true) {
         expect(step4.structuredContent).toMatchObject({
