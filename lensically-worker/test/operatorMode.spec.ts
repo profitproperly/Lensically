@@ -6932,7 +6932,8 @@ active_checkpoint: none
     const runtimeSha = "0123456789abcdef0123456789abcdef01234567";
     const deploymentId = "provider-reconcile-deployment";
     const anchorId = "fixture-provider-reconcile-anchor";
-    const legacyId = "fixture-provider-reconcile-legacy";
+        const legacyIds = Array.from({ length: 12 }, (_, index) => `fixture-provider-reconcile-legacy-${index}`);
+    const legacyId = legacyIds[0];
     try {
       mutableEnv.CF_VERSION_METADATA = { id: deploymentId };
       mutableEnv.LENSICALLY_COMMIT_SHA = runtimeSha;
@@ -6953,33 +6954,44 @@ active_checkpoint: none
         runtimeSha,
         deploymentId,
       ).run();
-      await env.DB.prepare(
-        `INSERT INTO operator_hardening_incidents (
-          id, signature, boundary, severity, classification, state, affected_scope,
-          blocked_profile_id, side_effect_state, expected_json, observed_json
-        ) VALUES (?, ?, 'client', 'P0', 'prevention_breach', 'detected', 'objective', ?, 'not_applicable', ?, ?)`,
-      ).bind(
-        legacyId,
-        "fixture-provider-reconcile-legacy-signature",
-        "case_step_a1",
-        JSON.stringify({ stage: "a1" }),
-        JSON.stringify({ client_blocked: true, lensically_receipt: false, message: "This tool call was blocked by OpenAI's safety checks." }),
-      ).run();
-      await env.DB.prepare(
-        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
-         VALUES (?, ?, NULL, 'detected', ?)`,
-      ).bind(
-        "fixture-provider-reconcile-legacy-event",
-        legacyId,
-        JSON.stringify({ error_category: "openai_predispatch_safety_block" }),
-      ).run();
+            const legacyStatements: D1PreparedStatement[] = [];
+      for (const [index, candidateId] of legacyIds.entries()) {
+        legacyStatements.push(
+          env.DB.prepare(
+            `INSERT INTO operator_hardening_incidents (
+              id, signature, boundary, severity, classification, state, affected_scope,
+              blocked_profile_id, side_effect_state, expected_json, observed_json
+            ) VALUES (?, ?, 'client', 'P0', 'prevention_breach', 'detected', 'objective', ?, 'not_applicable', ?, ?)`,
+          ).bind(
+            candidateId,
+            `fixture-provider-reconcile-legacy-signature-${index}`,
+            `case_step_a${(index % 10) + 1}`,
+            JSON.stringify({ stage: `a${(index % 10) + 1}` }),
+            JSON.stringify({ client_blocked: true, lensically_receipt: false, message: "This tool call was blocked by OpenAI's safety checks." }),
+          ),
+          env.DB.prepare(
+            `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+             VALUES (?, ?, NULL, 'detected', ?)`,
+          ).bind(
+            `fixture-provider-reconcile-legacy-event-${index}`,
+            candidateId,
+            JSON.stringify({ error_category: "openai_predispatch_safety_block" }),
+          ),
+        );
+      }
+      await env.DB.batch(legacyStatements);
 
       const statusCall = await mcpToolRaw<{
         ok: boolean;
         stale_replay_reconciliation: { checked: number; reconciled: number; skipped: number };
       }>("getHardeningStatus", { incident_id: legacyId });
       expect(statusCall.isError).not.toBe(true);
-      expect(statusCall.structuredContent.stale_replay_reconciliation.reconciled).toBeGreaterThanOrEqual(1);
+            expect(statusCall.structuredContent.stale_replay_reconciliation.reconciled).toBeGreaterThanOrEqual(legacyIds.length);
+      const legacyPlaceholders = legacyIds.map(() => "?").join(",");
+      const closedLegacy = await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM operator_hardening_incidents WHERE id IN (${legacyPlaceholders}) AND state = 'closed'`,
+      ).bind(...legacyIds).first<Record<string, unknown>>();
+      expect(Number(closedLegacy?.count ?? 0)).toBe(legacyIds.length);
       const legacy = await env.DB.prepare(
         `SELECT state, prevention_rule_id, resume_result_json, autonomy_dividend_json
          FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
@@ -6994,9 +7006,10 @@ active_checkpoint: none
         owner_action_required: false,
         historical_provider_debt_removed: true,
       });
-    } finally {
-      await env.DB.prepare(`DELETE FROM operator_hardening_incident_events WHERE incident_id IN (?, ?)`).bind(anchorId, legacyId).run();
-      await env.DB.prepare(`DELETE FROM operator_hardening_incidents WHERE id IN (?, ?)`).bind(anchorId, legacyId).run();
+        } finally {
+      const cleanupPlaceholders = legacyIds.map(() => "?").join(",");
+      await env.DB.prepare(`DELETE FROM operator_hardening_incident_events WHERE incident_id IN (${cleanupPlaceholders})`).bind(...legacyIds).run();
+      await env.DB.prepare(`DELETE FROM operator_hardening_incidents WHERE id = ? OR id IN (${cleanupPlaceholders})`).bind(anchorId, ...legacyIds).run();
       if (originalMetadata) mutableEnv.CF_VERSION_METADATA = originalMetadata;
       else delete mutableEnv.CF_VERSION_METADATA;
       if (originalSha !== undefined) mutableEnv.LENSICALLY_COMMIT_SHA = originalSha;

@@ -18986,11 +18986,31 @@ async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): 
        AND TRIM(deployment_id) <> ''
      ORDER BY datetime(COALESCE(closed_at, updated_at)) DESC
      LIMIT 1`,
-  ).first<Record<string, unknown>>();
+    ).first<Record<string, unknown>>();
+  const candidateRows = candidates.results ?? [];
+  const targetIncidentIds = [...new Set(candidateRows.map((row) => {
+    const expected = safeParseJsonString(String(row.expected_json ?? ""));
+    return expected && typeof expected === "object" && !Array.isArray(expected)
+      ? normalizeOperatorText((expected as Record<string, unknown>).incident_id, 120, true)
+      : null;
+  }).filter((value): value is string => Boolean(value)))];
+  const targetStateById = new Map<string, HardeningState>();
+  if (targetIncidentIds.length > 0) {
+    const placeholders = targetIncidentIds.map(() => "?").join(",");
+    const targetRows = await env.DB.prepare(
+      `SELECT id, state FROM operator_hardening_incidents WHERE id IN (${placeholders})`,
+    ).bind(...targetIncidentIds).all<Record<string, unknown>>();
+    for (const targetRow of targetRows.results ?? []) {
+      const targetId = normalizeOperatorText(targetRow.id, 120, true);
+      const targetState = normalizeHardeningState(targetRow.state);
+      if (targetId && targetState) targetStateById.set(targetId, targetState);
+    }
+  }
 
-  let reconciled = 0;
+  const reconciliationStatements: D1PreparedStatement[] = [];
+  const reconciliationIncidentIds: string[] = [];
   let skipped = 0;
-  for (const row of candidates.results ?? []) {
+  for (const row of candidateRows) {
     const incidentId = normalizeOperatorText(row.id, 120, true);
     const expected = safeParseJsonString(String(row.expected_json ?? ""));
     const observed = safeParseJsonString(String(row.observed_json ?? ""));
@@ -19026,13 +19046,11 @@ async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): 
       continue;
     }
 
-    let targetClosed = false;
-    if (targetIncidentId && targetIncidentId !== incidentId) {
-      const target = await env.DB.prepare(
-        `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
-      ).bind(targetIncidentId).first<Record<string, unknown>>();
-      targetClosed = normalizeHardeningState(target?.state) === "closed";
-    }
+        const targetClosed = Boolean(
+      targetIncidentId
+      && targetIncidentId !== incidentId
+      && targetStateById.get(targetIncidentId) === "closed",
+    );
     if (!handledHistoricalProvider && !targetClosed) {
       skipped += 1;
       continue;
@@ -19073,45 +19091,76 @@ async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): 
       client_case_gateway_dependency_removed: true,
     };
 
-    const sequence: Array<{ target_state: string; delta?: Record<string, unknown> }> = [
-      { target_state: "contained" },
-      { target_state: "classified" },
-      { target_state: "reproduced" },
-      { target_state: "generalized", delta: { root_cause: rootCause, generalized_cause: generalizedCause } },
-      { target_state: "repaired" },
-      { target_state: "prevention_locked", delta: { prevention_rule_id: preventionRuleId } },
-      { target_state: "validated", delta: { regression_test_ids: regressionTestIds } },
-      { target_state: "released", delta: { tested_sha: currentRuntimeSha } },
-      { target_state: "live_verified", delta: { deployment_id: currentRuntimeDeploymentId } },
-      { target_state: "resumed", delta: { live_verification: liveVerification } },
-      { target_state: "closed", delta: { resume_result: resumeResult, autonomy_dividend: autonomyDividend } },
-    ];
-
-    let completed = false;
-    for (const transition of sequence) {
-      const current = await env.DB.prepare(
-        `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
-      ).bind(incidentId).first<Record<string, unknown>>();
-      const currentState = normalizeHardeningState(current?.state);
-      if (!currentState) break;
-      if (currentState === "closed") {
-        completed = true;
-        break;
-      }
-      if (HARDENING_STATE_ORDER.indexOf(currentState) >= HARDENING_STATE_ORDER.indexOf(transition.target_state as HardeningState)) continue;
-      const advanced = await advanceHardeningIncident(env, {
-        incident_id: incidentId,
-        target_state: transition.target_state,
-        ...(transition.delta ?? {}),
-      });
-      if (advanced.ok !== true) break;
-      if (transition.target_state === "closed" && advanced.current_state === "closed") completed = true;
+        const terminalEvidence: HardeningTransitionEvidence = {
+      root_cause: rootCause,
+      generalized_cause: generalizedCause,
+      prevention_rule_id: preventionRuleId,
+      regression_test_ids: regressionTestIds,
+      tested_sha: currentRuntimeSha,
+      deployment_id: currentRuntimeDeploymentId,
+      live_verification: liveVerification,
+      resume_result: resumeResult,
+      autonomy_dividend: autonomyDividend,
+    };
+    const terminalValidation = validateHardeningTerminalReconciliation(terminalEvidence);
+    const currentState = normalizeHardeningState(row.state);
+    if (!terminalValidation.allowed || !currentState) {
+      skipped += 1;
+      continue;
     }
-    if (completed) reconciled += 1;
-    else skipped += 1;
+
+    reconciliationIncidentIds.push(incidentId);
+    reconciliationStatements.push(
+      env.DB.prepare(
+        `UPDATE operator_hardening_incidents SET
+          state = 'closed', root_cause = ?, generalized_cause = ?, prevention_rule_id = ?,
+          regression_test_ids_json = ?, tested_sha = ?, deployment_id = ?,
+          live_verification_json = ?, resume_result_json = ?, autonomy_dividend_json = ?,
+          closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND state = ?`,
+      ).bind(
+        rootCause,
+        generalizedCause,
+        preventionRuleId,
+        normalizeOperatorJson(regressionTestIds, []),
+        currentRuntimeSha ?? null,
+        currentRuntimeDeploymentId ?? null,
+        normalizeOperatorJson(liveVerification, {}),
+        normalizeOperatorJson(resumeResult, {}),
+        normalizeOperatorJson(autonomyDividend, {}),
+        incidentId,
+        currentState,
+      ),
+      env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, ?, 'closed', ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        incidentId,
+        currentState,
+        normalizeOperatorJson({
+          ...terminalEvidence,
+          reconciliation_source: reconciliationSource,
+          terminal_reconciliation: true,
+          request_amplification_removed: true,
+        }, {}),
+      ),
+    );
   }
 
-  return { checked: (candidates.results ?? []).length, reconciled, skipped };
+    if (reconciliationStatements.length > 0) {
+    await env.DB.batch(reconciliationStatements);
+  }
+  let reconciled = 0;
+  if (reconciliationIncidentIds.length > 0) {
+    const placeholders = reconciliationIncidentIds.map(() => "?").join(",");
+    const confirmed = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM operator_hardening_incidents WHERE id IN (${placeholders}) AND state = 'closed'`,
+    ).bind(...reconciliationIncidentIds).first<Record<string, unknown>>();
+    reconciled = Number(confirmed?.count ?? 0);
+    skipped += Math.max(0, reconciliationIncidentIds.length - reconciled);
+  }
+  return { checked: candidateRows.length, reconciled, skipped };
 }
 
 async function getHardeningStatus(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
