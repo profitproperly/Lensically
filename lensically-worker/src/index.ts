@@ -17817,7 +17817,8 @@ async function prepareOperatorRoutedGatewayCall(
   let directInputs = gatewayArgs.inputs && typeof gatewayArgs.inputs === "object" && !Array.isArray(gatewayArgs.inputs)
     ? gatewayArgs.inputs as Record<string, unknown>
     : null;
-      if (actionIntent === "advance control step" && directInputs) {
+            const preparedControlStep = directInputs?.prepared_tool_name === "runGitHubWorkflow";
+  if (actionIntent === "advance control step" && directInputs && !preparedControlStep) {
     const controlInputKeys = Object.keys(directInputs);
     const requestedReleaseSha = typeof directInputs.release_sha === "string" ? directInputs.release_sha : null;
     if (
