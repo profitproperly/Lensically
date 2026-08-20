@@ -17588,7 +17588,18 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       available_profile_hint: "Use startup, account_key_selection, or account_proceed for account initialization; use a registered snake_case capability profile for later work.",
         };
   }
-      if (profileId === "control_step") {
+            if (profileId === "control_step") {
+    if (typedLifecycleBound) {
+      return {
+        ok: true,
+        profile_id: profileId,
+        request: {
+          objective: "Advance one control step.",
+          intent: "advance control step",
+          inputs: { ...inputs },
+        },
+      };
+    }
     const inputKeys = Object.keys(inputs);
     const releaseSha = typeof inputs.release_sha === "string" ? inputs.release_sha : null;
     if (
