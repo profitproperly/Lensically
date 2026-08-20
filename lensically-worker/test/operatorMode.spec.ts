@@ -3873,6 +3873,7 @@ describe("operator mode MCP endpoint", () => {
     const mutationExecutionDescriptorBranches = mutationExecutionDescriptorSchema?.oneOf ?? [];
     expect(readExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "read_only")).toBe(true);
     expect(mutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);
+    expect(mutationExecutionDescriptorBranches.some((branch) => branch.properties?.action_id?.const === "client_block_intake")).toBe(false);
     expect(mutationExecutionDescriptorBranches.some((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""))).toBe(false);
     const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...readExecutionDescriptorBranches];
     const caseStepDescriptorBranches = executionDescriptorBranches.filter((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""));
