@@ -18666,8 +18666,20 @@ async function closeResolvedHardeningIncidentsForRequest(
   return incidents.length;
 }
 
-function hardeningRecurrenceFamily(boundary: string, category: string): string {
+function hardeningRecurrenceFamily(boundary: string, category: string, observed?: unknown): string {
   const normalizedCategory = category.toLowerCase();
+  const observedRecord = observed && typeof observed === "object" && !Array.isArray(observed)
+    ? observed as Record<string, unknown>
+    : null;
+  const observedTransportStatus = Number(observedRecord?.transport_status ?? observedRecord?.status ?? 0);
+  const observedMessage = normalizeOperatorText(observedRecord?.message, 500, true)?.toLowerCase() ?? "";
+  const categorySignalsUpstream502 = normalizedCategory.includes("502")
+    && (normalizedCategory.includes("upstream") || normalizedCategory.includes("external"));
+  const observedSignalsUpstream502 = observedTransportStatus === 502
+    && (observedMessage.includes("upstream") || observedMessage.includes("external service"));
+  if (boundary === "external" && (categorySignalsUpstream502 || observedSignalsUpstream502)) {
+    return "external:upstream_transport_502";
+  }
   const isOpenAiSafetyPredispatch = boundary === "client" && (
     normalizedCategory === "openai_client_safety_block"
     || normalizedCategory === "client_pre_dispatch_block"
@@ -18701,7 +18713,7 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   const fingerprint = normalizeOperatorText(args.request_fingerprint, 200, true);
   const observed = normalizeOperatorText(args.observed_outcome, 1000, true) ?? category;
   const rule = resolvePromotedWinningPath(category.replace(/_/g, " "), observed, { blocked_profile_id: profile });
-    const recurrenceFamily = hardeningRecurrenceFamily(boundary, category);
+      const recurrenceFamily = hardeningRecurrenceFamily(boundary, category, args.observed_outcome);
   const signature = await sha256OperatorText(JSON.stringify({ boundary, profile, category, fingerprint }));
   const existing = await env.DB.prepare(
     `SELECT * FROM operator_hardening_incidents WHERE signature = ? AND state <> 'closed' LIMIT 1`,
@@ -18755,23 +18767,36 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
      ORDER BY datetime(COALESCE(i.closed_at, i.updated_at)) DESC
      LIMIT 100`,
   ).bind(boundary).all<Record<string, unknown>>();
-  const relatedPriorRows = (priorRows.results ?? []).filter((candidate) => {
+    const relatedPriorRows = (priorRows.results ?? []).filter((candidate) => {
     const candidateCategory = normalizeOperatorMachineKey(candidate.detected_error_category, "");
-    if (!candidateCategory || hardeningRecurrenceFamily(boundary, candidateCategory) !== recurrenceFamily) return false;
-        if (
+    const candidateObserved = safeParseJsonString(String(candidate.observed_json ?? ""));
+    if (!candidateCategory || hardeningRecurrenceFamily(boundary, candidateCategory, candidateObserved) !== recurrenceFamily) return false;
+    if (
       recurrenceFamily === "client:openai_safety_predispatch"
       || recurrenceFamily === "client:closed_schema_contract_violation"
     ) return true;
+    if (recurrenceFamily === "external:upstream_transport_502") {
+      return String(candidate.blocked_profile_id ?? "") === profile
+        && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "");
+    }
     return String(candidate.blocked_profile_id ?? "") === profile
       && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "")
       && candidateCategory === category;
   });
-    const priorActiveRow = relatedPriorRows.find((candidate) => String(candidate.state) !== "closed") ?? null;
+  const priorActiveRow = relatedPriorRows
+    .filter((candidate) => String(candidate.state) !== "closed")
+    .sort((left, right) => {
+      const leftState = normalizeHardeningState(left.state) ?? "detected";
+      const rightState = normalizeHardeningState(right.state) ?? "detected";
+      const progressDelta = HARDENING_STATE_ORDER.indexOf(rightState) - HARDENING_STATE_ORDER.indexOf(leftState);
+      if (progressDelta !== 0) return progressDelta;
+      return String(left.created_at ?? "").localeCompare(String(right.created_at ?? ""));
+    })[0] ?? null;
   const priorClosedRow = relatedPriorRows.find((candidate) =>
     String(candidate.state) === "closed"
     && String(candidate.prevention_rule_id ?? "").trim().length > 0
   ) ?? null;
-  if (priorActiveRow && String(priorActiveRow.state ?? "detected") !== "detected") {
+    if (priorActiveRow) {
     const priorActiveState = String(priorActiveRow.state ?? "detected");
     await env.DB.batch([
       env.DB.prepare(

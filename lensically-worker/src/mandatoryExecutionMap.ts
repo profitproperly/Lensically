@@ -534,6 +534,27 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
         regression_test_id: "normalizes live OpenAI safety pre-dispatch wording variants into one causal recurrence family",
     supersession_rule: "Any replacement must preserve occurrence evidence while normalizing semantically equivalent OpenAI client safety pre-dispatch wording before novelty classification and must retain regression coverage for live escaped variants.",
   },
+    {
+    id: "external_upstream_502_causal_recurrence_convergence",
+    status: "active",
+    priority: 260,
+    defect_class: "known_recurrence",
+    matching_conditions: {
+      any_terms: ["upstream external 502", "external transport 502", "upstream transport", "unknown runtime failure", "execute operator read action 502"],
+    },
+    losing_path: "Treat the same external upstream 502 as unrelated failures when one intake uses a transport-specific category and another source-defined classifier falls back to unknown_runtime_failure, creating sibling P1 incidents instead of accumulating one causal hardening history.",
+    root_cause: "The hardening recurrence-family normalizer handled client-side OpenAI aliases but external failures fell through to raw boundary/category families, and related active external incidents required exact category equality even when observed transport evidence proved the same 502 boundary.",
+    winning_path: {
+      surface: "runtime_guard",
+      procedure: ["Normalize external upstream 502 failures from either category semantics or observed transport_status/message evidence into external:upstream_transport_502.", "Preserve each occurrence's original category and observed evidence while comparing the normalized causal family.", "Keep external-family convergence scoped to the same blocked profile and blocked tool so unrelated 502s do not collapse together.", "Prefer the most advanced active incident in the causal family and converge recurrences from detected onward instead of creating sibling blockers.", "Regression-test transport-specific and fallback classifier categories against the same live failure shape."],
+    },
+    evidence: ["Current production incident c262eea7-d8d8-4ac4-8ec5-22ca94171951 was recorded as upstream_external_502 for execute_operator_read_action.", "A live recurrence of the same executeOperatorReadAction 502 on 2026-08-20 was classified by inspectMcpFailure as unknown_runtime_failure and incorrectly opened sibling incident a5efd3dc-2c9a-4951-ad90-329a0471f77b.", "Source inspection proved hardeningRecurrenceFamily returned raw external categories and relatedPriorRows required candidateCategory === category outside the two client-only normalized families."],
+    scope: "universal",
+    binding_scope: "runtime_guard",
+    enforcement_point: "hardeningRecurrenceFamily external transport normalization and recordHardeningIncident active-family convergence before novelty classification.",
+    regression_test_id: "converges external upstream 502 category drift into one active hardening incident",
+    supersession_rule: "Any replacement must preserve every occurrence, normalize causal external upstream 502 evidence before novelty classification, keep convergence profile/tool scoped, prefer the most advanced active incident, and prevent sibling blockers from category wording drift.",
+  },
   {
     id: "openai_predispatch_external_recurrence_convergence",
     status: "active",

@@ -6606,6 +6606,57 @@ active_checkpoint: none
     }
   }, 30000);
 
+    it("converges external upstream 502 category drift into one active hardening incident", async () => {
+    const firstCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; state: string };
+    }>("recordHardeningIncident", {
+      boundary: "external",
+      blocked_profile_id: "execute_operator_read_action",
+      error_category: "upstream_external_502",
+      operation_class: "engineering_read",
+      expected_outcome: { gateway: "executeOperatorReadAction" },
+      observed_outcome: { transport_status: 502, message: "Upstream or external service errors", lensically_receipt: "unknown" },
+    });
+    const first = firstCall.structuredContent;
+    expect(firstCall.isError).not.toBe(true);
+    expect(first.created).toBe(true);
+    expect(first.incident).toMatchObject({ classification: "novel_failure", state: "detected" });
+
+    const secondCall = await mcpToolRaw<{
+      ok: boolean;
+      created: boolean;
+      incident: { id: string; classification: string; state: string };
+      recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
+    }>("recordHardeningIncident", {
+      boundary: "external",
+      blocked_profile_id: "execute_operator_read_action",
+      error_category: "unknown_runtime_failure",
+      operation_class: "engineering_read",
+      expected_outcome: { gateway: "executeOperatorReadAction" },
+      observed_outcome: { transport_status: 502, message: "Upstream or external service errors", lensically_receipt: "unknown" },
+    });
+    const second = secondCall.structuredContent;
+    expect(secondCall.isError).not.toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.incident).toMatchObject({ id: first.incident.id, classification: "known_prevention", state: "detected" });
+    expect(second.recurrence).toMatchObject({
+      status: "known_active_recurrence",
+      prior_incident_id: first.incident.id,
+      recurrence_family: "external:upstream_transport_502",
+    });
+
+    const events = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM operator_hardening_incident_events WHERE incident_id = ?`,
+    ).bind(first.incident.id).first<{ count: number }>();
+    expect(Number(events?.count ?? 0)).toBeGreaterThanOrEqual(2);
+
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(first.incident.id).run();
+  }, 30000);
+
   it("converges recurrences into an already-advanced active hardening incident", async () => {
     const firstCall = await mcpToolRaw<{
       ok: boolean;
