@@ -18997,46 +18997,79 @@ async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): 
     const targetIncidentId = expected && typeof expected === "object" && !Array.isArray(expected)
       ? normalizeOperatorText((expected as Record<string, unknown>).incident_id, 120, true)
       : null;
-    const authoritativePredispatchNonreceipt = Boolean(
-      observed
-      && typeof observed === "object"
-      && !Array.isArray(observed)
-      && (observed as Record<string, unknown>).lensically_step4_receipt === false,
+    const observedRecord = observed && typeof observed === "object" && !Array.isArray(observed)
+      ? observed as Record<string, unknown>
+      : null;
+    const detectedErrorCategory = normalizeOperatorMachineKey(row.detected_error_category, "");
+    const observedMessage = normalizeOperatorText(observedRecord?.message, 1000, true)?.toLowerCase() ?? "";
+    const inferredErrorCategory = detectedErrorCategory
+      || (observedMessage.includes("openai") && observedMessage.includes("safety") ? "openai_predispatch_safety_block" : "");
+    const recurrenceFamily = inferredErrorCategory
+      ? hardeningRecurrenceFamily("client", inferredErrorCategory, observedRecord)
+      : null;
+    const handledHistoricalProvider = Boolean(
+      handledProviderAnchor
+      && recurrenceFamily === "client:openai_safety_predispatch",
     );
-    if (!incidentId || !targetIncidentId || targetIncidentId === incidentId || !authoritativePredispatchNonreceipt) {
+    const dispatchText = normalizeOperatorText(observedRecord?.dispatch, 500, true)?.toLowerCase() ?? "";
+    const authoritativePredispatchNonreceipt = Boolean(
+      observedRecord
+      && (
+        observedRecord.lensically_step4_receipt === false
+        || observedRecord.lensically_receipt === false
+        || observedRecord.client_blocked === true
+        || dispatchText.includes("blocked_before")
+      ),
+    );
+    if (!incidentId || !authoritativePredispatchNonreceipt) {
       skipped += 1;
       continue;
     }
 
-    const target = await env.DB.prepare(
-      `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
-    ).bind(targetIncidentId).first<Record<string, unknown>>();
-    if (normalizeHardeningState(target?.state) !== "closed") {
+    let targetClosed = false;
+    if (targetIncidentId && targetIncidentId !== incidentId) {
+      const target = await env.DB.prepare(
+        `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
+      ).bind(targetIncidentId).first<Record<string, unknown>>();
+      targetClosed = normalizeHardeningState(target?.state) === "closed";
+    }
+    if (!handledHistoricalProvider && !targetClosed) {
       skipped += 1;
       continue;
     }
 
-    const rootCause = "A client pre-dispatch block preserved a replay capsule after the semantic target incident had already reached closed, and replay authorization was not reconciled against the target's current durable state before reuse.";
-    const generalizedCause = "Any client-side replay preserved after authoritative non-receipt must revalidate the semantic target's current durable state immediately before replay; if the target already satisfies the operation or is closed, reconcile the blocker instead of dispatching obsolete work.";
+    const reconciliationSource = handledHistoricalProvider
+      ? "server_owned_historical_openai_predispatch_reconciliation"
+      : "server_owned_client_predispatch_target_reconciliation";
+    const rootCause = handledHistoricalProvider
+      ? "Historical OpenAI pre-dispatch non-receipt remained globally blocking after the provider recurrence prevention was proven because status reconciliation recognized only the newest receipt field and required an already-closed semantic target."
+      : "A client pre-dispatch block preserved a replay capsule after the semantic target incident had already reached closed, and replay authorization was not reconciled against the target's current durable state before reuse.";
+    const generalizedCause = handledHistoricalProvider
+      ? "Once the OpenAI pre-dispatch handling prevention is durably closed and proven, historical same-family non-received incidents must converge server-side during hardening status reconciliation across legacy non-receipt field shapes instead of requiring fresh client mutation calls."
+      : "Any client-side replay preserved after authoritative non-receipt must revalidate the semantic target's current durable state immediately before replay; if the target already satisfies the operation or is closed, reconcile the blocker instead of dispatching obsolete work.";
     const preventionRuleId = "openai_predispatch_external_recurrence_convergence";
-    const regressionTestIds = ["live hardening status reconciliation closes stale client predispatch replay target"];
+    const regressionTestIds = [handledHistoricalProvider
+      ? "hardening status reconciles historical OpenAI predispatch nonreceipt under locked provider convergence"
+      : "live hardening status reconciliation closes stale client predispatch replay target"];
     const liveVerification = {
-      source: "server_owned_client_predispatch_target_reconciliation",
+      source: reconciliationSource,
+      provider_anchor_incident_id: handledHistoricalProvider ? normalizeOperatorText(handledProviderAnchor?.id, 120, true) : null,
       target_incident_id: targetIncidentId,
-      target_state: "closed",
+      target_state: targetClosed ? "closed" : null,
       current_runtime_sha: currentRuntimeSha ?? null,
       current_runtime_deployment_id: currentRuntimeDeploymentId ?? null,
     };
     const resumeResult = {
-      status: "semantic_operation_already_satisfied",
-      source: "server_owned_client_predispatch_target_reconciliation",
+      status: handledHistoricalProvider ? "historical_external_provider_occurrence_reconciled" : "semantic_operation_already_satisfied",
+      source: reconciliationSource,
       target_incident_id: targetIncidentId,
-      target_state: "closed",
+      target_state: targetClosed ? "closed" : null,
     };
     const autonomyDividend = {
-      source: "server_owned_client_predispatch_target_reconciliation",
+      source: reconciliationSource,
       owner_action_required: false,
       stale_replay_removed: true,
+      historical_provider_debt_removed: handledHistoricalProvider,
       client_case_gateway_dependency_removed: true,
     };
 
