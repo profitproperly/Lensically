@@ -18878,8 +18878,115 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
   };
 }
 
+async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): Promise<{ checked: number; reconciled: number; skipped: number }> {
+  await ensureOperatorMcpAdminTables(env);
+  const currentRuntimeSha = normalizeOperatorText(env.LENSICALLY_COMMIT_SHA, 120, true);
+  const currentRuntimeDeploymentId = normalizeOperatorText(env.CF_VERSION_METADATA?.id, 160, true);
+  const candidates = await env.DB.prepare(
+    `SELECT * FROM operator_hardening_incidents
+     WHERE boundary = 'client'
+       AND state <> 'closed'
+       AND severity IN ('P0', 'P1')
+     ORDER BY datetime(updated_at) ASC
+     LIMIT 20`,
+  ).all<Record<string, unknown>>();
+
+  let reconciled = 0;
+  let skipped = 0;
+  for (const row of candidates.results ?? []) {
+    const incidentId = normalizeOperatorText(row.id, 120, true);
+    const expected = safeParseJsonString(String(row.expected_json ?? ""));
+    const observed = safeParseJsonString(String(row.observed_json ?? ""));
+    const targetIncidentId = expected && typeof expected === "object" && !Array.isArray(expected)
+      ? normalizeOperatorText((expected as Record<string, unknown>).incident_id, 120, true)
+      : null;
+    const authoritativePredispatchNonreceipt = Boolean(
+      observed
+      && typeof observed === "object"
+      && !Array.isArray(observed)
+      && (observed as Record<string, unknown>).lensically_step4_receipt === false,
+    );
+    if (!incidentId || !targetIncidentId || targetIncidentId === incidentId || !authoritativePredispatchNonreceipt) {
+      skipped += 1;
+      continue;
+    }
+
+    const target = await env.DB.prepare(
+      `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
+    ).bind(targetIncidentId).first<Record<string, unknown>>();
+    if (normalizeHardeningState(target?.state) !== "closed") {
+      skipped += 1;
+      continue;
+    }
+
+    const rootCause = "A client pre-dispatch block preserved a replay capsule after the semantic target incident had already reached closed, and replay authorization was not reconciled against the target's current durable state before reuse.";
+    const generalizedCause = "Any client-side replay preserved after authoritative non-receipt must revalidate the semantic target's current durable state immediately before replay; if the target already satisfies the operation or is closed, reconcile the blocker instead of dispatching obsolete work.";
+    const preventionRuleId = "openai_predispatch_external_recurrence_convergence";
+    const regressionTestIds = ["live hardening status reconciliation closes stale client predispatch replay target"];
+    const liveVerification = {
+      source: "server_owned_client_predispatch_target_reconciliation",
+      target_incident_id: targetIncidentId,
+      target_state: "closed",
+      current_runtime_sha: currentRuntimeSha ?? null,
+      current_runtime_deployment_id: currentRuntimeDeploymentId ?? null,
+    };
+    const resumeResult = {
+      status: "semantic_operation_already_satisfied",
+      source: "server_owned_client_predispatch_target_reconciliation",
+      target_incident_id: targetIncidentId,
+      target_state: "closed",
+    };
+    const autonomyDividend = {
+      source: "server_owned_client_predispatch_target_reconciliation",
+      owner_action_required: false,
+      stale_replay_removed: true,
+      client_case_gateway_dependency_removed: true,
+    };
+
+    const sequence: Array<{ target_state: string; delta?: Record<string, unknown> }> = [
+      { target_state: "contained" },
+      { target_state: "classified" },
+      { target_state: "reproduced" },
+      { target_state: "generalized", delta: { root_cause: rootCause, generalized_cause: generalizedCause } },
+      { target_state: "repaired" },
+      { target_state: "prevention_locked", delta: { prevention_rule_id: preventionRuleId } },
+      { target_state: "validated", delta: { regression_test_ids: regressionTestIds } },
+      { target_state: "released", delta: { tested_sha: currentRuntimeSha } },
+      { target_state: "live_verified", delta: { deployment_id: currentRuntimeDeploymentId } },
+      { target_state: "resumed", delta: { live_verification: liveVerification } },
+      { target_state: "closed", delta: { resume_result: resumeResult, autonomy_dividend: autonomyDividend } },
+    ];
+
+    let completed = false;
+    for (const transition of sequence) {
+      const current = await env.DB.prepare(
+        `SELECT state FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
+      ).bind(incidentId).first<Record<string, unknown>>();
+      const currentState = normalizeHardeningState(current?.state);
+      if (!currentState) break;
+      if (currentState === "closed") {
+        completed = true;
+        break;
+      }
+      if (HARDENING_STATE_ORDER.indexOf(currentState) >= HARDENING_STATE_ORDER.indexOf(transition.target_state as HardeningState)) continue;
+      const advanced = await advanceHardeningIncident(env, {
+        incident_id: incidentId,
+        target_state: transition.target_state,
+        ...(transition.delta ?? {}),
+      });
+      if (advanced.ok !== true) break;
+      if (transition.target_state === "closed" && advanced.current_state === "closed") completed = true;
+    }
+    if (completed) reconciled += 1;
+    else skipped += 1;
+  }
+
+  return { checked: (candidates.results ?? []).length, reconciled, skipped };
+}
+
 async function getHardeningStatus(env: Env, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   await ensureOperatorMcpAdminTables(env);
+  const staleReplayReconciliation = await reconcileSatisfiedClientPredispatchHardeningIncidents(env);
   const incidentId = normalizeOperatorText(args.incident_id, 120, true);
   const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
   const result = incidentId
