@@ -23128,6 +23128,34 @@ async function handleOperatorMcpEngineeringTool(
       ? `/actions/workflows/${encodeURIComponent(workflowId)}/runs?per_page=${limit}`
       : `/actions/runs?per_page=${limit}`;
     const result = await githubRepoApi(env, path);
+    if (!result.ok && Number(result.status) === 404 && workflowId) {
+      const workflows = await githubRepoApi(env, "/actions/workflows?per_page=100");
+      const workflowRows = workflows.data && typeof workflows.data === "object" && !Array.isArray(workflows.data)
+        && Array.isArray((workflows.data as Record<string, unknown>).workflows)
+        ? (workflows.data as Record<string, unknown>).workflows as Array<Record<string, unknown>>
+        : [];
+      const requested = workflowId.toLowerCase();
+      const workflowFound = workflowRows.some((row) => {
+        const candidates = [row.id, row.name, row.path]
+          .map((value) => String(value ?? "").trim().toLowerCase())
+          .filter(Boolean);
+        return candidates.includes(requested);
+      });
+      if (workflows.ok && !workflowFound) {
+        return {
+          ok: true,
+          status: 200,
+          runs: [],
+          requested_workflow_id: workflowId,
+          workflow_found: false,
+          reconciliation: {
+            mode: "authoritative_workflow_inventory",
+            workflow_lookup_status: 404,
+            workflow_inventory_status: workflows.status,
+          },
+        };
+      }
+    }
     const runs = result.data && typeof result.data === "object" && !Array.isArray(result.data) && Array.isArray((result.data as Record<string, unknown>).workflow_runs)
       ? ((result.data as Record<string, unknown>).workflow_runs as Array<Record<string, unknown>>).map((run) => ({ id: run.id, name: run.name, status: run.status, conclusion: run.conclusion, head_sha: run.head_sha, created_at: run.created_at, html_url: run.html_url }))
       : [];
