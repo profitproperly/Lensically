@@ -3974,10 +3974,10 @@ describe("operator mode MCP endpoint", () => {
       "Call getOperatorSessionMap before any other Lensically Operator Mode tool.",
     ]);
     expect(initialized.instructions.length).toBeLessThan(1000);
-    const step1 = await mcpTool<{ session_map_token: string; lifecycle: { initial_sequence: string[]; recurring_sequence: string[] }; session_map: { architecture: string }; account_data_loaded: boolean }>("getOperatorSessionMap");
-    expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"]);
-    expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"]);
-    expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", case_mutation: "executeOperatorCaseAction", mutation: "executeOperatorAction" });
+    const step1 = await mcpTool<{ session_map_token: string; lifecycle: { initial_sequence: string[]; recurring_sequence: string[]; step4_gateways: Record<string, string> }; session_map: { architecture: string }; account_data_loaded: boolean }>("getOperatorSessionMap");
+    expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", case_mutation: "executeOperatorCaseAction", hardening_intake: "executeOperatorHardeningAction", mutation: "executeOperatorAction" });
     expect(step1.session_map.architecture).toBe("recursive_pointer_tree_v1");
     expect(step1.account_data_loaded).toBe(false);
     expect(step1.session_map_token).toBeTruthy();
