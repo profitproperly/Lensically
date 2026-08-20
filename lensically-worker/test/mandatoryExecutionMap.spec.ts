@@ -56,6 +56,20 @@ describe("mandatory execution map", () => {
     );
   });
 
+  it("binds current campaign topology revalidation before stale hardening closure", () => {
+    const prevention = resolveActionBoundWinningPaths("runMcpTests")
+      .find((candidate) => candidate.id === "current_capability_campaign_topology_revalidation");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.action_binding?.tool_names).toContain("runMcpTests");
+    expect(prevention?.winning_path.procedure).toContain(
+      "Re-run the exact bounded campaign on the current production SHA and callable topology before advancing a historical campaign incident.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "If the historically failing member left the callable surface and the exact current segment passes completely, classify the incident as stale validation debt rather than inventing a source defect.",
+    );
+  });
+
   it("closes stored-verified resumed hardening incidents without client finalization", () => {
     const prevention = WINNING_PATH_PROMOTIONS
       .find((candidate) => candidate.id === "server_owned_resumed_hardening_closure");
