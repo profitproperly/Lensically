@@ -6827,9 +6827,6 @@ active_checkpoint: none
         status: "known_active_recurrence",
         recurrence_family: "client:openai_safety_predispatch",
       });
-      await env.DB.prepare(
-        `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      ).bind(variant.incident.id).run();
     }
 
     for (const incidentId of [alias.incident.id, currentAlias.incident.id]) {
