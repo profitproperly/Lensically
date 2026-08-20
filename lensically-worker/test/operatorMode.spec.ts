@@ -4210,6 +4210,20 @@ active_checkpoint: none
       "competency.repository_engineering",
       "competency.release_infrastructure",
     ]));
+
+    const systemControlStep2 = await mcpToolCallRaw<{
+      action_rule_binding: { competency_ids: string[]; rule_ids: string[] };
+    }>("getOperatorKnowledge", {
+      session_map_token: step1.structuredContent.session_map_token,
+      planned_action: { capability: "list_mcp_tools", arguments: {} },
+    });
+    expect(systemControlStep2.isError, JSON.stringify(systemControlStep2.structuredContent)).not.toBe(true);
+    expect(systemControlStep2.structuredContent.action_rule_binding.competency_ids).toEqual(["governance", "repository_engineering"]);
+    expect(systemControlStep2.structuredContent.action_rule_binding.competency_ids).not.toContain("account_runtime");
+    expect(systemControlStep2.structuredContent.action_rule_binding.rule_ids).toEqual(expect.arrayContaining([
+      "competency.governance",
+      "competency.repository_engineering",
+    ]));
   });
 
   it("preserves client-visible read semantics for engineering continuation through Step 4", async () => {
