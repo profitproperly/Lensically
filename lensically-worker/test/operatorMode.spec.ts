@@ -6746,7 +6746,7 @@ active_checkpoint: none
       recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
     }>("recordHardeningIncident", {
       boundary: "client",
-      blocked_profile_id: "hardening_transition",
+      blocked_profile_id: "run_git_hub_workflow",
       request_fingerprint: "fixture-openai-client-block-b",
       error_category: "openai_client_safety_pre_dispatch",
       operation_class: "engineering_hardening_transition",
