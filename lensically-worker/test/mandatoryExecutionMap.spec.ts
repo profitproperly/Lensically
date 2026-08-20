@@ -76,6 +76,18 @@ describe("mandatory execution map", () => {
     );
   });
 
+  it("promotes server-owned reconciliation for historical OpenAI predispatch debt", () => {
+    const prevention = WINNING_PATH_PROMOTIONS
+      .find((candidate) => candidate.id === "openai_predispatch_external_recurrence_convergence");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.binding_scope).toBe("runtime_guard");
+    expect(prevention?.winning_path.procedure).toContain(
+      "During hardening status reads, if this provider convergence is already proven by a closed same-family prevention anchor, reconcile pre-repair active OpenAI pre-dispatch non-receipt debt server-side across legacy receipt-field shapes instead of requiring another client mutation to close historical bookkeeping.",
+    );
+    expect(prevention?.enforcement_point).toContain("getHardeningStatus historical provider-debt reconciliation");
+  });
+
   it("binds current campaign topology revalidation before stale hardening closure", () => {
     const prevention = resolveActionBoundWinningPaths("runMcpTests")
       .find((candidate) => candidate.id === "current_capability_campaign_topology_revalidation");
