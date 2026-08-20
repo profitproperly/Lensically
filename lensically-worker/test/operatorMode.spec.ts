@@ -6458,7 +6458,7 @@ active_checkpoint: none
     ]);
     const step1 = await mcpToolCallRaw<{
       ok: boolean;
-      lifecycle: { version: string; initial_sequence: string[]; recurring_sequence: string[]; step4_gateways: { read_only: string; case_mutation: string; mutation: string } };
+      lifecycle: { version: string; initial_sequence: string[]; recurring_sequence: string[]; step4_gateways: { read_only: string; case_mutation: string; hardening_intake: string; mutation: string } };
       session_map: {
         version: string;
         architecture: string;
