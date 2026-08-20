@@ -807,11 +807,12 @@ if (!operatorMcpToolDirectory.includes("OPERATOR_PUBLIC_DIRECT_TOOL_NAMES")
     || !operatorMcpToolDirectory.includes("findOperatorMcpToolDefinition")) {
   lifecycleErrors.push("operator_mcp_tool_directory_module_incomplete");
 }
-if (!operatorMcpToolDirectoryTests.includes("preserves the seven-tool, five-stage public lifecycle surface while keeping capabilities internal")
+if (!operatorMcpToolDirectoryTests.includes("preserves the eight-tool, five-stage public lifecycle surface while keeping capabilities internal")
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getOperatorSessionMap")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("executeOperatorReadAction")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("executeOperatorAction")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("executeOperatorCaseAction")')
+    || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("executeOperatorHardeningAction")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("getRepoStatus")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("searchRepoFiles")')
     || !operatorMcpToolDirectoryTests.includes('isOperatorPublicDirectToolName("operateStripe")')
