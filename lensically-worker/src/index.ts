@@ -19003,6 +19003,7 @@ async function getHardeningStatus(env: Env, args: Record<string, unknown>): Prom
     version: CONTINUOUS_HARDENING_VERSION,
     incidents,
     events,
+    stale_replay_reconciliation: staleReplayReconciliation,
     normal_work_blocked: Boolean(activeBlocking),
     blocking_incident: activeBlocking,
     required_action: activeBlocking ? "advance the blocking incident through verified closure before resuming normal work" : null,
