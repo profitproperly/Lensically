@@ -56,6 +56,7 @@ export interface OperatorMcpToolCallDependencies {
   readOnlyRoutedExecutionGateway: string;
   routedExecutionGateway: string;
   caseRoutedExecutionGateway: string;
+  hardeningRoutedExecutionGateway: string;
   mandatoryExecutionMapVersion: string;
   preCallRoutingVersion: string;
   executionPolicyVersion: string;
