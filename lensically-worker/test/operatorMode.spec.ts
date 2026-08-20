@@ -3824,9 +3824,9 @@ describe("operator mode MCP endpoint", () => {
         "operator_mcp_version_single_source",
         "neutral_control_plane_profile_aliases",
       ]));
-      expect(releaseWinningPathIds.indexOf("operator_mcp_version_single_source")).toBeLessThan(
-        releaseWinningPathIds.indexOf("neutral_control_plane_profile_aliases"),
-      );
+            const releaseVersionRuleIndex = releaseWinningPathIds.indexOf("operator_mcp_version_single_source");
+      const neutralControlPlaneRuleIndex = releaseWinningPathIds.indexOf("neutral_control_plane_profile_aliases");
+      expect(releaseVersionRuleIndex).toBeLessThan(neutralControlPlaneRuleIndex);
     });
 
     it("advertises only the normalized five-stage lifecycle and tiny Step-0 instructions", async () => {
