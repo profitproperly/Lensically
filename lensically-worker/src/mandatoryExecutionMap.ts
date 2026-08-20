@@ -577,9 +577,9 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     supersession_rule: "Any replacement must preserve every provider occurrence as durable evidence, keep active recurrence matching scoped to the same blocked profile/tool route, keep closed provider convergence family-wide, keep blocked actions non-received and non-replayed by default, avoid reopening hardening solely for recurrence of the externally controlled event once the handling prevention is proven, and retain blocking prevention-regression semantics for genuine controllable prevention escapes.",
   },
     {
-    id: "neutral_control_plane_profile_aliases",
+        id: "neutral_control_plane_profile_aliases",
     status: "active",
-    priority: 248,
+    priority: 99,
     defect_class: "known_recurrence",
     matching_conditions: {
       any_terms: ["control_step", "run github workflow", "control plane profile", "neutral control plane alias", "client-safe control plane"],
@@ -596,7 +596,7 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     binding_scope: "action",
     action_binding: { tool_names: ["runGitHubWorkflow"] },
     enforcement_point: "Required client-safe control_step mapping, Step-2 action-rule binding, server-side public-to-internal workflow argument derivation, and exact-head lifecycle regression.",
-    regression_test_id: "binds the neutral control-plane alias prevention to control_step before execution",
+        regression_test_id: "promotes neutral control-plane aliases without displacing the worker release winner",
     supersession_rule: "Any replacement must keep semantic workflow profile identifiers off the public client surface, preserve server-side derivation of internal workflow inputs from the prepared action, and keep the prevention bound to runGitHubWorkflow before Step 4.",
   },
   {

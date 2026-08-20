@@ -32,6 +32,7 @@ import worker, {
 
 } from "../src";
 import { OPERATOR_ACTION_RULE_REGISTRY_VERSION } from "../src/operatorMcpProtocol";
+import { resolveActionBoundWinningPaths, resolveHardeningPreventionBinding } from "../src/mandatoryExecutionMap";
 import {
   finalizeManifestCycleReceipt,
   recordManifestCycleDefect,
@@ -3812,6 +3813,18 @@ describe("operator mode MCP endpoint", () => {
     }
   }, 30000);
 
+        it("promotes neutral control-plane aliases without displacing the worker release winner", () => {
+      expect(resolveHardeningPreventionBinding("neutral_control_plane_profile_aliases")).toMatchObject({
+        id: "neutral_control_plane_profile_aliases",
+        binding_scope: "action",
+        tool_names: ["runGitHubWorkflow"],
+      });
+      expect(resolveActionBoundWinningPaths("runGitHubWorkflow", { task: "worker-deploy" }).map((entry) => entry.id).slice(0, 2)).toEqual([
+        "operator_mcp_version_single_source",
+        "neutral_control_plane_profile_aliases",
+      ]);
+    });
+
     it("advertises only the normalized five-stage lifecycle and tiny Step-0 instructions", async () => {
     const initialized = await mcpRequest<{ instructions: string }>("initialize", {
       protocolVersion: "2025-06-18",
@@ -3999,7 +4012,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
     const controlStepSingleSourceRuleId = ["operator", "mcp", "version", "single", "source"].join("_");
-        expect(controlStepKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining([controlStepSingleSourceRuleId, "neutral_control_plane_profile_aliases", "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
+                expect(controlStepKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining([controlStepSingleSourceRuleId, "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
     const controlStepLiveState = await mcpTool<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: string } }>("getOperatorLiveState", {
       knowledge_token: controlStepKnowledge.knowledge_token,
     });
