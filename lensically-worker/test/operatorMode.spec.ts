@@ -4160,8 +4160,13 @@ active_checkpoint: none
       lifecycle_stage: number;
       closure_token: string;
       next_sequence: string[];
-      operator_action_closure: {
-        turn_close_gate: { must_continue: boolean; normal_turn_close_allowed: boolean };
+            operator_action_closure: {
+        turn_close_gate: {
+          must_continue: boolean;
+          normal_turn_close_allowed: boolean;
+          active_interrupt: boolean;
+          active_interrupt_key: string | null;
+        };
       };
     }>("closeOperatorAction", {
       action_execution_token: step4.action_execution_token,
@@ -4175,9 +4180,11 @@ active_checkpoint: none
     expect(step5).toMatchObject({ ok: true, lifecycle_stage: 5 });
     expect(step5.closure_token).toBeTruthy();
     expect(step5.next_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"]);
-    expect(step5.operator_action_closure.turn_close_gate).toMatchObject({
+        expect(step5.operator_action_closure.turn_close_gate).toMatchObject({
       must_continue: true,
       normal_turn_close_allowed: false,
+      active_interrupt: false,
+      active_interrupt_key: null,
     });
   }, 30000);
 
