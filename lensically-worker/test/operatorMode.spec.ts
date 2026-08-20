@@ -3999,7 +3999,7 @@ describe("operator mode MCP endpoint", () => {
     });
     expect(controlStepKnowledge.knowledge_token).toBeTruthy();
     const controlStepSingleSourceRuleId = ["operator", "mcp", "version", "single", "source"].join("_");
-    expect(controlStepKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining([controlStepSingleSourceRuleId, "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
+        expect(controlStepKnowledge.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining([controlStepSingleSourceRuleId, "neutral_control_plane_profile_aliases", "client_safe_step4_execution_descriptor", "typed_profile_exact_contract"]));
     const controlStepLiveState = await mcpTool<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: string } }>("getOperatorLiveState", {
       knowledge_token: controlStepKnowledge.knowledge_token,
     });
