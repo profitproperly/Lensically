@@ -129,7 +129,7 @@ export function findOperatorMcpToolDefinition(
   tools: readonly OperatorMcpToolDefinition[],
   toolName: string,
   classifications: OperatorMcpToolClassifications,
-): Record<string, unknown> | null {
+): (OperatorMcpToolDefinition & { handler: OperatorMcpToolHandler; required_fields: string[] }) | null {
   const tool = tools.find((item) => item.name === toolName);
   return tool ? shapeOperatorMcpToolDefinition(tool, classifications) : null;
 }
