@@ -7756,6 +7756,19 @@ active_checkpoint: none
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const request = new Request(input, init);
       const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/repos/profitproperly/Lensically/branches/main") {
+        return new Response(JSON.stringify({ commit: { sha: "vitest-head-sha" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/repos/profitproperly/Lensically/contents/ENGINEERING_CONTINUATION.md") {
+        const content = "# ENGINEERING CONTINUATION\n\nstatus: clear\nactive_job_id: none\nactive_checkpoint: none\n";
+        return new Response(JSON.stringify({ sha: "vitest-continuation-sha", size: content.length, content: btoa(content), encoding: "base64" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       if (request.method === "GET" && url.pathname === "/repos/opmgdeadman/mcp-controller") {
         return new Response(JSON.stringify({
           id: 1,
