@@ -7430,6 +7430,13 @@ active_checkpoint: none
     expect(capabilityDefinition.isError).not.toBe(true);
     expect(capabilityDefinition.structuredContent).toMatchObject({ ok: true, tool: { name: "applyRepoPatchSet" } });
 
+    const composedCapabilityDefinition = await mcpToolCallRaw<{ ok: boolean; tool: { name: string } }>("executeLensicallyIntent", {
+      profile_id: "capability_definition",
+      inputs: { capability: "operateGitHubRepositories" },
+    });
+    expect(composedCapabilityDefinition.isError).not.toBe(true);
+    expect(composedCapabilityDefinition.structuredContent).toMatchObject({ ok: true, tool: { name: "operateGitHubRepositories" } });
+
         const mapped = await mcpToolCallRaw<{
       ok: boolean;
       routed_execution: { executed_tool: string; model_tool_choice_allowed: boolean };
