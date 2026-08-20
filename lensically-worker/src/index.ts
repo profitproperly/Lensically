@@ -20886,7 +20886,23 @@ async function handleOperatorMcpAdminTool(
 
   if (toolName === "readMcpToolDefinition") {
     const definition = await readOperatorMcpToolDefinition(env, normalizeOperatorText(args.tool_name, 160) ?? "");
-    return definition ? { ok: true, tool: definition } : { ok: false, error: "tool_not_found" };
+    if (!definition) return { ok: false, error: "tool_not_found" };
+    const plannedActionEligible = !OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES.has(definition.name)
+      && !FORBIDDEN_RETIRED_TOOL_NAMES.has(definition.name)
+      && !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(definition.name);
+    const plannedActionCapability = plannedActionEligible
+      ? operatorActionCapabilityIdForToolName(definition.name)
+      : null;
+    return {
+      ok: true,
+      tool: definition,
+      planned_action_contract: plannedActionCapability
+        ? {
+            capability: plannedActionCapability,
+            arguments_schema: operatorInternalActionArgumentSchema(definition),
+          }
+        : null,
+    };
   }
 
   if (toolName === "runMcpTests") {
