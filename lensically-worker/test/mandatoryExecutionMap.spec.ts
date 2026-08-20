@@ -14,10 +14,12 @@ describe("mandatory execution map", () => {
       description: "Run one exact engineering workflow.",
       inputSchema: {
         type: "object",
-        properties: {
+                properties: {
+          task: { type: "string" },
           dry_run: { type: "boolean" },
           release_sha: { type: "string" },
         },
+        required: ["task"],
         additionalProperties: false,
       },
     }];
@@ -35,8 +37,9 @@ describe("mandatory execution map", () => {
 
     expect(prepared?.ok).toBe(true);
     expect(prepared?.tool_name).toBe("runGitHubWorkflow");
-    expect(prepared?.arguments?.dry_run).toBe(true);
+        expect(prepared?.arguments?.dry_run).toBe(true);
     expect(prepared?.arguments?.release_sha).toBe("0123456789abcdef0123456789abcdef01234567");
+    expect(prepared?.arguments?.task).toBe("worker-deploy");
     expect(prepared?.arguments).not.toHaveProperty("prepared_tool_name");
   });
 

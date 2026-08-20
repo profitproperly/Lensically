@@ -340,15 +340,15 @@ export const WINNING_PATH_PROMOTIONS: readonly WinningPathPromotion[] = [
     },
     losing_path: "Allow the public typed action contract, server-side planned-action validator, and executable handler contract to diverge or rely on a prevention name that is not bound to the action before execution.",
     root_cause: "The public typed-action schema and runtime validator were generated from separate contract sources, allowing schema drift and leaving named prevention detached from the actual prepared action.",
-    winning_path: {
+        winning_path: {
       surface: "source_control",
-      procedure: ["Generate and validate the public typed action from the same canonical handler contract.", "Bind the exact typed-contract prevention to every current and future action at Step 2.", "Carry the prepared action fingerprint unchanged through live state and execution.", "Reject any schema, capability, tool, or argument drift before execution."],
+      procedure: ["Generate and validate the public typed action from the same canonical handler contract.", "Bind the exact typed-contract prevention to every current and future action at Step 2.", "Carry the prepared action fingerprint unchanged through live state and execution.", "When a public typed action intentionally omits an internal required handler argument, derive that argument deterministically from the immutable prepared action before static required-input validation and regression-test against the real internal required fields.", "Reject any schema, capability, tool, argument, or required-input derivation drift before execution."],
     },
-    evidence: ["The normalized lifecycle previously exposed a public action schema that could drift from operatorInternalActionArgumentSchema.", "Continuous-hardening closure already named typed_profile_exact_contract, proving the lesson existed before it was promoted into active enforcement."],
+    evidence: ["The normalized lifecycle previously exposed a public action schema that could drift from operatorInternalActionArgumentSchema.", "Continuous-hardening closure already named typed_profile_exact_contract, proving the lesson existed before it was promoted into active enforcement.", "Live exact-SHA control_step accepted public release_sha but Step 4 failed static_router_inputs_missing because the prepared lifecycle path reached runGitHubWorkflow before deriving its internal required task=worker-deploy."],
     scope: "universal",
     binding_scope: "action",
     action_binding: { tool_names: ["*"] },
-    enforcement_point: "Step-2 action-rule binding, shared typed action schema/validator, prepared-action fingerprint verification, and Step-4 execution guard.",
+    enforcement_point: "Step-2 action-rule binding, shared typed action schema/validator, deterministic public-to-internal required-argument derivation, prepared-action fingerprint verification, static required-input validation, and Step-4 execution guard.",
     regression_test_id: "enforces the continuous-hardening lifecycle and closure proof",
         supersession_rule: "Any replacement must remain automatically bound to every current and future typed action and preserve fail-closed schema/action immutability before execution.",
   },
@@ -1309,7 +1309,9 @@ function inferredArgumentsForOperationalIntent(
     if (/\b(public|request)\b/.test(normalized) && /\b(gateway|action)\b/.test(normalized)) return { tool_name: "executeLensicallyIntent" };
     return {};
   }
-    if (toolName !== "runGitHubWorkflow") return {};
+        if (toolName !== "runGitHubWorkflow") return {};
+  const releaseSha = typeof inputs.release_sha === "string" ? inputs.release_sha.trim() : "";
+  if (/^[a-fA-F0-9]{40}$/.test(releaseSha)) return { task: "worker-deploy" };
   
   if (/\btypecheck\b/.test(normalized)) return { task: "typecheck" };
   if (/\bgpt\s+memory\s+tests?\b/.test(normalized)) return { task: "gpt-memory-tests" };
