@@ -6489,6 +6489,7 @@ active_checkpoint: none
       live_state_loader: "getOperatorLiveState",
       read_action_executor: "executeOperatorReadAction",
       case_action_executor: "executeOperatorCaseAction",
+      hardening_action_executor: "executeOperatorHardeningAction",
       action_executor: "executeOperatorAction",
       action_closer: "closeOperatorAction",
     });
