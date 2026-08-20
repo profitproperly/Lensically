@@ -169,11 +169,18 @@ async function mcpToolRaw<T = Record<string, unknown>>(toolName: string, args: R
   if (step3.isError) return step3 as unknown as { structuredContent: T; isError?: boolean };
   const step4Gateway = step3.structuredContent.execution_descriptor.effect_class === "read_only"
     ? "executeOperatorReadAction"
-    : "executeOperatorAction";
-  const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>(step4Gateway, {
-    live_state_token: step3.structuredContent.live_state_token,
-    execution_descriptor: step3.structuredContent.execution_descriptor,
-  });
+    : capability === "case_step"
+      ? "executeOperatorCaseAction"
+      : capability === "client_block_intake"
+        ? "executeOperatorHardeningAction"
+        : "executeOperatorAction";
+  const step4Args = step4Gateway === "executeOperatorCaseAction" || step4Gateway === "executeOperatorHardeningAction"
+    ? { live_state_token: step3.structuredContent.live_state_token }
+    : {
+        live_state_token: step3.structuredContent.live_state_token,
+        execution_descriptor: step3.structuredContent.execution_descriptor,
+      };
+  const step4 = await mcpToolCallRaw<T & { action_execution_token?: string }>(step4Gateway, step4Args);
   if (step4.isError || !step4.structuredContent.action_execution_token) return step4;
   const step5 = await mcpToolCallRaw("closeOperatorAction", {
     action_execution_token: step4.structuredContent.action_execution_token,
