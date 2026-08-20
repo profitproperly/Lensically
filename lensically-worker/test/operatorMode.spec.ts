@@ -6467,6 +6467,7 @@ active_checkpoint: none
         live_state_loader: string;
         read_action_executor: string;
         case_action_executor: string;
+        hardening_action_executor: string;
         action_executor: string;
         action_closer: string;
       };
