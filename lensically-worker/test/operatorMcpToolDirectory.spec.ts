@@ -84,6 +84,7 @@ describe("Operator MCP tool directory", () => {
     expect(isOperatorPublicDirectToolName("executeOperatorReadAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorCaseAction")).toBe(true);
+    expect(isOperatorPublicDirectToolName("executeOperatorHardeningAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("getRepoStatus")).toBe(false);
     expect(isOperatorPublicDirectToolName("searchRepoFiles")).toBe(false);
     expect(isOperatorPublicDirectToolName("operateStripe")).toBe(false);
