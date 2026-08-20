@@ -8,6 +8,17 @@ import {
 } from "../src/mandatoryExecutionMap";
 
 describe("mandatory execution map", () => {
+  it("preserves lifecycle-bound control-step inputs before public validation", () => {
+    const source = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    const lifecycleGuard = source.indexOf('if (profileId === "control_step") {\n    if (typedLifecycleBound) {');
+    const publicInputGuard = source.indexOf('const inputKeys = Object.keys(inputs);', lifecycleGuard);
+    const preparedPassThrough = source.indexOf('inputs: { ...inputs },', lifecycleGuard);
+
+    expect(lifecycleGuard).toBeGreaterThanOrEqual(0);
+    expect(preparedPassThrough).toBeGreaterThan(lifecycleGuard);
+    expect(publicInputGuard).toBeGreaterThan(preparedPassThrough);
+  });
+
   it("binds the neutral case-step prevention to opaque Step-4 identities", () => {
     const prevention = resolveActionBoundWinningPaths("advanceHardeningIncident")
       .find((candidate) => candidate.id === "neutral_case_step_contract");
