@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { prepareSourceDefinedDirectEngineeringCall, resolveActionBoundWinningPaths, WINNING_PATH_PROMOTIONS } from "../src/mandatoryExecutionMap";
+import {
+  prepareSourceDefinedDirectEngineeringCall,
+  resolveActionBoundWinningPaths,
+  validateHardeningTerminalReconciliation,
+  WINNING_PATH_PROMOTIONS,
+} from "../src/mandatoryExecutionMap";
 
 describe("mandatory execution map", () => {
   it("binds the neutral case-step prevention to opaque Step-4 identities", () => {
@@ -31,6 +36,30 @@ describe("mandatory execution map", () => {
     expect(prevention?.winning_path.procedure).toContain(
       "Treat the incident's stored tested SHA and deployment ID as the exact verified release evidence even if a later Worker deployment is running when closure bookkeeping occurs.",
     );
+  });
+
+    it("reconciles terminal hardening only from complete persisted closure evidence", () => {
+    const completeEvidence = {
+      root_cause: "root cause",
+      generalized_cause: "generalized cause",
+      prevention_rule_id: "server_owned_resumed_hardening_closure",
+      regression_test_ids: ["terminal-reconciliation-regression"],
+      tested_sha: "0123456789abcdef0123456789abcdef01234567",
+      deployment_id: "deployment-id",
+      live_verification: { verified: true },
+      resume_result: { status: "resumed" },
+      autonomy_dividend: { owner_action_required: false },
+    };
+
+    expect(validateHardeningTerminalReconciliation(completeEvidence)).toEqual({ allowed: true, errors: [] });
+
+    const incomplete = validateHardeningTerminalReconciliation({
+      ...completeEvidence,
+      resume_result: null,
+    });
+    expect(incomplete.allowed).toBe(false);
+    expect(incomplete.errors).toContain("resume_result_required");
+    expect(incomplete.errors).not.toContain("invalid_transition:resumed:closed");
   });
 
   it("binds declared first-party workflow inputs before GitHub dispatch", () => {

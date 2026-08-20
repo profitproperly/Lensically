@@ -64,7 +64,13 @@ export function validateHardeningTransition(current: HardeningState, target: Har
   if (atOrAfter("resumed") && !evidence.live_verification) errors.push("live_verification_required");
   if (target === "closed" && !evidence.resume_result) errors.push("resume_result_required");
   if (target === "closed" && !evidence.autonomy_dividend) errors.push("autonomy_dividend_required");
-  return { allowed: errors.length === 0, errors };
+    return { allowed: errors.length === 0, errors };
+}
+
+export function validateHardeningTerminalReconciliation(
+  persistedEvidence: HardeningTransitionEvidence = {},
+): { allowed: boolean; errors: string[] } {
+  return validateHardeningTransition("resumed", "closed", persistedEvidence);
 }
 
 export const AGENT_NATIVE_OPERATING_CONTRACT_VERSION = "agent-native-operating-contract-v1";

@@ -25,8 +25,9 @@ import {
   MANDATORY_EXECUTION_MAP_VERSION,
     prepareMandatoryExecutionMapCall,
   prepareSourceDefinedDirectEngineeringCall,
-  resolvePromotedWinningPath,
+    resolvePromotedWinningPath,
   resolveHardeningResumeResult,
+  validateHardeningTerminalReconciliation,
   validateHardeningTransition,
   validateOperatorActionClosure,
   type ExecutionPolicyLibrarySource,
@@ -19032,8 +19033,36 @@ async function advanceHardeningIncident(env: Env, args: Record<string, unknown>)
     ? HARDENING_STATE_ORDER[HARDENING_STATE_ORDER.indexOf(current) + 1] ?? null
     : normalizeHardeningState(args.target_state);
   if (!target) return { ok: false, error: "hardening_incident_and_target_required" };
-  const supplied = args.evidence && typeof args.evidence === "object" && !Array.isArray(args.evidence) ? args.evidence as Record<string, unknown> : {};
+    const supplied = args.evidence && typeof args.evidence === "object" && !Array.isArray(args.evidence) ? args.evidence as Record<string, unknown> : {};
     const priorRegressions = safeParseJsonString(String(row.regression_test_ids_json ?? "[]"));
+  if (current === "closed" && target === "closed") {
+    const persistedEvidence: HardeningTransitionEvidence = {
+      root_cause: normalizeOperatorText(row.root_cause, 4000, true),
+      generalized_cause: normalizeOperatorText(row.generalized_cause, 4000, true),
+      prevention_rule_id: normalizeOperatorMachineKey(row.prevention_rule_id, "") || null,
+      regression_test_ids: Array.isArray(priorRegressions) ? priorRegressions.map(String).filter(Boolean) : [],
+      tested_sha: normalizeOperatorText(row.tested_sha, 120, true),
+      deployment_id: normalizeOperatorText(row.deployment_id, 160, true),
+      live_verification: safeParseJsonString(String(row.live_verification_json ?? "")) as Record<string, unknown> | null,
+      resume_result: resolveHardeningResumeResult({}, {}, safeParseJsonString(String(row.resume_result_json ?? ""))),
+      autonomy_dividend: safeParseJsonString(String(row.autonomy_dividend_json ?? "")) as Record<string, unknown> | null,
+    };
+    const reconciliation = validateHardeningTerminalReconciliation(persistedEvidence);
+    if (!reconciliation.allowed) {
+      return { ok: false, error: "hardening_transition_blocked", incident_id: incidentId, current_state: current, target_state: target, missing_or_invalid_evidence: reconciliation.errors };
+    }
+    return {
+      ok: true,
+      idempotent: true,
+      reconciled: true,
+      version: CONTINUOUS_HARDENING_VERSION,
+      incident: serializeHardeningIncident(row),
+      previous_state: current,
+      current_state: current,
+      target_state: target,
+      normal_work_blocked: false,
+    };
+  }
   const evidence: HardeningTransitionEvidence = {
     root_cause: normalizeOperatorText(args.root_cause ?? row.root_cause, 4000, true),
     generalized_cause: normalizeOperatorText(args.generalized_cause ?? row.generalized_cause, 4000, true),
