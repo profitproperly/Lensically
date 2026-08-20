@@ -12,6 +12,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "executeOperatorReadAction",
   "executeOperatorAction",
   "executeOperatorCaseAction",
+  "executeOperatorHardeningAction",
   "closeOperatorAction",
   "engineeringPrecheck",
   "getEngineeringAccessState",
