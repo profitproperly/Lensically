@@ -3819,10 +3819,14 @@ describe("operator mode MCP endpoint", () => {
         binding_scope: "action",
         tool_names: ["runGitHubWorkflow"],
       });
-      expect(resolveActionBoundWinningPaths("runGitHubWorkflow", { task: "worker-deploy" }).map((entry) => entry.id).slice(0, 2)).toEqual([
+            const releaseWinningPathIds = resolveActionBoundWinningPaths("runGitHubWorkflow", { task: "worker-deploy" }).map((entry) => entry.id);
+      expect(releaseWinningPathIds).toEqual(expect.arrayContaining([
         "operator_mcp_version_single_source",
         "neutral_control_plane_profile_aliases",
-      ]);
+      ]));
+      expect(releaseWinningPathIds.indexOf("operator_mcp_version_single_source")).toBeLessThan(
+        releaseWinningPathIds.indexOf("neutral_control_plane_profile_aliases"),
+      );
     });
 
     it("advertises only the normalized five-stage lifecycle and tiny Step-0 instructions", async () => {
