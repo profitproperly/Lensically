@@ -7752,6 +7752,53 @@ active_checkpoint: none
     });
   }, 30000);
 
+  it("keeps composed cross-repository mutations on operateGitHubRepositories through Step 4", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/repos/opmgdeadman/mcp-controller") {
+        return new Response(JSON.stringify({
+          id: 1,
+          name: "mcp-controller",
+          full_name: "opmgdeadman/mcp-controller",
+          private: true,
+          default_branch: "main",
+          permissions: { push: true, pull: true },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (request.method === "GET" && url.pathname === "/repos/opmgdeadman/mcp-controller/contents/route-regression.txt") {
+        return new Response(JSON.stringify({ sha: "fixture-file-sha", size: 5, content: btoa("alpha"), encoding: "base64" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (request.method === "PUT" && url.pathname === "/repos/opmgdeadman/mcp-controller/contents/route-regression.txt") {
+        return new Response(JSON.stringify({ content: { sha: "fixture-next-sha" }, commit: { sha: "fixture-commit-sha" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      throw new Error(`No outbound mock for ${request.method} ${url.toString()}`);
+    });
+
+    const routed = await mcpToolRaw<{
+      ok: boolean;
+      routed_execution: { executed_tool: string };
+    }>("operateGitHubRepositories", {
+      operation: "patch_file",
+      repository: "opmgdeadman/mcp-controller",
+      path: "route-regression.txt",
+      find: "alpha",
+      replace: "beta",
+      message: "Exercise composed cross-repository mutation route",
+      operation_id: "composed-cross-repo-route-regression",
+    });
+    fetchSpy.mockRestore();
+    expect(routed.isError, JSON.stringify(routed.structuredContent)).not.toBe(true);
+    expect(routed.structuredContent.ok).toBe(true);
+    expect(routed.structuredContent.routed_execution.executed_tool).toBe("operateGitHubRepositories");
+  }, 30000);
+
   it("routes operational status and engineering intents deterministically away from content procedures", async () => {
         const status = await mcpToolRaw<{
       ok: boolean;
