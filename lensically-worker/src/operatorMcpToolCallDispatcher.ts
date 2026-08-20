@@ -183,6 +183,7 @@ export async function dispatchOperatorMcpToolCall(
     requestedToolName === dependencies.readOnlyRoutedExecutionGateway
     || requestedToolName === dependencies.routedExecutionGateway
     || requestedToolName === dependencies.caseRoutedExecutionGateway
+    || requestedToolName === dependencies.hardeningRoutedExecutionGateway
   ) {
     const lifecycleCheck = await dependencies.verifyLifecycleExecutionToken(
       governedRequestedArgs.live_state_token,
