@@ -64,6 +64,7 @@ const PUBLIC_DIRECT_TOOL_NAMES = [
   "executeOperatorReadAction",
   "executeOperatorAction",
   "executeOperatorCaseAction",
+  "executeOperatorHardeningAction",
   "closeOperatorAction",
 ] as const;
 
