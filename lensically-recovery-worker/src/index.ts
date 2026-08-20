@@ -653,7 +653,9 @@ async function toolCall(name: string, args: Record<string, unknown>, env: Env): 
       ? "executeOperatorReadAction"
       : plannedAction.capability === "case_step"
         ? "executeOperatorCaseAction"
-        : "executeOperatorAction";
+        : plannedAction.capability === "client_block_intake"
+          ? "executeOperatorHardeningAction"
+          : "executeOperatorAction";
     const execution = await mainMcpRequest(origin, token, 7, "tools/call", { name: executionGateway, arguments: { live_state_token: liveStateToken, execution_descriptor: executionDescriptor, governing_standards_ack: governingAck } }, sessionId);
     const executionContent = structured(execution);
     const actionExecutionToken = typeof executionContent?.action_execution_token === "string" ? executionContent.action_execution_token : "";
