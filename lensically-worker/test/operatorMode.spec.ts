@@ -6122,6 +6122,10 @@ active_checkpoint: none
     expect(releaseTool.tool?.inputSchema?.properties?.force?.type).toBe("boolean");
         expect(releaseStatusTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(55);
     expect(workflowWatchTool.tool?.inputSchema?.properties?.wait_seconds?.maximum).toBe(60);
+    expect(workflowControlTool.planned_action_contract?.capability).toBe("control_step");
+    expect(Object.keys(workflowControlTool.planned_action_contract?.arguments_schema?.properties ?? {}).sort()).toEqual(["dry_run", "release_sha"]);
+    expect(workflowControlTool.planned_action_contract?.arguments_schema?.required).toEqual([]);
+    expect(workflowControlTool.planned_action_contract?.arguments_schema?.additionalProperties).toBe(false);
         expect(hardeningTransitionTool.tool?.inputSchema?.properties).toHaveProperty("resume_result");
     expect(createRepositoryTool.tool?.inputSchema?.properties?.visibility?.enum).toEqual(["private", "public"]);
         expect(createRepositoryTool.tool?.inputSchema?.properties?.operation_id?.maxLength).toBe(120);
