@@ -3834,6 +3834,7 @@ describe("operator mode MCP endpoint", () => {
     const readActionTool = listed.tools.find((tool) => tool.name === "executeOperatorReadAction");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
     const caseActionTool = listed.tools.find((tool) => tool.name === "executeOperatorCaseAction");
+    const hardeningActionTool = listed.tools.find((tool) => tool.name === "executeOperatorHardeningAction");
     const closeTool = listed.tools.find((tool) => tool.name === "closeOperatorAction");
     const plannedActionSchema = knowledgeTool?.inputSchema?.properties?.planned_action as {
       properties?: { capability?: { enum?: string[] } };
