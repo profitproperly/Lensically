@@ -6639,7 +6639,7 @@ active_checkpoint: none
     const first = firstCall.structuredContent;
     expect(firstCall.isError).not.toBe(true);
     expect(first.created).toBe(true);
-    expect(first.incident).toMatchObject({ classification: "novel_failure", state: "detected" });
+    expect(first.incident).toMatchObject({ classification: "prevention_breach", state: "detected" });
 
     const secondCall = await mcpToolRaw<{
       ok: boolean;
