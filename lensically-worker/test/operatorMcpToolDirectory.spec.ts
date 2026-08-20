@@ -68,8 +68,8 @@ const tools: OperatorMcpToolDefinition[] = [
 ];
 
 describe("Operator MCP tool directory", () => {
-                                                                it("preserves the seven-tool, five-stage public lifecycle surface while keeping capabilities internal", () => {
-    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(7);
+                                                                it("preserves the eight-tool, five-stage public lifecycle surface while keeping capabilities internal", () => {
+    expect(OPERATOR_PUBLIC_DIRECT_TOOL_NAMES.size).toBe(8);
     expect([...OPERATOR_PUBLIC_DIRECT_TOOL_NAMES]).toEqual([
       "getOperatorSessionMap",
       "getOperatorKnowledge",
@@ -77,6 +77,7 @@ describe("Operator MCP tool directory", () => {
       "executeOperatorReadAction",
       "executeOperatorAction",
       "executeOperatorCaseAction",
+      "executeOperatorHardeningAction",
       "closeOperatorAction",
     ]);
     expect(isOperatorPublicDirectToolName("getOperatorSessionMap")).toBe(true);
