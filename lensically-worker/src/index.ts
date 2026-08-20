@@ -18767,21 +18767,20 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
      ORDER BY datetime(COALESCE(i.closed_at, i.updated_at)) DESC
      LIMIT 100`,
   ).bind(boundary).all<Record<string, unknown>>();
-    const relatedPriorRows = (priorRows.results ?? []).filter((candidate) => {
+      const familyPriorRows = (priorRows.results ?? []).filter((candidate) => {
     const candidateCategory = normalizeOperatorMachineKey(candidate.detected_error_category, "");
     const candidateObserved = safeParseJsonString(String(candidate.observed_json ?? ""));
-    if (!candidateCategory || hardeningRecurrenceFamily(boundary, candidateCategory, candidateObserved) !== recurrenceFamily) return false;
-    if (
-      recurrenceFamily === "client:openai_safety_predispatch"
-      || recurrenceFamily === "client:closed_schema_contract_violation"
-    ) return true;
-    if (recurrenceFamily === "external:upstream_transport_502") {
-      return String(candidate.blocked_profile_id ?? "") === profile
-        && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "");
-    }
-    return String(candidate.blocked_profile_id ?? "") === profile
-      && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "")
-      && candidateCategory === category;
+    return Boolean(candidateCategory)
+      && hardeningRecurrenceFamily(boundary, candidateCategory, candidateObserved) === recurrenceFamily;
+  });
+  const relatedPriorRows = familyPriorRows.filter((candidate) => {
+    const candidateCategory = normalizeOperatorMachineKey(candidate.detected_error_category, "");
+    const sameRoute = String(candidate.blocked_profile_id ?? "") === profile
+      && String(candidate.blocked_tool_name ?? "") === (blockedTool ?? "");
+    if (recurrenceFamily === "client:openai_safety_predispatch") return sameRoute;
+    if (recurrenceFamily === "client:closed_schema_contract_violation") return true;
+    if (recurrenceFamily === "external:upstream_transport_502") return sameRoute;
+    return sameRoute && candidateCategory === category;
   });
   const priorActiveRow = relatedPriorRows
     .filter((candidate) => String(candidate.state) !== "closed")
@@ -18838,8 +18837,8 @@ async function recordHardeningIncident(env: Env, args: Record<string, unknown>):
       required_next_state: "next",
     };
   }
-  const handledExternalPriorRow = recurrenceFamily === "client:openai_safety_predispatch"
-    ? relatedPriorRows.find((candidate) =>
+    const handledExternalPriorRow = recurrenceFamily === "client:openai_safety_predispatch"
+    ? familyPriorRows.find((candidate) =>
         String(candidate.state) === "closed"
         && String(candidate.prevention_rule_id ?? "") === "openai_predispatch_external_recurrence_convergence"
       ) ?? null

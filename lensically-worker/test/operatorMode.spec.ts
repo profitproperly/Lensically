@@ -6865,7 +6865,13 @@ active_checkpoint: none
         tested_sha = 'fixture-external-sha', deployment_id = 'fixture-external-deployment',
         closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-    ).bind(third.incident.id).run();
+        ).bind(third.incident.id).run();
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET
+        state = 'repaired', blocked_profile_id = 'run_git_hub_workflow', blocked_tool_name = NULL,
+        closed_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(second.incident.id).run();
 
     const handledCall = await mcpToolRaw<{
       ok: boolean;
@@ -6892,7 +6898,14 @@ active_checkpoint: none
       prior_prevention_rule_id: "openai_predispatch_external_recurrence_convergence",
       recurrence_family: "client:openai_safety_predispatch",
     });
-    expect(handled.normal_work_blocked).toBe(false);
+        expect(handled.normal_work_blocked).toBe(false);
+    const unrelatedActive = await env.DB.prepare(
+      `SELECT state, blocked_profile_id FROM operator_hardening_incidents WHERE id = ?`,
+    ).bind(second.incident.id).first<{ state: string; blocked_profile_id: string }>();
+    expect(unrelatedActive).toMatchObject({ state: "repaired", blocked_profile_id: "run_git_hub_workflow" });
+    await env.DB.prepare(
+      `UPDATE operator_hardening_incidents SET state = 'closed', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    ).bind(second.incident.id).run();
   }, 30000);
 
     it("classifies a repeated resolved failure as a prevention regression", async () => {
