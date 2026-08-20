@@ -8883,6 +8883,7 @@ active_checkpoint: none
       "executeOperatorReadAction",
       "executeOperatorAction",
       "executeOperatorCaseAction",
+      "executeOperatorHardeningAction",
       "closeOperatorAction",
     ]);
     expect(names).not.toContain("getOperatorStartupContext");
