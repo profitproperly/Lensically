@@ -17509,7 +17509,8 @@ function resolveExactCapabilityToolName(value: unknown): string | null {
   };
   if (aliases[key]) return aliases[key];
   return buildComposedOperatorMcpTools(false).find((tool) =>
-    operatorActionCapabilityIdForToolName(tool.name) === key
+    normalizeOperatorMachineKey(tool.name, "") === key
+    || operatorActionCapabilityIdForToolName(tool.name) === key
     || operatorPublicProfileIdForToolName(tool.name) === key
     || normalizeOperatorMachineKey(tool.title, "") === key,
   )?.name ?? null;
