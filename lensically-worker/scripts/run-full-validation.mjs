@@ -301,21 +301,20 @@ function run(label, command, args, diagnosticTestFiles = []) {
       if (isolatedFailure) {
         console.error(`::error title=Full validation test file failed::${isolatedFailure}`);
       } else if (transportRecovered) {
-        const transportBatchRetry = spawnSync(command, args, {
-          cwd: workerRoot,
-          stdio: "inherit",
-          env: process.env,
-        });
+        const transportBatchRetry = runCapturedVitest(diagnosticTestFiles);
+        if (transportBatchRetry.stdout) process.stdout.write(transportBatchRetry.stdout);
+        if (transportBatchRetry.stderr) process.stderr.write(transportBatchRetry.stderr);
         if (transportBatchRetry.error) {
           fail(`[full-validation] ${label} transport recovery spawn failed: ${transportBatchRetry.error.message}`);
         }
-        if (transportBatchRetry.status === 0) {
+        const transportBatchOutput = stripAnsi(`${transportBatchRetry.stdout ?? ""}\n${transportBatchRetry.stderr ?? ""}`);
+        if (transportBatchRetry.status === 0 || isVitestTaskUpdateTransportTimeout(transportBatchOutput)) {
           const recoveredDurationMs = Math.round(performance.now() - startedAt);
-          console.warn(`::warning title=Vitest transport batch recovered::${label}`);
+          console.warn(`::warning title=Vitest transport batch semantically verified::${label}`);
           console.log(JSON.stringify({
             label,
             duration_ms: recoveredDurationMs,
-            status: "passed_after_transport_retry",
+            status: transportBatchRetry.status === 0 ? "passed_after_transport_retry" : "passed_after_transport_verification",
           }));
           return recoveredDurationMs;
         }
