@@ -204,6 +204,7 @@ export async function dispatchOperatorMcpToolCall(
       ? lifecycleCheck.payload.effect_class
       : "";
     const requestedExecutionDescriptor = requestedToolName === dependencies.caseRoutedExecutionGateway
+      || requestedToolName === dependencies.hardeningRoutedExecutionGateway
       ? { action_id: expectedClientActionId, effect_class: expectedEffectClass }
       : asRecord(governedRequestedArgs.execution_descriptor);
     const preparedCapabilityForGateway = typeof lifecycleCheck.payload.planned_capability === "string"
