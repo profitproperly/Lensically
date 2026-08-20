@@ -16867,6 +16867,7 @@ const OPERATOR_PRE_CALL_ROUTING_VERSION = "operator-pre-call-routing-v2";
 const OPERATOR_READ_EXECUTION_GATEWAY = "executeOperatorReadAction";
 const OPERATOR_ROUTED_EXECUTION_GATEWAY = "executeOperatorAction";
 const OPERATOR_CASE_EXECUTION_GATEWAY = "executeOperatorCaseAction";
+const OPERATOR_HARDENING_EXECUTION_GATEWAY = "executeOperatorHardeningAction";
 const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
   "getOperatorSessionMap",
   "getOperatorKnowledge",
@@ -16874,6 +16875,7 @@ const OPERATOR_LIFECYCLE_PUBLIC_TOOL_NAMES = new Set<string>([
   OPERATOR_READ_EXECUTION_GATEWAY,
   OPERATOR_ROUTED_EXECUTION_GATEWAY,
   OPERATOR_CASE_EXECUTION_GATEWAY,
+  OPERATOR_HARDENING_EXECUTION_GATEWAY,
   "closeOperatorAction",
 ]);
 
