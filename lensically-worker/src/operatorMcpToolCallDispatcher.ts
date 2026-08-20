@@ -214,7 +214,9 @@ export async function dispatchOperatorMcpToolCall(
       ? dependencies.readOnlyRoutedExecutionGateway
       : preparedCapabilityForGateway === "case_step"
         ? dependencies.caseRoutedExecutionGateway
-        : dependencies.routedExecutionGateway;
+        : preparedCapabilityForGateway === "client_block_intake"
+          ? dependencies.hardeningRoutedExecutionGateway
+          : dependencies.routedExecutionGateway;
     if (expectedEffectClass && requestedToolName !== expectedGateway) {
       return mcpToolResultResponse(id, {
         ok: false,
