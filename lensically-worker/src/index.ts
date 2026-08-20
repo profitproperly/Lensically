@@ -16341,7 +16341,7 @@ function buildOperatorKnowledgeTree(): Record<string, unknown> {
 
 function operatorStartupFallbackRoutes(): string[] {
   return [
-        "Use the canonical lifecycle: getOperatorKnowledge -> getOperatorLiveState -> the server-matched Step-4 gateway (executeOperatorReadAction for read_only, executeOperatorCaseAction for case_step mutations, executeOperatorAction for other mutations) -> closeOperatorAction for each meaningful task after session mapping.",
+        "Use the canonical lifecycle: getOperatorKnowledge -> getOperatorLiveState -> the server-matched Step-4 gateway (executeOperatorReadAction for read_only, executeOperatorCaseAction for case_step mutations, executeOperatorHardeningAction for client_block_intake, executeOperatorAction for other mutations) -> closeOperatorAction for each meaningful task after session mapping.",
     "Server-side continuity, authorization, idempotency, gates, and scheduler safety remain mandatory after the direct call arrives.",
     "Use bounded known-file repository reads and searches; a complete known-file search reports its scanned line count and match count.",
         "Use one atomic patch set for related edits. Routine pushes use fast validation; production uses one explicit exact-SHA release after the final change.",
