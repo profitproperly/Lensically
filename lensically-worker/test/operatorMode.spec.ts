@@ -6854,7 +6854,7 @@ active_checkpoint: none
       recurrence: { status: string; prior_incident_id: string; prior_prevention_rule_id: string; recurrence_family: string };
     }>("recordHardeningIncident", {
       boundary: "client",
-      blocked_profile_id: "verify_deployed_mcp_version",
+      blocked_profile_id: "run_git_hub_workflow",
       request_fingerprint: "fixture-openai-client-block-c",
       error_category: "openai_safety_check_blocked_runtime_verification_before_lensically_dispatch",
       operation_class: "engineering_runtime_verification",
