@@ -776,6 +776,12 @@ const OPERATOR_PAYLOAD_PRIORITY_KEYS = [
 const OPERATOR_PAYLOAD_PRIORITY_RANK = new Map<string, number>(
   OPERATOR_PAYLOAD_PRIORITY_KEYS.map((key, index) => [key, index]),
 );
+const OPERATOR_PAYLOAD_PRESERVED_IDENTITY_ARRAY_PATHS = new Set([
+  "action_rule_binding.competency_ids",
+  "action_rule_binding.rule_ids",
+  "action_rule_binding.prevention_rule_ids",
+  "action_rule_binding.action_intelligence_ids",
+]);
 
 function operatorPayloadBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value ?? null)).byteLength;
@@ -803,9 +809,10 @@ function compactOperatorPayloadValue(
     }
     return { compacted: true };
   }
-  if (Array.isArray(value)) {
-    const returned = value.slice(0, limits.arrayItems);
-    if (value.length > returned.length) {
+    if (Array.isArray(value)) {
+    const preserveIdentity = OPERATOR_PAYLOAD_PRESERVED_IDENTITY_ARRAY_PATHS.has(path);
+    const returned = preserveIdentity ? value : value.slice(0, limits.arrayItems);
+    if (!preserveIdentity && value.length > returned.length) {
       truncations.push({ path, total_count: value.length, returned_count: returned.length, next_offset: returned.length });
     }
     return returned.map((entry, index) => compactOperatorPayloadValue(
