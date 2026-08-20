@@ -114,7 +114,7 @@ export function classifyOperatorMcpToolHandler(
 export function shapeOperatorMcpToolDefinition(
   tool: OperatorMcpToolDefinition,
   classifications: OperatorMcpToolClassifications,
-): Record<string, unknown> {
+): OperatorMcpToolDefinition & { handler: OperatorMcpToolHandler; required_fields: string[] } {
   const required = Array.isArray(tool.inputSchema.required)
     ? tool.inputSchema.required
     : [];
