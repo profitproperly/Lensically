@@ -6657,7 +6657,7 @@ active_checkpoint: none
     const second = secondCall.structuredContent;
     expect(secondCall.isError).not.toBe(true);
     expect(second.created).toBe(false);
-    expect(second.incident).toMatchObject({ id: first.incident.id, classification: "known_prevention", state: "detected" });
+    expect(second.incident).toMatchObject({ id: first.incident.id, classification: "prevention_breach", state: "detected" });
     expect(second.recurrence).toMatchObject({
       status: "known_active_recurrence",
       prior_incident_id: first.incident.id,
