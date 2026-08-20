@@ -18887,8 +18887,8 @@ async function reconcileSatisfiedClientPredispatchHardeningIncidents(env: Env): 
      WHERE boundary = 'client'
        AND state <> 'closed'
        AND severity IN ('P0', 'P1')
-     ORDER BY datetime(updated_at) ASC
-     LIMIT 20`,
+     ORDER BY CASE severity WHEN 'P0' THEN 0 ELSE 1 END, datetime(updated_at) DESC
+     LIMIT 50`,
   ).all<Record<string, unknown>>();
 
   let reconciled = 0;
