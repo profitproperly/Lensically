@@ -6814,7 +6814,7 @@ active_checkpoint: none
         recurrence: { status: string; recurrence_family: string };
       }>("recordHardeningIncident", {
         boundary: "client",
-        blocked_profile_id: "case_step_a1",
+        blocked_profile_id: "run_git_hub_workflow",
         request_fingerprint: `fixture-${errorCategory}`,
         error_category: errorCategory,
         operation_class: "engineering_hardening_transition",
