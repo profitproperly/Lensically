@@ -7052,7 +7052,7 @@ active_checkpoint: none
     });
     const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const publicToolCount = registry.tools.length;
-    expect(publicToolCount).toBe(7);
+    expect(publicToolCount).toBe(8);
     for (const key of ALL_BRAND_KEYS) {
       const selected = await mcpToolRaw<{ handshake: string[]; tool_count: number; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: key });
       expect(selected.isError).not.toBe(true);
