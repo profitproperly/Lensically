@@ -4347,6 +4347,125 @@ active_checkpoint: none
     expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
   }, 30000);
 
+      it("routes client block intake only through dedicated token-only hardening gateway", async () => {
+    const session = await mcpToolCallRaw<{ session_map_token: string }>("getOperatorSessionMap");
+    expect(session.isError).not.toBe(true);
+
+    const intakeAction = {
+      capability: "client_block_intake",
+      arguments: {
+        boundary: "client",
+        blocked_profile_id: "fixture_hardening_gateway",
+        error_category: "fixture_client_pre_dispatch_block",
+        operation_class: "engineering_control",
+        expected_outcome: { lensically_receipt: true },
+        observed_outcome: { client_blocked: true, lensically_receipt: false },
+      },
+    };
+    const step2 = await mcpToolCallRaw<{
+      knowledge_token: string;
+      action_rule_binding: { prevention_rule_ids: string[] };
+    }>("getOperatorKnowledge", {
+      session_map_token: session.structuredContent.session_map_token,
+      planned_action: intakeAction,
+    });
+    expect(step2.isError, JSON.stringify(step2.structuredContent)).not.toBe(true);
+    expect(step2.structuredContent.action_rule_binding.prevention_rule_ids).toEqual(expect.arrayContaining([
+      "client_safe_hardening_intake_gateway",
+      "client_safe_step4_execution_descriptor",
+    ]));
+
+    const step3 = await mcpToolCallRaw<{
+      live_state_token: string;
+      execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" };
+    }>("getOperatorLiveState", {
+      knowledge_token: step2.structuredContent.knowledge_token,
+      planned_action: intakeAction,
+    });
+    expect(step3.isError, JSON.stringify(step3.structuredContent)).not.toBe(true);
+    expect(step3.structuredContent.execution_descriptor).toEqual({ action_id: "client_block_intake", effect_class: "mutation" });
+
+    const wrongGeneric = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      execution_descriptor: step3.structuredContent.execution_descriptor,
+    });
+    expect(wrongGeneric.isError).toBe(true);
+    expect(wrongGeneric.structuredContent).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorHardeningAction",
+      execution_started: false,
+    });
+
+    const wrongCase = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorCaseAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+    });
+    expect(wrongCase.isError).toBe(true);
+    expect(wrongCase.structuredContent).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorHardeningAction",
+      execution_started: false,
+    });
+
+    const wrongRead = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorReadAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+      execution_descriptor: step3.structuredContent.execution_descriptor,
+    });
+    expect(wrongRead.isError).toBe(true);
+    expect(wrongRead.structuredContent).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorHardeningAction",
+      execution_started: false,
+    });
+
+    const step4 = await mcpToolCallRaw<{
+      ok: boolean;
+      incident: { id: string };
+      action_execution_token: string;
+    }>("executeOperatorHardeningAction", {
+      live_state_token: step3.structuredContent.live_state_token,
+    });
+    expect(step4.isError, JSON.stringify(step4.structuredContent)).not.toBe(true);
+    expect(step4.structuredContent.ok).toBe(true);
+    expect(step4.structuredContent.incident.id).toBeTruthy();
+
+    const step5 = await mcpToolCallRaw<{ ok: boolean; lifecycle_stage: number }>("closeOperatorAction", {
+      action_execution_token: step4.structuredContent.action_execution_token,
+      verification: {
+        verified: true,
+        evidence: ["client_block_intake executed through the dedicated token-only hardening gateway."],
+        next_action: "Continue the isolated hardening gateway regression.",
+        prevention_required: false,
+      },
+    });
+    expect(step5.isError, JSON.stringify(step5.structuredContent)).not.toBe(true);
+    expect(step5.structuredContent).toMatchObject({ ok: true, lifecycle_stage: 5 });
+
+    const nonHardeningAction = { capability: "operational_observation", arguments: { capability: "fixture_non_hardening", outcome: "prepared" } };
+    const nonHardeningStep2 = await mcpToolCallRaw<{ knowledge_token: string }>("getOperatorKnowledge", {
+      session_map_token: session.structuredContent.session_map_token,
+      planned_action: nonHardeningAction,
+    });
+    expect(nonHardeningStep2.isError, JSON.stringify(nonHardeningStep2.structuredContent)).not.toBe(true);
+    const nonHardeningStep3 = await mcpToolCallRaw<{ live_state_token: string; execution_descriptor: { action_id: string; effect_class: "read_only" | "mutation" } }>("getOperatorLiveState", {
+      knowledge_token: nonHardeningStep2.structuredContent.knowledge_token,
+      planned_action: nonHardeningAction,
+    });
+    expect(nonHardeningStep3.isError, JSON.stringify(nonHardeningStep3.structuredContent)).not.toBe(true);
+    const wrongHardening = await mcpToolCallRaw<{ ok: boolean; error?: string; required_tool?: string }>("executeOperatorHardeningAction", {
+      live_state_token: nonHardeningStep3.structuredContent.live_state_token,
+    });
+    expect(wrongHardening.isError).toBe(true);
+    expect(wrongHardening.structuredContent).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorAction",
+      execution_started: false,
+    });
+  }, 30000);
+
       it("exposes and executes the complete stage-specific neutral case_step contract through the normalized lifecycle", async () => {
     const recordedCall = await mcpToolRaw<{
       ok: boolean;
