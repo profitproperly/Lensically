@@ -6453,6 +6453,7 @@ active_checkpoint: none
       "executeOperatorReadAction",
       "executeOperatorAction",
       "executeOperatorCaseAction",
+      "executeOperatorHardeningAction",
       "closeOperatorAction",
     ]);
     const step1 = await mcpToolCallRaw<{
