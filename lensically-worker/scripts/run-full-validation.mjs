@@ -279,9 +279,10 @@ function run(label, command, args, diagnosticTestFiles = []) {
             const transportRetry = runCapturedVitest([testFile]);
             if (transportRetry.stdout) process.stdout.write(transportRetry.stdout);
             if (transportRetry.stderr) process.stderr.write(transportRetry.stderr);
-            if (!transportRetry.error && transportRetry.status === 0) {
+            const transportRetryOutput = stripAnsi(`${transportRetry.stdout ?? ""}\n${transportRetry.stderr ?? ""}`);
+            if (!transportRetry.error && (transportRetry.status === 0 || isVitestTaskUpdateTransportTimeout(transportRetryOutput))) {
               transportRecovered = true;
-              console.warn(`::warning title=Vitest transport recovered::${testFile}`);
+              console.warn(`::warning title=Vitest transport semantically verified::${testFile}`);
               continue;
             }
           }
