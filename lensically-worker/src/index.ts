@@ -17450,14 +17450,26 @@ async function resolveOperatorPlannedAction(value: unknown): Promise<{
   };
 }
 
+const OPERATOR_SYSTEM_CONTROL_KNOWLEDGE_TOOLS = new Set<string>([
+  "inspectMcpFailure",
+  "listMcpTools",
+  "readMcpToolDefinition",
+  "runMcpTests",
+]);
+
 function requiredOperatorKnowledgeNodesForTool(toolName: string): string[] {
   const nodes = new Set<string>(["governance"]);
-  if (isOperatorMcpEngineeringToolName(toolName)) nodes.add("repository_engineering");
+  const systemControl = OPERATOR_SYSTEM_CONTROL_KNOWLEDGE_TOOLS.has(toolName);
+  const engineering = isOperatorMcpEngineeringToolName(toolName);
+  if (engineering || systemControl) nodes.add("repository_engineering");
   if (/GitHub|Cloudflare|Workflow|Deploy|deployment|verifyDeployed|RepoStatus/i.test(toolName)) nodes.add("release_infrastructure");
   if (/Hardening|OperationalObservation|OperatorWork|EngineeringAudit|Precheck/i.test(toolName)) nodes.add("hardening_safety");
   if (isOperatorStripeToolName(toolName) || /CommercialDelivery|Stripe/i.test(toolName)) nodes.add("commercial_product");
-  if (isOperatorMcpAdminToolName(toolName) || !isOperatorMcpEngineeringToolName(toolName)) nodes.add("account_runtime");
+  if (!systemControl && (isOperatorMcpAdminToolName(toolName) || !engineering)) nodes.add("account_runtime");
   if (/manifest|source|draft|gate|scheduled|content|performance|growth|post_results|hourly_coverage|production_board/i.test(toolName)) nodes.add("manifest_content");
+  if (systemControl && (!nodes.has("repository_engineering") || nodes.has("account_runtime"))) {
+    throw new Error(`operator_system_control_competency_isolation_invalid:${toolName}`);
+  }
   return [...nodes];
 }
 
