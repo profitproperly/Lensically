@@ -17764,7 +17764,7 @@ function compileOperatorPublicProfileRequest(gatewayArgs: Record<string, unknown
       };
     }
   }
-  const baseTools = buildOperatorMcpBaseTools(false);
+  const baseTools = buildComposedOperatorMcpTools(false);
   const matchedTool = baseTools.find((tool) => operatorPublicProfileIdForToolName(tool.name) === profileId);
   if (!matchedTool) {
     return {
