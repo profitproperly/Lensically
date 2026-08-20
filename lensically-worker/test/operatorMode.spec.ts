@@ -115,6 +115,7 @@ const TEST_LIFECYCLE_TOOL_NAMES = new Set([
   "executeOperatorReadAction",
   "executeOperatorAction",
   "executeOperatorCaseAction",
+  "executeOperatorHardeningAction",
   "closeOperatorAction",
 ]);
 
