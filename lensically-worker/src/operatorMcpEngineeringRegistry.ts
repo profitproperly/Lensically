@@ -332,6 +332,20 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   },
   {
+    name: "executeOperatorHardeningAction",
+    title: "Execute operator hardening intake",
+    description: "Mutating Step 4 for one server-prepared hardening incident intake. Forward only the opaque live-state token from Step 3; the server derives and verifies the bound client-block intake identity and rejects every other mutation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        live_state_token: { type: "string", minLength: 16 },
+      },
+      required: ["live_state_token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: "closeOperatorAction",
     title: "Close operator action",
     description: "Step 5 of the canonical Operator lifecycle. Consume the server-bound Step-4 execution proof, require verification evidence, preserve prevention obligations, and leave one explicit next checkpoint before closure. The executed action is not replayed through the client.",
