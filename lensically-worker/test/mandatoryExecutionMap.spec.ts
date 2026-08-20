@@ -7,19 +7,37 @@ import {
 } from "../src/mandatoryExecutionMap";
 
 describe("mandatory execution map", () => {
-  it("preserves lifecycle-bound control-step inputs through both public validation layers", () => {
-    const source = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-    const lifecycleGuard = source.indexOf('if (profileId === "control_step") {\n    if (typedLifecycleBound) {');
-    const publicInputGuard = source.indexOf('const inputKeys = Object.keys(inputs);', lifecycleGuard);
-    const preparedPassThrough = source.indexOf('inputs: { ...inputs },', lifecycleGuard);
-    const routedPreparedMarker = source.indexOf('const preparedControlStep = directInputs?.prepared_tool_name === "runGitHubWorkflow";');
-    const routedPublicGuard = source.indexOf('if (actionIntent === "advance control step" && directInputs && !preparedControlStep)', routedPreparedMarker);
+  it("preserves lifecycle-bound control-step inputs through source-defined preparation", () => {
+    const tools = [{
+      name: "runGitHubWorkflow",
+      title: "Run GitHub workflow",
+      description: "Run one exact engineering workflow.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          dry_run: { type: "boolean" },
+          release_sha: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    }];
 
-    expect(lifecycleGuard).toBeGreaterThanOrEqual(0);
-    expect(preparedPassThrough).toBeGreaterThan(lifecycleGuard);
-    expect(publicInputGuard).toBeGreaterThan(preparedPassThrough);
-    expect(routedPreparedMarker).toBeGreaterThan(publicInputGuard);
-    expect(routedPublicGuard).toBeGreaterThan(routedPreparedMarker);
+    const prepared = prepareSourceDefinedDirectEngineeringCall(
+      "advance control step",
+      "Validate one exact release control step.",
+      {
+        prepared_tool_name: "runGitHubWorkflow",
+        dry_run: true,
+        release_sha: "0123456789abcdef0123456789abcdef01234567",
+      },
+      tools,
+    );
+
+    expect(prepared?.ok).toBe(true);
+    expect(prepared?.tool_name).toBe("runGitHubWorkflow");
+    expect(prepared?.arguments?.dry_run).toBe(true);
+    expect(prepared?.arguments?.release_sha).toBe("0123456789abcdef0123456789abcdef01234567");
+    expect(prepared?.arguments).not.toHaveProperty("prepared_tool_name");
   });
 
   it("binds the neutral case-step prevention to opaque Step-4 identities", () => {
