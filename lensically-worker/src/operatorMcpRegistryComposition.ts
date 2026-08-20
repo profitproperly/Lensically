@@ -60,6 +60,7 @@ export const OPERATOR_MCP_DIRECT_PRIORITIES = new Map<string, number>([
   ["executeOperatorReadAction", 3],
   ["executeOperatorAction", 3],
   ["executeOperatorCaseAction", 3],
+  ["executeOperatorHardeningAction", 3],
   ["closeOperatorAction", 4],
   ["getEngineeringContinuation", 10],
   ["getDatabaseSchemaState", 11],
