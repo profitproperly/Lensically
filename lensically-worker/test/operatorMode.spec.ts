@@ -6925,6 +6925,88 @@ active_checkpoint: none
     ).bind(second.incident.id).run();
   }, 30000);
 
+  it("reconciles historical OpenAI predispatch nonreceipt during hardening status without another client mutation", async () => {
+    const mutableEnv = env as typeof env & {
+      CF_VERSION_METADATA?: { id: string };
+      LENSICALLY_COMMIT_SHA?: string;
+    };
+    const originalMetadata = mutableEnv.CF_VERSION_METADATA;
+    const originalSha = mutableEnv.LENSICALLY_COMMIT_SHA;
+    const runtimeSha = "0123456789abcdef0123456789abcdef01234567";
+    const deploymentId = "provider-reconcile-deployment";
+    const anchorId = "fixture-provider-reconcile-anchor";
+    const legacyId = "fixture-provider-reconcile-legacy";
+    try {
+      mutableEnv.CF_VERSION_METADATA = { id: deploymentId };
+      mutableEnv.LENSICALLY_COMMIT_SHA = runtimeSha;
+      await env.DB.prepare(
+        `INSERT INTO operator_hardening_incidents (
+          id, signature, boundary, severity, classification, state, affected_scope,
+          blocked_profile_id, side_effect_state, root_cause, generalized_cause,
+          prevention_rule_id, regression_test_ids_json, tested_sha, deployment_id, closed_at
+        ) VALUES (?, ?, 'client', 'P1', 'known_prevention', 'closed', 'objective', ?, 'not_applicable', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      ).bind(
+        anchorId,
+        "fixture-provider-reconcile-anchor-signature",
+        "case_step_a10",
+        "fixture provider anchor root cause",
+        "fixture provider anchor generalized cause",
+        "openai_predispatch_external_recurrence_convergence",
+        '["fixture-provider-anchor-regression"]',
+        runtimeSha,
+        deploymentId,
+      ).run();
+      await env.DB.prepare(
+        `INSERT INTO operator_hardening_incidents (
+          id, signature, boundary, severity, classification, state, affected_scope,
+          blocked_profile_id, side_effect_state, expected_json, observed_json
+        ) VALUES (?, ?, 'client', 'P0', 'prevention_breach', 'detected', 'objective', ?, 'not_applicable', ?, ?)`,
+      ).bind(
+        legacyId,
+        "fixture-provider-reconcile-legacy-signature",
+        "case_step_a1",
+        JSON.stringify({ stage: "a1" }),
+        JSON.stringify({ client_blocked: true, lensically_receipt: false, message: "This tool call was blocked by OpenAI's safety checks." }),
+      ).run();
+      await env.DB.prepare(
+        `INSERT INTO operator_hardening_incident_events (id, incident_id, from_state, to_state, evidence_json)
+         VALUES (?, ?, NULL, 'detected', ?)`,
+      ).bind(
+        "fixture-provider-reconcile-legacy-event",
+        legacyId,
+        JSON.stringify({ error_category: "openai_predispatch_safety_block" }),
+      ).run();
+
+      const statusCall = await mcpToolRaw<{
+        ok: boolean;
+        stale_replay_reconciliation: { checked: number; reconciled: number; skipped: number };
+      }>("getHardeningStatus", { incident_id: legacyId });
+      expect(statusCall.isError).not.toBe(true);
+      expect(statusCall.structuredContent.stale_replay_reconciliation.reconciled).toBeGreaterThanOrEqual(1);
+      const legacy = await env.DB.prepare(
+        `SELECT state, prevention_rule_id, resume_result_json, autonomy_dividend_json
+         FROM operator_hardening_incidents WHERE id = ? LIMIT 1`,
+      ).bind(legacyId).first<Record<string, unknown>>();
+      expect(legacy?.state).toBe("closed");
+      expect(legacy?.prevention_rule_id).toBe("openai_predispatch_external_recurrence_convergence");
+      expect(JSON.parse(String(legacy?.resume_result_json ?? "{}"))).toMatchObject({
+        status: "historical_external_provider_occurrence_reconciled",
+        source: "server_owned_historical_openai_predispatch_reconciliation",
+      });
+      expect(JSON.parse(String(legacy?.autonomy_dividend_json ?? "{}"))).toMatchObject({
+        owner_action_required: false,
+        historical_provider_debt_removed: true,
+      });
+    } finally {
+      await env.DB.prepare(`DELETE FROM operator_hardening_incident_events WHERE incident_id IN (?, ?)`).bind(anchorId, legacyId).run();
+      await env.DB.prepare(`DELETE FROM operator_hardening_incidents WHERE id IN (?, ?)`).bind(anchorId, legacyId).run();
+      if (originalMetadata) mutableEnv.CF_VERSION_METADATA = originalMetadata;
+      else delete mutableEnv.CF_VERSION_METADATA;
+      if (originalSha !== undefined) mutableEnv.LENSICALLY_COMMIT_SHA = originalSha;
+      else delete mutableEnv.LENSICALLY_COMMIT_SHA;
+    }
+  }, 30000);
+
     it("classifies a repeated resolved failure as a prevention regression", async () => {
         const firstCall = await mcpToolRaw<{
       ok: boolean;
