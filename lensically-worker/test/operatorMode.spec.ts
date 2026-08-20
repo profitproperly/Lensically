@@ -3862,6 +3862,11 @@ describe("operator mode MCP endpoint", () => {
     expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("execution_descriptor");
     expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("action");
     expect(caseActionTool?.inputSchema?.required).toEqual(expect.arrayContaining(["live_state_token", "governing_standards_ack"]));
+    expect(hardeningActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
+    expect(hardeningActionTool?.inputSchema?.properties).toHaveProperty("governing_standards_ack");
+    expect(hardeningActionTool?.inputSchema?.properties).not.toHaveProperty("execution_descriptor");
+    expect(hardeningActionTool?.inputSchema?.properties).not.toHaveProperty("action");
+    expect(hardeningActionTool?.inputSchema?.required).toEqual(expect.arrayContaining(["live_state_token", "governing_standards_ack"]));
     const readExecutionDescriptorSchema = readActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const mutationExecutionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const readExecutionDescriptorBranches = readExecutionDescriptorSchema?.oneOf ?? [];
