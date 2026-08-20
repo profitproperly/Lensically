@@ -38,6 +38,24 @@ describe("mandatory execution map", () => {
     expect(prevention?.enforcement_point).toContain("executeOperatorCaseAction");
   });
 
+  it("binds client block intake to the dedicated token-only hardening gateway", () => {
+    const prevention = resolveActionBoundWinningPaths("recordHardeningIncident")
+      .find((candidate) => candidate.id === "client_safe_hardening_intake_gateway");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.action_binding?.tool_names).toContain("recordHardeningIncident");
+    expect(prevention?.winning_path.procedure).toContain(
+      "Forward only the opaque live-state token through executeOperatorHardeningAction.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Exclude client_block_intake from the generic executeOperatorAction descriptor union.",
+    );
+    expect(prevention?.enforcement_point).toContain("executeOperatorHardeningAction");
+    expect(prevention?.regression_test_id).toBe(
+      "routes client block intake only through dedicated token-only hardening gateway",
+    );
+  });
+
   it("closes stored-verified resumed hardening incidents without client finalization", () => {
     const prevention = WINNING_PATH_PROMOTIONS
       .find((candidate) => candidate.id === "server_owned_resumed_hardening_closure");
