@@ -7993,7 +7993,7 @@ active_checkpoint: none
     expect(status.structuredContent.startup_authority).not.toHaveProperty("exact_owner_approved_text");
         expect(status.structuredContent.session_lifecycle).toMatchObject({
       session_map_tool: "getOperatorSessionMap",
-      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"],
     });
     expect(status.structuredContent.session_lifecycle?.rule).toContain("Steps 2-5");
     expect(status.structuredContent).not.toHaveProperty("mandatory_execution_map");
