@@ -6133,6 +6133,7 @@ active_checkpoint: none
       "executeOperatorReadAction",
       "executeOperatorAction",
       "executeOperatorCaseAction",
+      "executeOperatorHardeningAction",
       "closeOperatorAction",
       "persist_manifest_autonomous_post",
     ]);
