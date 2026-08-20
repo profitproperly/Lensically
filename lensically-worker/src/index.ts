@@ -17508,7 +17508,7 @@ function resolveExactCapabilityToolName(value: unknown): string | null {
     repository_symbol_search: "searchRepoFiles",
   };
   if (aliases[key]) return aliases[key];
-  return buildOperatorMcpBaseTools(false).find((tool) =>
+  return buildComposedOperatorMcpTools(false).find((tool) =>
     operatorActionCapabilityIdForToolName(tool.name) === key
     || operatorPublicProfileIdForToolName(tool.name) === key
     || normalizeOperatorMachineKey(tool.title, "") === key,
