@@ -15732,7 +15732,7 @@ async function operatorPublicMcpToolCount(env: Env): Promise<number> {
   return countOperatorPublicMcpTools(await buildOperatorPublicMcpTools(env));
 }
 
-async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<Record<string, unknown> | null> {
+async function readOperatorMcpToolDefinition(env: Env, toolName: string): Promise<ReturnType<typeof findOperatorMcpToolDefinition>> {
   return findOperatorMcpToolDefinition(
     await buildOperatorMcpTools(env, true),
     toolName,
