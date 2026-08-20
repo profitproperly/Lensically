@@ -6700,7 +6700,7 @@ active_checkpoint: none
       recurrence: { status: string; prior_incident_id: string; recurrence_family: string };
     }>("recordHardeningIncident", {
       boundary: "client",
-      blocked_profile_id: "case_step_a6",
+      blocked_profile_id: "control_step",
       request_fingerprint: "fixture-advanced-active-recurrence-b",
       error_category: "openai_client_predispatch_safety_block",
       operation_class: "engineering_hardening_transition",
