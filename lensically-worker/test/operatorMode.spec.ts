@@ -3820,6 +3820,7 @@ describe("operator mode MCP endpoint", () => {
       "executeOperatorReadAction",
       "executeOperatorAction",
       "executeOperatorCaseAction",
+      "executeOperatorHardeningAction",
       "closeOperatorAction",
     ]);
     expect(names).not.toContain("getOperatorStartupContext");
