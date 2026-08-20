@@ -15711,6 +15711,22 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     required: ["live_state_token", "governing_standards_ack"],
     additionalProperties: false,
   };
+  if (hardeningMutationActionIds.size !== 1) {
+    throw new Error(`operator_hardening_action_descriptor_coverage_invalid:${hardeningMutationActionIds.size}`);
+  }
+  hardeningActionGateway.inputSchema = {
+    type: "object",
+    properties: {
+      live_state_token: { type: "string", minLength: 16 },
+      governing_standards_ack: {
+        type: "string",
+        const: OPERATOR_GOVERNING_STANDARDS_ACK,
+        description: "Mandatory pre-action acknowledgment.",
+      },
+    },
+    required: ["live_state_token", "governing_standards_ack"],
+    additionalProperties: false,
+  };
   return tools;
 }
 
