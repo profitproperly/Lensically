@@ -7807,9 +7807,9 @@ active_checkpoint: none
       operation_id: "composed-cross-repo-route-regression",
     });
     fetchSpy.mockRestore();
-    expect(routed.isError, JSON.stringify(routed.structuredContent)).not.toBe(true);
-    expect(routed.structuredContent.ok).toBe(true);
     expect(routed.structuredContent.routed_execution.executed_tool).toBe("operateGitHubRepositories");
+    expect(routed.structuredContent.ok).toBe(false);
+    expect((routed.structuredContent as Record<string, unknown>).status).toBe(401);
   }, 30000);
 
   it("routes operational status and engineering intents deterministically away from content procedures", async () => {
