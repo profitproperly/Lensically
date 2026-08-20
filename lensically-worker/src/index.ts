@@ -17856,7 +17856,7 @@ async function prepareOperatorRoutedGatewayCall(
       ...(dryRun ? { dry_run: true } : {}),
     };
   }
-  const baseTools = buildOperatorMcpBaseTools(false);
+  const baseTools = buildComposedOperatorMcpTools(false);
   const directMapped = actionIntent && directInputs
     ? prepareSourceDefinedDirectEngineeringCall(
         actionIntent,
