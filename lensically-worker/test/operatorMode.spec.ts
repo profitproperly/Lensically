@@ -6107,6 +6107,12 @@ active_checkpoint: none
     const releaseTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { force?: { type?: string } } } } }>("readMcpToolDefinition", { tool_name: "runEngineeringRelease" });
         const releaseStatusTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getEngineeringRelease" });
     const workflowWatchTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { wait_seconds?: { maximum?: number } } } } }>("readMcpToolDefinition", { tool_name: "getGitHubWorkflowRun" });
+    const workflowControlTool = await mcpTool<{
+      planned_action_contract?: {
+        capability?: string;
+        arguments_schema?: { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: boolean };
+      };
+    }>("readMcpToolDefinition", { tool_name: "runGitHubWorkflow" });
         const hardeningTransitionTool = await mcpTool<{ tool?: { inputSchema?: { properties?: Record<string, unknown> } } }>("readMcpToolDefinition", { tool_name: "advanceHardeningIncident" });
         const createRepositoryTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { visibility?: { enum?: string[] }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createGitHubRepository" });
         const createPagesProjectTool = await mcpTool<{ tool?: { inputSchema?: { properties?: { project_name?: { maxLength?: number }, operation_id?: { maxLength?: number } } } } }>("readMcpToolDefinition", { tool_name: "createCloudflarePagesProject" });
