@@ -83,6 +83,7 @@ describe("Operator MCP tool directory", () => {
     ]);
     expect(isOperatorPublicDirectToolName("getOperatorSessionMap")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorReadAction")).toBe(true);
+    expect(isOperatorPublicDirectToolName("executeOperatorEngineeringAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorCaseAction")).toBe(true);
     expect(isOperatorPublicDirectToolName("executeOperatorHardeningAction")).toBe(true);
