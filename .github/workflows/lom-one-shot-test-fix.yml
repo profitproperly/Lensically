@@ -1,11 +1,9 @@
-# one-shot trigger
 name: LOM one-shot regression expectation repair
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/lom-one-shot-test-fix.yml
+  workflow_run:
+    workflows: ["Lensically Engineering"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -28,16 +26,18 @@ jobs:
           text = path.read_text()
 
           old_list = '''      "executeOperatorHardeningAction",
-                "closeOperatorAction",
-    ]);'''
-          if old_list not in text:
-              old_list = '''      "executeOperatorHardeningAction",
       "closeOperatorAction",
     ]);'''
-          new_list = old_list.replace('      "closeOperatorAction",\n', '      "closeOperatorAction",\n      "executeOperatorEngineeringAction",\n')
           if text.count(old_list) != 1:
               raise SystemExit(f"public lifecycle list anchor count={text.count(old_list)}")
-          text = text.replace(old_list, new_list, 1)
+          text = text.replace(
+              old_list,
+              '''      "executeOperatorHardeningAction",
+      "closeOperatorAction",
+      "executeOperatorEngineeringAction",
+    ]);''',
+              1,
+          )
 
           for variable in ("wrongHardening", "nonCaseGatewayMismatch"):
               pattern = re.compile(
@@ -48,13 +48,14 @@ jobs:
                   raise SystemExit(f"{variable} required_tool anchor count={count}")
 
           path.write_text(text)
-      - name: Commit repair and remove one-shot workflow
+      - name: Commit repair and remove temporary trigger
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "lensically-repair-bot"
           git config user.email "actions@users.noreply.github.com"
           git rm .github/workflows/lom-one-shot-test-fix.yml
+          git rm -f lensically-worker/.lom-repair-trigger
           git add lensically-worker/test/operatorMode.spec.ts
           git commit -m "Update LOM engineering gateway test expectations"
           git push origin HEAD:main
