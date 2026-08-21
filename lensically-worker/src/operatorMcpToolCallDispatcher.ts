@@ -54,6 +54,7 @@ export type OperatorMcpAutonomyAuthorization = JsonRecord & {
 
 export interface OperatorMcpToolCallDependencies {
   readOnlyRoutedExecutionGateway: string;
+  engineeringRoutedExecutionGateway: string;
   routedExecutionGateway: string;
   caseRoutedExecutionGateway: string;
   hardeningRoutedExecutionGateway: string;
