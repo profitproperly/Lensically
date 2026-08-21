@@ -1,13 +1,66 @@
-name: Retired LOM one-shot repair
+name: LOM nine-tool regression repair
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/lom-one-shot-test-fix.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  retired:
+  repair:
     runs-on: ubuntu-latest
     steps:
-      - run: echo retired
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Patch exact nine-tool assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("lensically-worker/test/operatorMode.spec.ts")
+          text = path.read_text()
+          replacements = [
+            (
+              'expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);',
+              'expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);'
+            ),
+            (
+              'expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);',
+              'expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);'
+            ),
+            (
+              'expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", case_mutation: "executeOperatorCaseAction", hardening_intake: "executeOperatorHardeningAction", mutation: "executeOperatorAction" });',
+              'expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", engineering_mutation: "executeOperatorEngineeringAction", case_mutation: "executeOperatorCaseAction", hardening_intake: "executeOperatorHardeningAction", mutation: "executeOperatorAction" });'
+            ),
+            (
+              'it("treats exactly eight public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {',
+              'it("treats exactly nine public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {'
+            ),
+            (
+              '      "executeOperatorHardeningAction",\n      "closeOperatorAction",\n    ]);\n    expect(exact).toMatchObject({',
+              '      "executeOperatorHardeningAction",\n      "closeOperatorAction",\n      "executeOperatorEngineeringAction",\n    ]);\n    expect(exact).toMatchObject({'
+            ),
+            (
+              '    expect(publicToolCount).toBe(8);',
+              '    expect(publicToolCount).toBe(9);'
+            ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"nine-tool anchor count={count}: {old[:90]}")
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          git config user.name "lensically-repair-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add lensically-worker/test/operatorMode.spec.ts
+          git commit -m "Align LOM regressions with nine-tool lifecycle"
+          git push origin HEAD:main
