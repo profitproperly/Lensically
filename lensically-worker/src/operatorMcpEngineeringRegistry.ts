@@ -10,6 +10,7 @@ export const OPERATOR_MCP_ENGINEERING_TOOL_NAMES = [
   "getEngineeringContinuation",
   "getDatabaseSchemaState",
   "executeOperatorReadAction",
+  "executeOperatorEngineeringAction",
   "executeOperatorAction",
   "executeOperatorCaseAction",
   "executeOperatorHardeningAction",
