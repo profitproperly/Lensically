@@ -1,13 +1,23 @@
 # Lensically Continuation Ledger
 
-status: clear
-updated_at: 2026-08-19
+status: active
+updated_at: 2026-08-21
 repository: profitproperly/Lensically
 branch: main
 continuation_contract: canonical-continuation-v1
-active_job_id: none
-active_checkpoint: none
-ecl_active_count: 0
+active_job_id: lensically-fleet-v2-native-recovery-retirement-20260821
+active_checkpoint: audit-main-native-recovery
+ecl_active_count: 1
+
+## ACTIVE — Fleet Operating Contract v2 + Native Recovery Consolidation
+
+job_id: `lensically-fleet-v2-native-recovery-retirement-20260821`
+status: active
+opened_at: 2026-08-21
+objective: Bring Lensically Main to verified Fleet Operating Contract v2 compliance, prove Main-native recovery is sufficient for ordinary Lensically faults, and retire the dedicated Lensically Recovery MCP only after that proof.
+current_action: Audit the current Main runtime/source for recipient/next-state/authority-set enforcement and native recovery. Install only missing enforcement/recovery, run focused and full regressions, release the exact tested SHA, live-verify Main, parity-close it, then remove the separate Recovery fleet member and runtime only if Main is proven sufficient.
+completion_condition: Main is source/runtime verified under Fleet Operating Contract v2 with native recovery regression and live proof; dedicated Recovery is retired without loss of required recovery capability; Controller fleet authority/compliance and M-BRAIN parity are synchronized; public-schema refresh is requested only if the current chat cannot use a changed deployed public contract.
+
 
 ## COMPLETED — Full Callable LOM Wiring Certification
 
