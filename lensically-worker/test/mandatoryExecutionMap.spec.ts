@@ -85,7 +85,7 @@ describe("mandatory execution map", () => {
     expect(prevention?.winning_path.procedure).toContain(
       "During hardening status reads, if this provider convergence is already proven by a closed same-family prevention anchor, reconcile pre-repair active OpenAI pre-dispatch non-receipt debt server-side across legacy receipt-field shapes instead of requiring another client mutation to close historical bookkeeping.",
     );
-    expect(prevention?.enforcement_point).toContain("getHardeningStatus historical provider-debt reconciliation");
+    expect(prevention?.enforcement_point).toContain("getHardeningStatus terminal-evidence validation with batched historical provider-debt reconciliation");
   });
 
     it("promotes bounded transient GitHub read retry and current-production revalidation", () => {
