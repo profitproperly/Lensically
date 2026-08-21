@@ -3812,9 +3812,12 @@ if (!tests.includes('capability: "repository_file_read"')
     || !tests.includes('expect(Object.keys(readStep3.state)).toEqual(["runtime"])')) {
   errors.push("lifecycle_read_only_step3_cpu_regression_missing");
 }
-if (!workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"')
+const publicDirectToolBlock = operatorMcpToolDirectory.match(/const PUBLIC_DIRECT_TOOL_NAMES = \[(.*?)\] as const;/s)?.[1] ?? "";
+const expectedPublicDirectToolCount = (publicDirectToolBlock.match(/"[^"]+"/g) ?? []).length;
+if (expectedPublicDirectToolCount <= 0
+    || !workflow.includes('.execution_kernel.public_gateway == "operator_lifecycle"')
     || !workflow.includes('.execution_kernel.public_contract == "operator-lifecycle-v1"')
-    || !workflow.includes('(.live_tool_count == 7)')) {
+    || !workflow.includes(`(.live_tool_count == ${expectedPublicDirectToolCount})`)) {
   errors.push("release_workflow_normalized_lifecycle_runtime_gate_missing");
 }
 if (!workflow.includes("- name: Publish exact release authority target")
