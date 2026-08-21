@@ -15584,7 +15584,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     const caseActionGateway = tools.find((tool) => tool.name === OPERATOR_CASE_EXECUTION_GATEWAY);
     const hardeningActionGateway = tools.find((tool) => tool.name === OPERATOR_HARDENING_EXECUTION_GATEWAY);
     const closeGateway = tools.find((tool) => tool.name === "closeOperatorAction");
-  if (!knowledgeGateway || !liveStateGateway || !readActionGateway || !actionGateway || !caseActionGateway || !hardeningActionGateway || !closeGateway) return tools;
+  if (!knowledgeGateway || !liveStateGateway || !readActionGateway || !engineeringActionGateway || !actionGateway || !caseActionGateway || !hardeningActionGateway || !closeGateway) return tools;
 
   const actionCapabilityIds = new Set<string>();
   const plannedActionCapabilityEnums: string[] = [];
