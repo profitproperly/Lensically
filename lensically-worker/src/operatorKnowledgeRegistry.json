@@ -65,7 +65,7 @@
         "Publishing or scheduler behavior changes require scheduler safety verification in the release path."
       ],
       "recovery_boundary": [
-        "Recovery is break-glass only when Main or its deployment plane cannot receive or complete the repair.",
+        "Main owns native diagnosis, bounded repair, regression, release verification, and return-to-normal recovery while Main remains callable.",
         "Return normal work to Main immediately after the break-glass condition is repaired."
       ]
     },
