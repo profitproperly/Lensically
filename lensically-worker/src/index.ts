@@ -23725,6 +23725,7 @@ async function handleOperatorMcpToolCall(
 ): Promise<Response> {
   return dispatchOperatorMcpToolCall({ request, id, params }, {
     readOnlyRoutedExecutionGateway: OPERATOR_READ_EXECUTION_GATEWAY,
+    engineeringRoutedExecutionGateway: OPERATOR_ENGINEERING_EXECUTION_GATEWAY,
     routedExecutionGateway: OPERATOR_ROUTED_EXECUTION_GATEWAY,
     caseRoutedExecutionGateway: OPERATOR_CASE_EXECUTION_GATEWAY,
     hardeningRoutedExecutionGateway: OPERATOR_HARDENING_EXECUTION_GATEWAY,
