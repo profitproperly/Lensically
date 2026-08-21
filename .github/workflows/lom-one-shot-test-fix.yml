@@ -1,65 +1,13 @@
-name: LOM one-shot regression expectation repair
+name: Retired LOM one-shot repair
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - lensically-worker/.lom-repair-trigger
-  workflow_run:
-    workflows: ["Lensically Engineering"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 1
-      - name: Repair exact LOM gateway expectations
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
-
-          path = Path("lensically-worker/test/operatorMode.spec.ts")
-          text = path.read_text()
-
-          old_list = '''      "executeOperatorHardeningAction",
-      "closeOperatorAction",
-    ]);'''
-          if text.count(old_list) != 1:
-              raise SystemExit(f"public lifecycle list anchor count={text.count(old_list)}")
-          text = text.replace(
-              old_list,
-              '''      "executeOperatorHardeningAction",
-      "closeOperatorAction",
-      "executeOperatorEngineeringAction",
-    ]);''',
-              1,
-          )
-
-          for variable in ("wrongHardening", "nonCaseGatewayMismatch"):
-              pattern = re.compile(
-                  rf'(expect\({variable}\.structuredContent\)\.toMatchObject\(\{{[\s\S]{{0,600}}?required_tool:\s*)"executeOperatorAction"'
-              )
-              text, count = pattern.subn(r'\1"executeOperatorEngineeringAction"', text, count=1)
-              if count != 1:
-                  raise SystemExit(f"{variable} required_tool anchor count={count}")
-
-          path.write_text(text)
-      - name: Commit repair and remove temporary trigger
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "lensically-repair-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git rm .github/workflows/lom-one-shot-test-fix.yml
-          git rm -f lensically-worker/.lom-repair-trigger
-          git add lensically-worker/test/operatorMode.spec.ts
-          git commit -m "Update LOM engineering gateway test expectations"
-          git push origin HEAD:main
+      - run: echo retired
