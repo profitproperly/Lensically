@@ -145,8 +145,19 @@ describe("Operator MCP protocol contract", () => {
     expect(OPERATOR_TURN_CLOSE_RULE).toContain("Lifecycle action closure closes one action only");
     expect(OPERATOR_TURN_CLOSE_RULE).toContain("Status reporting may describe progress but may not substitute for execution");
     expect(OPERATOR_GOVERNING_STANDARDS.turn_close_rule).toBe(OPERATOR_TURN_CLOSE_RULE);
+        expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Main's engineering, diagnostic, hardening, validation, and release capabilities");
+    expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("MCP Controller enter as the fleet break-glass plane");
+    expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("dedicated Lensically Recovery connector is retired");
     expect(OPERATOR_FAILURE_REPAIR_RULE).toContain("Alternate tools are required when they are part of root-cause repair");
     expect(OPERATOR_GOVERNING_STANDARDS.failure_repair_rule).toBe(OPERATOR_FAILURE_REPAIR_RULE);
+    expect(OPERATOR_GOVERNING_STANDARDS.native_recovery_contract).toMatchObject({
+      version: "lensically-native-recovery-v1",
+      default_plane: "main_native",
+      escalation_plane: "mcp_controller_break_glass",
+      dedicated_recovery_connector: "retired",
+      controller_domain_business_logic: false,
+      claims_client_predispatch_interception: false,
+    });
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("short opaque continuation references");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("remain server-side");
     expect(OPERATOR_OPAQUE_LIFECYCLE_TOKEN_RULE).toContain("byte-for-byte");

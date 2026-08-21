@@ -2,12 +2,15 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { describe, expect, it } from "vitest";
 import worker from "../src";
 import {
-  HUMAN_FREE_AUTONOMY_CONTRACT,
+    HUMAN_FREE_AUTONOMY_CONTRACT,
   HUMAN_FREE_AUTONOMY_POLICY_VERSION,
+  LENSICALLY_NATIVE_RECOVERY_CONTRACT,
+  LENSICALLY_NATIVE_RECOVERY_POLICY_VERSION,
   SCHEDULED_POST_DELETION_REASON_CODES,
   buildScheduledPostDeletionReason,
-  isHumanLearningApiRetired,
+    isHumanLearningApiRetired,
   normalizeScheduledPostDeletionReasonCode,
+  resolveLensicallyRecoveryPlane,
 } from "../src/humanFreeAutonomy";
 
 async function fetchFromWorker(path: string, init?: RequestInit): Promise<Response> {
@@ -36,6 +39,21 @@ describe("human-free autonomy contract", () => {
       "source-family evidence",
       "experiment outcomes",
     ]));
+  });
+
+    it("enforces Main-native recovery with Controller-only break-glass escalation", () => {
+    expect(LENSICALLY_NATIVE_RECOVERY_POLICY_VERSION).toBe("lensically-native-recovery-v1");
+    expect(resolveLensicallyRecoveryPlane("main_callable")).toBe("main_native");
+    expect(resolveLensicallyRecoveryPlane("main_unavailable")).toBe("mcp_controller_break_glass");
+    expect(resolveLensicallyRecoveryPlane("main_incapable")).toBe("mcp_controller_break_glass");
+    expect(LENSICALLY_NATIVE_RECOVERY_CONTRACT).toMatchObject({
+      default_plane: "main_native",
+      escalation_plane: "mcp_controller_break_glass",
+      dedicated_recovery_connector: "retired",
+      controller_domain_business_logic: false,
+      claims_client_predispatch_interception: false,
+      infrastructure_repair_strategy: "source_exact_repair_or_redeploy",
+    });
   });
 
   it("treats every scheduled deletion as unobserved operational state", () => {
