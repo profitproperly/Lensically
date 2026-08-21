@@ -15579,6 +15579,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     const knowledgeGateway = tools.find((tool) => tool.name === "getOperatorKnowledge");
     const liveStateGateway = tools.find((tool) => tool.name === "getOperatorLiveState");
     const readActionGateway = tools.find((tool) => tool.name === OPERATOR_READ_EXECUTION_GATEWAY);
+    const engineeringActionGateway = tools.find((tool) => tool.name === OPERATOR_ENGINEERING_EXECUTION_GATEWAY);
     const actionGateway = tools.find((tool) => tool.name === OPERATOR_ROUTED_EXECUTION_GATEWAY);
     const caseActionGateway = tools.find((tool) => tool.name === OPERATOR_CASE_EXECUTION_GATEWAY);
     const hardeningActionGateway = tools.find((tool) => tool.name === OPERATOR_HARDENING_EXECUTION_GATEWAY);
