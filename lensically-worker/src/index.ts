@@ -15590,6 +15590,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
   const plannedActionCapabilityEnums: string[] = [];
   const plannedActionContracts: Record<string, unknown>[] = [];
   const readActionDescriptorBranches: Record<string, unknown>[] = [];
+  const engineeringMutationActionDescriptorBranches: Record<string, unknown>[] = [];
   const mutationActionDescriptorBranches: Record<string, unknown>[] = [];
   const caseMutationActionIds = new Set<string>();
   const hardeningMutationActionIds = new Set<string>();
