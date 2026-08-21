@@ -10,7 +10,7 @@
         "lensically-worker/ is the production backend and Operator MCP.",
         "lensically-web/ is the private operational app at app.lensically.com.",
         "lensically-worker/public/ owns public Lensically sales, download, license, refund, privacy, terms, and data-deletion surfaces.",
-        "lensically-recovery-worker/ is the independent break-glass repair plane, not normal engineering.",
+        "Native recovery lives in Lensically Main; the historical lensically-recovery-worker/ is retired from active architecture.",
         "profitproperly/Lensically main is the authoritative repository and branch unless live source control proves otherwise."
       ],
       "repository_procedures": [
