@@ -36,10 +36,13 @@ describe("Operator MCP engineering registry", () => {
         expect(byName.get("executeOperatorReadAction")?.inputSchema).toMatchObject({ required: ["live_state_token"], additionalProperties: false });
     expect(byName.get("executeOperatorReadAction")?.annotations).toMatchObject({ readOnlyHint: true });
     expect(byName.get("executeOperatorReadAction")?.inputSchema?.properties).not.toHaveProperty("action");
+        expect(byName.get("executeOperatorEngineeringAction")?.inputSchema).toMatchObject({ required: ["live_state_token"], additionalProperties: false });
+    expect(byName.get("executeOperatorEngineeringAction")?.annotations).toMatchObject({ readOnlyHint: false });
+    expect(byName.get("executeOperatorEngineeringAction")?.description).toContain("engineering mutation");
         expect(byName.get("executeOperatorAction")?.inputSchema).toMatchObject({ required: ["live_state_token"], additionalProperties: false });
     expect(byName.get("executeOperatorAction")?.annotations).toMatchObject({ readOnlyHint: false });
     expect(byName.get("executeOperatorAction")?.inputSchema?.properties).not.toHaveProperty("action");
-    expect(byName.get("executeOperatorAction")?.description).toContain("server-bound mutating action");
+    expect(byName.get("executeOperatorAction")?.description).toContain("non-engineering mutation");
     expect(byName.get("executeOperatorCaseAction")?.inputSchema).toMatchObject({ required: ["live_state_token"], additionalProperties: false });
     expect(byName.get("executeOperatorCaseAction")?.annotations).toMatchObject({ readOnlyHint: false });
     expect(byName.get("executeOperatorCaseAction")?.inputSchema?.properties).not.toHaveProperty("action");
