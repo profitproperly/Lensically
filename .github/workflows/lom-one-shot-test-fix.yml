@@ -1,13 +1,66 @@
-name: Retired LOM one-shot repair
+name: LOM split-gateway regression repair
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/lom-one-shot-test-fix.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  retired:
+  repair:
     runs-on: ubuntu-latest
     steps:
-      - run: echo retired
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Patch exact split-gateway assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("lensically-worker/test/operatorMode.spec.ts")
+          text = path.read_text()
+          replacements = [
+            (
+              '    const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");\n    const caseActionTool = listed.tools.find((tool) => tool.name === "executeOperatorCaseAction");',
+              '    const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");\n    const engineeringActionTool = listed.tools.find((tool) => tool.name === "executeOperatorEngineeringAction");\n    const caseActionTool = listed.tools.find((tool) => tool.name === "executeOperatorCaseAction");'
+            ),
+            (
+              '    expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");\n    expect(caseActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");',
+              '    expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");\n    expect(engineeringActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");\n    expect(engineeringActionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");\n    expect(engineeringActionTool?.inputSchema?.properties).not.toHaveProperty("action");\n    expect(caseActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");'
+            ),
+            (
+              '    const mutationExecutionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;\n    const readExecutionDescriptorBranches = readExecutionDescriptorSchema?.oneOf ?? [];\n    const mutationExecutionDescriptorBranches = mutationExecutionDescriptorSchema?.oneOf ?? [];',
+              '    const mutationExecutionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;\n    const engineeringExecutionDescriptorSchema = engineeringActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;\n    const readExecutionDescriptorBranches = readExecutionDescriptorSchema?.oneOf ?? [];\n    const mutationExecutionDescriptorBranches = mutationExecutionDescriptorSchema?.oneOf ?? [];\n    const engineeringExecutionDescriptorBranches = engineeringExecutionDescriptorSchema?.oneOf ?? [];'
+            ),
+            (
+              '    expect(mutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);\n    expect(mutationExecutionDescriptorBranches.some((branch) => branch.properties?.action_id?.const === "client_block_intake")).toBe(false);',
+              '    expect(mutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);\n    expect(engineeringExecutionDescriptorBranches.length).toBeGreaterThan(0);\n    expect(engineeringExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);\n    expect(mutationExecutionDescriptorBranches.some((branch) => branch.properties?.action_id?.const === "client_block_intake")).toBe(false);'
+            ),
+            (
+              '    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...readExecutionDescriptorBranches];',
+              '    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...engineeringExecutionDescriptorBranches, ...readExecutionDescriptorBranches];'
+            ),
+            (
+              '    const repositoryPatchDescriptor = mutationExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");',
+              '    const repositoryPatchDescriptor = engineeringExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");'
+            ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"split-gateway anchor count={count}: {old[:80]}")
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          git config user.name "lensically-repair-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add lensically-worker/test/operatorMode.spec.ts
+          git commit -m "Align LOM lifecycle test with split engineering gateway"
+          git push origin HEAD:main
