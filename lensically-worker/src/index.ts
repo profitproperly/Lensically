@@ -21576,7 +21576,7 @@ async function handleOperatorMcpAdminTool(
     }
     const liveReadFailures = liveReadRows.filter((row) => row.passed !== true);
     const checks = [
-      { name: "effect_specific_step4_gateways_registered", passed: names.has(OPERATOR_READ_EXECUTION_GATEWAY) && names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) },
+      { name: "effect_specific_step4_gateways_registered", passed: names.has(OPERATOR_READ_EXECUTION_GATEWAY) && names.has(OPERATOR_ENGINEERING_EXECUTION_GATEWAY) && names.has(OPERATOR_ROUTED_EXECUTION_GATEWAY) && names.has(OPERATOR_CASE_EXECUTION_GATEWAY) && names.has(OPERATOR_HARDENING_EXECUTION_GATEWAY) },
       { name: "retired_internal_tools_absent", passed: [...FORBIDDEN_RETIRED_TOOL_NAMES].every((name) => !names.has(name)) },
       { name: "retired_human_guidance_tools_absent_from_campaign", passed: campaignTools.every((tool) => !RETIRED_HUMAN_GUIDANCE_TOOL_NAMES.has(tool.name)) },
       { name: "session_handshake_tools_registered", passed: names.has("selectOperatorKey") && names.has("confirmOperatorProceed") },
