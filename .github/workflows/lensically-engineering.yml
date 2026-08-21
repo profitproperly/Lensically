@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 3
+          fetch-depth: 4
       - name: Patch stale LOM expectations and restore workflow
         shell: bash
         run: |
@@ -25,38 +25,23 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           path = Path("lensically-worker/test/operatorMode.spec.ts")
           text = path.read_text()
-
-          old_list = '''      "executeOperatorHardeningAction",
-      "closeOperatorAction",
-    ]);'''
+          old_list = '      "executeOperatorHardeningAction",\n      "closeOperatorAction",\n    ]);'
+          new_list = '      "executeOperatorHardeningAction",\n      "closeOperatorAction",\n      "executeOperatorEngineeringAction",\n    ]);'
           if text.count(old_list) != 1:
               raise SystemExit(f"public lifecycle list anchor count={text.count(old_list)}")
-          text = text.replace(
-              old_list,
-              '''      "executeOperatorHardeningAction",
-      "closeOperatorAction",
-      "executeOperatorEngineeringAction",
-    ]);''',
-              1,
-          )
-
+          text = text.replace(old_list, new_list, 1)
           for variable in ("wrongHardening", "nonCaseGatewayMismatch"):
-              pattern = re.compile(
-                  rf'(expect\({variable}\.structuredContent\)\.toMatchObject\(\{{[\s\S]{{0,600}}?required_tool:\s*)"executeOperatorAction"'
-              )
+              pattern = re.compile(rf'(expect\({variable}\.structuredContent\)\.toMatchObject\(\{{[\s\S]{{0,600}}?required_tool:\s*)"executeOperatorAction"')
               text, count = pattern.subn(r'\1"executeOperatorEngineeringAction"', text, count=1)
               if count != 1:
                   raise SystemExit(f"{variable} required_tool anchor count={count}")
-
           path.write_text(text)
           PY
-
           git config user.name "lensically-repair-bot"
           git config user.email "actions@users.noreply.github.com"
-          git checkout HEAD^^ -- .github/workflows/lensically-engineering.yml
+          git checkout HEAD^^^ -- .github/workflows/lensically-engineering.yml
           git rm -f .github/workflows/lom-one-shot-test-fix.yml lensically-worker/.lom-repair-trigger
           git add .github/workflows/lensically-engineering.yml lensically-worker/test/operatorMode.spec.ts
           git commit -m "Update LOM engineering gateway test expectations"
