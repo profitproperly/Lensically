@@ -4009,9 +4009,9 @@ describe("operator mode MCP endpoint", () => {
     ]);
     expect(initialized.instructions.length).toBeLessThan(1000);
     const step1 = await mcpTool<{ session_map_token: string; lifecycle: { initial_sequence: string[]; recurring_sequence: string[]; step4_gateways: Record<string, string> }; session_map: { architecture: string }; account_data_loaded: boolean }>("getOperatorSessionMap");
-    expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
-    expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
-    expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", case_mutation: "executeOperatorCaseAction", hardening_intake: "executeOperatorHardeningAction", mutation: "executeOperatorAction" });
+    expect(step1.lifecycle.initial_sequence).toEqual(["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.lifecycle.recurring_sequence).toEqual(["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"]);
+    expect(step1.lifecycle.step4_gateways).toEqual({ read_only: "executeOperatorReadAction", engineering_mutation: "executeOperatorEngineeringAction", case_mutation: "executeOperatorCaseAction", hardening_intake: "executeOperatorHardeningAction", mutation: "executeOperatorAction" });
     expect(step1.session_map.architecture).toBe("recursive_pointer_tree_v1");
     expect(step1.account_data_loaded).toBe(false);
     expect(step1.session_map_token).toBeTruthy();
@@ -6141,7 +6141,7 @@ active_checkpoint: none
     expect(operatorOperationLeaseMs("schedule_approved_draft")).toBe(120000);
   });
 
-  it("treats exactly eight public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {
+  it("treats exactly nine public tools across the five normalized lifecycle stages as a healthy deployment boundary", () => {
     const exact = evaluateOperatorPublicLifecycleBoundary([
       "getOperatorSessionMap",
       "getOperatorKnowledge",
@@ -6151,6 +6151,7 @@ active_checkpoint: none
       "executeOperatorCaseAction",
       "executeOperatorHardeningAction",
       "closeOperatorAction",
+      "executeOperatorEngineeringAction",
     ]);
     expect(exact).toMatchObject({
       lifecycle_surface_exact: true,
@@ -7234,7 +7235,7 @@ active_checkpoint: none
     });
     const registry = await mcpRequest<{ tools: Array<{ name: string }> }>("tools/list");
     const publicToolCount = registry.tools.length;
-    expect(publicToolCount).toBe(8);
+    expect(publicToolCount).toBe(9);
     for (const key of ALL_BRAND_KEYS) {
       const selected = await mcpToolRaw<{ handshake: string[]; tool_count: number; account_data_loaded: boolean }>("selectOperatorKey", { brand_key: key });
       expect(selected.isError).not.toBe(true);
