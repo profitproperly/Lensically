@@ -1,6 +1,10 @@
 name: LOM one-shot regression expectation repair
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - lensically-worker/.lom-repair-trigger
   workflow_run:
     workflows: ["Lensically Engineering"]
     types: [completed]
