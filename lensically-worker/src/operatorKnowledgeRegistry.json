@@ -66,7 +66,7 @@
       ],
       "recovery_boundary": [
         "Main owns native diagnosis, bounded repair, regression, release verification, and return-to-normal recovery while Main remains callable.",
-        "Return normal work to Main immediately after the break-glass condition is repaired."
+        "Escalate to MCP Controller only when Main is unavailable or incapable; after Controller repair and exact Main verification, return all control to Main."
       ]
     },
     "account_runtime": {
