@@ -234,7 +234,7 @@
       "canonical_handler": "executeOperatorEngineeringAction",
       "route_intent": "execute engineering operator action",
       "implementation_mode": "new_handler",
-      "focused_regression": "routes server-bound engineering mutations only through the dedicated engineering Step-4 gateway",
+      "focused_regression": "requires the engineering Step-4 gateway for a prepared repository mutation",
       "release_scope": "operator-engineering",
       "live_verification": "The deployed dedicated engineering Step-4 gateway accepts only server-bound engineering mutations, rejects business/read/checkpoint/hardening-intake actions, and preserves exact prepared-action identity before execution.",
       "compatibility_bridge": false
