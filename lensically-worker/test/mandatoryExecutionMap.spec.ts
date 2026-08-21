@@ -88,6 +88,27 @@ describe("mandatory execution map", () => {
     expect(prevention?.enforcement_point).toContain("getHardeningStatus historical provider-debt reconciliation");
   });
 
+    it("promotes bounded transient GitHub read retry and current-production revalidation", () => {
+    const prevention = resolveActionBoundWinningPaths("readRepoFile")
+      .find((candidate) => candidate.id === "transient_github_read_retry_and_current_revalidation");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.status).toBe("active");
+    expect(prevention?.action_binding?.tool_names).toContain("readRepoFile");
+    expect(prevention?.winning_path.procedure).toContain(
+      "Retry only read-safe GET or HEAD requests with the bounded three-retry backoff already enforced by githubApiRetryable and githubRepoApiRetryable.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Never apply the same automatic retry policy to ambiguous repository mutations.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Before closing historical transient-read debt, rerun the exact read on current production; only fresh success plus exact current release identity may prove the old failure is no longer active.",
+    );
+    expect(prevention?.regression_test_id).toBe(
+      "retries transient repository reads without replaying ambiguous mutations",
+    );
+  });
+
   it("binds current campaign topology revalidation before stale hardening closure", () => {
     const prevention = resolveActionBoundWinningPaths("runMcpTests")
       .find((candidate) => candidate.id === "current_capability_campaign_topology_revalidation");
