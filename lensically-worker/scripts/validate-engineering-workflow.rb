@@ -104,6 +104,14 @@ Tempfile.create(["lensically-production-verification", ".sh"]) do |file|
   abort("production_verification_shell_syntax_invalid") unless system("bash", "-n", file.path, out: File::NULL, err: File::NULL)
 end
 
+tool_directory_path = File.expand_path("../src/operatorMcpToolDirectory.ts", __dir__)
+tool_directory_source = File.read(tool_directory_path)
+public_direct_tool_block = tool_directory_source.match(/const PUBLIC_DIRECT_TOOL_NAMES = \[(.*?)\] as const;/m)&.captures&.first
+abort("public_direct_tool_names_missing") unless public_direct_tool_block
+expected_public_tool_count = public_direct_tool_block.scan(/"[^"]+"/).length
+abort("public_direct_tool_count_invalid") if expected_public_tool_count <= 0
+abort("production_verification_live_tool_count_stale:expected=#{expected_public_tool_count}") unless production_verification_run.include?("(.live_tool_count == #{expected_public_tool_count})")
+
 push_typecheck_run = step_run(jobs, "push-validation", "Typecheck Worker")
 abort("push_typecheck_missing") unless push_typecheck_run.include?("npx tsc --noEmit")
 push_plan_run = step_run(jobs, "push-validation", "Validate test syntax and plan")
