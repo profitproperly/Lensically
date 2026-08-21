@@ -44,7 +44,7 @@
     },
     "release_infrastructure": {
       "version": "release-infrastructure-v1",
-      "load_when": "GitHub Actions, Cloudflare Worker or Pages deployment, release identity, production verification, scheduler-sensitive release work, or Recovery boundaries.",
+      "load_when": "GitHub Actions, Cloudflare Worker or Pages deployment, release identity, production verification, scheduler-sensitive release work, native recovery, or MCP Controller escalation boundaries.",
       "release_authority": [
         "Production Worker releases use one explicit exact-SHA release workflow.",
         "Release only a head that has passed the required validation for that exact SHA.",
