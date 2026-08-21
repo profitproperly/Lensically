@@ -2,9 +2,10 @@ name: Lensically Engineering
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - .github/workflows/lensically-engineering.yml
+      - ".github/workflows/lensically-engineering.yml"
 
 permissions:
   contents: write
@@ -16,10 +17,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 2
-      - name: Patch exact stale LOM gateway expectations
-        shell: python
+          fetch-depth: 3
+      - name: Patch stale LOM expectations and restore workflow
+        shell: bash
         run: |
+          set -euo pipefail
+          python3 - <<'PY'
           from pathlib import Path
           import re
 
@@ -49,13 +52,11 @@ jobs:
                   raise SystemExit(f"{variable} required_tool anchor count={count}")
 
           path.write_text(text)
-      - name: Restore canonical workflow and commit repair
-        shell: bash
-        run: |
-          set -euo pipefail
+          PY
+
           git config user.name "lensically-repair-bot"
           git config user.email "actions@users.noreply.github.com"
-          git checkout HEAD^ -- .github/workflows/lensically-engineering.yml
+          git checkout HEAD^^ -- .github/workflows/lensically-engineering.yml
           git rm -f .github/workflows/lom-one-shot-test-fix.yml lensically-worker/.lom-repair-trigger
           git add .github/workflows/lensically-engineering.yml lensically-worker/test/operatorMode.spec.ts
           git commit -m "Update LOM engineering gateway test expectations"
