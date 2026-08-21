@@ -40,7 +40,25 @@ describe("mandatory execution map", () => {
         expect(prepared?.arguments?.dry_run).toBe(true);
     expect(prepared?.arguments?.release_sha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(prepared?.arguments?.task).toBe("worker-deploy");
-    expect(prepared?.arguments).not.toHaveProperty("prepared_tool_name");
+        expect(prepared?.arguments).not.toHaveProperty("prepared_tool_name");
+  });
+
+  it("binds authoritative exact-head validation evidence to control_step", () => {
+    const prevention = resolveActionBoundWinningPaths("runGitHubWorkflow")
+      .find((candidate) => candidate.id === "authoritative_control_step_exact_head_validation");
+
+    expect(prevention).toBeDefined();
+    expect(prevention?.status).toBe("active");
+    expect(prevention?.action_binding?.tool_names).toContain("runGitHubWorkflow");
+    expect(prevention?.winning_path.procedure).toContain(
+      "Do not require optional full-validation status for a fast-mapped validated head.",
+    );
+    expect(prevention?.winning_path.procedure).toContain(
+      "Fail closed when either authoritative signal is absent or failed.",
+    );
+    expect(prevention?.regression_test_id).toBe(
+      "accepts a validated fast-mapped head without an optional full-validation status",
+    );
   });
 
   it("binds the neutral case-step prevention to opaque Step-4 identities", () => {
