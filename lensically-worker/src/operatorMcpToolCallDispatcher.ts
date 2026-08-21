@@ -182,6 +182,7 @@ export async function dispatchOperatorMcpToolCall(
 
   if (
     requestedToolName === dependencies.readOnlyRoutedExecutionGateway
+    || requestedToolName === dependencies.engineeringRoutedExecutionGateway
     || requestedToolName === dependencies.routedExecutionGateway
     || requestedToolName === dependencies.caseRoutedExecutionGateway
     || requestedToolName === dependencies.hardeningRoutedExecutionGateway
