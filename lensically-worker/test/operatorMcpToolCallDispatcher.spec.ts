@@ -248,6 +248,46 @@ describe("Operator MCP tool-call dispatcher", () => {
     expect(compilePublicProfileRequest).not.toHaveBeenCalled();
   });
 
+  it("requires the engineering Step-4 gateway for a prepared repository mutation", async () => {
+    const compilePublicProfileRequest = vi.fn();
+    const dependencies = baseDependencies({
+      compilePublicProfileRequest,
+      isEngineeringToolName: vi.fn((toolName) => toolName === "applyRepoPatchSet"),
+      verifyLifecycleExecutionToken: vi.fn(async () => ({
+        ok: true,
+        payload: {
+          stage: 3,
+          knowledge_node_ids: ["governance", "repository_engineering"],
+          scopes: ["runtime", "repository", "engineering_continuation"],
+          planned_capability: "repository_patch_set",
+          planned_tool: "applyRepoPatchSet",
+          planned_arguments: {},
+          planned_action_fingerprint: "request-fingerprint",
+          client_action_id: "repository_patch_set",
+          effect_class: "mutation",
+        },
+      })),
+    });
+    const response = await dispatchOperatorMcpToolCall({
+      request: new Request("https://lensically.test/mcp", { method: "POST" }),
+      id: 21,
+      params: {
+        name: "executeOperatorAction",
+        arguments: {
+          live_state_token: "live-token",
+          execution_descriptor: { action_id: "repository_patch_set", effect_class: "mutation" },
+        },
+      },
+    }, dependencies);
+    expect(await structuredContent(response)).toMatchObject({
+      ok: false,
+      error: "operator_execution_gateway_effect_mismatch",
+      required_tool: "executeOperatorEngineeringAction",
+      execution_started: false,
+    });
+    expect(compilePublicProfileRequest).not.toHaveBeenCalled();
+  });
+
     it("preserves registered Step-4 profile compilation failures after valid live-state proof", async () => {
         const dependencies = baseDependencies({
       verifyLifecycleExecutionToken: vi.fn(async () => ({
