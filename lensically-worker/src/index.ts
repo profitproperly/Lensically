@@ -15704,6 +15704,7 @@ function buildOperatorMcpBaseTools(includeScopedWrappers: boolean): OperatorMcpT
     additionalProperties: false,
   });
   readActionGateway.inputSchema = buildStep4InputSchema(readActionDescriptorBranches);
+  engineeringActionGateway.inputSchema = buildStep4InputSchema(engineeringMutationActionDescriptorBranches);
   actionGateway.inputSchema = buildStep4InputSchema(mutationActionDescriptorBranches);
   if (caseMutationActionIds.size !== OPERATOR_CASE_STEP_STAGES.length) {
     throw new Error(`operator_case_action_descriptor_coverage_invalid:${caseMutationActionIds.size}`);
