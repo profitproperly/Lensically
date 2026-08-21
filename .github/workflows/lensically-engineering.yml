@@ -17,8 +17,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 6
-      - name: Patch stale LOM expectations and restore workflow
+          fetch-depth: 1
+      - name: Patch exact stale LOM expectations
         shell: bash
         run: |
           set -euo pipefail
@@ -48,8 +48,7 @@ jobs:
           PY
           git config user.name "lensically-repair-bot"
           git config user.email "actions@users.noreply.github.com"
-          git checkout HEAD~5 -- .github/workflows/lensically-engineering.yml
-          git rm -f .github/workflows/lom-one-shot-test-fix.yml lensically-worker/.lom-repair-trigger
-          git add .github/workflows/lensically-engineering.yml lensically-worker/test/operatorMode.spec.ts
+          git rm -f lensically-worker/.lom-repair-trigger
+          git add lensically-worker/test/operatorMode.spec.ts
           git commit -m "Update LOM engineering gateway test expectations"
           git push origin HEAD:main
