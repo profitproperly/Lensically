@@ -1,0 +1,11 @@
+{
+  "source_repository": "profitproperly/Lensically-v2",
+  "source_sha": "7548c0b31933886af63009e24b29379a937a0517",
+  "checkout": "failure",
+  "tests": "skipped",
+  "cloudflare_credentials_available": false,
+  "deploy": "skipped",
+  "target_worker": "lensically-v2-mcp",
+  "write_mode": "staged",
+  "legacy_production_mutated": false
+}
