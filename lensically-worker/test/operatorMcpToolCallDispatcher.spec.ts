@@ -14,7 +14,10 @@ function baseDependencies(
 ): OperatorMcpToolCallDependencies {
   const dependencies: OperatorMcpToolCallDependencies = {
     readOnlyRoutedExecutionGateway: "executeOperatorReadAction",
-        routedExecutionGateway: "executeOperatorAction",
+    engineeringRoutedExecutionGateway: "executeOperatorEngineeringAction",
+    routedExecutionGateway: "executeOperatorAction",
+    caseRoutedExecutionGateway: "executeOperatorCaseAction",
+    hardeningRoutedExecutionGateway: "executeOperatorHardeningAction",
     mandatoryExecutionMapVersion: "map-v1",
     preCallRoutingVersion: "pre-call-v1",
     executionPolicyVersion: "execution-v1",
