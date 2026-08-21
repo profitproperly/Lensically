@@ -3847,6 +3847,7 @@ describe("operator mode MCP endpoint", () => {
       "executeOperatorCaseAction",
       "executeOperatorHardeningAction",
       "closeOperatorAction",
+      "executeOperatorEngineeringAction",
     ]);
     expect(names).not.toContain("getOperatorStartupContext");
     expect(names).not.toContain("executeLensicallyIntent");
@@ -4486,7 +4487,7 @@ active_checkpoint: none
     expect(wrongHardening.structuredContent).toMatchObject({
       ok: false,
       error: "operator_execution_gateway_effect_mismatch",
-      required_tool: "executeOperatorAction",
+      required_tool: "executeOperatorEngineeringAction",
       execution_started: false,
     });
   }, 30000);
@@ -4527,7 +4528,7 @@ active_checkpoint: none
     expect(nonCaseGatewayMismatch.structuredContent).toMatchObject({
       ok: false,
       error: "operator_execution_gateway_effect_mismatch",
-      required_tool: "executeOperatorAction",
+      required_tool: "executeOperatorEngineeringAction",
       execution_started: false,
     });
 
