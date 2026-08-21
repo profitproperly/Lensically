@@ -3859,6 +3859,7 @@ describe("operator mode MCP endpoint", () => {
     const liveStateTool = listed.tools.find((tool) => tool.name === "getOperatorLiveState");
     const readActionTool = listed.tools.find((tool) => tool.name === "executeOperatorReadAction");
     const actionTool = listed.tools.find((tool) => tool.name === "executeOperatorAction");
+    const engineeringActionTool = listed.tools.find((tool) => tool.name === "executeOperatorEngineeringAction");
     const caseActionTool = listed.tools.find((tool) => tool.name === "executeOperatorCaseAction");
     const hardeningActionTool = listed.tools.find((tool) => tool.name === "executeOperatorHardeningAction");
     const closeTool = listed.tools.find((tool) => tool.name === "closeOperatorAction");
@@ -3883,6 +3884,9 @@ describe("operator mode MCP endpoint", () => {
     expect(actionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
     expect(actionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
     expect(actionTool?.inputSchema?.properties).not.toHaveProperty("action");
+    expect(engineeringActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
+    expect(engineeringActionTool?.inputSchema?.properties).toHaveProperty("execution_descriptor");
+    expect(engineeringActionTool?.inputSchema?.properties).not.toHaveProperty("action");
     expect(caseActionTool?.inputSchema?.properties).toHaveProperty("live_state_token");
     expect(caseActionTool?.inputSchema?.properties).toHaveProperty("governing_standards_ack");
     expect(caseActionTool?.inputSchema?.properties).not.toHaveProperty("execution_descriptor");
@@ -3895,13 +3899,17 @@ describe("operator mode MCP endpoint", () => {
     expect(hardeningActionTool?.inputSchema?.required).toEqual(expect.arrayContaining(["live_state_token", "governing_standards_ack"]));
     const readExecutionDescriptorSchema = readActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const mutationExecutionDescriptorSchema = actionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
+    const engineeringExecutionDescriptorSchema = engineeringActionTool?.inputSchema?.properties?.execution_descriptor as { oneOf?: Array<{ properties?: { action_id?: { const?: string }; effect_class?: { const?: string } } }> } | undefined;
     const readExecutionDescriptorBranches = readExecutionDescriptorSchema?.oneOf ?? [];
     const mutationExecutionDescriptorBranches = mutationExecutionDescriptorSchema?.oneOf ?? [];
+    const engineeringExecutionDescriptorBranches = engineeringExecutionDescriptorSchema?.oneOf ?? [];
     expect(readExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "read_only")).toBe(true);
     expect(mutationExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);
+    expect(engineeringExecutionDescriptorBranches.length).toBeGreaterThan(0);
+    expect(engineeringExecutionDescriptorBranches.every((branch) => branch.properties?.effect_class?.const === "mutation")).toBe(true);
     expect(mutationExecutionDescriptorBranches.some((branch) => branch.properties?.action_id?.const === "client_block_intake")).toBe(false);
     expect(mutationExecutionDescriptorBranches.some((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""))).toBe(false);
-    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...readExecutionDescriptorBranches];
+    const executionDescriptorBranches = [...mutationExecutionDescriptorBranches, ...engineeringExecutionDescriptorBranches, ...readExecutionDescriptorBranches];
     const caseStepDescriptorBranches = executionDescriptorBranches.filter((branch) => /^exec_02_(?:0[0-9]|10)$/.test(branch.properties?.action_id?.const ?? ""));
     expect(caseStepDescriptorBranches).toHaveLength(11);
     const caseStepDescriptorIds = Array.from(new Set(caseStepDescriptorBranches.map((branch) => branch.properties?.action_id?.const ?? "")));
@@ -3925,7 +3933,7 @@ describe("operator mode MCP endpoint", () => {
     expect(controlStepDescriptors.map((branch) => branch.properties?.effect_class?.const).sort()).toEqual(["mutation", "read_only"]);
     const continuationDescriptor = readExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "get_engineering_continuation");
     expect(continuationDescriptor?.properties?.effect_class?.const).toBe("read_only");
-    const repositoryPatchDescriptor = mutationExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
+    const repositoryPatchDescriptor = engineeringExecutionDescriptorBranches.find((branch) => branch.properties?.action_id?.const === "repository_patch_set");
     expect(repositoryPatchDescriptor?.properties?.effect_class?.const).toBe("mutation");
     const safeGitHubUpsertContract = plannedActionContracts.find((contract) => contract.capability === "upsert_git_hub_repository_file");
     const safeGitHubRepositorySchema = safeGitHubUpsertContract?.argument_schema?.properties?.repository as { pattern?: string; maxLength?: number } | undefined;
