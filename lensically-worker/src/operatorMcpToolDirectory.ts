@@ -62,6 +62,7 @@ const PUBLIC_DIRECT_TOOL_NAMES = [
   "getOperatorKnowledge",
   "getOperatorLiveState",
   "executeOperatorReadAction",
+  "executeOperatorEngineeringAction",
   "executeOperatorAction",
   "executeOperatorCaseAction",
   "executeOperatorHardeningAction",
