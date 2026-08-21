@@ -1,0 +1,118 @@
+name: Lensically v2 staged deploy bridge
+run-name: Lensically v2 staged deploy · 7548c0b31933886af63009e24b29379a937a0517
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/lensically-v2-staged-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: lensically-v2-staged-deploy-bridge
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout control repository
+        uses: actions/checkout@v4
+        with:
+          path: control
+
+      - name: Checkout exact Lensically v2 source
+        id: v2checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: profitproperly/Lensically-v2
+          ref: 7548c0b31933886af63009e24b29379a937a0517
+          token: ${{ secrets.WHITE_LABEL_PARITY_TOKEN }}
+          path: lensically-v2
+          persist-credentials: false
+
+      - name: Setup Node
+        if: ${{ steps.v2checkout.outcome == 'success' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Re-run exact source parity checks
+        id: tests
+        if: ${{ steps.v2checkout.outcome == 'success' }}
+        continue-on-error: true
+        working-directory: lensically-v2
+        run: npm run check
+
+      - name: Check Cloudflare credentials
+        id: cf
+        if: ${{ steps.v2checkout.outcome == 'success' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Wrangler
+        if: ${{ steps.v2checkout.outcome == 'success' && steps.tests.outcome == 'success' && steps.cf.outputs.ready == 'true' }}
+        working-directory: lensically-v2
+        run: npm install --no-audit --no-fund
+
+      - name: Deploy exact tested Lensically v2 source in staged mode
+        id: deploy
+        if: ${{ steps.v2checkout.outcome == 'success' && steps.tests.outcome == 'success' && steps.cf.outputs.ready == 'true' }}
+        continue-on-error: true
+        working-directory: lensically-v2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Write bounded bridge receipt
+        if: always()
+        env:
+          SOURCE_SHA: 7548c0b31933886af63009e24b29379a937a0517
+          CHECKOUT_OUTCOME: ${{ steps.v2checkout.outcome }}
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          CF_READY: ${{ steps.cf.outputs.ready }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        working-directory: control
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const receipt = {
+            source_repository: 'profitproperly/Lensically-v2',
+            source_sha: process.env.SOURCE_SHA,
+            checkout: process.env.CHECKOUT_OUTCOME || 'unknown',
+            tests: process.env.TEST_OUTCOME || 'skipped',
+            cloudflare_credentials_available: process.env.CF_READY === 'true',
+            deploy: process.env.DEPLOY_OUTCOME || 'skipped',
+            target_worker: 'lensically-v2-mcp',
+            write_mode: 'staged',
+            legacy_production_mutated: false
+          };
+          fs.writeFileSync('LENSICALLY_V2_DEPLOY_RESULT.json', JSON.stringify(receipt, null, 2) + '\n');
+          NODE
+
+      - name: Persist bridge receipt
+        if: always()
+        working-directory: control
+        run: |
+          git config user.name "lensically-v2-deploy-bridge"
+          git config user.email "actions@users.noreply.github.com"
+          git add LENSICALLY_V2_DEPLOY_RESULT.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Record Lensically v2 staged deploy receipt [skip ci]"
+          git push
+
+      - name: Enforce bridge result
+        if: ${{ steps.v2checkout.outcome != 'success' || steps.tests.outcome != 'success' || steps.cf.outputs.ready != 'true' || steps.deploy.outcome != 'success' }}
+        run: exit 1
