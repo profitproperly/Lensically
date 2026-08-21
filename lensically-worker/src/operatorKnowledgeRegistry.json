@@ -16,7 +16,7 @@
       "repository_procedures": [
         "Known exact file reads use internal readRepoFile with bounded lines when practical.",
         "Known exact file searches use internal searchRepoFiles against one exact file only.",
-        "Unknown-location or free-text repository discovery belongs to Recovery. Never probe the Main plane with directory prefixes or speculative paths.",
+        "Unknown-location repository discovery stays in Main: use bounded listRepoFiles to establish an exact path, then exact-file search/read. Escalate to MCP Controller only when Main is unavailable or incapable.",
         "One isolated exact replacement uses internal applyRepoTextPatch.",
         "Related multi-file or multi-replacement work uses internal applyRepoPatchSet so one coherent commit advances main.",
         "Every exact replacement must identify exactly one location. If a literal repeats, include enough enclosing semantic context to make the replacement unique before mutation.",
