@@ -16371,8 +16371,8 @@ async function buildOperatorSessionMap(request: Request, env: Env): Promise<Reco
     ok: true,
     lifecycle: {
       version: OPERATOR_LIFECYCLE_VERSION,
-      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"],
-      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"],
+      initial_sequence: ["getOperatorSessionMap", "getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"],
+      recurring_sequence: ["getOperatorKnowledge", "getOperatorLiveState", "executeOperatorReadAction|executeOperatorEngineeringAction|executeOperatorCaseAction|executeOperatorHardeningAction|executeOperatorAction", "closeOperatorAction"],
       step4_gateways: { read_only: OPERATOR_READ_EXECUTION_GATEWAY, engineering_mutation: OPERATOR_ENGINEERING_EXECUTION_GATEWAY, case_mutation: OPERATOR_CASE_EXECUTION_GATEWAY, hardening_intake: OPERATOR_HARDENING_EXECUTION_GATEWAY, business_mutation: OPERATOR_ROUTED_EXECUTION_GATEWAY },
       rule: "Step 0 initializes only. Step 1 maps. Step 2 loads durable knowledge. Step 3 loads live state and chooses the effect-matched Step-4 gateway. Step 4 executes. Step 5 verifies and closes.",
     },
