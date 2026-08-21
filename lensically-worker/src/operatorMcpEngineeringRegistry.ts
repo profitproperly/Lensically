@@ -305,9 +305,23 @@ export const OPERATOR_MCP_ENGINEERING_TOOLS: OperatorMcpToolDefinition[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
       {
+    name: "executeOperatorEngineeringAction",
+    title: "Execute engineering operator action",
+    description: "Engineering-mutation Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound engineering mutation prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. The dispatcher rejects business, read-only, checkpoint, and hardening-intake actions on this gateway.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        live_state_token: { type: "string", minLength: 16 },
+      },
+      required: ["live_state_token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+      {
     name: "executeOperatorAction",
     title: "Execute mutating operator action",
-    description: "Mutating Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound mutating action prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. Read-only actions must use executeOperatorReadAction so client-visible tool metadata matches the prepared effect before dispatch.",
+    description: "Business-mutation Step 4 of the canonical Operator lifecycle. Execute exactly one server-bound non-engineering mutation prepared in Steps 2 and 3 by replaying the exact execution_descriptor from Step 3. Read-only, engineering, checkpoint, and hardening-intake actions must use their dedicated gateways so client-visible tool metadata matches the prepared operation before dispatch.",
     inputSchema: {
       type: "object",
       properties: {
