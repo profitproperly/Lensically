@@ -1,0 +1,1232 @@
+{
+  "schema_version": "lensically-v2-zero-legacy-retirement-inventory-v1",
+  "generated_at": "2026-08-22T07:13:26.147Z",
+  "web_api_route_count": 31,
+  "worker_api_literal_count": 90,
+  "web_routes": [
+    {
+      "route": "/api/batch-schedule/presets",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 47,
+          "raw": "/api/batch-schedule/presets"
+        },
+        {
+          "file": "lensically-web/components/BatchSchedulePanel.tsx",
+          "line": 49,
+          "raw": "/api/batch-schedule/presets"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34225,
+          "raw": "/api/batch-schedule/presets"
+        },
+        {
+          "line": 34271,
+          "raw": "/api/batch-schedule/presets"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/history",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/cycles/page.tsx",
+          "line": 199,
+          "raw": "/api/cycles/history"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34938,
+          "raw": "/api/cycles/history"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/selection-detail",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/cycles/page.tsx",
+          "line": 202,
+          "raw": "/api/cycles/selection-detail"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34941,
+          "raw": "/api/cycles/selection-detail"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/selections",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/cycles/page.tsx",
+          "line": 201,
+          "raw": "/api/cycles/selections"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34940,
+          "raw": "/api/cycles/selections"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/state",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/cycles/page.tsx",
+          "line": 198,
+          "raw": "/api/cycles/state"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34937,
+          "raw": "/api/cycles/state"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/summary",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/cycles/page.tsx",
+          "line": 200,
+          "raw": "/api/cycles/summary"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34939,
+          "raw": "/api/cycles/summary"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt-memory/saved-patterns/review",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 93,
+          "raw": "/api/gpt-memory/saved-patterns/review"
+        }
+      ],
+      "worker_implemented": false,
+      "worker_occurrences": []
+    },
+    {
+      "route": "/api/hermes/generate-posts",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 46,
+          "raw": "/api/hermes/generate-posts"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35855,
+          "raw": "/api/hermes/generate-posts"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/delete",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 89,
+          "raw": "/api/patterns/delete"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34113,
+          "raw": "/api/patterns/delete"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/import",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/mobile-save/page.tsx",
+          "line": 9,
+          "raw": "/api/patterns/import"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 33484,
+          "raw": "/api/patterns/import"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/list",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 88,
+          "raw": "/api/patterns/list"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 33532,
+          "raw": "/api/patterns/list"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/source-card",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 90,
+          "raw": "/api/patterns/source-card"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34004,
+          "raw": "/api/patterns/source-card"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/source-card/guidance",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 91,
+          "raw": "/api/patterns/source-card/guidance"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34041,
+          "raw": "/api/patterns/source-card/guidance"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/update",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/saved-patterns/page.tsx",
+          "line": 92,
+          "raw": "/api/patterns/update"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34158,
+          "raw": "/api/patterns/update"
+        }
+      ]
+    },
+    {
+      "route": "/api/signal-radar/overview",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/signal-radar/page.tsx",
+          "line": 82,
+          "raw": "/api/signal-radar/overview?limit=80"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34922,
+          "raw": "/api/signal-radar/overview"
+        }
+      ]
+    },
+    {
+      "route": "/api/source-cards/create",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/source-cards/page.tsx",
+          "line": 77,
+          "raw": "/api/source-cards/create"
+        },
+        {
+          "file": "lensically-web/scripts/test-source-cards-ui.mjs",
+          "line": 18,
+          "raw": "/api/source-cards/create"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 33746,
+          "raw": "/api/source-cards/create"
+        }
+      ]
+    },
+    {
+      "route": "/api/source-cards/guidance",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/source-cards/page.tsx",
+          "line": 78,
+          "raw": "/api/source-cards/guidance"
+        },
+        {
+          "file": "lensically-web/scripts/test-source-cards-ui.mjs",
+          "line": 19,
+          "raw": "/api/source-cards/guidance"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 33941,
+          "raw": "/api/source-cards/guidance"
+        }
+      ]
+    },
+    {
+      "route": "/api/source-cards/list",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/source-cards/page.tsx",
+          "line": 76,
+          "raw": "/api/source-cards/list"
+        },
+        {
+          "file": "lensically-web/scripts/test-source-cards-ui.mjs",
+          "line": 17,
+          "raw": "/api/source-cards/list"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 33612,
+          "raw": "/api/source-cards/list"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/accounts",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 43,
+          "raw": "/api/threads/accounts"
+        },
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 63,
+          "raw": "/api/threads/accounts"
+        },
+        {
+          "file": "lensically-web/app/mobile-save/page.tsx",
+          "line": 10,
+          "raw": "/api/threads/accounts"
+        },
+        {
+          "file": "lensically-web/components/ThreadsAccountSwitcher.tsx",
+          "line": 28,
+          "raw": "/api/threads/accounts"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35083,
+          "raw": "/api/threads/accounts"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/dashboard",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/dashboard/page.tsx",
+          "line": 79,
+          "raw": "/api/threads/dashboard"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34970,
+          "raw": "/api/threads/dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/followers",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/followers/page.tsx",
+          "line": 30,
+          "raw": "/api/threads/followers"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35002,
+          "raw": "/api/threads/followers"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/me",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 44,
+          "raw": "/api/threads/me"
+        },
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 64,
+          "raw": "/api/threads/me"
+        },
+        {
+          "file": "lensically-web/components/sidebar.tsx",
+          "line": 42,
+          "raw": "/api/threads/me"
+        },
+        {
+          "file": "lensically-web/lib/routeDataPrefetch.ts",
+          "line": 37,
+          "raw": "/api/threads/me"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 34609,
+          "raw": "/api/threads/me"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/post-now",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 48,
+          "raw": "/api/threads/post-now"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35537,
+          "raw": "/api/threads/post-now"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/posts",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/insights/PostsList.tsx",
+          "line": 33,
+          "raw": "/api/threads/posts"
+        },
+        {
+          "file": "lensically-web/lib/routeDataPrefetch.ts",
+          "line": 38,
+          "raw": "/api/threads/posts"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35175,
+          "raw": "/api/threads/posts"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/posts/archive",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/post-archive/page.tsx",
+          "line": 40,
+          "raw": "/api/threads/posts/archive"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35308,
+          "raw": "/api/threads/posts/archive"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/schedule/page.tsx",
+          "line": 49,
+          "raw": "/api/threads/schedule"
+        },
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 66,
+          "raw": "/api/threads/schedule"
+        },
+        {
+          "file": "lensically-web/components/BatchSchedulePanel.tsx",
+          "line": 51,
+          "raw": "/api/threads/schedule"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35970,
+          "raw": "/api/threads/schedule"
+        },
+        {
+          "line": 36586,
+          "raw": "/api/threads/schedule"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule/batch",
+      "occurrences": [
+        {
+          "file": "lensically-web/components/BatchSchedulePanel.tsx",
+          "line": 50,
+          "raw": "/api/threads/schedule/batch"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 35721,
+          "raw": "/api/threads/schedule/batch"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule/delete",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 69,
+          "raw": "/api/threads/schedule/delete"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 36264,
+          "raw": "/api/threads/schedule/delete"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule/retry",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 68,
+          "raw": "/api/threads/schedule/retry"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 36447,
+          "raw": "/api/threads/schedule/retry"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule/strategy",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 70,
+          "raw": "/api/threads/schedule/strategy"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 36347,
+          "raw": "/api/threads/schedule/strategy"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/schedule/update",
+      "occurrences": [
+        {
+          "file": "lensically-web/app/(internal)/scheduled-posts/page.tsx",
+          "line": 67,
+          "raw": "/api/threads/schedule/update"
+        }
+      ],
+      "worker_implemented": true,
+      "worker_occurrences": [
+        {
+          "line": 36188,
+          "raw": "/api/threads/schedule/update"
+        }
+      ]
+    }
+  ],
+  "worker_only_routes": [
+    {
+      "route": "/api/accounts",
+      "occurrences": [
+        {
+          "line": 33305,
+          "raw": "/api/accounts"
+        },
+        {
+          "line": 36663,
+          "raw": "/api/accounts"
+        }
+      ]
+    },
+    {
+      "route": "/api/agent/",
+      "occurrences": [
+        {
+          "line": 35168,
+          "raw": "/api/agent/"
+        }
+      ]
+    },
+    {
+      "route": "/api/automation/",
+      "occurrences": [
+        {
+          "line": 36679,
+          "raw": "/api/automation/"
+        }
+      ]
+    },
+    {
+      "route": "/api/batch-schedule/",
+      "occurrences": [
+        {
+          "line": 3793,
+          "raw": "/api/batch-schedule/"
+        },
+        {
+          "line": 33272,
+          "raw": "/api/batch-schedule/"
+        }
+      ]
+    },
+    {
+      "route": "/api/commercial/checkout-session",
+      "occurrences": [
+        {
+          "line": 33316,
+          "raw": "/api/commercial/checkout-session"
+        }
+      ]
+    },
+    {
+      "route": "/api/commercial/download",
+      "occurrences": [
+        {
+          "line": 33318,
+          "raw": "/api/commercial/download"
+        }
+      ]
+    },
+    {
+      "route": "/api/commercial/embedded-checkout-session",
+      "occurrences": [
+        {
+          "line": 33317,
+          "raw": "/api/commercial/embedded-checkout-session"
+        }
+      ]
+    },
+    {
+      "route": "/api/cycles/",
+      "occurrences": [
+        {
+          "line": 34935,
+          "raw": "/api/cycles/"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt-memory/",
+      "occurrences": [
+        {
+          "line": 33477,
+          "raw": "/api/gpt-memory/"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/",
+      "occurrences": [
+        {
+          "line": 33470,
+          "raw": "/api/gpt/"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/accounts",
+      "occurrences": [
+        {
+          "line": 27087,
+          "raw": "/api/gpt/accounts"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/batch-presets",
+      "occurrences": [
+        {
+          "line": 27780,
+          "raw": "/api/gpt/batch-presets"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/context",
+      "occurrences": [
+        {
+          "line": 27161,
+          "raw": "/api/gpt/context"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/desired-slots",
+      "occurrences": [
+        {
+          "line": 27664,
+          "raw": "/api/gpt/desired-slots"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/draft-similarity",
+      "occurrences": [
+        {
+          "line": 27253,
+          "raw": "/api/gpt/draft-similarity"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/experiment",
+      "occurrences": [
+        {
+          "line": 27567,
+          "raw": "/api/gpt/experiment"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/generation-brief",
+      "occurrences": [
+        {
+          "line": 27216,
+          "raw": "/api/gpt/generation-brief"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/generation-context",
+      "occurrences": [
+        {
+          "line": 27186,
+          "raw": "/api/gpt/generation-context"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/generation-drafts",
+      "occurrences": [
+        {
+          "line": 27430,
+          "raw": "/api/gpt/generation-drafts"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/generation-drafts/update",
+      "occurrences": [
+        {
+          "line": 27470,
+          "raw": "/api/gpt/generation-drafts/update"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/generation-runs",
+      "occurrences": [
+        {
+          "line": 27395,
+          "raw": "/api/gpt/generation-runs"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/growth-context",
+      "occurrences": [
+        {
+          "line": 27334,
+          "raw": "/api/gpt/growth-context"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/growth-review",
+      "occurrences": [
+        {
+          "line": 27346,
+          "raw": "/api/gpt/growth-review"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/insights/recent",
+      "occurrences": [
+        {
+          "line": 27305,
+          "raw": "/api/gpt/insights/recent"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/memory-hygiene-review",
+      "occurrences": [
+        {
+          "line": 27884,
+          "raw": "/api/gpt/memory-hygiene-review"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/memory-hygiene/apply",
+      "occurrences": [
+        {
+          "line": 27895,
+          "raw": "/api/gpt/memory-hygiene/apply"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/novelty-fatigue",
+      "occurrences": [
+        {
+          "line": 27383,
+          "raw": "/api/gpt/novelty-fatigue"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/operator-playbook",
+      "occurrences": [
+        {
+          "line": 27076,
+          "raw": "/api/gpt/operator-playbook"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/pattern-adaptation",
+      "occurrences": [
+        {
+          "line": 27612,
+          "raw": "/api/gpt/pattern-adaptation"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/posts/recent",
+      "occurrences": [
+        {
+          "line": 27291,
+          "raw": "/api/gpt/posts/recent"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/preflight-snapshot",
+      "occurrences": [
+        {
+          "line": 27094,
+          "raw": "/api/gpt/preflight-snapshot"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/preflight-snapshot/page",
+      "occurrences": [
+        {
+          "line": 27126,
+          "raw": "/api/gpt/preflight-snapshot/page"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/recent-performance",
+      "occurrences": [
+        {
+          "line": 27358,
+          "raw": "/api/gpt/recent-performance"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/rule-review",
+      "occurrences": [
+        {
+          "line": 27535,
+          "raw": "/api/gpt/rule-review"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/rule-suggestions",
+      "occurrences": [
+        {
+          "line": 27371,
+          "raw": "/api/gpt/rule-suggestions"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/saved-patterns",
+      "occurrences": [
+        {
+          "line": 27275,
+          "raw": "/api/gpt/saved-patterns"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/schedule",
+      "occurrences": [
+        {
+          "line": 27690,
+          "raw": "/api/gpt/schedule"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/schedule/batch",
+      "occurrences": [
+        {
+          "line": 27730,
+          "raw": "/api/gpt/schedule/batch"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/scheduled",
+      "occurrences": [
+        {
+          "line": 27649,
+          "raw": "/api/gpt/scheduled"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/strategy-memory",
+      "occurrences": [
+        {
+          "line": 27812,
+          "raw": "/api/gpt/strategy-memory"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/strategy-memory/update",
+      "occurrences": [
+        {
+          "line": 27853,
+          "raw": "/api/gpt/strategy-memory/update"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/taste-feedback",
+      "occurrences": [
+        {
+          "line": 27500,
+          "raw": "/api/gpt/taste-feedback"
+        }
+      ]
+    },
+    {
+      "route": "/api/gpt/taste-interview",
+      "occurrences": [
+        {
+          "line": 27242,
+          "raw": "/api/gpt/taste-interview"
+        }
+      ]
+    },
+    {
+      "route": "/api/internal/batch-schedule/presets",
+      "occurrences": [
+        {
+          "line": 34250,
+          "raw": "/api/internal/batch-schedule/presets"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/",
+      "occurrences": [
+        {
+          "line": 37920,
+          "raw": "/api/operator/"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/health",
+      "occurrences": [
+        {
+          "line": 33351,
+          "raw": "/api/operator/health"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/local-node/",
+      "occurrences": [
+        {
+          "line": 33441,
+          "raw": "/api/operator/local-node/"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/mcp",
+      "occurrences": [
+        {
+          "line": 23544,
+          "raw": "/api/operator/mcp"
+        },
+        {
+          "line": 33461,
+          "raw": "/api/operator/mcp"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/oauth/.well-known/oauth-authorization-server",
+      "occurrences": [
+        {
+          "line": 33326,
+          "raw": "/api/operator/oauth/.well-known/oauth-authorization-server"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/oauth/authorize",
+      "occurrences": [
+        {
+          "line": 20372,
+          "raw": "/api/operator/oauth/authorize"
+        },
+        {
+          "line": 33335,
+          "raw": "/api/operator/oauth/authorize"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/oauth/token",
+      "occurrences": [
+        {
+          "line": 20373,
+          "raw": "/api/operator/oauth/token"
+        },
+        {
+          "line": 33343,
+          "raw": "/api/operator/oauth/token"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/scheduler-health",
+      "occurrences": [
+        {
+          "line": 36758,
+          "raw": "/api/operator/scheduler-health"
+        }
+      ]
+    },
+    {
+      "route": "/api/operator/tools/",
+      "occurrences": [
+        {
+          "line": 20489,
+          "raw": "/api/operator/tools/"
+        },
+        {
+          "line": 23679,
+          "raw": "/api/operator/tools/"
+        },
+        {
+          "line": 33450,
+          "raw": "/api/operator/tools/"
+        },
+        {
+          "line": 33451,
+          "raw": "/api/operator/tools/"
+        }
+      ]
+    },
+    {
+      "route": "/api/patterns/",
+      "occurrences": [
+        {
+          "line": 2629,
+          "raw": "/api/patterns/"
+        }
+      ]
+    },
+    {
+      "route": "/api/public/lensically-proof",
+      "occurrences": [
+        {
+          "line": 33362,
+          "raw": "/api/public/lensically-proof"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/insights",
+      "occurrences": [
+        {
+          "line": 35358,
+          "raw": "/api/threads/insights"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/intelligence-dashboard",
+      "occurrences": [
+        {
+          "line": 34907,
+          "raw": "/api/threads/intelligence-dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/post-insights",
+      "occurrences": [
+        {
+          "line": 35403,
+          "raw": "/api/threads/post-insights"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/publish",
+      "occurrences": [
+        {
+          "line": 35537,
+          "raw": "/api/threads/publish"
+        },
+        {
+          "line": 35597,
+          "raw": "/api/threads/publish"
+        },
+        {
+          "line": 35609,
+          "raw": "/api/threads/publish"
+        },
+        {
+          "line": 35663,
+          "raw": "/api/threads/publish"
+        },
+        {
+          "line": 35708,
+          "raw": "/api/threads/publish"
+        }
+      ]
+    },
+    {
+      "route": "/api/threads/user-insights",
+      "occurrences": [
+        {
+          "line": 35454,
+          "raw": "/api/threads/user-insights"
+        }
+      ]
+    }
+  ],
+  "cron_count": 4,
+  "crons": [
+    {
+      "cron": "* * * * *",
+      "hits": [
+        {
+          "line": 421,
+          "context": "371:   getManifestIntelligenceEngineState,\n372:   refreshManifestIntelligenceEngine,\n373:   registerManifestExperimentAssignment,\n374:   upsertManifestSemanticSignature,\n375: } from \"./manifestIntelligenceEngine\";\n376: import {\n377:   buildManifestMeasurementAuditRead,\n378:     ensureManifestMeasurementAuditTables,\n379:   refreshManifestMeasurementAudit,\n380:   refreshManifestSavedPatternIntelligence,\n381:   type ManifestAuditSection,\n382: } from \"./manifestMeasurementAudit\";\n383: import {\n384:   buildManifestDecisionIntelligence,\n385:   buildManifestIntelligenceDashboard,\n386:   ensureManifestProductIntegrationTables,\n387:   recordManifestDecisionInfluence,\n388: } from \"./manifestProductIntegration\";\n389: import {\n390:   SOURCE_FAMILY_LABEL_POLICY_VERSION,\n391:   SOURCE_SELECTION_ENGINE_VERSION,\n392:     enrichSourceCandidatesForSelection,\n393:   ensureSourceFamilySelectionTables,\n394:                                 loadLockedSourceCardSelectionCandidates,\n395:   loadSourceLabelAllocationState,\n396:   normalizeSourceFamilyLifetimeLabel,\n397: \n398: \n399: \n400:     persistLockedSourceSelectionPlan,\n401: \n402:   readLockedSourceSelectionPlan,\n403: \n404:   refreshSourceFamilyLabels,\n405:   runSourceFamilySelectionEdgeCases,\n406:   selectSourceFamilyLineup,\n407:   validateLineupAgainstLockedSourceSelectionPlan,\n408: } from \"./sourceFamilySelection\";\n409: \n410: \n411: const DEFAULT_APP_URL = \"https://app.lensically.com\";\n412: const DEFAULT_ROOT_SITE_URL = \"https://lensically.com\";\n413: const DEFAULT_WORKER_ORIGIN = \"https://api.lensically.com\";\n414: const LOCAL_DEV_HOSTS = new Set([\"localhost\", \"127.0.0.1\"]);\n415: const SCHEDULED_POST_STATUS_APPROVED = \"approved\";\n416: const SCHEDULED_POST_STATUS_POSTING = \"posting\";\n417: const SCHEDULED_POST_STATUS_POSTED = \"posted\";\n418: const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;\n419: const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;\n420: const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 3 * 60 * 1000;\n421: const SCHEDULED_POST_PUBLISH_CRON = \"* * * * *\";\n422: const SCHEDULED_POST_ALARM_INTERVAL_MS = 60 * 1000;\n423: const SCHEDULED_POST_ALARM_OBJECT_NAME = \"scheduled-post-publisher\";\n424: const THREADS_TOKEN_REFRESH_CRON = \"0 */12 * * *\";\n425: const LEGACY_COMBINED_SCHEDULED_CRON = \"0 3 * * *\";\n426: const THREADS_FOLLOWER_START_OF_DAY_CRON = \"1 4,5 * * *\";\n427: const THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON = \"0 * * * *\";\n428: const THREADS_INSIGHTS_TIME_ZONE = \"America/New_York\";\n429: const THREADS_FOLLOWER_START_OF_DAY_HOUR = 0;\n430: const THREADS_FOLLOWER_START_OF_DAY_MINUTE = 1;\n431: const THREADS_INSIGHTS_TARGET_HOURS = new Set([0, 6, 12, 18]);\n432: const THREADS_INSIGHTS_TARGET_MINUTE = 0;\n433: const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;\n434: const MAX_THREADS_POST_CURSOR_DEPTH = 250;\n435: const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;\n436: const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;\n437: const WORKSPACE_APP_USER_ID = \"workspace-owner\";\n438: const SAVED_PATTERNS_APP_USER_ID = \"lensically\";\n439: const WORKSPACE_IS_ADMIN = true;\n440: const WORKSPACE_DEFAULT_TIMEZONE = \"America/New_York\";\n441: const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;\n442: const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;\n443: const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;\n444: const HERMES_DEFAULT_MODEL = \"gpt-5.5\";\n445: const HERMES_MAX_POST_COUNT = 50;\n446: const HERMES_CONTEXT_ARCHIVE_LIMIT = 48;\n447: const HERMES_CONTEXT_PATTERN_LIMIT = 48;\n448: const DASHBOARD_TIME_ZONE = \"America/New_York\";\n449: const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;\n450: const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;\n451: const DASHBOARD_WEAK_POST_VIEWS_THRESHOLD = 100;\n452: const DASHBOARD_WEAK_POST_VIEWS_HOURS = 6;\n453: const DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS = 3;\n454: const DASHBOARD_POST_PREVIEW_LENGTH = 140;\n455: const DASHBOARD_RECENT_POST_LIMIT = 250;\n456: const DASHBOARD_WINNING_TERM_LIMIT = 8;\n457: const DASHBOARD_WINNING_PHRASE_LIMIT = 5;\n458: const DASHBOARD_FATIGUE_WORD_LIMIT = 6;\n459: const DASHBOARD_STOP_WORDS = new Set([\n460:   \"a\", \"an\", \"and\", \"are\", \"as\", \"at\", \"be\", \"been\", \"but\", \"by\", \"for\", \"from\", \"had\", \"has\", \"have\",\n461:   \"he\", \"her\", \"his\", \"i\", \"if\", \"in\", \"into\", \"is\", \"it\", \"its\", \"me\", \"my\", \"of\", \"on\", \"or\", \"our\",\n462:   \"so\", \"that\", \"the\", \"their\", \"them\", \"there\", \"they\", \"this\", \"to\", \"was\", \"we\", \"were\", \"will\",\n463:   \"with\", \"you\", \"your\",\n464: ]);\n465: \r\n466: interface Env {\n467:   THREADS_CLIENT_ID: string;\n468:   THREADS_CLIENT_SECRET: string;\n469:   INTERNAL_API_KEY: string;\n470:   LENSICALLY_GPT_API_KEY?: string;\n471:   LENSICALLY_MCP_ACCESS_TOKEN?: string;"
+        }
+      ]
+    },
+    {
+      "cron": "0 */12 * * *",
+      "hits": [
+        {
+          "line": 424,
+          "context": "374:   upsertManifestSemanticSignature,\n375: } from \"./manifestIntelligenceEngine\";\n376: import {\n377:   buildManifestMeasurementAuditRead,\n378:     ensureManifestMeasurementAuditTables,\n379:   refreshManifestMeasurementAudit,\n380:   refreshManifestSavedPatternIntelligence,\n381:   type ManifestAuditSection,\n382: } from \"./manifestMeasurementAudit\";\n383: import {\n384:   buildManifestDecisionIntelligence,\n385:   buildManifestIntelligenceDashboard,\n386:   ensureManifestProductIntegrationTables,\n387:   recordManifestDecisionInfluence,\n388: } from \"./manifestProductIntegration\";\n389: import {\n390:   SOURCE_FAMILY_LABEL_POLICY_VERSION,\n391:   SOURCE_SELECTION_ENGINE_VERSION,\n392:     enrichSourceCandidatesForSelection,\n393:   ensureSourceFamilySelectionTables,\n394:                                 loadLockedSourceCardSelectionCandidates,\n395:   loadSourceLabelAllocationState,\n396:   normalizeSourceFamilyLifetimeLabel,\n397: \n398: \n399: \n400:     persistLockedSourceSelectionPlan,\n401: \n402:   readLockedSourceSelectionPlan,\n403: \n404:   refreshSourceFamilyLabels,\n405:   runSourceFamilySelectionEdgeCases,\n406:   selectSourceFamilyLineup,\n407:   validateLineupAgainstLockedSourceSelectionPlan,\n408: } from \"./sourceFamilySelection\";\n409: \n410: \n411: const DEFAULT_APP_URL = \"https://app.lensically.com\";\n412: const DEFAULT_ROOT_SITE_URL = \"https://lensically.com\";\n413: const DEFAULT_WORKER_ORIGIN = \"https://api.lensically.com\";\n414: const LOCAL_DEV_HOSTS = new Set([\"localhost\", \"127.0.0.1\"]);\n415: const SCHEDULED_POST_STATUS_APPROVED = \"approved\";\n416: const SCHEDULED_POST_STATUS_POSTING = \"posting\";\n417: const SCHEDULED_POST_STATUS_POSTED = \"posted\";\n418: const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;\n419: const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;\n420: const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 3 * 60 * 1000;\n421: const SCHEDULED_POST_PUBLISH_CRON = \"* * * * *\";\n422: const SCHEDULED_POST_ALARM_INTERVAL_MS = 60 * 1000;\n423: const SCHEDULED_POST_ALARM_OBJECT_NAME = \"scheduled-post-publisher\";\n424: const THREADS_TOKEN_REFRESH_CRON = \"0 */12 * * *\";\n425: const LEGACY_COMBINED_SCHEDULED_CRON = \"0 3 * * *\";\n426: const THREADS_FOLLOWER_START_OF_DAY_CRON = \"1 4,5 * * *\";\n427: const THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON = \"0 * * * *\";\n428: const THREADS_INSIGHTS_TIME_ZONE = \"America/New_York\";\n429: const THREADS_FOLLOWER_START_OF_DAY_HOUR = 0;\n430: const THREADS_FOLLOWER_START_OF_DAY_MINUTE = 1;\n431: const THREADS_INSIGHTS_TARGET_HOURS = new Set([0, 6, 12, 18]);\n432: const THREADS_INSIGHTS_TARGET_MINUTE = 0;\n433: const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;\n434: const MAX_THREADS_POST_CURSOR_DEPTH = 250;\n435: const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;\n436: const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;\n437: const WORKSPACE_APP_USER_ID = \"workspace-owner\";\n438: const SAVED_PATTERNS_APP_USER_ID = \"lensically\";\n439: const WORKSPACE_IS_ADMIN = true;\n440: const WORKSPACE_DEFAULT_TIMEZONE = \"America/New_York\";\n441: const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;\n442: const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;\n443: const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;\n444: const HERMES_DEFAULT_MODEL = \"gpt-5.5\";\n445: const HERMES_MAX_POST_COUNT = 50;\n446: const HERMES_CONTEXT_ARCHIVE_LIMIT = 48;\n447: const HERMES_CONTEXT_PATTERN_LIMIT = 48;\n448: const DASHBOARD_TIME_ZONE = \"America/New_York\";\n449: const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;\n450: const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;\n451: const DASHBOARD_WEAK_POST_VIEWS_THRESHOLD = 100;\n452: const DASHBOARD_WEAK_POST_VIEWS_HOURS = 6;\n453: const DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS = 3;\n454: const DASHBOARD_POST_PREVIEW_LENGTH = 140;\n455: const DASHBOARD_RECENT_POST_LIMIT = 250;\n456: const DASHBOARD_WINNING_TERM_LIMIT = 8;\n457: const DASHBOARD_WINNING_PHRASE_LIMIT = 5;\n458: const DASHBOARD_FATIGUE_WORD_LIMIT = 6;\n459: const DASHBOARD_STOP_WORDS = new Set([\n460:   \"a\", \"an\", \"and\", \"are\", \"as\", \"at\", \"be\", \"been\", \"but\", \"by\", \"for\", \"from\", \"had\", \"has\", \"have\",\n461:   \"he\", \"her\", \"his\", \"i\", \"if\", \"in\", \"into\", \"is\", \"it\", \"its\", \"me\", \"my\", \"of\", \"on\", \"or\", \"our\",\n462:   \"so\", \"that\", \"the\", \"their\", \"them\", \"there\", \"they\", \"this\", \"to\", \"was\", \"we\", \"were\", \"will\",\n463:   \"with\", \"you\", \"your\",\n464: ]);\n465: \r\n466: interface Env {\n467:   THREADS_CLIENT_ID: string;\n468:   THREADS_CLIENT_SECRET: string;\n469:   INTERNAL_API_KEY: string;\n470:   LENSICALLY_GPT_API_KEY?: string;\n471:   LENSICALLY_MCP_ACCESS_TOKEN?: string;\n472:   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;\n473:   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;\n474:   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;"
+        }
+      ]
+    },
+    {
+      "cron": "1 4,5 * * *",
+      "hits": [
+        {
+          "line": 426,
+          "context": "376: import {\n377:   buildManifestMeasurementAuditRead,\n378:     ensureManifestMeasurementAuditTables,\n379:   refreshManifestMeasurementAudit,\n380:   refreshManifestSavedPatternIntelligence,\n381:   type ManifestAuditSection,\n382: } from \"./manifestMeasurementAudit\";\n383: import {\n384:   buildManifestDecisionIntelligence,\n385:   buildManifestIntelligenceDashboard,\n386:   ensureManifestProductIntegrationTables,\n387:   recordManifestDecisionInfluence,\n388: } from \"./manifestProductIntegration\";\n389: import {\n390:   SOURCE_FAMILY_LABEL_POLICY_VERSION,\n391:   SOURCE_SELECTION_ENGINE_VERSION,\n392:     enrichSourceCandidatesForSelection,\n393:   ensureSourceFamilySelectionTables,\n394:                                 loadLockedSourceCardSelectionCandidates,\n395:   loadSourceLabelAllocationState,\n396:   normalizeSourceFamilyLifetimeLabel,\n397: \n398: \n399: \n400:     persistLockedSourceSelectionPlan,\n401: \n402:   readLockedSourceSelectionPlan,\n403: \n404:   refreshSourceFamilyLabels,\n405:   runSourceFamilySelectionEdgeCases,\n406:   selectSourceFamilyLineup,\n407:   validateLineupAgainstLockedSourceSelectionPlan,\n408: } from \"./sourceFamilySelection\";\n409: \n410: \n411: const DEFAULT_APP_URL = \"https://app.lensically.com\";\n412: const DEFAULT_ROOT_SITE_URL = \"https://lensically.com\";\n413: const DEFAULT_WORKER_ORIGIN = \"https://api.lensically.com\";\n414: const LOCAL_DEV_HOSTS = new Set([\"localhost\", \"127.0.0.1\"]);\n415: const SCHEDULED_POST_STATUS_APPROVED = \"approved\";\n416: const SCHEDULED_POST_STATUS_POSTING = \"posting\";\n417: const SCHEDULED_POST_STATUS_POSTED = \"posted\";\n418: const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;\n419: const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;\n420: const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 3 * 60 * 1000;\n421: const SCHEDULED_POST_PUBLISH_CRON = \"* * * * *\";\n422: const SCHEDULED_POST_ALARM_INTERVAL_MS = 60 * 1000;\n423: const SCHEDULED_POST_ALARM_OBJECT_NAME = \"scheduled-post-publisher\";\n424: const THREADS_TOKEN_REFRESH_CRON = \"0 */12 * * *\";\n425: const LEGACY_COMBINED_SCHEDULED_CRON = \"0 3 * * *\";\n426: const THREADS_FOLLOWER_START_OF_DAY_CRON = \"1 4,5 * * *\";\n427: const THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON = \"0 * * * *\";\n428: const THREADS_INSIGHTS_TIME_ZONE = \"America/New_York\";\n429: const THREADS_FOLLOWER_START_OF_DAY_HOUR = 0;\n430: const THREADS_FOLLOWER_START_OF_DAY_MINUTE = 1;\n431: const THREADS_INSIGHTS_TARGET_HOURS = new Set([0, 6, 12, 18]);\n432: const THREADS_INSIGHTS_TARGET_MINUTE = 0;\n433: const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;\n434: const MAX_THREADS_POST_CURSOR_DEPTH = 250;\n435: const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;\n436: const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;\n437: const WORKSPACE_APP_USER_ID = \"workspace-owner\";\n438: const SAVED_PATTERNS_APP_USER_ID = \"lensically\";\n439: const WORKSPACE_IS_ADMIN = true;\n440: const WORKSPACE_DEFAULT_TIMEZONE = \"America/New_York\";\n441: const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;\n442: const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;\n443: const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;\n444: const HERMES_DEFAULT_MODEL = \"gpt-5.5\";\n445: const HERMES_MAX_POST_COUNT = 50;\n446: const HERMES_CONTEXT_ARCHIVE_LIMIT = 48;\n447: const HERMES_CONTEXT_PATTERN_LIMIT = 48;\n448: const DASHBOARD_TIME_ZONE = \"America/New_York\";\n449: const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;\n450: const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;\n451: const DASHBOARD_WEAK_POST_VIEWS_THRESHOLD = 100;\n452: const DASHBOARD_WEAK_POST_VIEWS_HOURS = 6;\n453: const DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS = 3;\n454: const DASHBOARD_POST_PREVIEW_LENGTH = 140;\n455: const DASHBOARD_RECENT_POST_LIMIT = 250;\n456: const DASHBOARD_WINNING_TERM_LIMIT = 8;\n457: const DASHBOARD_WINNING_PHRASE_LIMIT = 5;\n458: const DASHBOARD_FATIGUE_WORD_LIMIT = 6;\n459: const DASHBOARD_STOP_WORDS = new Set([\n460:   \"a\", \"an\", \"and\", \"are\", \"as\", \"at\", \"be\", \"been\", \"but\", \"by\", \"for\", \"from\", \"had\", \"has\", \"have\",\n461:   \"he\", \"her\", \"his\", \"i\", \"if\", \"in\", \"into\", \"is\", \"it\", \"its\", \"me\", \"my\", \"of\", \"on\", \"or\", \"our\",\n462:   \"so\", \"that\", \"the\", \"their\", \"them\", \"there\", \"they\", \"this\", \"to\", \"was\", \"we\", \"were\", \"will\",\n463:   \"with\", \"you\", \"your\",\n464: ]);\n465: \r\n466: interface Env {\n467:   THREADS_CLIENT_ID: string;\n468:   THREADS_CLIENT_SECRET: string;\n469:   INTERNAL_API_KEY: string;\n470:   LENSICALLY_GPT_API_KEY?: string;\n471:   LENSICALLY_MCP_ACCESS_TOKEN?: string;\n472:   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;\n473:   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;\n474:   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;\n475:     LENSICALLY_COMMIT_SHA?: string;\n476:   LENSICALLY_STRIPE_KEY?: string;"
+        }
+      ]
+    },
+    {
+      "cron": "0 * * * *",
+      "hits": [
+        {
+          "line": 427,
+          "context": "377:   buildManifestMeasurementAuditRead,\n378:     ensureManifestMeasurementAuditTables,\n379:   refreshManifestMeasurementAudit,\n380:   refreshManifestSavedPatternIntelligence,\n381:   type ManifestAuditSection,\n382: } from \"./manifestMeasurementAudit\";\n383: import {\n384:   buildManifestDecisionIntelligence,\n385:   buildManifestIntelligenceDashboard,\n386:   ensureManifestProductIntegrationTables,\n387:   recordManifestDecisionInfluence,\n388: } from \"./manifestProductIntegration\";\n389: import {\n390:   SOURCE_FAMILY_LABEL_POLICY_VERSION,\n391:   SOURCE_SELECTION_ENGINE_VERSION,\n392:     enrichSourceCandidatesForSelection,\n393:   ensureSourceFamilySelectionTables,\n394:                                 loadLockedSourceCardSelectionCandidates,\n395:   loadSourceLabelAllocationState,\n396:   normalizeSourceFamilyLifetimeLabel,\n397: \n398: \n399: \n400:     persistLockedSourceSelectionPlan,\n401: \n402:   readLockedSourceSelectionPlan,\n403: \n404:   refreshSourceFamilyLabels,\n405:   runSourceFamilySelectionEdgeCases,\n406:   selectSourceFamilyLineup,\n407:   validateLineupAgainstLockedSourceSelectionPlan,\n408: } from \"./sourceFamilySelection\";\n409: \n410: \n411: const DEFAULT_APP_URL = \"https://app.lensically.com\";\n412: const DEFAULT_ROOT_SITE_URL = \"https://lensically.com\";\n413: const DEFAULT_WORKER_ORIGIN = \"https://api.lensically.com\";\n414: const LOCAL_DEV_HOSTS = new Set([\"localhost\", \"127.0.0.1\"]);\n415: const SCHEDULED_POST_STATUS_APPROVED = \"approved\";\n416: const SCHEDULED_POST_STATUS_POSTING = \"posting\";\n417: const SCHEDULED_POST_STATUS_POSTED = \"posted\";\n418: const DEFAULT_SCHEDULED_POST_MAX_BATCH_SIZE = 25;\n419: const MAX_SCHEDULED_POST_MAX_BATCH_SIZE = 100;\n420: const SCHEDULED_POST_STALE_POSTING_WINDOW_MS = 3 * 60 * 1000;\n421: const SCHEDULED_POST_PUBLISH_CRON = \"* * * * *\";\n422: const SCHEDULED_POST_ALARM_INTERVAL_MS = 60 * 1000;\n423: const SCHEDULED_POST_ALARM_OBJECT_NAME = \"scheduled-post-publisher\";\n424: const THREADS_TOKEN_REFRESH_CRON = \"0 */12 * * *\";\n425: const LEGACY_COMBINED_SCHEDULED_CRON = \"0 3 * * *\";\n426: const THREADS_FOLLOWER_START_OF_DAY_CRON = \"1 4,5 * * *\";\n427: const THREADS_INSIGHTS_SIX_HOUR_WINDOW_CRON = \"0 * * * *\";\n428: const THREADS_INSIGHTS_TIME_ZONE = \"America/New_York\";\n429: const THREADS_FOLLOWER_START_OF_DAY_HOUR = 0;\n430: const THREADS_FOLLOWER_START_OF_DAY_MINUTE = 1;\n431: const THREADS_INSIGHTS_TARGET_HOURS = new Set([0, 6, 12, 18]);\n432: const THREADS_INSIGHTS_TARGET_MINUTE = 0;\n433: const THREADS_INSIGHTS_CACHE_MAX_AGE_HOURS = 30;\n434: const MAX_THREADS_POST_CURSOR_DEPTH = 250;\n435: const IMMEDIATE_PUBLISH_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;\n436: const THREADS_CONNECTION_TOMBSTONE_WINDOW_MS = 24 * 60 * 60 * 1000;\n437: const WORKSPACE_APP_USER_ID = \"workspace-owner\";\n438: const SAVED_PATTERNS_APP_USER_ID = \"lensically\";\n439: const WORKSPACE_IS_ADMIN = true;\n440: const WORKSPACE_DEFAULT_TIMEZONE = \"America/New_York\";\n441: const MAX_BATCH_SCHEDULE_PRESET_NAME_LENGTH = 80;\n442: const MAX_BATCH_SCHEDULE_PRESET_COUNT = 50;\n443: const MAX_BATCH_SCHEDULE_PRESET_SLOTS = 50;\n444: const HERMES_DEFAULT_MODEL = \"gpt-5.5\";\n445: const HERMES_MAX_POST_COUNT = 50;\n446: const HERMES_CONTEXT_ARCHIVE_LIMIT = 48;\n447: const HERMES_CONTEXT_PATTERN_LIMIT = 48;\n448: const DASHBOARD_TIME_ZONE = \"America/New_York\";\n449: const DASHBOARD_FOLLOWER_SNAPSHOT_RETENTION_DAYS = 45;\n450: const DASHBOARD_HIT_RATE_LIKES_THRESHOLD = 30;\n451: const DASHBOARD_WEAK_POST_VIEWS_THRESHOLD = 100;\n452: const DASHBOARD_WEAK_POST_VIEWS_HOURS = 6;\n453: const DASHBOARD_WEAK_POST_ZERO_LIKES_HOURS = 3;\n454: const DASHBOARD_POST_PREVIEW_LENGTH = 140;\n455: const DASHBOARD_RECENT_POST_LIMIT = 250;\n456: const DASHBOARD_WINNING_TERM_LIMIT = 8;\n457: const DASHBOARD_WINNING_PHRASE_LIMIT = 5;\n458: const DASHBOARD_FATIGUE_WORD_LIMIT = 6;\n459: const DASHBOARD_STOP_WORDS = new Set([\n460:   \"a\", \"an\", \"and\", \"are\", \"as\", \"at\", \"be\", \"been\", \"but\", \"by\", \"for\", \"from\", \"had\", \"has\", \"have\",\n461:   \"he\", \"her\", \"his\", \"i\", \"if\", \"in\", \"into\", \"is\", \"it\", \"its\", \"me\", \"my\", \"of\", \"on\", \"or\", \"our\",\n462:   \"so\", \"that\", \"the\", \"their\", \"them\", \"there\", \"they\", \"this\", \"to\", \"was\", \"we\", \"were\", \"will\",\n463:   \"with\", \"you\", \"your\",\n464: ]);\n465: \r\n466: interface Env {\n467:   THREADS_CLIENT_ID: string;\n468:   THREADS_CLIENT_SECRET: string;\n469:   INTERNAL_API_KEY: string;\n470:   LENSICALLY_GPT_API_KEY?: string;\n471:   LENSICALLY_MCP_ACCESS_TOKEN?: string;\n472:   LENSICALLY_MCP_OAUTH_CLIENT_ID?: string;\n473:   LENSICALLY_MCP_OAUTH_CLIENT_SECRET?: string;\n474:   LENSICALLY_MCP_OAUTH_REDIRECT_URI?: string;\n475:     LENSICALLY_COMMIT_SHA?: string;\n476:   LENSICALLY_STRIPE_KEY?: string;\n477:   CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };"
+        }
+      ]
+    }
+  ]
+}
