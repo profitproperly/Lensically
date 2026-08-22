@@ -1,66 +1,16 @@
-name: Lensically Recovery
-run-name: Lensically Recovery · ${{ github.sha }}
+name: Lensically Recovery RETIRED
+run-name: Lensically Recovery RETIRED · ${{ github.sha }}
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "lensically-recovery-worker/**"
-      - ".github/workflows/lensically-recovery.yml"
   workflow_dispatch:
-
-concurrency:
-  group: lensically-recovery-main
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  validate-and-deploy:
+  retired:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: lensically-recovery-worker
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: lensically-recovery-worker/package-lock.json
-
-      - name: Restore recovery dependencies
-        id: recovery-cache
-        uses: actions/cache@v4
-        with:
-          path: lensically-recovery-worker/node_modules
-          key: ${{ runner.os }}-node22-recovery-${{ hashFiles('lensically-recovery-worker/package-lock.json') }}
-
-      - name: Install recovery dependencies
-        if: ${{ steps.recovery-cache.outputs.cache-hit != 'true' }}
-        run: npm ci
-
-      - name: Typecheck Recovery
-        run: npx tsc --noEmit
-
-      - name: Test Recovery workflow dispatch contract
-        run: node scripts/test-workflow-dispatch-contract.mjs
-
-      - name: Test Recovery search fallback contract
-        run: node scripts/test-search-fallback-contract.mjs
-
-      - name: Test Recovery GitHub retry contract
-        run: node scripts/test-github-retry-contract.mjs
-
-      - name: Deploy Recovery
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config wrangler.jsonc --var "LENSICALLY_COMMIT_SHA:${{ github.sha }}"
-
-      - name: Live smoke Recovery and Main lifecycle
-        run: node scripts/live-smoke.mjs
+      - name: Recovery MCP retired
+        run: |
+          echo "Lensically Recovery is retired. Lensically v2 owns normal recovery; MCP Controller is the fleet break-glass lane."
