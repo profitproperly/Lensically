@@ -1,0 +1,29 @@
+name: Build v2 Retirement Inventory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "V2_RETIREMENT_INVENTORY_APPLY.md"
+
+permissions:
+  contents: write
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build route and cron inventory
+        run: node scripts/build-v2-retirement-inventory.mjs
+      - name: Commit migration evidence
+        shell: bash
+        run: |
+          git config user.name "lensically-v2-retirement-inventory"
+          git config user.email "actions@users.noreply.github.com"
+          git add V2_RETIREMENT_INVENTORY.json V2_RETIREMENT_EXTRACT.md
+          git commit -m "Generate v2 zero-legacy retirement inventory"
+          git push
